@@ -57,6 +57,44 @@ Tool > RUN discovery_agent -> web_search | pearl crypto project
 +--------------------------------------------------------------------------------+
 ```
 
+## GitHub Agent Onboarding Benchmark
+
+이 섹션은 다른 agent/company 계열 GitHub 프로젝트들이 "처음 설치하고 어떻게 시작하는지", "사용자가 어디에 말을 걸고", "작업 로그를 어떻게 보여주는지"를 JIMMORIA 관점으로 정리한 기준이다.
+
+| Project | First install/start pattern | Conversation direction | JIMMORIA decision |
+|---|---|---|---|
+| [Aider](https://github.com/Aider-AI/aider) / [install docs](https://aider.chat/docs/install.html) | 설치 후 프로젝트 폴더 안에서 바로 `aider`를 실행하고, 같은 터미널 세션에서 파일과 대화한다. | 사용자가 계속 한 채팅창에 요청하고, 도구/변경은 채팅 로그 위로 올라간다. | `jimmoria` 단일 명령으로 HQ에 들어오게 하고, 입력창은 항상 Supervisor 채널로 유지한다. |
+| [OpenHands CLI](https://docs.openhands.dev/openhands/usage/cli/quick-start) | CLI quick start가 task 입력, LLM 설정, 실행 모드를 분리한다. | 대화형 CLI, headless, web/server 같은 실행 모드가 분리되어 있다. | 지금은 CLI-first로 두되, 나중에 `jimmoria web`/visual replay가 붙을 수 있도록 `events.json`과 session artifact를 계속 표준화한다. |
+| [Goose](https://github.com/block/goose) | 설치 후 `goose`로 세션을 열고, provider/extension/tool 상태를 명령으로 관리한다. | 대화는 짧게 유지하고 tool call/log/session은 별도 저장소와 diagnostics로 뺀다. | 화면에는 compact stream만 보이고, 자세한 agent/tool log는 `data/runs/<room_id>`와 `/events`, `/messages`에서 확인한다. |
+| [Hermes Agent](https://hermes-agent.nousresearch.com/docs/getting-started/installation) | installer, device login, gateway, tools, cron, profiles 같은 운영 명령이 분리되어 있다. | 일반 대화와 운영 명령이 공존하지만, 운영 상태는 별도 명령으로 확인한다. | `jimmoria tools`, `cron`, `profile`, `playbook`, `sessions`, `doctor`처럼 회사 운영 명령을 분리한다. |
+| [crewAI](https://github.com/crewAIInc/crewAI) / [quickstart](https://docs.crewai.com/quickstart) | `crewai create crew`로 프로젝트를 만들고 agents/tasks YAML을 채운 뒤 `crewai run`으로 실행한다. | 대화형 assistant라기보다 crew/task 실행 프레임워크다. | 에이전트 내부는 유지하고, Research Room의 goals/tasks/expected outputs만 `config/processes/*.yaml`로 분리한다. |
+| [ChatDev](https://github.com/OpenBMB/ChatDev) | 자연어 요구사항을 software company workflow와 visual process로 전개한다. | 사용자는 회사에 일을 맡기고, 내부 role/phase가 순차적으로 움직인다. | 사용자는 Supervisor에게 외주를 주고, Supervisor가 Research Room을 열지 직접 대답할지 먼저 판단한다. |
+| [MetaGPT](https://github.com/FoundationAgents/MetaGPT) | 한 줄 requirement에서 PM/architect/engineer/reviewer 같은 role workflow를 만든다. | 회사 SOP처럼 요구사항을 role별 산출물로 분해한다. | 리서치 요청은 10개 agent room으로 분해하지만, 잡담/설정/상태 질문은 room을 열지 않는다. |
+
+## Borrowed UX Rules
+
+JIMMORIA에 적용할 기준은 다음이다.
+
+- First run: 사용자는 `jimmoria`만 치면 된다. 설치 안내는 README에 짧게 두고, 첫 화면은 큰 로고와 Supervisor 채팅이다.
+- First setup: provider가 없을 때만 모델 설정을 묻는다. 이미 Codex CLI login이 있으면 설정 화면을 건너뛴다.
+- Conversation first: 일반 입력은 먼저 Supervisor와 대화한다. Supervisor가 Research Room 필요 여부를 판단한다.
+- Confirmation before run: 명확한 연구 작업이라도 Supervisor가 짧게 확인한 뒤 room을 연다. 사용자가 취소하면 run/report artifact를 만들지 않는다.
+- Stable input dock: 입력창은 하단 dock처럼 계속 유지되어야 한다. 로그가 올라와도 사용자는 "회사와 대화 중"이라는 감각을 잃지 않아야 한다.
+- Compact logs: 실시간 로그는 `Room >`, `Agent >`, `Tool >`, `Output >` 한 줄 stream을 기본값으로 둔다.
+- Deep logs elsewhere: 자세한 board, message, event, tool audit은 `/board`, `/messages`, `/events`, `data/runs/<room_id>`로 보낸다.
+- Report is not default: 모든 입력을 보고서로 만들지 않는다. report/research/analyze/dossier처럼 명확한 요청일 때만 보고서를 만든다.
+- External tools are visible: connector가 없거나 실패하면 조용히 넘어가지 않고, `unconfigured`, `missing evidence`, `insufficient_evidence`를 명확히 표시한다.
+- Visual future: CLI event stream은 나중에 ChatDev-style workflow canvas나 web visualizer가 replay할 수 있는 구조로 유지한다.
+
+## Next Onboarding Work
+
+- `jimmoria init`: 첫 설치 후 provider, output language, vault path, preferred workflow를 한 번에 잡는 wizard.
+- `jimmoria login`: Codex CLI login 상태를 확인하고 device login 안내를 보여주는 전용 명령.
+- `jimmoria doctor --fix`: missing optional dependency나 connector 설정을 가능한 범위에서 안내.
+- `jimmoria resume <room_id>`: 이전 Research Room을 다시 열어 Supervisor와 후속 대화.
+- `jimmoria --task "<request>"`: OpenHands/MetaGPT처럼 headless one-shot run.
+- `jimmoria tui`: 지금 line CLI를 유지하되, 나중에 full-screen bottom-docked input 모드 추가.
+
 ## Future UI Backlog
 
 - Full-screen TUI mode: bottom-fixed input, scrollback pane, right-side agent board.

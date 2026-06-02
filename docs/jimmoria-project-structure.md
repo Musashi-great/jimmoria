@@ -1270,3 +1270,38 @@ test_doctor_reports_missing_connector
 test_safety_gate_blocks_investment_advice
 test_report_requires_citations_or_unverified_label
 ```
+
+## 28. External CLI / Agent Onboarding Benchmark
+
+JIMMORIA의 대화형 CLI 방향은 다른 agent/company 계열 GitHub 프로젝트의 first-run 패턴을 참고한다. 자세한 비교표는 [jimmoria-cli-ui-reference-notes.md](jimmoria-cli-ui-reference-notes.md)에 정리한다.
+
+핵심 결론은 다음이다.
+
+- [Aider](https://github.com/Aider-AI/aider): 프로젝트 폴더에서 바로 대화형 agent를 시작한다. JIMMORIA도 `jimmoria` 단일 명령으로 Supervisor 채널에 들어와야 한다.
+- [OpenHands CLI](https://docs.openhands.dev/openhands/usage/cli/quick-start): CLI, headless, web/server 실행 모드를 분리한다. JIMMORIA도 CLI-first를 유지하되 `events.json` 기반 web visualizer로 확장할 수 있어야 한다.
+- [Goose](https://github.com/block/goose): 대화는 짧게 유지하고 session/tool diagnostics를 별도 저장한다. JIMMORIA도 화면에는 compact stream을, 자세한 기록은 `data/runs/<room_id>`에 둔다.
+- [Hermes Agent](https://hermes-agent.nousresearch.com/docs/getting-started/installation): installer, login, tools, cron, profiles를 운영 명령으로 분리한다. JIMMORIA도 `tools`, `cron`, `profile`, `playbook`, `sessions`, `doctor` 명령을 유지한다.
+- [crewAI](https://github.com/crewAIInc/crewAI): agents/tasks/process를 YAML로 분리한다. JIMMORIA는 에이전트 구현을 유지하고 Research Room process만 `config/processes/*.yaml`로 분리한다.
+- [ChatDev](https://github.com/OpenBMB/ChatDev)와 [MetaGPT](https://github.com/FoundationAgents/MetaGPT): 사용자의 한 문장을 회사 workflow로 전개한다. JIMMORIA는 리서치 요청일 때만 Research Room을 열고, 일반 대화/설정/상태 확인은 Supervisor가 직접 처리한다.
+
+이 기준 때문에 JIMMORIA의 일반 입력 흐름은 다음 순서를 따른다.
+
+```text
+ User enters one message
+ + Supervisor reads and replies first
+ + Supervisor decides: chat, settings, status, report retrieval, source ingest, or research room
+ + If research room is needed, ask for confirmation where appropriate
+ + Stream compact agent/tool/output logs above the persistent input dock
+ + Save deep logs and artifacts under data/runs/<room_id>
+```
+
+앞으로 설치/시작 UX는 다음 명령으로 수렴한다.
+
+```powershell
+jimmoria                 # enter Supervisor chat
+jimmoria init            # planned first-run setup wizard
+jimmoria login           # planned provider login helper
+jimmoria --task "..."    # planned headless one-shot request
+jimmoria resume <room>   # planned resume previous room
+jimmoria tui             # planned full-screen terminal UI
+```
