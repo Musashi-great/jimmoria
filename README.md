@@ -2,6 +2,12 @@
 
 Controlled P2P multi-agent MVP for a crypto research-only company.
 
+JIMMORIA is meant to feel like a research company you can chat with from the
+terminal. You type a research request, then the Supervisor opens a room and the
+specialized agents work in public: ingestion, narrative mapping, discovery,
+social/KOL checks, contract/on-chain checks, product/docs checks, funding/token
+checks, report writing, and Obsidian sync.
+
 The first loop supports:
 
 ```text
@@ -25,6 +31,8 @@ python -m crypto_research_agents.cli demo
 Start the interactive research console:
 
 ```powershell
+jimmoria
+jimmoria hq
 jimmoria chat
 python -m crypto_research_agents.cli chat
 ```
@@ -51,7 +59,9 @@ Type any research question/source text to open a Research Room.
 /runs                    Show previous runs
 /status [room_id]        Show latest or selected room status
 /messages [room_id]      Show collaboration history
+/events [room_id]        Show saved UI/replay events
 /report [room_id]        Print saved report
+/last                    Show the latest run card
 /help                    Show help
 /quit                    Exit
 ```
@@ -81,6 +91,7 @@ python -m crypto_research_agents.cli runs
 python -m crypto_research_agents.cli doctor
 python -m crypto_research_agents.cli status <room_id>
 python -m crypto_research_agents.cli messages <room_id> --limit 10
+python -m crypto_research_agents.cli events <room_id> --limit 30
 python -m crypto_research_agents.cli show-report <room_id>
 ```
 
@@ -148,8 +159,12 @@ reports/                 Markdown research reports
 vault/                   Obsidian-style notes
 data/memory.json         MVP shared memory snapshot
 data/runs/<room_id>/     room.json, messages.json, tool_audit_log.json
-                         llm_call_log.json
+                         llm_call_log.json, events.json
 ```
+
+`events.json` is the visual-ready event stream for replaying how the company
+worked on a request. A future terminal dashboard or web UI can render this file
+as an agent timeline, graph, or room view.
 
 The executable spec lives in:
 

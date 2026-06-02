@@ -62,6 +62,7 @@ class ResearchRuntime:
         self.model_gateway = ModelGateway()
         self.agent_specs = AgentSpecRegistry.load_dir(agent_spec_dir)
         self.tool_gateway = ToolGateway(default_policy(self.agent_specs))
+        self.event_log: list[dict[str, Any]] = []
         self.agents = {
             "supervisor_agent": SupervisorAgent(model_gateway=self.model_gateway, tool_gateway=self.tool_gateway, spec=self.agent_specs.get("supervisor_agent")),
             "ingestion_agent": IngestionAgent(model_gateway=self.model_gateway, tool_gateway=self.tool_gateway, spec=self.agent_specs.get("ingestion_agent")),
@@ -138,6 +139,7 @@ class ResearchRuntime:
                 bus=self.bus,
                 audit_log=self.tool_gateway.audit_log,
                 llm_call_log=self.model_gateway.call_log,
+                event_log=self.event_log,
                 root_dir=Path(memory_path).parent / "runs",
             )
         return ResearchRunResult(room=room, memory=self.memory, bus=self.bus)
@@ -196,6 +198,7 @@ class ResearchRuntime:
                 bus=self.bus,
                 audit_log=self.tool_gateway.audit_log,
                 llm_call_log=self.model_gateway.call_log,
+                event_log=self.event_log,
                 root_dir=Path(memory_path).parent / "runs",
             )
         return ResearchRunResult(room=room, memory=self.memory, bus=self.bus)
@@ -224,8 +227,10 @@ class ResearchRuntime:
         )
 
     def _emit(self, event_type: str, **payload: Any) -> None:
+        event = {"type": event_type, **payload}
+        self.event_log.append(event)
         if self.event_handler is not None:
-            self.event_handler({"type": event_type, **payload})
+            self.event_handler(event)
 
 
 def default_policy(agent_specs: AgentSpecRegistry | None = None) -> PolicyEngine:

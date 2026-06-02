@@ -9,6 +9,7 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 from crypto_research_agents import APP_NAME, __version__
+from crypto_research_agents.console import JimmoriaConsole
 from crypto_research_agents.runtime import ResearchRuntime
 from crypto_research_agents.runtime import DEFAULT_AGENTS
 from crypto_research_agents.core.capabilities import collect_capabilities
@@ -39,6 +40,14 @@ def main(argv: list[str] | None = None) -> None:
         help="Skip the startup model setup panel.",
     )
 
+    hq_parser = subparsers.add_parser("hq", help="Alias for the chat-like JIMMORIA HQ console.")
+    add_run_args(hq_parser)
+    hq_parser.add_argument(
+        "--skip-model-setup",
+        action="store_true",
+        help="Skip the startup model setup panel.",
+    )
+
     research_parser = subparsers.add_parser("research", help="Run the full article/project research loop.")
     add_source_args(research_parser, title_required=False)
     add_run_args(research_parser)
@@ -63,6 +72,11 @@ def main(argv: list[str] | None = None) -> None:
     messages_parser.add_argument("--limit", type=int, default=20)
     add_inspect_args(messages_parser)
 
+    events_parser = subparsers.add_parser("events", help="Show UI/replay events for a run.")
+    events_parser.add_argument("room_id")
+    events_parser.add_argument("--limit", type=int, default=30)
+    add_inspect_args(events_parser)
+
     report_parser = subparsers.add_parser("show-report", help="Print the saved report markdown for a run.")
     report_parser.add_argument("room_id")
     add_inspect_args(report_parser)
@@ -72,6 +86,9 @@ def main(argv: list[str] | None = None) -> None:
 
     args = parser.parse_args(argv)
     if args.command is None:
+        if sys.stdin.isatty():
+            chat_command(default_chat_args())
+            return
         parser.print_help()
         return
 
@@ -79,11 +96,11 @@ def main(argv: list[str] | None = None) -> None:
         doctor_command(args)
         return
 
-    if args.command in {"runs", "status", "messages", "show-report"}:
+    if args.command in {"runs", "status", "messages", "events", "show-report"}:
         inspect_command(args)
         return
 
-    if args.command == "chat":
+    if args.command in {"chat", "hq"}:
         chat_command(args)
         return
 
@@ -126,6 +143,16 @@ def add_run_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--vault", default="vault", help="Obsidian-style vault output directory.")
     parser.add_argument("--reports", default="reports", help="Report output directory.")
     parser.add_argument("--memory", default="data/memory.json", help="Shared memory JSON path.")
+
+
+def default_chat_args() -> argparse.Namespace:
+    return argparse.Namespace(
+        command="chat",
+        vault="vault",
+        reports="reports",
+        memory="data/memory.json",
+        skip_model_setup=False,
+    )
 
 
 def add_inspect_args(parser: argparse.ArgumentParser) -> None:
@@ -202,6 +229,18 @@ def inspect_command(args: argparse.Namespace) -> None:
             )
         return
 
+    if args.command == "events":
+        events = load_run_file(args.room_id, "events.json", args.runs_dir)
+        assert isinstance(events, list)
+        for event in events[: args.limit]:
+            event_type = event.get("type", "")
+            agent_id = event.get("agent_id", "")
+            room_id = event.get("room_id", "")
+            topic = event.get("topic", "")
+            summary = event.get("summary", "")
+            print(f"{event_type} | room={room_id} | agent={agent_id} | topic={topic} | {summary}")
+        return
+
     if args.command == "show-report":
         room = load_run_file(args.room_id, "room.json", args.runs_dir)
         report_path = room.get("output_paths", {}).get("report")
@@ -214,10 +253,14 @@ def inspect_command(args: argparse.Namespace) -> None:
 
 
 def chat_command(args: argparse.Namespace) -> None:
-    print_banner()
+    console = JimmoriaConsole(
+        memory_path=args.memory,
+        runs_dir=Path(args.memory).parent / "runs",
+    )
+    console.print_intro()
     if not args.skip_model_setup and sys.stdin.isatty():
         configure_model_panel()
-    print_chat_help()
+    console.print_help()
     last_room_id = ""
 
     while True:
@@ -231,14 +274,15 @@ def chat_command(args: argparse.Namespace) -> None:
             continue
 
         if line.startswith("/"):
-            should_quit, last_room_id = handle_chat_command(line, args, last_room_id)
+            should_quit, last_room_id = handle_chat_command(line, args, last_room_id, console)
             if should_quit:
                 return
             continue
 
+        console.print_user_message(line)
         title, content, url = chat_input_to_source(line)
         runtime = ResearchRuntime(load_memory(args.memory))
-        runtime.event_handler = make_event_printer()
+        runtime.event_handler = console.make_event_handler()
         result = runtime.run_article_research(
             title=title,
             content=content,
@@ -248,10 +292,16 @@ def chat_command(args: argparse.Namespace) -> None:
             memory_path=args.memory,
         )
         last_room_id = result.room.room_id
-        print_run_result(result)
+        console.last_room_id = last_room_id
+        console.print_run_summary(result)
 
 
-def handle_chat_command(line: str, args: argparse.Namespace, last_room_id: str) -> tuple[bool, str]:
+def handle_chat_command(
+    line: str,
+    args: argparse.Namespace,
+    last_room_id: str,
+    console: JimmoriaConsole,
+) -> tuple[bool, str]:
     command, _, rest = line.partition(" ")
     command = command.lower()
     rest = rest.strip()
@@ -261,15 +311,23 @@ def handle_chat_command(line: str, args: argparse.Namespace, last_room_id: str) 
         return True, last_room_id
 
     if command == "/help":
-        print_chat_help()
+        console.print_help()
         return False, last_room_id
 
     if command == "/models":
         configure_model_panel()
         return False, last_room_id
 
-    if command == "/agents":
-        print_agent_table()
+    if command in {"/agents", "/company"}:
+        console.print_company(active_only=False)
+        return False, last_room_id
+
+    if command == "/context":
+        console.print_context()
+        return False, last_room_id
+
+    if command == "/last":
+        console.print_latest_run_card(rest or None)
         return False, last_room_id
 
     if command == "/doctor":
@@ -300,6 +358,20 @@ def handle_chat_command(line: str, args: argparse.Namespace, last_room_id: str) 
         print_message_rows(messages, limit=20)
         return False, room_id
 
+    if command == "/events":
+        room_id = rest or last_room_id
+        if not room_id:
+            print("No room_id yet. Run a query first or pass /events <room_id>.")
+            return False, last_room_id
+        events = load_run_file(room_id, "events.json", Path(args.memory).parent / "runs")
+        assert isinstance(events, list)
+        for event in events[:30]:
+            print(
+                f"{event.get('type')} | room={event.get('room_id', '')} | "
+                f"agent={event.get('agent_id', '')} | {event.get('summary', '')}"
+            )
+        return False, room_id
+
     if command == "/report":
         room_id = rest or last_room_id
         if not room_id:
@@ -319,7 +391,8 @@ def handle_chat_command(line: str, args: argparse.Namespace, last_room_id: str) 
             return False, last_room_id
         title, content, url = chat_input_to_source(rest)
         runtime = ResearchRuntime(load_memory(args.memory))
-        runtime.event_handler = make_event_printer()
+        console.print_user_message(rest)
+        runtime.event_handler = console.make_event_handler()
         result = runtime.run_source_ingestion(
             title=title,
             content=content,
@@ -328,7 +401,8 @@ def handle_chat_command(line: str, args: argparse.Namespace, last_room_id: str) 
             memory_path=args.memory,
         )
         last_room_id = result.room.room_id
-        print_run_result(result)
+        console.last_room_id = last_room_id
+        console.print_run_summary(result)
         return False, last_room_id
 
     print("Unknown command. Type /help.")
@@ -343,30 +417,11 @@ def chat_input_to_source(line: str) -> tuple[str, str, str | None]:
 
 
 def print_banner() -> None:
-    print("")
-    print("=" * 72)
-    print(f" {APP_NAME} v{__version__}")
-    print(" Multi-agent crypto research company")
-    print(" Controlled P2P: Supervisor + Agent Bus + Shared Memory + Obsidian")
-    print("=" * 72)
-    print_agent_table(active_only=True)
+    JimmoriaConsole().print_intro()
 
 
 def print_chat_help() -> None:
-    print("")
-    print("Type a research question/source text to start a Research Room.")
-    print("")
-    print("Commands:")
-    print("  /add <text-or-url>       Ingest source only")
-    print("  /models                  Configure LLM provider/models")
-    print("  /doctor                  Show configured vs placeholder capabilities")
-    print("  /agents                  Show enabled agents")
-    print("  /runs                    Show previous runs")
-    print("  /status [room_id]        Show latest or selected room status")
-    print("  /messages [room_id]      Show collaboration history")
-    print("  /report [room_id]        Print saved report")
-    print("  /help                    Show this help")
-    print("  /quit                    Exit")
+    JimmoriaConsole().print_help()
 
 
 def print_agent_bar(agent_ids: list[str]) -> None:

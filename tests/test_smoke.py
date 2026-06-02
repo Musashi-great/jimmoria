@@ -40,7 +40,11 @@ class SmokeTest(unittest.TestCase):
             self.assertTrue(Path(result.room.output_paths["report"]).exists())
             self.assertTrue((root / "vault" / "50_Reports" / "AI-Wallet-Automation.md").exists())
             self.assertTrue((root / "runs" / result.room.room_id / "messages.json").exists())
+            self.assertTrue((root / "runs" / result.room.room_id / "events.json").exists())
             self.assertTrue((root / "runs" / result.room.room_id / "llm_call_log.json").exists())
+            events = json.loads((root / "runs" / result.room.room_id / "events.json").read_text(encoding="utf-8"))
+            self.assertGreaterEqual(len(events), 10)
+            self.assertEqual(events[0]["type"], "room_created")
             self.assertGreaterEqual(len(runtime.model_gateway.call_log), 3)
             self.assertGreaterEqual(len(result.bus.messages), 8)
             self.assertGreaterEqual(len(result.memory.get_room_findings(result.room.room_id)), 8)
@@ -91,6 +95,26 @@ class SmokeTest(unittest.TestCase):
 
             self.assertIn("status: completed", output.getvalue())
             self.assertTrue((root / "memory.json").exists())
+
+    def test_cli_events_command(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runtime = ResearchRuntime()
+            result = runtime.run_article_research(
+                title="Event Replay Check",
+                content="AI wallet automation with docs and points.",
+                vault_dir=root / "vault",
+                reports_dir=root / "reports",
+                memory_path=root / "memory.json",
+            )
+
+            output = StringIO()
+            with redirect_stdout(output):
+                cli_main(["events", result.room.room_id, "--runs-dir", str(root / "runs")])
+
+            text = output.getvalue()
+            self.assertIn("room_created", text)
+            self.assertIn("agent_start", text)
 
     def test_codex_oauth_provider_can_be_selected(self) -> None:
         with patch.dict(

@@ -14,6 +14,7 @@ def save_run_snapshot(
     bus: CollaborationBus,
     audit_log: list[dict[str, Any]],
     llm_call_log: list[dict[str, Any]] | None = None,
+    event_log: list[dict[str, Any]] | None = None,
     root_dir: str | Path = "data/runs",
 ) -> Path:
     run_dir = Path(root_dir) / room.room_id
@@ -32,6 +33,10 @@ def save_run_snapshot(
     )
     (run_dir / "llm_call_log.json").write_text(
         json.dumps(llm_call_log or [], ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    (run_dir / "events.json").write_text(
+        json.dumps(event_log or [], ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     return run_dir
