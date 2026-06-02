@@ -204,6 +204,31 @@ class SmokeTest(unittest.TestCase):
 
         self.assertIn("JIMMORIA v0.1.0", output.getvalue())
 
+    def test_chat_autodetects_existing_codex_login(self) -> None:
+        output = StringIO()
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            settings_path = root / "model_settings.json"
+            args = argparse.Namespace(
+                memory=str(root / "memory.json"),
+                vault=str(root / "vault"),
+                reports=str(root / "reports"),
+                skip_model_setup=False,
+            )
+            with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(settings_path)}, clear=True):
+                with patch("crypto_research_agents.cli.codex_login_status", return_value="Logged in using ChatGPT"):
+                    with patch("sys.stdin.isatty", return_value=True):
+                        with patch("builtins.input", return_value="/quit"):
+                            with patch("crypto_research_agents.cli.configure_model_panel") as setup_panel:
+                                with redirect_stdout(output):
+                                    chat_command(args)
+                                self.assertFalse(setup_panel.called)
+                self.assertEqual(os.environ["LLM_PROVIDER"], "codex_cli")
+                settings = json.loads(settings_path.read_text(encoding="utf-8"))
+                self.assertEqual(settings["LLM_PROVIDER"], "codex_cli")
+
+        self.assertIn("JIMMORIA v0.1.0", output.getvalue())
+
     def test_oauth_token_provider_reads_explicit_env(self) -> None:
         with patch.dict("os.environ", {"CODEX_OAUTH_TOKEN": "abc123"}, clear=True):
             token = OAuthTokenProvider().get_token()

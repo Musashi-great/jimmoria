@@ -279,6 +279,7 @@ def inspect_command(args: argparse.Namespace) -> None:
 
 def chat_command(args: argparse.Namespace) -> None:
     apply_saved_model_settings()
+    auto_configure_codex_cli_if_logged_in()
     console = JimmoriaConsole(
         memory_path=args.memory,
         runs_dir=Path(args.memory).parent / "runs",
@@ -757,6 +758,20 @@ def apply_saved_model_settings() -> None:
         value = data.get(name)
         if isinstance(value, str) and value and name not in os.environ:
             os.environ[name] = value
+
+
+def auto_configure_codex_cli_if_logged_in() -> None:
+    if os.getenv("LLM_PROVIDER"):
+        return
+    if not codex_is_logged_in():
+        return
+    os.environ["LLM_PROVIDER"] = "codex_cli"
+    save_model_settings()
+
+
+def codex_is_logged_in() -> bool:
+    status = codex_login_status().lower()
+    return "logged in" in status or "authenticated" in status
 
 
 def save_model_settings() -> None:

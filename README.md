@@ -43,6 +43,8 @@ jimmoria demo
 
 JIMMORIA는 토큰을 저장하지 않습니다. 저장하는 것은 `data/model_settings.json`의 provider/model preference 정도입니다. 모델명을 모르면 `Use provider default for every agent`를 선택하면 됩니다.
 
+이미 Codex CLI에 로그인되어 있으면 JIMMORIA가 자동으로 `codex_cli` provider를 감지하고 다음 실행부터 모델 설정 화면을 건너뜁니다.
+
 ## Chat Commands
 
 ```text
