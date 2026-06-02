@@ -59,6 +59,7 @@ class JimmoriaConsole:
         self.last_room_id = ""
         self.width = min(shutil.get_terminal_size((100, 30)).columns, 110)
         self.use_rich = RichConsole is not None and not os.getenv("JIMMORIA_PLAIN_LOGS")
+        self.event_style = os.getenv("JIMMORIA_EVENT_STYLE", "stream").strip().lower() or "stream"
 
     def print_intro(self) -> None:
         print_jimmoria_logo(self.width)
@@ -183,6 +184,12 @@ class JimmoriaConsole:
                 print(f"{prefix}{line}")
             else:
                 print(f"{continuation}{line}")
+
+    def print_event_line(self, label: str, text: str, *, muted: bool = False) -> None:
+        self.print_log_line(label, text, muted=muted)
+
+    def use_stream_events(self) -> bool:
+        return self.event_style not in {"card", "cards", "panel", "panels"}
 
     def read_chat_input(self) -> str:
         if not sys.stdin.isatty():
@@ -317,6 +324,12 @@ class JimmoriaConsole:
                 str(agent_id): AGENT_ACTIVITY.get(str(agent_id), "Waiting for assignment")
                 for agent_id in event.get("agents", [])
             }
+            if self.use_stream_events():
+                topic = self.compact_text(str(event.get("topic", "")), 72)
+                agent_count = len(event.get("agents", []))
+                self.print_event_line("Room", f"OPEN {event.get('room_id')} | agents {agent_count} | {topic}")
+                self.print_event_line("Board", self.agent_state_label(), muted=True)
+                return
             lines = [
                 f"Room: {event.get('room_id')}",
                 f"Topic: {event.get('topic')}",
@@ -333,6 +346,9 @@ class JimmoriaConsole:
             agent_id = str(event.get("agent_id", ""))
             self.agent_state[agent_id] = "running"
             self.agent_activity[agent_id] = AGENT_ACTIVITY.get(agent_id, f"Running {event.get('task_type')}")
+            if self.use_stream_events():
+                self.print_event_line("Agent", f"RUN {agent_id} | {self.agent_activity[agent_id]}")
+                return
             label = self.agent_label(agent_id)
             self.block(
                 f"{label} started",
@@ -348,6 +364,13 @@ class JimmoriaConsole:
             agent_id = str(event.get("agent_id", ""))
             self.agent_state[agent_id] = "done"
             self.agent_activity[agent_id] = f"Done: {event.get('summary')}"
+            if self.use_stream_events():
+                summary = self.compact_text(str(event.get("summary", "")), 76)
+                self.print_event_line(
+                    "Agent",
+                    f"DONE {agent_id} | {summary} | msg {event.get('messages')} / findings {event.get('findings')}",
+                )
+                return
             label = self.agent_label(agent_id)
             summary = str(event.get("summary", ""))
             self.block(
@@ -365,6 +388,10 @@ class JimmoriaConsole:
             agent_id = str(event.get("agent_id", ""))
             self.agent_state[agent_id] = "failed"
             self.agent_activity[agent_id] = f"Failed: {event.get('error')}"
+            if self.use_stream_events():
+                error = self.compact_text(str(event.get("error", "")), 82)
+                self.print_event_line("Agent", f"FAIL {agent_id} | {error}")
+                return
             label = self.agent_label(agent_id)
             self.block(
                 f"{label} failed",
@@ -386,6 +413,12 @@ class JimmoriaConsole:
             return
 
         if event_type == "room_completed":
+            if self.use_stream_events():
+                self.print_event_line(
+                    "Room",
+                    f"DONE {event.get('room_id')} | status {event.get('status')} | msg {event.get('messages')} / findings {event.get('findings')}",
+                )
+                return
             self.block(
                 "JIMMORIA finalizes the room",
                 [
@@ -399,6 +432,10 @@ class JimmoriaConsole:
             return
 
         if event_type == "room_failed":
+            if self.use_stream_events():
+                reason = self.compact_text(str(event.get("summary", "")), 86)
+                self.print_event_line("Room", f"FAIL {event.get('room_id')} | {reason}")
+                return
             self.block(
                 "JIMMORIA room failed",
                 [
@@ -511,6 +548,12 @@ class JimmoriaConsole:
             "tool_denied": "DENY",
             "tool_unconfigured": "WAIT",
         }.get(event_type, "TOOL")
+        if self.use_stream_events():
+            summary = self.compact_text(str(event.get("summary") or event.get("input_preview") or ""), 82)
+            latency = f" | {event.get('latency_ms')}ms" if event.get("latency_ms") is not None else ""
+            suffix = f" | {summary}" if summary else ""
+            self.print_event_line("Tool", f"{marker} {event.get('agent_id')} -> {event.get('tool_name')}{suffix}{latency}")
+            return
         lines = [
             f"[TOOL] {event.get('agent_id')} -> {event.get('tool_name')} [{marker}]",
         ]
@@ -532,6 +575,9 @@ class JimmoriaConsole:
         summary = str(event.get("summary") or labels.get(event_type, event_type))
         if event.get("path"):
             summary = f"{summary}"
+        if self.use_stream_events():
+            self.print_event_line("Output", f"{labels.get(event_type, event_type)} | {self.compact_text(summary, 88)}")
+            return
         self.block(
             labels.get(event_type, event_type),
             [
@@ -593,6 +639,12 @@ class JimmoriaConsole:
     def wrap(self, text: str) -> list[str]:
         width = max(40, self.width - 4)
         return textwrap.wrap(text, width=width, replace_whitespace=False) or [""]
+
+    def compact_text(self, text: str, max_length: int = 88) -> str:
+        compact = " ".join(str(text).split())
+        if len(compact) <= max_length:
+            return compact
+        return compact[: max_length - 3].rstrip() + "..."
 
     def rule(self, char: str = "-") -> None:
         print(char * self.width)

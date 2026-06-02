@@ -190,10 +190,12 @@ CLI/UI 개선 방향은 [jimmoria-cli-ui-reference-notes.md](jimmoria-cli-ui-ref
 예시:
 
 ```text
-[Live agent board]
-  RUN      ingestion_agent              Now: Storing source input and extracting entities, keywords, metadata
-  WAIT     narrative_agent              Waiting: Mapping market narratives and thesis categories
-  WAIT     discovery_agent              Waiting: Finding early project candidates from narrative signals
+Room > OPEN room_abc123 | agents 10 | pearl 프로젝트 리서치
+Board > 10 wait/0 done
+Agent > RUN supervisor_agent | Planning direction
+Agent > DONE supervisor_agent | Research room initialized | msg 1 / findings 1
+Tool > RUN discovery_agent -> web_search | pearl crypto project
+Output > Report written | reports/pearl-room_abc123.md
 ```
 
 ## 6. 에이전트 구성
@@ -879,3 +881,35 @@ Runtime 연결:
 - `ResearchRuntime`은 `company_settings.json`과 `intake_decision`을 SupervisorAgent와 ReportAgent에 전달한다.
 - SupervisorAgent는 `supervision_plan` finding에 `intake_decision`을 저장해 왜 해당 Research Room이 열렸는지 남긴다.
 - ReportAgent는 `report_language`를 보고 한국어/영문 report shell을 선택한다.
+
+## 24. Runtime Event Stream
+
+JIMMORIA CLI의 기본 runtime 이벤트 출력은 compact stream이다. 이 방식은 Goose의 local session/tool logs, Agent Cockpit의 mission event stream, Conduit/Mato 계열의 terminal workspace 패턴을 참고했다. 큰 panel/card가 계속 쌓이면 사용자가 실제 진행 상황을 훑기 어렵기 때문에, 기본 화면에서는 아래 형식의 한 줄 로그가 계속 위로 올라간다.
+
+```text
+Room > OPEN room_abc123 | agents 10 | pearl 프로젝트 리서치
+Board > 10 wait/0 done
+Agent > RUN supervisor_agent | Planning direction
+Agent > DONE supervisor_agent | Research room initialized | msg 1 / findings 1
+Tool > RUN discovery_agent -> web_search | pearl crypto project
+Output > Report written | reports/pearl-room_abc123.md
+Room > DONE room_abc123 | status completed | msg 14 / findings 10
+```
+
+상세 정보는 계속 저장된다.
+
+```text
+data/runs/<room_id>/events.json
+data/runs/<room_id>/messages.json
+data/runs/<room_id>/tool_audit_log.json
+data/runs/<room_id>/llm_call_log.json
+```
+
+큰 카드형 runtime UI가 필요하면 다음 환경변수를 사용할 수 있다.
+
+```powershell
+$env:JIMMORIA_EVENT_STYLE = "cards"
+jimmoria
+```
+
+이 경우 `room_created`, `agent_start`, `agent_done`, `room_completed`가 이전처럼 panel/card 중심으로 출력된다. 기본 compact stream에서 현재 agent board를 보고 싶으면 `/board`를 사용한다.

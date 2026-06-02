@@ -370,6 +370,7 @@ class SmokeTest(unittest.TestCase):
     def test_live_agent_board_shows_current_work(self) -> None:
         output = StringIO()
         console = JimmoriaConsole()
+        console.event_style = "cards"
 
         with redirect_stdout(output):
             console.handle_event(
@@ -401,6 +402,7 @@ class SmokeTest(unittest.TestCase):
     def test_live_agent_board_shows_failures(self) -> None:
         output = StringIO()
         console = JimmoriaConsole()
+        console.event_style = "cards"
 
         with redirect_stdout(output):
             console.handle_event(
@@ -425,6 +427,47 @@ class SmokeTest(unittest.TestCase):
         text = output.getvalue()
         self.assertIn("FAIL", text)
         self.assertIn("Stopped: Failed: Codex CLI provider failed", text)
+
+    def test_runtime_events_default_to_compact_stream(self) -> None:
+        output = StringIO()
+        console = JimmoriaConsole()
+
+        with redirect_stdout(output):
+            console.handle_event(
+                {
+                    "type": "room_created",
+                    "room_id": "room_test",
+                    "topic": "pearl pow project",
+                    "goals": ["Investigate the project."],
+                    "agents": ["supervisor_agent", "ingestion_agent"],
+                }
+            )
+            console.handle_event(
+                {
+                    "type": "agent_start",
+                    "room_id": "room_test",
+                    "agent_id": "ingestion_agent",
+                    "task_type": "source_ingestion",
+                }
+            )
+            console.handle_event(
+                {
+                    "type": "agent_done",
+                    "room_id": "room_test",
+                    "agent_id": "ingestion_agent",
+                    "summary": "Source stored and summarized.",
+                    "messages": 2,
+                    "findings": 3,
+                }
+            )
+
+        text = output.getvalue()
+        self.assertIn("Room > OPEN room_test", text)
+        self.assertIn("Board > 2 wait/0 done", text)
+        self.assertIn("Agent > RUN ingestion_agent", text)
+        self.assertIn("Agent > DONE ingestion_agent", text)
+        self.assertNotIn("JIMMORIA opens a Research Room", text)
+        self.assertNotIn("Live agent board", text)
 
     def test_article_research_loop_writes_outputs(self) -> None:
         with TemporaryDirectory() as tmp:

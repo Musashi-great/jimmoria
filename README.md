@@ -187,3 +187,14 @@ Supervisor 대화는 `supervisor_chat` 모델 라우트를 사용한다. live LL
 CLI 입력창은 제출 후 같은 내용을 큰 `You` 패널로 다시 반복하지 않는다. 입력 박스는 다음 입력용으로 다시 그려지고, 사용자가 보낸 문장은 위쪽 대화 로그에 `You > ...` 형태로 올라간다. 그 다음 Supervisor가 현재 처리 중인 일을 짧게 보여주고 답변하거나 Research Room을 연다.
 
 최근 CLI UX는 Mato, Conduit, Spettro, MetaGPT, ChatDev, ZeroHuman 같은 멀티에이전트/zero-human-company 계열 프로젝트의 terminal workspace와 visible orchestration 패턴을 참고했다. 적용 내용은 [docs/jimmoria-cli-ui-reference-notes.md](docs/jimmoria-cli-ui-reference-notes.md)에 정리되어 있다.
+
+Research Room runtime 로그는 기본적으로 큰 카드가 아니라 compact stream으로 올라간다.
+
+```text
+Room > OPEN room_abc123 | agents 10 | pearl 프로젝트 리서치
+Agent > RUN ingestion_agent | Extracting source metadata
+Tool > RUN discovery_agent -> web_search | pearl crypto project
+Output > Report written | reports/pearl-room_abc123.md
+```
+
+예전처럼 큰 카드/보드 중심으로 보고 싶으면 `JIMMORIA_EVENT_STYLE=cards`를 설정한다. 현재 board만 보고 싶으면 채팅 중 `/board`를 입력한다.
