@@ -219,14 +219,14 @@ Report Agent는 외부 데이터를 직접 해석하기보다 Agent Finding을 �
 현재 MVP의 기본 입력 채널은 CLI다.
 
 ```powershell
-python -m crypto_research_agents.cli chat
-python -m crypto_research_agents.cli add-source --title "Source" --url "https://..."
-python -m crypto_research_agents.cli research --title "Project thesis" --file .\source.txt
-python -m crypto_research_agents.cli runs
-python -m crypto_research_agents.cli doctor
-python -m crypto_research_agents.cli status <room_id>
-python -m crypto_research_agents.cli messages <room_id> --limit 10
-python -m crypto_research_agents.cli show-report <room_id>
+jimmoria
+jimmoria add-source --title "Source" --url "https://..."
+jimmoria research --title "Project thesis" --file .\source.txt
+jimmoria runs
+jimmoria doctor
+jimmoria status <room_id>
+jimmoria messages <room_id> --limit 10
+jimmoria show-report <room_id>
 ```
 
 명령 역할:

@@ -26,20 +26,29 @@ article/source input
 -> Obsidian-style markdown notes
 ```
 
+Install the CLI once from the project folder:
+
+```powershell
+cd C:\jimmoria
+python -m pip install -e .
+```
+
+After that, start the company with:
+
+```powershell
+jimmoria
+```
+
 Run the demo:
 
 ```powershell
 jimmoria demo
-python -m crypto_research_agents.cli demo
 ```
 
 Start the interactive research console:
 
 ```powershell
 jimmoria
-jimmoria hq
-jimmoria chat
-python -m crypto_research_agents.cli chat
 ```
 
 When chat starts, it opens a model setup panel:
@@ -79,15 +88,12 @@ Run a full research loop:
 ```powershell
 jimmoria research --title "AI wallet thesis" --file .\source.txt
 jimmoria research --title "AI wallet thesis" --url "https://example.com/article"
-python -m crypto_research_agents.cli research --title "AI wallet thesis" --file .\source.txt
-python -m crypto_research_agents.cli research --title "AI wallet thesis" --url "https://example.com/article"
 ```
 
 Ingest a source only:
 
 ```powershell
 jimmoria add-source --title "Source note" --text "AI wallet automation..."
-python -m crypto_research_agents.cli add-source --title "Source note" --text "AI wallet automation..."
 ```
 
 Inspect runs:
@@ -95,12 +101,10 @@ Inspect runs:
 ```powershell
 jimmoria runs
 jimmoria doctor
-python -m crypto_research_agents.cli runs
-python -m crypto_research_agents.cli doctor
-python -m crypto_research_agents.cli status <room_id>
-python -m crypto_research_agents.cli messages <room_id> --limit 10
-python -m crypto_research_agents.cli events <room_id> --limit 30
-python -m crypto_research_agents.cli show-report <room_id>
+jimmoria status <room_id>
+jimmoria messages <room_id> --limit 10
+jimmoria events <room_id> --limit 30
+jimmoria show-report <room_id>
 ```
 
 Use a live LLM provider:
@@ -111,7 +115,7 @@ $env:OPENAI_API_KEY="..."
 $env:OPENAI_MODEL_FAST="your-fast-model"
 $env:OPENAI_MODEL_REASONING="your-reasoning-model"
 $env:OPENAI_MODEL_WRITING="your-writing-model"
-python -m crypto_research_agents.cli demo
+jimmoria demo
 ```
 
 Use the Codex CLI ChatGPT login session:
@@ -119,7 +123,7 @@ Use the Codex CLI ChatGPT login session:
 ```powershell
 codex login --device-auth
 $env:LLM_PROVIDER="codex_cli"
-python -m crypto_research_agents.cli chat
+jimmoria
 ```
 
 Or use a Codex OAuth bearer token manually:
@@ -130,7 +134,7 @@ $env:CODEX_OAUTH_TOKEN="..."
 $env:CODEX_OAUTH_MODEL_FAST="your-fast-model"
 $env:CODEX_OAUTH_MODEL_REASONING="your-reasoning-model"
 $env:CODEX_OAUTH_MODEL_WRITING="your-writing-model"
-python -m crypto_research_agents.cli chat
+jimmoria
 ```
 
 Or provide the token through a command:
@@ -138,7 +142,7 @@ Or provide the token through a command:
 ```powershell
 $env:LLM_PROVIDER="codex_oauth"
 $env:CODEX_OAUTH_TOKEN_COMMAND="your-command-that-prints-a-bearer-token"
-python -m crypto_research_agents.cli demo
+jimmoria demo
 ```
 
 The manual bearer-token provider does not automatically read Codex internal auth
@@ -167,7 +171,7 @@ Not live yet:
 - Funding, points, and airdrop checking
 
 Those live research tools currently return `unconfigured` through ToolGateway.
-Use `python -m crypto_research_agents.cli doctor` to see this status before testing.
+Use `jimmoria doctor` to see this status before testing.
 ```
 
 Useful outputs:

@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "jimmoria"
 version = "0.1.0"
@@ -11,6 +15,9 @@ llm = ["openai>=1.0.0"]
 [project.scripts]
 jimmoria = "crypto_research_agents.cli:main"
 crypto-research = "crypto_research_agents.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["crypto_research_agents*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

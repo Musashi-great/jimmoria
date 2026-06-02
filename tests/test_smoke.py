@@ -2,6 +2,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import json
 import os
+import tomllib
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
@@ -25,6 +26,12 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("JIMMORIA v0.1.0", text)
         self.assertIn("Multi-agent crypto research company", text)
         self.assertNotIn("Company roster", text)
+
+    def test_pyproject_exposes_jimmoria_command(self) -> None:
+        pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+
+        self.assertEqual(pyproject["project"]["scripts"]["jimmoria"], "crypto_research_agents.cli:main")
+        self.assertEqual(pyproject["tool"]["setuptools"]["packages"]["find"]["include"], ["crypto_research_agents*"])
 
     def test_article_research_loop_writes_outputs(self) -> None:
         with TemporaryDirectory() as tmp:
