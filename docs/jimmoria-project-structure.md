@@ -35,6 +35,7 @@ jimmoria/
 
   config/
     agents/
+    processes/
     models/
     skills/
     tools/
@@ -50,7 +51,7 @@ jimmoria/
   vault/
 ```
 
-핵심은 `crypto_research_agents/`가 실제 실행 코드이고, `config/`가 회사의 에이전트 정의와 도구/모델 정책을 담는다는 점이다. `connectors/`는 ToolGateway 뒤에 붙는 실제 외부/HTTP 리서치 도구 구현을 담는다. `data/`, `reports/`, `vault/`는 실행하면서 생성되는 로컬 출력 폴더라 Git에는 올리지 않는다.
+핵심은 `crypto_research_agents/`가 실제 실행 코드이고, `config/`가 회사의 에이전트 정의, Research Room process, 도구/모델 정책을 담는다는 점이다. `connectors/`는 ToolGateway 뒤에 붙는 실제 외부/HTTP 리서치 도구 구현을 담는다. `data/`, `reports/`, `vault/`는 실행하면서 생성되는 로컬 출력 폴더라 Git에는 올리지 않는다.
 
 ## 3. 실행 진입점
 
@@ -134,6 +135,7 @@ flowchart LR
 | CLI | `crypto_research_agents/cli.py` | 명령어 파싱, 채팅 루프, 모델 설정 패널 |
 | Console | `crypto_research_agents/console.py` | JIMMORIA 로고, 박스형 입력창, 도움말, 실시간 에이전트 상황판 출력 |
 | Runtime | `crypto_research_agents/runtime.py` | Research Room 생성과 에이전트 실행 순서 관리 |
+| ProcessSpec | `core/process_spec.py` + `config/processes/` | Research Room의 goals, task order, expected output, artifact contract 정의 |
 | ResearchRoom | `core/room.py` | 하나의 리서치 작업 단위와 상태 |
 | CollaborationBus | `core/bus.py` | 에이전트 요청, 응답, 핸드오프, 업데이트 로그 |
 | SharedMemory | `core/memory.py` | 소스, 프로젝트 후보, finding, entity graph 저장 |
@@ -255,6 +257,55 @@ must_not
 ```
 
 에이전트는 실행 중 `self.system_prompt()`를 통해 이 YAML 내용을 LLM system prompt로 변환한다. 그래서 코드는 에이전트의 행동 골격을 담당하고, YAML은 그 에이전트가 어떤 회사원처럼 행동해야 하는지를 정의한다.
+
+## 7A. ProcessSpec와 Research Room Tasks
+
+JIMMORIA는 ChatDev의 configurable workflow/phase/role 구조와 crewAI의 `agents.yaml` + `tasks.yaml` + sequential process 패턴을 참고해 `config/processes/` 레이어를 추가했다. 목적은 에이전트 내부 구현을 바꾸지 않고 Research Room의 운영 절차를 config로 분리하는 것이다.
+
+현재 process manifest는 두 개다.
+
+```text
+config/processes/project_research_room.yaml
+config/processes/source_ingestion_room.yaml
+```
+
+`core/process_spec.py`는 다음 구조를 로드한다.
+
+```text
+process_id
+name
+process_type
+supervisor_mode
+goals
+tasks[]
+  task_id
+  agent_id
+  phase
+  description
+  expected_output
+  requires
+  output_channels
+artifact_contracts
+ui
+memory_policy
+```
+
+`ResearchRuntime`은 process manifest에서 room goals와 agent order를 가져온다. 실제 agent class와 controlled P2P bus는 그대로 유지된다. 즉, crewAI처럼 task를 config로 선언하지만 JIMMORIA의 Supervisor, CollaborationBus, SharedMemory, ToolGateway 구조는 그대로 남는다.
+
+`room_created` event에는 process metadata가 함께 저장된다.
+
+```json
+{
+  "type": "room_created",
+  "process": {
+    "process_id": "project_research_room",
+    "process_type": "sequential_controlled_p2p",
+    "tasks": []
+  }
+}
+```
+
+이 process metadata는 나중에 웹 visualizer가 agent workflow를 replay할 때 phase/task label로 사용할 수 있다.
 
 ## 8. Collaboration Bus
 
@@ -574,6 +625,7 @@ market_connectors.py     dexscreener_search_pairs, coingecko_coin_metadata
 
 ```text
 agent_spec.py       YAML persona/spec loader
+process_spec.py     Research Room process/task manifest loader
 bus.py              CollaborationBus
 message.py          AgentMessage model
 memory.py           SharedMemory, SourceRecord, ProjectCandidate, FindingRecord, source dedupe
@@ -603,6 +655,10 @@ paths.py            safe filename helper
 ### `config/agents/`
 
 에이전트별 persona와 policy다. 코드에서 각 에이전트의 기능 골격을 정의하고, config에서는 그 에이전트가 어떤 관점과 제약으로 일해야 하는지 정의한다.
+
+### `config/processes/`
+
+Research Room의 process/task manifest다. ChatDev처럼 workflow/phase/role을 설정으로 관리하고, crewAI처럼 agent와 task를 분리한다. 현재 `project_research_room.yaml`은 full research dossier를 위한 10-agent process이고, `source_ingestion_room.yaml`은 source-only ingestion을 위한 3-agent process다. Runtime은 이 manifest에서 goals와 agent order를 읽고, `room_created.process` event에 process metadata를 저장한다.
 
 ### `config/models/model_router.yaml`
 
@@ -714,7 +770,7 @@ python -m unittest discover -s tests -v
 
 ## 21. 한 줄 요약
 
-JIMMORIA는 현재 "채팅형 CLI + Research Room + controlled P2P Agent Bus + Shared Memory + Model Gateway + Tool Gateway + 기본 Web Search/URL/Website/Docs/GitHub/DEX/CoinGecko connectors + Markdown/Obsidian output"까지 구현된 크립토 리서치 회사 MVP다. 다음 핵심 작업은 Project Research Loop, Identity/Evidence/Collision 검증 엔진, 그리고 Social/Contract/Funding 에이전트의 source-backed finding 업그레이드다.
+JIMMORIA는 현재 "채팅형 CLI + ProcessSpec 기반 Research Room + controlled P2P Agent Bus + Shared Memory + Model Gateway + Tool Gateway + 기본 Web Search/URL/Website/Docs/GitHub/DEX/CoinGecko connectors + Markdown/Obsidian output"까지 구현된 크립토 리서치 회사 MVP다. 다음 핵심 작업은 Project Research Loop, Identity/Evidence/Collision 검증 엔진, 그리고 Social/Contract/Funding 에이전트의 source-backed finding 업그레이드다.
 ## 22. Current Runtime Update Notes
 
 최근 변경 기준으로 JIMMORIA는 live/source-backed 후보와 MVP placeholder 후보를 구분한다.

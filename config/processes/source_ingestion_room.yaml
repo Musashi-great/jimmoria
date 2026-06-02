@@ -1,0 +1,57 @@
+{
+  "process_id": "source_ingestion_room",
+  "name": "Source Ingestion Room",
+  "process_type": "sequential_controlled_p2p",
+  "supervisor_mode": "company_ceo_manager",
+  "inspired_by": [
+    "crewAI task-specific sequential process",
+    "ChatDev phase-limited workflow"
+  ],
+  "goals": [
+    "Store the source.",
+    "Extract metadata.",
+    "Create an Obsidian Source Note."
+  ],
+  "tasks": [
+    {
+      "task_id": "set_ingestion_direction",
+      "agent_id": "supervisor_agent",
+      "phase": "management",
+      "description": "Confirm this is source-only work and prevent unnecessary research/report generation.",
+      "expected_output": "Supervision plan for source-only ingestion.",
+      "output_channels": ["finding", "event"]
+    },
+    {
+      "task_id": "ingest_source",
+      "agent_id": "ingestion_agent",
+      "phase": "source_memory",
+      "requires": ["set_ingestion_direction"],
+      "description": "Store source text/URL and extract metadata, entities, keywords, canonical links, and source hash.",
+      "expected_output": "SourceRecord plus ingestion finding.",
+      "output_channels": ["memory.sources", "finding", "obsidian.source"]
+    },
+    {
+      "task_id": "sync_source_note",
+      "agent_id": "obsidian_curator_agent",
+      "phase": "knowledge_ops",
+      "requires": ["ingest_source"],
+      "description": "Save the source note into the local Obsidian-style vault without creating a full project dossier.",
+      "expected_output": "Vault Source note.",
+      "output_channels": ["obsidian.source"]
+    }
+  ],
+  "artifact_contracts": {
+    "source": "SharedMemory.sources + vault/20_Sources",
+    "replay": "data/runs/<room_id>/events.json"
+  },
+  "ui": {
+    "default_event_style": "stream",
+    "dock": "JIMMORIA HQ runtime dock remains visible while a room runs"
+  },
+  "memory_policy": {
+    "save_run": true,
+    "save_llm_call_log": true,
+    "save_tool_audit_log": true,
+    "dedupe_sources": true
+  }
+}

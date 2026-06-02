@@ -1,0 +1,130 @@
+{
+  "process_id": "project_research_room",
+  "name": "Project Research Room",
+  "process_type": "sequential_controlled_p2p",
+  "supervisor_mode": "company_ceo_manager",
+  "inspired_by": [
+    "ChatDev configurable workflows/phases/roles",
+    "crewAI agents.yaml + tasks.yaml + Process.sequential"
+  ],
+  "goals": [
+    "Store and summarize the source.",
+    "Extract narratives.",
+    "Discover similar early project candidates.",
+    "Create a candidate dossier and Obsidian notes."
+  ],
+  "tasks": [
+    {
+      "task_id": "set_room_direction",
+      "agent_id": "supervisor_agent",
+      "phase": "management",
+      "description": "Set research objective, priority, agent order, quality bar, and final output mode.",
+      "expected_output": "Supervision plan with intake decision and room goals.",
+      "output_channels": ["finding", "event"]
+    },
+    {
+      "task_id": "ingest_source",
+      "agent_id": "ingestion_agent",
+      "phase": "source_memory",
+      "requires": ["set_room_direction"],
+      "description": "Store source text/URL and extract entities, keywords, metadata, canonical links, and source note candidates.",
+      "expected_output": "SourceRecord plus ingestion finding.",
+      "output_channels": ["memory.sources", "finding", "obsidian.source"]
+    },
+    {
+      "task_id": "map_narratives",
+      "agent_id": "narrative_agent",
+      "phase": "thesis_mapping",
+      "requires": ["ingest_source"],
+      "description": "Classify the source into crypto market narratives and thesis categories.",
+      "expected_output": "Narrative finding with categories and confidence.",
+      "output_channels": ["finding", "memory.entity_graph"]
+    },
+    {
+      "task_id": "discover_candidates",
+      "agent_id": "discovery_agent",
+      "phase": "candidate_discovery",
+      "requires": ["map_narratives"],
+      "description": "Resolve named projects or find early project candidates from narrative and source signals.",
+      "expected_output": "ProjectCandidate records with origin/source_backing labels.",
+      "output_channels": ["memory.projects", "finding", "bus.requests"]
+    },
+    {
+      "task_id": "check_social_kol",
+      "agent_id": "social_kol_agent",
+      "phase": "evidence_checks",
+      "requires": ["discover_candidates"],
+      "description": "Check KOL handles, social mentions, community links, and public social evidence.",
+      "expected_output": "Social/KOL finding with citations or connector limitations.",
+      "output_channels": ["finding", "tool_audit"]
+    },
+    {
+      "task_id": "check_contract_onchain",
+      "agent_id": "contract_onchain_agent",
+      "phase": "evidence_checks",
+      "requires": ["discover_candidates"],
+      "description": "Verify chain, token identity, contract, DEX/explorer metadata, and ambiguity risk.",
+      "expected_output": "Contract/on-chain finding with token status and unresolved risks.",
+      "output_channels": ["finding", "tool_audit"]
+    },
+    {
+      "task_id": "check_product_tech",
+      "agent_id": "product_tech_agent",
+      "phase": "evidence_checks",
+      "requires": ["discover_candidates"],
+      "description": "Check website, docs, GitHub, product surface, and implementation readiness.",
+      "expected_output": "Product/tech finding with official links and product maturity.",
+      "output_channels": ["finding", "tool_audit"]
+    },
+    {
+      "task_id": "check_funding_token",
+      "agent_id": "funding_token_agent",
+      "phase": "opportunity_checks",
+      "requires": ["discover_candidates"],
+      "description": "Review investors, funding hints, token status, points, airdrop, and opportunity windows.",
+      "expected_output": "Funding/token finding with opportunity and uncertainty labels.",
+      "output_channels": ["finding", "tool_audit"]
+    },
+    {
+      "task_id": "write_dossier",
+      "agent_id": "report_agent",
+      "phase": "synthesis",
+      "requires": [
+        "check_social_kol",
+        "check_contract_onchain",
+        "check_product_tech",
+        "check_funding_token"
+      ],
+      "description": "Turn agent findings into a human-readable project research dossier.",
+      "expected_output": "Markdown dossier with TL;DR, candidate table, evidence, risks, and next questions.",
+      "output_channels": ["report", "finding"]
+    },
+    {
+      "task_id": "sync_obsidian",
+      "agent_id": "obsidian_curator_agent",
+      "phase": "knowledge_ops",
+      "requires": ["write_dossier"],
+      "description": "Save sources, candidates, narratives, and reports into the local Obsidian-style vault.",
+      "expected_output": "Vault notes and links for long-term memory.",
+      "output_channels": ["obsidian.project", "obsidian.source", "obsidian.report"]
+    }
+  ],
+  "artifact_contracts": {
+    "source": "SharedMemory.sources + vault/20_Sources",
+    "candidate": "SharedMemory.projects + source_backing/origin fields",
+    "finding": "SharedMemory.findings",
+    "report": "reports/*.md + vault/50_Reports",
+    "replay": "data/runs/<room_id>/events.json"
+  },
+  "ui": {
+    "default_event_style": "stream",
+    "dock": "JIMMORIA HQ runtime dock remains visible while a room runs",
+    "board_command": "/board"
+  },
+  "memory_policy": {
+    "save_run": true,
+    "save_llm_call_log": true,
+    "save_tool_audit_log": true,
+    "dedupe_sources": true
+  }
+}

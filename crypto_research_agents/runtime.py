@@ -23,6 +23,7 @@ from crypto_research_agents.core.company_settings import company_settings_path_f
 from crypto_research_agents.core.hooks import HookEngine
 from crypto_research_agents.core.memory import SharedMemory
 from crypto_research_agents.core.model_gateway import ModelGateway
+from crypto_research_agents.core.process_spec import load_process_spec
 from crypto_research_agents.core.room import ResearchRoom
 from crypto_research_agents.core.runtime_state import RuntimeState
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
@@ -57,12 +58,14 @@ class ResearchRuntime:
         memory: SharedMemory | None = None,
         *,
         agent_spec_dir: str | Path = "config/agents",
+        process_spec_dir: str | Path = "config/processes",
     ) -> None:
         self.memory = memory or SharedMemory()
         self.bus = CollaborationBus()
         self.hooks = HookEngine()
         self.model_gateway = ModelGateway()
         self.agent_specs = AgentSpecRegistry.load_dir(agent_spec_dir)
+        self.process_spec_dir = Path(process_spec_dir)
         self.tool_gateway = ToolGateway(default_policy(self.agent_specs))
         register_default_connectors(self.tool_gateway)
         self.event_log: list[dict[str, Any]] = []
@@ -93,15 +96,11 @@ class ResearchRuntime:
         intake_decision: dict[str, Any] | None = None,
     ) -> ResearchRunResult:
         company_settings = load_company_settings(company_settings_path_for(memory_path))
+        process = load_process_spec("project_research_room", self.process_spec_dir)
         room = ResearchRoom(
             topic=title,
-            goals=[
-                "Store and summarize the source.",
-                "Extract narratives.",
-                "Discover similar early project candidates.",
-                "Create a candidate dossier and Obsidian notes.",
-            ],
-            agents=list(DEFAULT_AGENTS),
+            goals=process.goals,
+            agents=process.agent_ids,
         )
         room.set_status(RuntimeState.ASSIGNED)
         self._emit(
@@ -110,6 +109,7 @@ class ResearchRuntime:
             topic=room.topic,
             goals=room.goals,
             agents=room.agents,
+            process=process.event_payload(),
         )
 
         try:
@@ -162,18 +162,11 @@ class ResearchRuntime:
         intake_decision: dict[str, Any] | None = None,
     ) -> ResearchRunResult:
         company_settings = load_company_settings(company_settings_path_for(memory_path))
+        process = load_process_spec("source_ingestion_room", self.process_spec_dir)
         room = ResearchRoom(
             topic=title,
-            goals=[
-                "Store the source.",
-                "Extract metadata.",
-                "Create an Obsidian Source Note.",
-            ],
-            agents=[
-                "supervisor_agent",
-                "ingestion_agent",
-                "obsidian_curator_agent",
-            ],
+            goals=process.goals,
+            agents=process.agent_ids,
         )
         room.set_status(RuntimeState.ASSIGNED)
         self._emit(
@@ -182,6 +175,7 @@ class ResearchRuntime:
             topic=room.topic,
             goals=room.goals,
             agents=room.agents,
+            process=process.event_payload(),
         )
 
         try:

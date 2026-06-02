@@ -361,7 +361,10 @@ class JimmoriaConsole:
             if self.use_stream_events():
                 topic = self.compact_text(str(event.get("topic", "")), 72)
                 agent_count = len(event.get("agents", []))
-                self.print_event_line("Room", f"OPEN {event.get('room_id')} | agents {agent_count} | {topic}")
+                process = event.get("process") if isinstance(event.get("process"), dict) else {}
+                process_id = process.get("process_id") if isinstance(process, dict) else ""
+                process_text = f" | process {process_id}" if process_id else ""
+                self.print_event_line("Room", f"OPEN {event.get('room_id')} | agents {agent_count}{process_text} | {topic}")
                 self.print_event_line("Board", self.agent_state_label(), muted=True)
                 return
             lines = [

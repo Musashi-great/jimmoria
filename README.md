@@ -86,6 +86,7 @@ jimmoria/
 
   config/
     agents/                에이전트 persona, 권한, tool policy
+    processes/             Research Room process/task manifest
     models/                모델 라우팅 기본 설정
     skills/                리서치 workflow 정의
     tools/                 tool registry
@@ -143,11 +144,25 @@ jimmoria doctor
 
 ```text
 config/agents/*.yaml                         에이전트 정의
+config/processes/*.yaml                      Research Room process/task manifest
 config/tools/tool_registry.yaml              필요한 외부 tool 목록
 config/models/model_router.yaml              모델 라우팅 기준
 docs/crypto-research-company-v1.4-execution-spec.md
 data/runs/<room_id>/events.json              나중에 시각화 UI에서 쓸 replay event stream
 ```
+
+## Process Manifests
+
+ChatDev의 configurable workflow/phase/role 개념과 crewAI의 `agents.yaml` + `tasks.yaml` + sequential process 패턴을 JIMMORIA 구조에 맞게 흡수했다. 에이전트 내부 구현은 그대로 두고, Research Room의 목표, task 순서, expected output, artifact contract를 `config/processes/`에 분리한다.
+
+```text
+config/processes/project_research_room.yaml
+config/processes/source_ingestion_room.yaml
+crypto_research_agents/core/process_spec.py
+```
+
+Runtime은 이 manifest를 읽어 room goals와 agent order를 결정하고, `events.json`의 `room_created.process`에 process metadata를 저장한다.
+
 ## Chat Intake Rule
 
 JIMMORIA는 이제 모든 일반 입력을 바로 보고서로 만들지 않는다.

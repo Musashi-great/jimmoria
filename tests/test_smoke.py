@@ -29,6 +29,7 @@ from crypto_research_agents.core.company_settings import CompanySettings
 from crypto_research_agents.core.llm_provider import CodexCliProvider, LLMRequest, LLMResponse, OAuthTokenProvider, provider_from_env
 from crypto_research_agents.core.memory import SharedMemory, SourceRecord
 from crypto_research_agents.core.model_gateway import ModelGateway
+from crypto_research_agents.core.process_spec import ProcessSpecRegistry, load_process_spec
 from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
 from crypto_research_agents.core.supervisor_intake import decide_supervisor_intake
 from crypto_research_agents.core.capabilities import collect_capabilities
@@ -722,6 +723,41 @@ class SmokeTest(unittest.TestCase):
         self.assertIsNotNone(funding)
         assert funding is not None
         self.assertIn("rootdata_get_project", funding.tools.allow)
+
+    def test_process_specs_load_research_and_ingestion_rooms(self) -> None:
+        registry = ProcessSpecRegistry.load_dir("config/processes")
+        research = registry.get("project_research_room")
+        source_only = registry.get("source_ingestion_room")
+        loaded_research = load_process_spec("project_research_room")
+
+        self.assertIsNotNone(research)
+        self.assertIsNotNone(source_only)
+        assert research is not None
+        assert source_only is not None
+        self.assertEqual(loaded_research.process_id, research.process_id)
+        self.assertEqual(research.process_type, "sequential_controlled_p2p")
+        self.assertEqual(research.agent_ids[0], "supervisor_agent")
+        self.assertEqual(research.agent_ids[-1], "obsidian_curator_agent")
+        self.assertEqual(len(research.tasks), 10)
+        self.assertIn("dossier", research.task_for_agent("report_agent").expected_output.lower())
+        self.assertEqual(source_only.agent_ids, ["supervisor_agent", "ingestion_agent", "obsidian_curator_agent"])
+        self.assertIn("prevent unnecessary research", source_only.tasks[0].description)
+
+    def test_runtime_room_created_event_includes_process_spec(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runtime = ResearchRuntime()
+            result = runtime.run_source_ingestion(
+                title="Source Only",
+                content="Store this source only.",
+                vault_dir=root / "vault",
+                memory_path=root / "memory.json",
+            )
+
+            first_event = runtime.event_log[0]
+            self.assertEqual(first_event["type"], "room_created")
+            self.assertEqual(first_event["process"]["process_id"], "source_ingestion_room")
+            self.assertEqual(result.room.agents, ["supervisor_agent", "ingestion_agent", "obsidian_curator_agent"])
 
     def test_cli_research_command(self) -> None:
         with TemporaryDirectory() as tmp:
