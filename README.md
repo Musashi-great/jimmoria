@@ -1,57 +1,35 @@
 # JIMMORIA
 
-Controlled P2P multi-agent MVP for a crypto research-only company.
+JIMMORIA는 크립토 리서치 전용 멀티에이전트 회사 CLI입니다.
 
-JIMMORIA is meant to feel like a research company you can chat with from the
-terminal. You type a research request, then the Supervisor opens a room and the
-specialized agents work in public: ingestion, narrative mapping, discovery,
-social/KOL checks, contract/on-chain checks, product/docs checks, funding/token
-checks, report writing, and Obsidian sync.
+사용자는 터미널에서 채팅을 치고, Supervisor가 Research Room을 열어 여러 에이전트에게 일을 나눕니다. 에이전트들은 소스 정리, 내러티브 분석, 후보 프로젝트 발굴, KOL/소셜 체크, 온체인/제품/토큰 체크, 보고서 작성, Obsidian 노트 정리를 담당합니다.
 
-The first screen shows a color JIMMORIA hero panel and a short description. The
-agent roster is hidden by default; use `/company` when you want to inspect every
-agent. Model/auth setup screens clear between steps so each choice opens a fresh
-panel instead of appending more text below the old one.
+현재는 MVP입니다. 에이전트 협업 구조와 보고서 생성 흐름은 동작하고, X/Twitter, Telegram, GitHub, Explorer 같은 실시간 외부 리서치 커넥터는 아직 placeholder 상태입니다.
 
-The first loop supports:
+## Quick Start
 
-```text
-article/source input
--> research room
--> ingestion
--> narrative mapping
--> candidate discovery
--> social / contract / product / funding checks
--> report generation
--> Obsidian-style markdown notes
-```
-
-Install the CLI once from the project folder:
+처음 한 번만 설치합니다.
 
 ```powershell
 cd C:\jimmoria
 python -m pip install -e .
 ```
 
-After that, start the company with:
+이후에는 바로 실행합니다.
 
 ```powershell
 jimmoria
 ```
 
-Run the demo:
+데모 실행:
 
 ```powershell
 jimmoria demo
 ```
 
-Start the interactive research console:
+## Model Setup
 
-```powershell
-jimmoria
-```
-
-When chat starts, it opens a model setup panel:
+처음 실행하면 모델 선택 화면이 나옵니다.
 
 ```text
 1. Codex OAuth / ChatGPT login code
@@ -59,186 +37,101 @@ When chat starts, it opens a model setup panel:
 3. Offline fallback
 ```
 
-Choose `Codex OAuth / ChatGPT login code` to run the Codex device login flow.
-Codex shows the browser/code login flow, then JIMMORIA uses the local Codex CLI
-ChatGPT login session for model calls. Manual bearer-token entry is still
-available as a fallback. Tokens are not written to config files.
+추천 흐름은 `Codex OAuth / ChatGPT login code`입니다. Codex CLI의 `codex login --device-auth` 방식으로 ChatGPT 로그인 코드를 입력합니다.
 
-After Codex login succeeds once, you normally do not need to log in again unless
-you sign out, change machines, or the Codex session expires. JIMMORIA stores only
-non-secret model/provider preferences in `data/model_settings.json`; it does not
-store bearer tokens.
+한 번 로그인하면 보통 다시 로그인할 필요가 없습니다. 로그아웃하거나, 다른 컴퓨터로 옮기거나, 세션이 만료된 경우에만 다시 로그인하면 됩니다.
 
-If a provider is already saved, `jimmoria` skips the startup model setup panel
-and goes straight into chat. Use `/models` anytime to change provider or model
-routes.
+JIMMORIA는 토큰을 저장하지 않습니다. 저장하는 것은 `data/model_settings.json`의 provider/model preference 정도입니다. 모델명을 모르면 `Use provider default for every agent`를 선택하면 됩니다.
 
-Model routing is selectable. Choose the recommended `Use provider default for
-every agent` route if you do not know model ids. JIMMORIA will let Codex use the
-default model your Codex CLI account/config supports.
-
-Inside chat mode:
+## Chat Commands
 
 ```text
-Type any research question/source text to open a Research Room.
-
-/add <text-or-url>       Ingest source only
-/models                  Configure LLM provider/models
-/doctor                  Show configured vs placeholder capabilities
-/company                 Show active and planned agents
-/runs                    Show previous runs
-/status [room_id]        Show latest or selected room status
-/messages [room_id]      Show collaboration history
-/events [room_id]        Show saved UI/replay events
-/report [room_id]        Print saved report
-/last                    Show the latest run card
-/help                    Show help
-/quit                    Exit
+/models                  모델/provider 설정 변경
+/company                 에이전트 목록 보기
+/doctor                  현재 연결 가능한 기능 확인
+/runs                    이전 실행 목록
+/status [room_id]        특정 Research Room 상태
+/messages [room_id]      에이전트 협업 메시지
+/events [room_id]        UI/replay 이벤트
+/report [room_id]        저장된 보고서 출력
+/last                    최근 실행 요약
+/quit                    종료
 ```
 
-Run a full research loop:
-
-```powershell
-jimmoria research --title "AI wallet thesis" --file .\source.txt
-jimmoria research --title "AI wallet thesis" --url "https://example.com/article"
-```
-
-Ingest a source only:
-
-```powershell
-jimmoria add-source --title "Source note" --text "AI wallet automation..."
-```
-
-Inspect runs:
-
-```powershell
-jimmoria runs
-jimmoria doctor
-jimmoria status <room_id>
-jimmoria messages <room_id> --limit 10
-jimmoria events <room_id> --limit 30
-jimmoria show-report <room_id>
-```
-
-Use a live LLM provider:
-
-```powershell
-$env:LLM_PROVIDER="openai"
-$env:OPENAI_API_KEY="..."
-$env:OPENAI_MODEL_FAST="your-fast-model"
-$env:OPENAI_MODEL_REASONING="your-reasoning-model"
-$env:OPENAI_MODEL_WRITING="your-writing-model"
-jimmoria demo
-```
-
-Use the Codex CLI ChatGPT login session:
-
-```powershell
-codex login --device-auth
-jimmoria
-```
-
-Or use a Codex OAuth bearer token manually:
-
-```powershell
-$env:LLM_PROVIDER="codex_oauth"
-$env:CODEX_OAUTH_TOKEN="..."
-$env:CODEX_OAUTH_MODEL_FAST="your-fast-model"
-$env:CODEX_OAUTH_MODEL_REASONING="your-reasoning-model"
-$env:CODEX_OAUTH_MODEL_WRITING="your-writing-model"
-jimmoria
-```
-
-Or provide the token through a command:
-
-```powershell
-$env:LLM_PROVIDER="codex_oauth"
-$env:CODEX_OAUTH_TOKEN_COMMAND="your-command-that-prints-a-bearer-token"
-jimmoria demo
-```
-
-The manual bearer-token provider does not automatically read Codex internal auth
-files. If you want the ChatGPT code-login flow, use `codex_cli` through
-`codex login --device-auth`.
-
-Once you pick Codex CLI in `/models`, JIMMORIA remembers `LLM_PROVIDER=codex_cli`
-locally. The next startup can reuse the existing Codex login session.
-
-If no live provider is configured, the runtime uses a deterministic offline fallback so the agent loop still runs.
-
-Current MVP limitations:
+일반 문장을 입력하면 Research Room이 열립니다.
 
 ```text
-Works now:
+jimmoria> AI wallet automation 관련 초기 프로젝트 찾아줘
+```
+
+## Project Structure
+
+```text
+jimmoria/
+  crypto_research_agents/
+    cli.py                 jimmoria 명령어 진입점
+    console.py             터미널 화면, 히어로, 채팅 UI
+    runtime.py             Research Room 실행 흐름
+    agents/                실제 에이전트 구현
+    core/                  Bus, Memory, Room, ModelGateway, ToolGateway
+    storage/               JSON 저장소, run snapshot, Obsidian writer
+
+  config/
+    agents/                에이전트 persona, 권한, tool policy
+    models/                모델 라우팅 기본 설정
+    skills/                리서치 workflow 정의
+    tools/                 tool registry
+
+  templates/
+    obsidian/              Source, Project, Report 노트 템플릿
+
+  docs/                    아키텍처와 실행 스펙
+  tests/                   smoke test
+
+  data/                    memory, runs, model_settings 출력
+  reports/                 markdown 리서치 보고서 출력
+  vault/                   Obsidian-style note 출력
+```
+
+`data/`, `reports/`, `vault/`는 실행 중 생성되는 로컬 출력 폴더이며 Git에는 올리지 않습니다.
+
+## Current MVP
+
+동작 중:
+
+```text
+- CLI 채팅 인터페이스
 - Research Room orchestration
 - Supervisor + controlled P2P Agent Bus
-- AgentSpec/persona loading
-- LLM provider routing with offline fallback, OpenAI API key, Codex CLI ChatGPT login, or explicit Codex OAuth token source
-- Markdown reports, run snapshots, tool audit logs, LLM call logs
-- Obsidian-style local note writing
-
-Not live yet:
-- X/Twitter/KOL search
-- Telegram/Discord channel reading
-- Explorer/RPC contract lookup
-- DEX pair/token metadata lookup
-- Docs/GitHub/website crawling
-- Funding, points, and airdrop checking
-
-Those live research tools currently return `unconfigured` through ToolGateway.
-Use `jimmoria doctor` to see this status before testing.
+- AgentSpec/persona YAML 로딩
+- Codex CLI login, OpenAI API key, offline fallback provider
+- Markdown report 생성
+- run snapshot, event log, tool audit log, LLM call log
+- Obsidian-style note 생성
 ```
 
-Useful outputs:
+아직 live 연결 전:
 
 ```text
-reports/                 Markdown research reports
-vault/                   Obsidian-style notes
-data/memory.json         MVP shared memory snapshot
-data/runs/<room_id>/     room.json, messages.json, tool_audit_log.json
-                         llm_call_log.json, events.json
+- X/Twitter/KOL 검색
+- Telegram/Discord 채널 읽기
+- GitHub/docs/website crawler
+- Explorer/RPC/DEX token metadata
+- RootData/funding/airdrop/points checker
 ```
 
-`events.json` is the visual-ready event stream for replaying how the company
-worked on a request. A future terminal dashboard or web UI can render this file
-as an agent timeline, graph, or room view.
+상태 확인:
 
-The executable spec lives in:
+```powershell
+jimmoria doctor
+```
+
+## Important Files
 
 ```text
+config/agents/*.yaml                         에이전트 정의
+config/tools/tool_registry.yaml              필요한 외부 tool 목록
+config/models/model_router.yaml              모델 라우팅 기준
 docs/crypto-research-company-v1.4-execution-spec.md
-```
-
-Agent identities are configured in:
-
-```text
-config/agents/*.yaml
-```
-
-Each AgentSpec includes persona fields:
-
-```text
-persona_name
-identity
-personality
-mission
-scope
-must_follow
-must_not
-```
-
-Use `/company` in chat mode to see each agent and persona.
-
-Tool registry is configured in:
-
-```text
-config/tools/tool_registry.yaml
-```
-
-The registry separates required, recommended, and optional tools across X/KOL, Telegram/Discord/RSS, website/docs/GitHub, RootData, CoinGecko, DefiLlama, DEX Screener, Etherscan, Dune, The Graph, Snapshot, reporting, Obsidian, and safety gates.
-
-Model routing defaults are documented in:
-
-```text
-config/models/model_router.yaml
+data/runs/<room_id>/events.json              나중에 시각화 UI에서 쓸 replay event stream
 ```
