@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import shutil
+import sys
 import textwrap
 from pathlib import Path
 from typing import Any
@@ -30,12 +32,7 @@ class JimmoriaConsole:
         self.width = min(shutil.get_terminal_size((100, 30)).columns, 110)
 
     def print_intro(self) -> None:
-        self.rule("=")
-        print_jimmoria_logo()
-        print(f" {APP_NAME} v{__version__}")
-        print(" Multi-agent crypto research company")
-        print(" Type a request. The company opens a room and the agents work.")
-        self.rule("=")
+        print_jimmoria_logo(self.width)
 
     def print_help(self) -> None:
         lines = [
@@ -260,12 +257,76 @@ class JimmoriaConsole:
         print(char * self.width)
 
 
-def print_jimmoria_logo() -> None:
-    print(
-        r"""
-       JJJJJJJ  III  MM    MM  MM    MM   OOOOO   RRRRR    III    AAAAA
-          JJ     I   MMM  MMM  MMM  MMM  OO   OO  RR  RR    I    AA   AA
-          JJ     I   MM MM MM  MM MM MM  OO   OO  RRRRR     I    AAAAAAA
-       JJ JJ     I   MM    MM  MM    MM  OO   OO  RR  RR    I    AA   AA
-        JJJ     III  MM    MM  MM    MM   OOOOO   RR   RR  III   AA   AA"""
-    )
+def print_jimmoria_logo(width: int = 100) -> None:
+    width = max(64, min(width, 110))
+    if supports_color():
+        print_color_hero(width)
+    else:
+        print_plain_hero(width)
+
+
+def print_color_hero(width: int) -> None:
+    reset = "\033[0m"
+    bold = "\033[1m"
+    dim = "\033[2m"
+    cyan = "\033[38;2;45;212;255m"
+    blue = "\033[38;2;84;122;255m"
+    violet = "\033[38;2;196;92;255m"
+    green = "\033[38;2;76;255;158m"
+    muted = "\033[38;2;145;157;183m"
+    line = "=" * width
+    name = "J I M M O R I A"
+    subtitle = "Multi-agent crypto research company"
+    hint = "Chat with the company. Watch the agents work."
+    signal = "o  o  o  o  o  o"
+
+    print(f"{blue}{line}{reset}")
+    print(center_ansi(f"{green}{signal}{reset}", width))
+    print("")
+    print(center_ansi(f"{bold}{cyan}{name}{reset}", width))
+    print(center_ansi(f"{violet}{subtitle}{reset}", width))
+    print("")
+    print(center_ansi(f"{dim}{muted}{hint}{reset}", width))
+    print(center_ansi(f"{muted}v{__version__}{reset}", width))
+    print(f"{blue}{line}{reset}")
+
+
+def print_plain_hero(width: int) -> None:
+    line = "=" * width
+    print(line)
+    print(center_text("J I M M O R I A", width))
+    print(center_text("Multi-agent crypto research company", width))
+    print(center_text("Chat with the company. Watch the agents work.", width))
+    print(center_text(f"JIMMORIA v{__version__}", width))
+    print(line)
+
+
+def supports_color() -> bool:
+    if os.getenv("NO_COLOR"):
+        return False
+    if os.getenv("JIMMORIA_FORCE_COLOR"):
+        return True
+    return sys.stdout.isatty()
+
+
+def center_text(text: str, width: int) -> str:
+    return text.center(width)
+
+
+def center_ansi(text: str, width: int) -> str:
+    return " " * max((width - visible_len(text)) // 2, 0) + text
+
+
+def visible_len(text: str) -> int:
+    length = 0
+    in_escape = False
+    for char in text:
+        if char == "\033":
+            in_escape = True
+            continue
+        if in_escape:
+            if char == "m":
+                in_escape = False
+            continue
+        length += 1
+    return length

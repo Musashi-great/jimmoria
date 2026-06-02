@@ -8,8 +8,8 @@ specialized agents work in public: ingestion, narrative mapping, discovery,
 social/KOL checks, contract/on-chain checks, product/docs checks, funding/token
 checks, report writing, and Obsidian sync.
 
-The first screen shows a large JIMMORIA logo and a short description. The agent
-roster is hidden by default; use `/company` when you want to inspect every
+The first screen shows a color JIMMORIA hero panel and a short description. The
+agent roster is hidden by default; use `/company` when you want to inspect every
 agent. Model/auth setup screens clear between steps so each choice opens a fresh
 panel instead of appending more text below the old one.
 

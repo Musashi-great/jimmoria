@@ -26,6 +26,7 @@ class SmokeTest(unittest.TestCase):
         text = output.getvalue()
         self.assertIn("JIMMORIA v0.1.0", text)
         self.assertIn("Multi-agent crypto research company", text)
+        self.assertNotIn("JJJJJJJ", text)
         self.assertNotIn("Company roster", text)
 
     def test_pyproject_exposes_jimmoria_command(self) -> None:
