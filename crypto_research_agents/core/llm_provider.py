@@ -116,26 +116,18 @@ class CodexCliProvider:
     def __init__(self, *, command: str | None = None) -> None:
         self.command = command or os.getenv("CODEX_CLI_COMMAND", "codex")
         self.timeout = float(os.getenv("CODEX_CLI_TIMEOUT", "180"))
+        self._exec_help_text: str | None = None
 
     def complete(self, request: LLMRequest) -> LLMResponse:
         prompt = _codex_cli_prompt(request)
         with tempfile.TemporaryDirectory() as tmp:
             output_path = Path(tmp) / "last_message.txt"
-            command = [
-                self.command,
-                "exec",
-                "--ephemeral",
-                "--skip-git-repo-check",
-                "--ask-for-approval",
-                "never",
-                "--sandbox",
-                "read-only",
-                "--output-last-message",
-                str(output_path),
-            ]
-            if _is_real_model_name(request.model):
-                command.extend(["--model", request.model])
-            command.append("-")
+            command = _build_codex_exec_command(
+                executable=self.command,
+                help_text=self.exec_help_text(),
+                output_path=output_path,
+                model=request.model,
+            )
 
             completed = subprocess.run(
                 command,
@@ -158,6 +150,11 @@ class CodexCliProvider:
             provider=self.provider_name,
             usage={"mode": "codex_cli"},
         )
+
+    def exec_help_text(self) -> str:
+        if self._exec_help_text is None:
+            self._exec_help_text = _load_codex_exec_help(self.command)
+        return self._exec_help_text
 
 
 class OAuthTokenProvider:
@@ -300,6 +297,56 @@ def provider_from_env() -> LLMProvider:
         except RuntimeError:
             return OfflineLLMProvider()
     return OfflineLLMProvider()
+
+
+def _load_codex_exec_help(command: str) -> str:
+    try:
+        completed = subprocess.run(
+            [command, "exec", "--help"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return "\n".join(part for part in [completed.stdout, completed.stderr] if part)
+
+
+def _build_codex_exec_command(
+    *,
+    executable: str,
+    help_text: str,
+    output_path: Path,
+    model: str,
+) -> list[str]:
+    command = [executable, "exec"]
+
+    if _codex_exec_supports(help_text, "--ephemeral"):
+        command.append("--ephemeral")
+    if _codex_exec_supports(help_text, "--skip-git-repo-check"):
+        command.append("--skip-git-repo-check")
+
+    if _codex_exec_supports(help_text, "--ask-for-approval"):
+        command.extend(["--ask-for-approval", "never"])
+    elif _codex_exec_supports(help_text, "--approval-policy"):
+        command.extend(["--approval-policy", "never"])
+
+    if _codex_exec_supports(help_text, "--sandbox"):
+        command.extend(["--sandbox", os.getenv("CODEX_CLI_SANDBOX", "read-only")])
+
+    if _codex_exec_supports(help_text, "--output-last-message"):
+        command.extend(["--output-last-message", str(output_path)])
+
+    if _is_real_model_name(model) and _codex_exec_supports(help_text, "--model"):
+        command.extend(["--model", model])
+
+    command.append("-")
+    return command
+
+
+def _codex_exec_supports(help_text: str, option: str) -> bool:
+    return option in help_text
 
 
 def _codex_cli_prompt(request: LLMRequest) -> str:

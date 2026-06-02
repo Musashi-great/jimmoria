@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import tomllib
 import unittest
 from contextlib import redirect_stdout
@@ -14,7 +15,7 @@ from crypto_research_agents.runtime import ResearchRuntime
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
 from crypto_research_agents.cli import chat_command, configure_model_panel, main as cli_main, print_banner
 from crypto_research_agents.console import JimmoriaConsole, print_jimmoria_logo
-from crypto_research_agents.core.llm_provider import OAuthTokenProvider, provider_from_env
+from crypto_research_agents.core.llm_provider import CodexCliProvider, LLMRequest, OAuthTokenProvider, provider_from_env
 from crypto_research_agents.core.model_gateway import ModelGateway
 from crypto_research_agents.core.capabilities import collect_capabilities
 
@@ -209,6 +210,48 @@ class SmokeTest(unittest.TestCase):
             provider = provider_from_env()
 
         self.assertEqual(provider.provider_name, "codex_cli")
+
+    def test_codex_cli_provider_uses_supported_exec_flags(self) -> None:
+        help_text = """
+Usage: codex exec [OPTIONS] [PROMPT]
+  --ephemeral
+  --skip-git-repo-check
+  -s, --sandbox <SANDBOX_MODE>
+  -o, --output-last-message <FILE>
+  -m, --model <MODEL>
+"""
+        commands: list[list[str]] = []
+
+        def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+            commands.append(command)
+            if command == ["codex", "exec", "--help"]:
+                return subprocess.CompletedProcess(command, 0, stdout=help_text, stderr="")
+
+            output_index = command.index("--output-last-message") + 1
+            Path(command[output_index]).write_text('{"summary": "ok"}', encoding="utf-8")
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        request = LLMRequest(
+            agent_id="ingestion_agent",
+            task_type="source_ingestion",
+            model="codex-test-model",
+            system_prompt="Return JSON.",
+            user_prompt="pearl pow project",
+            max_tokens=100,
+            temperature=0.1,
+            response_format="json",
+        )
+
+        with patch("crypto_research_agents.core.llm_provider.subprocess.run", side_effect=fake_run):
+            response = CodexCliProvider().complete(request)
+
+        exec_command = commands[1]
+        self.assertEqual(response.text, '{"summary": "ok"}')
+        self.assertIn("--sandbox", exec_command)
+        self.assertIn("--output-last-message", exec_command)
+        self.assertIn("--model", exec_command)
+        self.assertNotIn("--ask-for-approval", exec_command)
+        self.assertEqual(exec_command[-1], "-")
 
     def test_model_setup_offline_choice_uses_screen_flow(self) -> None:
         output = StringIO()
