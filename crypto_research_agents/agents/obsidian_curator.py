@@ -1,0 +1,52 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from crypto_research_agents.agents.base import AgentResult, BaseAgent
+from crypto_research_agents.core.bus import CollaborationBus
+from crypto_research_agents.core.memory import SharedMemory
+from crypto_research_agents.core.room import ResearchRoom
+from crypto_research_agents.storage.obsidian_store import ObsidianStore
+
+
+class ObsidianCuratorAgent(BaseAgent):
+    agent_id = "obsidian_curator_agent"
+    name = "Obsidian Curator Agent"
+    task_type = "obsidian_sync"
+
+    def run(self, room: ResearchRoom, memory: SharedMemory, bus: CollaborationBus, **kwargs: Any) -> AgentResult:
+        vault_dir = Path(kwargs.get("vault_dir", "vault"))
+        store = ObsidianStore(vault_dir)
+
+        written: list[str] = []
+        for source_id in room.source_inputs:
+            source = memory.sources.get(source_id)
+            if source:
+                written.append(str(store.write_source_note(source)))
+
+        for project in memory.projects.values():
+            if not set(project.sources).intersection(room.source_inputs):
+                continue
+            written.append(str(store.write_project_note(project)))
+
+        if room.report_draft:
+            written.append(str(store.write_report(room.topic, room.report_draft)))
+
+        room.output_paths["obsidian_vault"] = str(vault_dir)
+        summary = f"Obsidian sync wrote {len(written)} notes."
+        finding = self.write_finding(
+            room=room,
+            memory=memory,
+            finding_type="obsidian_sync",
+            summary=summary,
+            data={"paths": written},
+            confidence=0.75,
+        )
+        bus.update(
+            room_id=room.room_id,
+            from_agent=self.agent_id,
+            summary="Obsidian vault updated.",
+            payload={"finding_id": finding.finding_id, "paths": written},
+        )
+        return AgentResult(self.agent_id, summary, {"finding_id": finding.finding_id, "paths": written}, confidence=0.75)

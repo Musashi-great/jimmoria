@@ -1,0 +1,15 @@
+{
+  "skill_id": "project_research",
+  "description": "프로젝트 기본 정보, 소셜 신호, 컨트랙트/토큰, 제품 상태, 내러티브를 조사한다.",
+  "steps": [
+    "create_research_room",
+    "run_discovery",
+    "request_social_check",
+    "request_contract_check",
+    "request_product_check",
+    "request_narrative_check",
+    "merge_findings",
+    "write_candidate_dossier"
+  ],
+  "required_output": ["candidate_dossier", "agent_findings", "sources"]
+}

@@ -1,0 +1,16 @@
+[project]
+name = "jimmoria"
+version = "0.1.0"
+description = "JIMMORIA controlled P2P multi-agent runtime for a crypto research company MVP."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+llm = ["openai>=1.0.0"]
+
+[project.scripts]
+jimmoria = "crypto_research_agents.cli:main"
+crypto-research = "crypto_research_agents.cli:main"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

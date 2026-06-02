@@ -1,0 +1,181 @@
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from .agent_spec import AgentSpecRegistry
+from .llm_provider import provider_from_env
+from .tool_gateway import ToolGateway
+
+
+@dataclass(slots=True)
+class CapabilityStatus:
+    name: str
+    status: str
+    detail: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"name": self.name, "status": self.status, "detail": self.detail}
+
+
+def collect_capabilities(
+    tool_gateway: ToolGateway | None = None,
+    *,
+    agent_spec_dir: str | Path = "config/agents",
+    memory_path: str | Path = "data/memory.json",
+    runs_dir: str | Path = "data/runs",
+    vault_dir: str | Path = "vault",
+    reports_dir: str | Path = "reports",
+) -> list[CapabilityStatus]:
+    gateway = tool_gateway or ToolGateway()
+    provider = provider_from_env()
+    agent_spec_status = _agent_spec_status(agent_spec_dir)
+    capabilities = [
+        CapabilityStatus(
+            "Runtime scaffold",
+            "configured",
+            "ResearchRoom, Agent Bus, Shared Memory, Tool Gateway, and Model Gateway are available",
+        ),
+        agent_spec_status,
+        CapabilityStatus(
+            "Shared memory JSON",
+            "configured",
+            _path_detail(memory_path, "created on first run"),
+        ),
+        CapabilityStatus(
+            "Run snapshots",
+            "configured",
+            _path_detail(runs_dir, "created after each run"),
+        ),
+        CapabilityStatus(
+            "Report writer",
+            "configured",
+            _path_detail(reports_dir, "created when report_agent writes a report"),
+        ),
+        CapabilityStatus(
+            "Obsidian vault writer",
+            "configured",
+            _path_detail(vault_dir, "created when obsidian_curator_agent syncs notes"),
+        ),
+        CapabilityStatus(
+            "LLM provider",
+            "configured" if provider.provider_name != "offline_fallback" else "fallback",
+            provider.provider_name,
+        ),
+        CapabilityStatus(
+            "Codex OAuth token",
+            "configured" if _codex_token_configured() else "missing",
+            "explicit token source set" if _codex_token_configured() else "set CODEX_OAUTH_TOKEN, CODEX_OAUTH_TOKEN_FILE, or CODEX_OAUTH_TOKEN_COMMAND",
+        ),
+        CapabilityStatus(
+            "OpenAI API key",
+            "configured" if os.getenv("OPENAI_API_KEY") else "missing",
+            "OPENAI_API_KEY set" if os.getenv("OPENAI_API_KEY") else "set OPENAI_API_KEY",
+        ),
+    ]
+
+    tool_specs = [
+        ("X/Twitter search", "x_search_posts"),
+        ("X/KOL timeline", "x_get_user_timeline"),
+        ("X/KOL list builder", "x_build_kol_list"),
+        ("Telegram read", "telegram_read_channel"),
+        ("Discord read", "discord_read_channel"),
+        ("RSS feed monitor", "rss_monitor_feed"),
+        ("RootData project directory", "rootdata_search_projects"),
+        ("CoinGecko metadata", "coingecko_coin_metadata"),
+        ("DefiLlama protocol data", "defillama_protocol_search"),
+        ("Explorer contract lookup", "get_contract_address"),
+        ("Explorer metadata", "explorer_lookup"),
+        ("DEX pair lookup", "get_dex_pair"),
+        ("DEX Screener pair search", "dexscreener_search_pairs"),
+        ("Docs crawler", "crawl_docs"),
+        ("GitHub reader", "read_github_repo"),
+        ("GitHub repo search", "github_search_repos"),
+        ("Funding/airdrop checker", "check_airdrop_points"),
+        ("Snapshot governance API", "snapshot_get_proposals"),
+        ("Dune query execution", "dune_execute_query"),
+        ("The Graph subgraph query", "thegraph_query_subgraph"),
+    ]
+    for label, tool_name in tool_specs:
+        configured = gateway.has_tool(tool_name)
+        capabilities.append(
+            CapabilityStatus(
+                label,
+                "configured" if configured else "placeholder",
+                tool_name if configured else f"{tool_name} connector not registered in ToolGateway",
+            )
+        )
+    capabilities.append(_overall_status(capabilities))
+    return capabilities
+
+
+def _codex_token_configured() -> bool:
+    return bool(
+        os.getenv("CODEX_OAUTH_TOKEN")
+        or os.getenv("CODEX_OAUTH_TOKEN_FILE")
+        or os.getenv("CODEX_OAUTH_TOKEN_COMMAND")
+    )
+
+
+def _agent_spec_status(agent_spec_dir: str | Path) -> CapabilityStatus:
+    required_agents = {
+        "supervisor_agent",
+        "ingestion_agent",
+        "narrative_agent",
+        "discovery_agent",
+        "social_kol_agent",
+        "contract_onchain_agent",
+        "product_tech_agent",
+        "funding_token_agent",
+        "report_agent",
+        "obsidian_curator_agent",
+    }
+    try:
+        registry = AgentSpecRegistry.load_dir(agent_spec_dir)
+    except Exception as exc:
+        return CapabilityStatus("Agent specs/personas", "missing", f"failed to load: {exc}")
+
+    missing = sorted(required_agents - set(registry.specs))
+    if missing:
+        return CapabilityStatus(
+            "Agent specs/personas",
+            "missing",
+            f"missing specs: {', '.join(missing)}",
+        )
+    return CapabilityStatus(
+        "Agent specs/personas",
+        "configured",
+        f"{len(registry.specs)} specs loaded from {Path(agent_spec_dir)}",
+    )
+
+
+def _path_detail(path: str | Path, missing_note: str) -> str:
+    target = Path(path)
+    if target.exists():
+        return f"{target} exists"
+    return f"{target} not found yet; {missing_note}"
+
+
+def _overall_status(capabilities: list[CapabilityStatus]) -> CapabilityStatus:
+    placeholders = [
+        item.name
+        for item in capabilities
+        if item.status == "placeholder"
+        and item.name
+        not in {
+            "Overall",
+        }
+    ]
+    if placeholders:
+        return CapabilityStatus(
+            "Overall",
+            "placeholder",
+            "MVP scaffold runs, but live research connectors are not connected yet.",
+        )
+    return CapabilityStatus(
+        "Overall",
+        "configured",
+        "Core runtime and live connector checks are configured.",
+    )

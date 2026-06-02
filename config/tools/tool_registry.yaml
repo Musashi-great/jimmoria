@@ -1,0 +1,488 @@
+{
+  "registry_version": "0.2",
+  "status_values": ["required", "recommended", "optional"],
+  "implementation_status_values": ["implemented", "planned", "external_connector_required"],
+  "minimum_viable_live_stack": [
+    "x_search_posts",
+    "x_get_user_timeline",
+    "x_build_kol_list",
+    "rss_monitor_feed",
+    "crawl_website",
+    "crawl_docs",
+    "github_search_repos",
+    "read_github_repo",
+    "coingecko_coin_metadata",
+    "dexscreener_search_pairs",
+    "explorer_lookup",
+    "rootdata_search_projects",
+    "source_cache_write",
+    "vector_search",
+    "vector_upsert",
+    "render_markdown",
+    "write_note"
+  ],
+  "auth": [
+    "oauth_connect",
+    "oauth_refresh",
+    "api_key_get",
+    "bot_token_get",
+    "permission_check",
+    "credential_health_check",
+    "rate_limit_check"
+  ],
+  "task": [
+    "create_research_room",
+    "create_task",
+    "assign_task",
+    "agent_handoff",
+    "update_task_status",
+    "task_retry",
+    "task_cancel"
+  ],
+  "memory": [
+    "db_read_project",
+    "db_write_project",
+    "db_search_project",
+    "db_read_kol_profile",
+    "db_write_kol_profile",
+    "vector_search",
+    "vector_upsert",
+    "entity_graph_read",
+    "entity_graph_write",
+    "source_cache_read",
+    "source_cache_write",
+    "dedupe_entity",
+    "retrieve_prior_runs",
+    "update_watchlist"
+  ],
+  "source_ingestion": [
+    "fetch_url",
+    "parse_html",
+    "parse_pdf",
+    "parse_markdown",
+    "parse_tweet_thread",
+    "parse_rss_feed",
+    "extract_metadata",
+    "archive_source_snapshot"
+  ],
+  "social": [
+    "x_search_posts",
+    "x_count_recent_posts",
+    "x_get_recent_mentions",
+    "x_get_user_profile",
+    "x_get_user_timeline",
+    "x_build_kol_list",
+    "x_track_list",
+    "telegram_read_channel",
+    "telegram_search_public_channels",
+    "discord_read_channel",
+    "discord_search_messages",
+    "rss_monitor_feed",
+    "count_mentions",
+    "calculate_social_momentum",
+    "update_kol_profile"
+  ],
+  "market_narrative": [
+    "coingecko_coin_metadata",
+    "coingecko_latest_listings",
+    "coingecko_category_markets",
+    "defillama_protocol_search",
+    "defillama_tvl_snapshot",
+    "defillama_fees_revenue",
+    "dexscreener_search_pairs",
+    "dexscreener_latest_profiles",
+    "rootdata_search_projects",
+    "rootdata_get_project",
+    "rootdata_get_hot_projects",
+    "snapshot_get_space",
+    "snapshot_get_proposals",
+    "dune_execute_query",
+    "dune_get_query_results",
+    "thegraph_query_subgraph"
+  ],
+  "onchain_contract": [
+    "resolve_chain",
+    "get_contract_address",
+    "explorer_lookup",
+    "explorer_get_contract_source",
+    "explorer_get_token_supply",
+    "explorer_get_token_holders",
+    "get_token_metadata",
+    "get_dex_pair",
+    "dexscreener_search_pairs",
+    "dexscreener_token_pairs",
+    "check_contract_verified",
+    "check_official_links_match_contract",
+    "rpc_read_contract",
+    "thegraph_query_subgraph"
+  ],
+  "product_tech": [
+    "crawl_website",
+    "crawl_docs",
+    "read_github_repo",
+    "github_search_repos",
+    "github_get_repo_activity",
+    "github_get_releases",
+    "github_get_commits",
+    "github_get_issues",
+    "check_app_status",
+    "detect_waitlist_or_testnet",
+    "website_change_monitor",
+    "docs_change_monitor",
+    "monitor_github_activity"
+  ],
+  "funding_token": [
+    "check_airdrop_points",
+    "find_points_program",
+    "find_airdrop_hints",
+    "crawl_funding_news",
+    "rootdata_search_projects",
+    "rootdata_get_project",
+    "rootdata_get_investors",
+    "rootdata_get_hot_projects",
+    "parse_tokenomics",
+    "parse_unlock_schedule",
+    "check_tge_status"
+  ],
+  "monitor": [
+    "monitor_rss",
+    "monitor_x_list",
+    "monitor_telegram_channels",
+    "monitor_discord_channels",
+    "monitor_github_activity",
+    "monitor_docs_changes",
+    "monitor_rootdata_updates",
+    "monitor_defillama_protocols",
+    "push_signal_queue"
+  ],
+  "report": [
+    "merge_agent_findings",
+    "render_markdown",
+    "compile_sources",
+    "generate_daily_radar",
+    "generate_candidate_dossier",
+    "generate_kol_map",
+    "generate_narrative_map",
+    "source_citation_check",
+    "confidence_score_report"
+  ],
+  "obsidian": [
+    "read_note",
+    "write_note",
+    "update_frontmatter",
+    "create_wikilinks",
+    "update_backlinks",
+    "create_project_note",
+    "create_source_note",
+    "create_kol_note",
+    "create_narrative_note",
+    "sync_watchlist"
+  ],
+  "safety": [
+    "secret_scan",
+    "pii_redact",
+    "source_rights_check",
+    "investment_advice_guard",
+    "claim_evidence_check",
+    "request_human_approval"
+  ],
+  "tool_meta": {
+    "x_search_posts": {
+      "priority": "required",
+      "owner_agent": "social_kol_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Search recent X posts for project, KOL, narrative, URL, and ticker mentions.",
+      "provider_options": ["X API v2 recent search"],
+      "required_secrets": ["X_BEARER_TOKEN"],
+      "source_docs": ["https://docs.x.com/x-api/posts/search/introduction"]
+    },
+    "x_count_recent_posts": {
+      "priority": "recommended",
+      "owner_agent": "social_kol_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Count recent X mentions to estimate momentum without fetching every post.",
+      "provider_options": ["X API v2 recent counts"],
+      "required_secrets": ["X_BEARER_TOKEN"],
+      "source_docs": ["https://docs.x.com/x-api/fundamentals/rate-limits"]
+    },
+    "x_get_user_profile": {
+      "priority": "required",
+      "owner_agent": "social_kol_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Resolve KOL handles, profile metadata, verification state, and follower context.",
+      "provider_options": ["X API v2 users"],
+      "required_secrets": ["X_BEARER_TOKEN"],
+      "source_docs": ["https://docs.x.com/overview"]
+    },
+    "x_get_user_timeline": {
+      "priority": "required",
+      "owner_agent": "social_kol_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Read a KOL timeline to find repeated project and narrative mentions.",
+      "provider_options": ["X API v2 user timeline"],
+      "required_secrets": ["X_BEARER_TOKEN"],
+      "source_docs": ["https://docs.x.com/x-api/posts/search/integrate/overview"]
+    },
+    "x_build_kol_list": {
+      "priority": "required",
+      "owner_agent": "social_kol_agent",
+      "implementation_status": "planned",
+      "purpose": "Build and update KOL handle sets by narrative, ecosystem, and credibility tier.",
+      "provider_options": ["local KOL DB", "X API user/profile endpoints", "RootData leading figures"],
+      "required_secrets": [],
+      "source_docs": ["https://www.rootdata.com/Api/Doc"]
+    },
+    "telegram_read_channel": {
+      "priority": "recommended",
+      "owner_agent": "social_kol_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Read messages from monitored public or approved Telegram channels.",
+      "provider_options": ["Telegram Bot API getUpdates", "Telegram client API for approved channels"],
+      "required_secrets": ["TELEGRAM_BOT_TOKEN"],
+      "source_docs": ["https://core.telegram.org/bots/api"]
+    },
+    "discord_read_channel": {
+      "priority": "recommended",
+      "owner_agent": "social_kol_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Read approved Discord channel messages for community and dev signal tracking.",
+      "provider_options": ["Discord REST API channel messages"],
+      "required_secrets": ["DISCORD_BOT_TOKEN"],
+      "source_docs": ["https://docs.discord.com/developers/resources/message"]
+    },
+    "rss_monitor_feed": {
+      "priority": "required",
+      "owner_agent": "monitor_24h_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Monitor official blogs, GitHub release feeds, media feeds, and ecosystem news feeds.",
+      "provider_options": ["RSS 2.0", "Atom"],
+      "required_secrets": [],
+      "source_docs": ["https://www.rssboard.org/rss-specification"]
+    },
+    "crawl_website": {
+      "priority": "required",
+      "owner_agent": "product_tech_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Fetch project websites and extract official links, team/product claims, and waitlist/testnet status.",
+      "provider_options": ["HTTP crawler", "Playwright fallback"],
+      "required_secrets": [],
+      "source_docs": []
+    },
+    "crawl_docs": {
+      "priority": "required",
+      "owner_agent": "product_tech_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Crawl documentation pages for product state, technical depth, API references, and change signals.",
+      "provider_options": ["HTTP crawler", "site map crawler", "Mintlify/GitBook/Docusaurus adapters"],
+      "required_secrets": [],
+      "source_docs": []
+    },
+    "github_search_repos": {
+      "priority": "required",
+      "owner_agent": "product_tech_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Find likely official repositories and related open-source activity.",
+      "provider_options": ["GitHub REST API search"],
+      "required_secrets": ["GITHUB_TOKEN"],
+      "source_docs": ["https://docs.github.com/en/rest"]
+    },
+    "read_github_repo": {
+      "priority": "required",
+      "owner_agent": "product_tech_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Read repository metadata, README, languages, stars, forks, and default branch info.",
+      "provider_options": ["GitHub REST API repositories"],
+      "required_secrets": ["GITHUB_TOKEN"],
+      "source_docs": ["https://docs.github.com/en/rest/repos"]
+    },
+    "github_get_repo_activity": {
+      "priority": "required",
+      "owner_agent": "product_tech_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Check commits, releases, issues, and contribution recency as early project evidence.",
+      "provider_options": ["GitHub REST API"],
+      "required_secrets": ["GITHUB_TOKEN"],
+      "source_docs": ["https://docs.github.com/en/rest"]
+    },
+    "coingecko_coin_metadata": {
+      "priority": "recommended",
+      "owner_agent": "contract_onchain_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Fetch coin metadata, official links, socials, descriptions, and contract addresses.",
+      "provider_options": ["CoinGecko /coins/{id}", "CoinGecko contract endpoints"],
+      "required_secrets": ["COINGECKO_API_KEY"],
+      "source_docs": ["https://docs.coingecko.com/reference/endpoint-overview"]
+    },
+    "coingecko_latest_listings": {
+      "priority": "optional",
+      "owner_agent": "discovery_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Find newly listed coins as a secondary discovery source, not as trading signal.",
+      "provider_options": ["CoinGecko /coins/list/new"],
+      "required_secrets": ["COINGECKO_API_KEY"],
+      "source_docs": ["https://docs.coingecko.com/reference/endpoint-overview"]
+    },
+    "defillama_protocol_search": {
+      "priority": "recommended",
+      "owner_agent": "narrative_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Resolve DeFi protocols and categories for narrative context.",
+      "provider_options": ["DefiLlama free API /protocols"],
+      "required_secrets": [],
+      "source_docs": ["https://api-docs.defillama.com/"]
+    },
+    "defillama_tvl_snapshot": {
+      "priority": "optional",
+      "owner_agent": "narrative_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Use TVL snapshots only as ecosystem context, not price or investment advice.",
+      "provider_options": ["DefiLlama free API"],
+      "required_secrets": [],
+      "source_docs": ["https://api-docs.defillama.com/"]
+    },
+    "dexscreener_search_pairs": {
+      "priority": "recommended",
+      "owner_agent": "contract_onchain_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Search DEX pairs by token/project query and cross-check whether a tradable pair exists.",
+      "provider_options": ["DEX Screener search"],
+      "required_secrets": [],
+      "source_docs": ["https://docs.dexscreener.com/api/reference"]
+    },
+    "dexscreener_latest_profiles": {
+      "priority": "optional",
+      "owner_agent": "discovery_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Use latest token profiles as a weak discovery source that requires heavy verification.",
+      "provider_options": ["DEX Screener latest token profiles"],
+      "required_secrets": [],
+      "source_docs": ["https://docs.dexscreener.com/api/reference"]
+    },
+    "rootdata_search_projects": {
+      "priority": "required",
+      "owner_agent": "discovery_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Search indexed crypto projects, especially early projects and official social links.",
+      "provider_options": ["RootData API"],
+      "required_secrets": ["ROOTDATA_API_KEY"],
+      "source_docs": ["https://www.rootdata.com/Api/Doc"]
+    },
+    "rootdata_get_project": {
+      "priority": "required",
+      "owner_agent": "funding_token_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Fetch project profile, team, investors, and official links when available.",
+      "provider_options": ["RootData API get_item"],
+      "required_secrets": ["ROOTDATA_API_KEY"],
+      "source_docs": ["https://www.rootdata.com/Api/Doc"]
+    },
+    "rootdata_get_hot_projects": {
+      "priority": "recommended",
+      "owner_agent": "discovery_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Use hot/trending project lists as candidate discovery input.",
+      "provider_options": ["RootData API"],
+      "required_secrets": ["ROOTDATA_API_KEY"],
+      "source_docs": ["https://www.rootdata.com/Api/Doc"]
+    },
+    "snapshot_get_proposals": {
+      "priority": "optional",
+      "owner_agent": "narrative_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Read governance proposals to detect protocol roadmap and community decisions.",
+      "provider_options": ["Snapshot Hub GraphQL API"],
+      "required_secrets": [],
+      "source_docs": ["https://docs.snapshot.box/tools/api"]
+    },
+    "dune_execute_query": {
+      "priority": "optional",
+      "owner_agent": "contract_onchain_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Execute saved Dune queries for custom on-chain research views.",
+      "provider_options": ["Dune API"],
+      "required_secrets": ["DUNE_API_KEY"],
+      "source_docs": ["https://docs.dune.com/api-reference/overview/introduction/"]
+    },
+    "thegraph_query_subgraph": {
+      "priority": "optional",
+      "owner_agent": "contract_onchain_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Query protocol subgraphs when an indexed GraphQL data source exists.",
+      "provider_options": ["The Graph GraphQL API"],
+      "required_secrets": ["THEGRAPH_API_KEY"],
+      "source_docs": ["https://thegraph.com/docs/en/subgraphs/querying/graphql-api/"]
+    },
+    "explorer_lookup": {
+      "priority": "required",
+      "owner_agent": "contract_onchain_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Look up official contract pages, source verification, token supply, holder count, and explorer metadata.",
+      "provider_options": ["Etherscan API v2", "Blockscout-compatible APIs"],
+      "required_secrets": ["ETHERSCAN_API_KEY"],
+      "source_docs": ["https://docs.etherscan.io/"]
+    },
+    "check_airdrop_points": {
+      "priority": "required",
+      "owner_agent": "funding_token_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Detect points, quest, allowlist, testnet, and airdrop hint programs from official sources.",
+      "provider_options": ["official website crawler", "docs crawler", "RSS/X monitors"],
+      "required_secrets": [],
+      "source_docs": []
+    },
+    "find_airdrop_hints": {
+      "priority": "recommended",
+      "owner_agent": "funding_token_agent",
+      "implementation_status": "planned",
+      "purpose": "Classify airdrop hints as confirmed, hint, rumor, or unknown with source links.",
+      "provider_options": ["official source extraction", "X/KOL mentions"],
+      "required_secrets": [],
+      "source_docs": []
+    },
+    "render_markdown": {
+      "priority": "required",
+      "owner_agent": "report_agent",
+      "implementation_status": "planned",
+      "purpose": "Render candidate dossiers, daily radar, KOL maps, and narrative reports.",
+      "provider_options": ["local markdown renderer"],
+      "required_secrets": [],
+      "source_docs": []
+    },
+    "write_note": {
+      "priority": "required",
+      "owner_agent": "obsidian_curator_agent",
+      "implementation_status": "planned",
+      "purpose": "Write Obsidian-compatible project, source, KOL, narrative, and report notes.",
+      "provider_options": ["local filesystem"],
+      "required_secrets": [],
+      "source_docs": []
+    },
+    "claim_evidence_check": {
+      "priority": "required",
+      "owner_agent": "report_agent",
+      "implementation_status": "planned",
+      "purpose": "Reject report claims that have no source, finding, or explicit uncertainty label.",
+      "provider_options": ["local validator"],
+      "required_secrets": [],
+      "source_docs": []
+    },
+    "investment_advice_guard": {
+      "priority": "required",
+      "owner_agent": "report_agent",
+      "implementation_status": "planned",
+      "purpose": "Prevent output from becoming buy/sell advice or price prediction.",
+      "provider_options": ["local policy validator"],
+      "required_secrets": [],
+      "source_docs": []
+    },
+    "secret_scan": {
+      "priority": "required",
+      "owner_agent": "tool_policy_agent",
+      "implementation_status": "planned",
+      "purpose": "Block accidental logging of API keys, OAuth tokens, bot tokens, and private notes.",
+      "provider_options": ["local scanner"],
+      "required_secrets": [],
+      "source_docs": []
+    }
+  }
+}

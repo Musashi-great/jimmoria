@@ -1,0 +1,30 @@
+{
+  "provider": "openai_or_codex_oauth",
+  "env": {
+    "api_key": "OPENAI_API_KEY",
+    "fast_model": "OPENAI_MODEL_FAST",
+    "reasoning_model": "OPENAI_MODEL_REASONING",
+    "writing_model": "OPENAI_MODEL_WRITING",
+    "strong_model": "OPENAI_MODEL_STRONG",
+    "codex_oauth_token": "CODEX_OAUTH_TOKEN",
+    "codex_oauth_token_file": "CODEX_OAUTH_TOKEN_FILE",
+    "codex_oauth_token_command": "CODEX_OAUTH_TOKEN_COMMAND",
+    "codex_oauth_base_url": "CODEX_OAUTH_BASE_URL",
+    "codex_fast_model": "CODEX_OAUTH_MODEL_FAST",
+    "codex_reasoning_model": "CODEX_OAUTH_MODEL_REASONING",
+    "codex_writing_model": "CODEX_OAUTH_MODEL_WRITING",
+    "codex_strong_model": "CODEX_OAUTH_MODEL_STRONG"
+  },
+  "fallback": {
+    "provider": "offline_fallback",
+    "behavior": "deterministic local extraction and summarization"
+  },
+  "routes": {
+    "source_ingestion": "fast_model",
+    "narrative_reasoning": "reasoning_model",
+    "supervision": "reasoning_model",
+    "report_writing": "writing_model",
+    "final_synthesis": "writing_model",
+    "embedding_search": "embedding_model"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "skill_id": "article_ingestion",
+  "description": "아티클 저장, 엔티티 추출, 내러티브 태깅, Source Note 생성을 수행한다.",
+  "steps": [
+    "fetch_or_read_source",
+    "clean_content",
+    "extract_entities",
+    "classify_narrative",
+    "write_source_record",
+    "write_obsidian_source_note"
+  ],
+  "required_output": ["source_id", "entities", "keywords", "source_note_path"]
+}
