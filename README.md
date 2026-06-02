@@ -181,3 +181,5 @@ JIMMORIA의 일반 채팅 상대는 Supervisor다. 사용자는 먼저 Superviso
 예를 들어 `pearl 프로젝트를 분석해봐`는 리서치 방을 열지만, `보고서는 한글로 만들어`, `슈퍼바이저 권한을 더 크게 가져가`, `로그 스타일을 바꿔` 같은 말은 보고서를 만들지 않고 회사 운영 설정으로 반영된다. `지금 보고서 작성은 한글 위주로 세팅된 게 맞지?` 같은 말은 Research Room 없이 Supervisor가 직접 답한다. `안녕` 같은 인사는 설정으로 저장하지 않는다.
 
 Research Room이 필요한 경우에만 Supervisor가 방을 열고 에이전트들에게 작업을 배정한다. 그렇지 않으면 Supervisor가 바로 답하거나 설정을 반영하고 끝낸다.
+
+Supervisor 대화는 `supervisor_chat` 모델 라우트를 사용한다. live LLM이 설정되어 있으면 일반 챗봇처럼 자연어로 답하고, 모델이 없으면 로컬 fallback이 짧게 응답한다.

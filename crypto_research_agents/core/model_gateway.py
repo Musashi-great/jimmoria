@@ -29,6 +29,15 @@ class ModelGateway:
         self.call_log: list[dict[str, Any]] = []
 
     def select(self, *, agent_id: str, task_type: str) -> ModelDecision:
+        if task_type == "supervisor_chat":
+            return ModelDecision(
+                selected_model=_model_env("FAST")
+                or _model_env("STRONG")
+                or "fast_chat_model",
+                reason=f"{agent_id} requested front-door conversation",
+                max_tokens=1200,
+                temperature=0.45,
+            )
         if task_type in {"report_writing", "final_synthesis"}:
             return ModelDecision(
                 selected_model=_model_env("WRITING")

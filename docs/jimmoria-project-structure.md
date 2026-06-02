@@ -868,6 +868,7 @@ Runtime 연결:
 - `company_status`면 `/settings`와 같은 settings/status panel을 보여주고 종료한다.
 - `source_ingestion`이면 작은 ingestion room을 열어 Source Note만 저장한다.
 - `research_request`면 기존처럼 `ResearchRuntime.run_article_research()`를 실행한다.
+- `supervisor_chat` 응답은 `supervisor_chat` 모델 라우트를 사용한다. live LLM이 있으면 자연어 응답을 생성하고, offline fallback이면 로컬 대화 응답을 사용한다.
 - `ResearchRuntime`은 `company_settings.json`과 `intake_decision`을 SupervisorAgent와 ReportAgent에 전달한다.
 - SupervisorAgent는 `supervision_plan` finding에 `intake_decision`을 저장해 왜 해당 Research Room이 열렸는지 남긴다.
 - ReportAgent는 `report_language`를 보고 한국어/영문 report shell을 선택한다.

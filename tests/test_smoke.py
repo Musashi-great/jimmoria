@@ -26,9 +26,10 @@ from crypto_research_agents.cli import (
 )
 from crypto_research_agents.console import JimmoriaConsole, print_jimmoria_logo
 from crypto_research_agents.core.company_settings import CompanySettings
-from crypto_research_agents.core.llm_provider import CodexCliProvider, LLMRequest, OAuthTokenProvider, provider_from_env
+from crypto_research_agents.core.llm_provider import CodexCliProvider, LLMRequest, LLMResponse, OAuthTokenProvider, provider_from_env
 from crypto_research_agents.core.memory import SharedMemory, SourceRecord
 from crypto_research_agents.core.model_gateway import ModelGateway
+from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
 from crypto_research_agents.core.supervisor_intake import decide_supervisor_intake
 from crypto_research_agents.core.capabilities import collect_capabilities
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
@@ -212,7 +213,7 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("Supervisor", text)
         self.assertNotIn("Supervisor intake", text)
         self.assertNotIn("Report preview", text)
-        self.assertIn("맞습니다", text)
+        self.assertIn("한국어 우선", text)
 
     def test_small_talk_answers_without_saving_settings(self) -> None:
         output = StringIO()
@@ -236,8 +237,48 @@ class SmokeTest(unittest.TestCase):
         text = output.getvalue()
         self.assertIn("Supervisor", text)
         self.assertNotIn("Supervisor intake", text)
-        self.assertIn("안녕하세요. JIMMORIA Supervisor입니다.", text)
+        self.assertIn("JIMMORIA Supervisor", text)
         self.assertNotIn("Company instruction applied", text)
+
+    def test_supervisor_chat_explains_report_structure_naturally(self) -> None:
+        settings = CompanySettings(report_language="ko")
+        decision = decide_supervisor_intake("보고서 뭐뭐씀?", settings)
+
+        reply = generate_supervisor_chat_reply("보고서 뭐뭐씀?", settings, decision)
+        joined = "\n".join(reply)
+
+        self.assertIn("TL;DR", joined)
+        self.assertIn("후보 프로젝트", joined)
+        self.assertNotIn("report_language", joined.lower())
+
+    def test_supervisor_chat_uses_live_model_when_available(self) -> None:
+        class FakeProvider:
+            provider_name = "fake_live"
+
+            def complete(self, request: LLMRequest) -> LLMResponse:
+                self.request = request
+                return LLMResponse(
+                    text="좋아. 여기서는 내가 바로 답하고, 리서치가 필요하면 방을 열게.",
+                    model=request.model,
+                    provider=self.provider_name,
+                    usage={"mode": "test"},
+                )
+
+        provider = FakeProvider()
+        gateway = ModelGateway(provider=provider)
+        decision = decide_supervisor_intake("보고서 뭐뭐씀?", CompanySettings(report_language="ko"))
+
+        reply = generate_supervisor_chat_reply(
+            "보고서 뭐뭐씀?",
+            CompanySettings(report_language="ko"),
+            decision,
+            history=[{"role": "user", "content": "안녕"}],
+            model_gateway=gateway,
+        )
+
+        self.assertEqual(reply, ["좋아. 여기서는 내가 바로 답하고, 리서치가 필요하면 방을 열게."])
+        self.assertEqual(provider.request.task_type, "supervisor_chat")
+        self.assertIn("recent_dialogue", provider.request.user_prompt)
 
     def test_chat_intake_status_shows_settings_without_report(self) -> None:
         output = StringIO()
@@ -775,6 +816,11 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(registry["tool_meta"]["crawl_docs"]["implementation_status"], "implemented")
         self.assertEqual(registry["tool_meta"]["x_search_posts"]["priority"], "required")
         self.assertEqual(registry["tool_meta"]["rootdata_get_project"]["owner_agent"], "funding_token_agent")
+
+    def test_model_router_contains_supervisor_chat_route(self) -> None:
+        router = json.loads(Path("config/models/model_router.yaml").read_text(encoding="utf-8"))
+
+        self.assertEqual(router["routes"]["supervisor_chat"], "fast_model")
 
     def test_doctor_command_outputs_current_limitations(self) -> None:
         with TemporaryDirectory() as tmp:

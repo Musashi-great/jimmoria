@@ -21,12 +21,13 @@ from crypto_research_agents.core.company_settings import (
     load_company_settings,
     save_company_settings,
 )
-from crypto_research_agents.core.supervisor_intake import build_supervisor_reply, decide_supervisor_intake
+from crypto_research_agents.core.supervisor_intake import decide_supervisor_intake
 from crypto_research_agents.core.supervisor_intake import (
     build_company_instruction_reply,
     build_company_status_reply,
     build_supervisor_dispatch_reply,
 )
+from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 from crypto_research_agents.storage.json_store import load_memory
 from crypto_research_agents.storage.run_store import list_run_summaries, load_run_file
@@ -308,6 +309,7 @@ def chat_command(args: argparse.Namespace) -> None:
         configure_model_panel(clear_before=False)
     console.print_help()
     last_room_id = ""
+    supervisor_history: list[dict[str, str]] = []
 
     while True:
         try:
@@ -333,22 +335,30 @@ def chat_command(args: argparse.Namespace) -> None:
         if intake_decision.intent_type == "company_config":
             applied = apply_company_instruction(line, settings)
             save_company_settings(settings, settings_path)
-            console.print_supervisor_reply(build_company_instruction_reply(applied, settings, settings_path))
+            reply = build_company_instruction_reply(applied, settings, settings_path)
+            console.print_supervisor_reply(reply)
+            append_supervisor_history(supervisor_history, line, reply)
             continue
 
         if intake_decision.intent_type == "company_status":
-            console.print_supervisor_reply(build_company_status_reply(settings))
+            reply = build_company_status_reply(settings)
+            console.print_supervisor_reply(reply)
             console.print_company_settings(settings, settings_path)
+            append_supervisor_history(supervisor_history, line, reply)
             continue
 
         if intake_decision.intent_type == "supervisor_chat":
-            console.print_supervisor_reply(build_supervisor_reply(line, settings, intake_decision))
+            reply = generate_supervisor_chat_reply(line, settings, intake_decision, history=supervisor_history)
+            console.print_supervisor_reply(reply)
+            append_supervisor_history(supervisor_history, line, reply)
             continue
 
         title, content, url = chat_input_to_source(line)
         runtime = ResearchRuntime(load_memory(args.memory))
         runtime.event_handler = console.make_event_handler()
-        console.print_supervisor_reply(build_supervisor_dispatch_reply(intake_decision, len(DEFAULT_AGENTS)))
+        reply = build_supervisor_dispatch_reply(intake_decision, len(DEFAULT_AGENTS))
+        console.print_supervisor_reply(reply)
+        append_supervisor_history(supervisor_history, line, reply)
         if intake_decision.intent_type == "source_ingestion":
             result = runtime.run_source_ingestion(
                 title=title,
@@ -371,6 +381,12 @@ def chat_command(args: argparse.Namespace) -> None:
         last_room_id = result.room.room_id
         console.last_room_id = last_room_id
         console.print_run_summary(result)
+
+
+def append_supervisor_history(history: list[dict[str, str]], user_message: str, reply_lines: list[str]) -> None:
+    history.append({"role": "user", "content": user_message})
+    history.append({"role": "supervisor", "content": "\n".join(reply_lines)})
+    del history[:-16]
 
 
 def handle_chat_command(

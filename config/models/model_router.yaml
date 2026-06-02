@@ -20,6 +20,7 @@
     "behavior": "deterministic local extraction and summarization"
   },
   "routes": {
+    "supervisor_chat": "fast_model",
     "source_ingestion": "fast_model",
     "narrative_reasoning": "reasoning_model",
     "supervision": "reasoning_model",
