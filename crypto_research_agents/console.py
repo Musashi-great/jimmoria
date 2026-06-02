@@ -269,44 +269,88 @@ def print_color_hero(width: int) -> None:
     reset = "\033[0m"
     bold = "\033[1m"
     dim = "\033[2m"
-    cyan = "\033[38;2;45;212;255m"
-    blue = "\033[38;2;84;122;255m"
-    violet = "\033[38;2;196;92;255m"
+    cyan = "\033[38;2;84;202;255m"
+    blue = "\033[38;2;44;118;255m"
     green = "\033[38;2;76;255;158m"
     muted = "\033[38;2;145;157;183m"
     line = "=" * width
-    name = "J I M M O R I A"
+    mark = block_mark(block_char())
     subtitle = "Multi-agent crypto research company"
-    hint = "Chat with the company. Watch the agents work."
-    signal = "o  o  o  o  o  o"
 
     print(f"{blue}{line}{reset}")
-    print(center_ansi(f"{green}{signal}{reset}", width))
     print("")
-    print(center_ansi(f"{bold}{cyan}{name}{reset}", width))
-    print(center_ansi(f"{violet}{subtitle}{reset}", width))
+    for row in mark:
+        print(center_ansi(f"{bold}{cyan}{row}{reset}", width))
     print("")
-    print(center_ansi(f"{dim}{muted}{hint}{reset}", width))
-    print(center_ansi(f"{muted}v{__version__}{reset}", width))
+    print(center_ansi(f"{bold}{green}JIMMORIA v{__version__}{reset}", width))
+    print(center_ansi(f"{muted}{subtitle}{reset}", width))
+    print(center_ansi(f"{dim}{muted}Research rooms. Agent bus. Obsidian memory.{reset}", width))
     print(f"{blue}{line}{reset}")
 
 
 def print_plain_hero(width: int) -> None:
     line = "=" * width
     print(line)
-    print(center_text("J I M M O R I A", width))
-    print(center_text("Multi-agent crypto research company", width))
-    print(center_text("Chat with the company. Watch the agents work.", width))
+    print("")
+    for row in block_mark(block_char()):
+        print(center_text(row, width))
+    print("")
     print(center_text(f"JIMMORIA v{__version__}", width))
+    print(center_text("Multi-agent crypto research company", width))
+    print(center_text("Research rooms. Agent bus. Obsidian memory.", width))
     print(line)
 
 
 def supports_color() -> bool:
     if os.getenv("NO_COLOR"):
         return False
-    if os.getenv("JIMMORIA_FORCE_COLOR"):
+    if not sys.stdout.isatty() and not os.getenv("JIMMORIA_FORCE_COLOR"):
+        return False
+    if os.name == "nt" and not enable_windows_ansi():
+        return False
+    return True
+
+
+def block_mark(fill: str) -> list[str]:
+    return [
+        f"{fill * 6}    {fill * 3}    {fill * 3}   {fill * 6}",
+        f"  {fill * 2}      {fill * 4}  {fill * 4}   {fill * 2}   {fill * 2}",
+        f"  {fill * 2}      {fill * 2} {fill * 4} {fill * 2}   {fill * 6}",
+        f"{fill * 2} {fill * 2}     {fill * 2}  {fill * 2}  {fill * 2}   {fill * 2}  {fill * 2}",
+        f" {fill * 3}      {fill * 2}      {fill * 2}   {fill * 2}   {fill * 2}",
+    ]
+
+
+def block_char() -> str:
+    return "█" if can_encode("█") else "#"
+
+
+def can_encode(text: str) -> bool:
+    encoding = sys.stdout.encoding or "utf-8"
+    try:
+        text.encode(encoding)
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
+def enable_windows_ansi() -> bool:
+    try:
+        import ctypes
+    except ImportError:
+        return False
+
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.GetStdHandle(-11)
+    if handle in (-1, 0):
+        return False
+    mode = ctypes.c_uint32()
+    if not kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+        return False
+    enable_virtual_terminal_processing = 0x0004
+    if mode.value & enable_virtual_terminal_processing:
         return True
-    return sys.stdout.isatty()
+    return bool(kernel32.SetConsoleMode(handle, mode.value | enable_virtual_terminal_processing))
 
 
 def center_text(text: str, width: int) -> str:
