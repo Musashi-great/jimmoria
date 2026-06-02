@@ -8,6 +8,11 @@ specialized agents work in public: ingestion, narrative mapping, discovery,
 social/KOL checks, contract/on-chain checks, product/docs checks, funding/token
 checks, report writing, and Obsidian sync.
 
+The first screen shows a large JIMMORIA logo and a short description. The agent
+roster is hidden by default; use `/company` when you want to inspect every
+agent. Model/auth setup screens clear between steps so each choice opens a fresh
+panel instead of appending more text below the old one.
+
 The first loop supports:
 
 ```text
@@ -40,12 +45,15 @@ python -m crypto_research_agents.cli chat
 When chat starts, it opens a model setup panel:
 
 ```text
-1. Codex OAuth
+1. Codex OAuth / ChatGPT login code
 2. OpenAI API Key
 3. Offline fallback
 ```
 
-Choose `Codex OAuth` to enter the token source and model names for the current CLI session. Tokens are not written to config files.
+Choose `Codex OAuth / ChatGPT login code` to run the Codex device login flow.
+Codex shows the browser/code login flow, then JIMMORIA uses the local Codex CLI
+ChatGPT login session for model calls. Manual bearer-token entry is still
+available as a fallback. Tokens are not written to config files.
 
 Inside chat mode:
 
@@ -55,7 +63,7 @@ Type any research question/source text to open a Research Room.
 /add <text-or-url>       Ingest source only
 /models                  Configure LLM provider/models
 /doctor                  Show configured vs placeholder capabilities
-/agents                  Show enabled agents
+/company                 Show active and planned agents
 /runs                    Show previous runs
 /status [room_id]        Show latest or selected room status
 /messages [room_id]      Show collaboration history
@@ -106,7 +114,15 @@ $env:OPENAI_MODEL_WRITING="your-writing-model"
 python -m crypto_research_agents.cli demo
 ```
 
-Use a Codex OAuth bearer token:
+Use the Codex CLI ChatGPT login session:
+
+```powershell
+codex login --device-auth
+$env:LLM_PROVIDER="codex_cli"
+python -m crypto_research_agents.cli chat
+```
+
+Or use a Codex OAuth bearer token manually:
 
 ```powershell
 $env:LLM_PROVIDER="codex_oauth"
@@ -125,7 +141,9 @@ $env:CODEX_OAUTH_TOKEN_COMMAND="your-command-that-prints-a-bearer-token"
 python -m crypto_research_agents.cli demo
 ```
 
-The runtime does not automatically read Codex internal auth files. Token sources must be explicit.
+The manual bearer-token provider does not automatically read Codex internal auth
+files. If you want the ChatGPT code-login flow, use `codex_cli` through
+`codex login --device-auth`.
 
 If no live provider is configured, the runtime uses a deterministic offline fallback so the agent loop still runs.
 
@@ -136,7 +154,7 @@ Works now:
 - Research Room orchestration
 - Supervisor + controlled P2P Agent Bus
 - AgentSpec/persona loading
-- LLM provider routing with offline fallback, OpenAI API key, or explicit Codex OAuth token source
+- LLM provider routing with offline fallback, OpenAI API key, Codex CLI ChatGPT login, or explicit Codex OAuth token source
 - Markdown reports, run snapshots, tool audit logs, LLM call logs
 - Obsidian-style local note writing
 
@@ -190,7 +208,7 @@ must_follow
 must_not
 ```
 
-Use `/agents` in chat mode to see each agent and persona.
+Use `/company` in chat mode to see each agent and persona.
 
 Tool registry is configured in:
 

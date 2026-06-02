@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
 from urllib.error import HTTPError
 from urllib.request import Request as UrlRequest
@@ -103,6 +105,58 @@ class OpenAIChatProvider:
             provider=self.provider_name,
             usage=usage,
             raw=response,
+        )
+
+
+class CodexCliProvider:
+    """LLM provider that uses the local Codex CLI ChatGPT login session."""
+
+    provider_name = "codex_cli"
+
+    def __init__(self, *, command: str | None = None) -> None:
+        self.command = command or os.getenv("CODEX_CLI_COMMAND", "codex")
+        self.timeout = float(os.getenv("CODEX_CLI_TIMEOUT", "180"))
+
+    def complete(self, request: LLMRequest) -> LLMResponse:
+        prompt = _codex_cli_prompt(request)
+        with tempfile.TemporaryDirectory() as tmp:
+            output_path = Path(tmp) / "last_message.txt"
+            command = [
+                self.command,
+                "exec",
+                "--ephemeral",
+                "--skip-git-repo-check",
+                "--ask-for-approval",
+                "never",
+                "--sandbox",
+                "read-only",
+                "--output-last-message",
+                str(output_path),
+            ]
+            if _is_real_model_name(request.model):
+                command.extend(["--model", request.model])
+            command.append("-")
+
+            completed = subprocess.run(
+                command,
+                input=prompt,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
+            )
+            if completed.returncode != 0:
+                raise RuntimeError(
+                    "Codex CLI provider failed: "
+                    + (completed.stderr.strip() or completed.stdout.strip())
+                )
+            text = output_path.read_text(encoding="utf-8").strip() if output_path.exists() else completed.stdout.strip()
+
+        return LLMResponse(
+            text=text,
+            model=request.model,
+            provider=self.provider_name,
+            usage={"mode": "codex_cli"},
         )
 
 
@@ -227,6 +281,8 @@ def provider_from_env() -> LLMProvider:
     provider = os.getenv("LLM_PROVIDER", "").strip().lower()
     if provider in {"offline", "fallback", "none"}:
         return OfflineLLMProvider()
+    if provider in {"codex_cli", "codex_device", "codex_login"}:
+        return CodexCliProvider()
     if provider in {"codex_oauth", "codex", "oauth"}:
         return CodexOAuthChatProvider()
     if (
@@ -244,6 +300,34 @@ def provider_from_env() -> LLMProvider:
         except RuntimeError:
             return OfflineLLMProvider()
     return OfflineLLMProvider()
+
+
+def _codex_cli_prompt(request: LLMRequest) -> str:
+    response_rule = ""
+    if request.response_format == "json":
+        response_rule = "\nReturn only a valid JSON object. Do not include markdown fences."
+    return (
+        "You are serving as an LLM provider inside JIMMORIA, a crypto research-only "
+        "multi-agent runtime. Follow the system prompt and user prompt. Do not browse "
+        "or run tools unless explicitly necessary; answer from the provided context."
+        f"{response_rule}\n\n"
+        f"System prompt:\n{request.system_prompt}\n\n"
+        f"User prompt:\n{request.user_prompt}\n"
+    )
+
+
+def _is_real_model_name(model: str) -> bool:
+    placeholders = {
+        "mvp_shared_llm",
+        "fast_model",
+        "medium_model",
+        "cheap_model",
+        "fast_reasoning",
+        "strong_reasoning_model",
+        "strong_writing_model",
+        "embedding_model",
+    }
+    return bool(model and model not in placeholders)
 
 
 def parse_json_response(response: LLMResponse) -> dict[str, Any]:

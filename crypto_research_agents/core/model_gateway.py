@@ -112,4 +112,8 @@ class ModelGateway:
 
 
 def _model_env(tier: str) -> str | None:
-    return os.getenv(f"CODEX_OAUTH_MODEL_{tier}") or os.getenv(f"OPENAI_MODEL_{tier}")
+    return (
+        os.getenv(f"CODEX_CLI_MODEL_{tier}")
+        or os.getenv(f"CODEX_OAUTH_MODEL_{tier}")
+        or os.getenv(f"OPENAI_MODEL_{tier}")
+    )

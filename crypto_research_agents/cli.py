@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import getpass
 import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from urllib.error import URLError
@@ -259,7 +261,7 @@ def chat_command(args: argparse.Namespace) -> None:
     )
     console.print_intro()
     if not args.skip_model_setup and sys.stdin.isatty():
-        configure_model_panel()
+        configure_model_panel(clear_before=False)
     console.print_help()
     last_room_id = ""
 
@@ -473,13 +475,15 @@ def print_agent_table(*, active_only: bool = False) -> None:
         print(f"       {one_liner}")
 
 
-def configure_model_panel() -> None:
-    print("")
-    print_box(
+def configure_model_panel(*, clear_before: bool = True) -> None:
+    if clear_before:
+        clear_screen()
+    print_screen(
+        "Model Setup",
         [
-            "Model Setup",
             f"Current provider: {os.getenv('LLM_PROVIDER') or 'offline_fallback'}",
-            "1. Codex OAuth",
+            "",
+            "1. Codex OAuth / ChatGPT login code",
             "2. OpenAI API Key",
             "3. Offline fallback",
             "Enter. Keep current",
@@ -487,6 +491,7 @@ def configure_model_panel() -> None:
     )
     choice = input("Choose provider [1/2/3/Enter]: ").strip().lower()
     if not choice:
+        clear_screen()
         print_current_model_config()
         return
 
@@ -506,44 +511,57 @@ def configure_model_panel() -> None:
         return
 
     print("Unknown provider choice. Keeping current configuration.")
+    clear_screen()
     print_current_model_config()
 
 
 def configure_codex_oauth() -> None:
     clear_openai_session_env()
-    os.environ["LLM_PROVIDER"] = "codex_oauth"
-    print("")
-    print("Codex OAuth token source:")
-    print("  1. Paste bearer token for this session")
-    print("  2. Token file path")
-    print("  3. Command that prints bearer token")
-    print("  Enter. Configure models only")
-    source_choice = input("Choose token source [1/2/3/Enter]: ").strip().lower()
-
+    os.environ["LLM_PROVIDER"] = "codex_cli"
     clear_codex_token_session_env()
+    clear_screen()
+    print_screen(
+        "Codex OAuth",
+        [
+            "Recommended: sign in with the Codex device code flow.",
+            "This opens the same style of flow where ChatGPT shows a code login page.",
+            "",
+            "1. Start Codex device login",
+            "2. Paste bearer token manually",
+            "3. Token file path",
+            "4. Command that prints bearer token",
+            "Enter. Use existing Codex login",
+        ],
+    )
+    source_choice = input("Choose Codex auth method [1/2/3/4/Enter]: ").strip().lower()
+
     if source_choice == "1":
+        run_codex_device_login()
+        os.environ["LLM_PROVIDER"] = "codex_cli"
+    elif source_choice == "2":
+        os.environ["LLM_PROVIDER"] = "codex_oauth"
         token = getpass.getpass("CODEX_OAUTH_TOKEN: ").strip()
         if token:
             os.environ["CODEX_OAUTH_TOKEN"] = token
-    elif source_choice == "2":
+    elif source_choice == "3":
+        os.environ["LLM_PROVIDER"] = "codex_oauth"
         token_file = input("CODEX_OAUTH_TOKEN_FILE path: ").strip()
         if token_file:
             os.environ["CODEX_OAUTH_TOKEN_FILE"] = token_file
-    elif source_choice == "3":
+    elif source_choice == "4":
+        os.environ["LLM_PROVIDER"] = "codex_oauth"
         token_command = input("CODEX_OAUTH_TOKEN_COMMAND: ").strip()
         if token_command:
             os.environ["CODEX_OAUTH_TOKEN_COMMAND"] = token_command
 
-    base_url = input_with_default("CODEX_OAUTH_BASE_URL", os.getenv("CODEX_OAUTH_BASE_URL", "https://api.openai.com/v1"))
-    if base_url:
-        os.environ["CODEX_OAUTH_BASE_URL"] = base_url
-
-    configure_model_names(prefix="CODEX_OAUTH_MODEL")
+    configure_model_names(prefix="CODEX_CLI_MODEL" if os.getenv("LLM_PROVIDER") == "codex_cli" else "CODEX_OAUTH_MODEL")
 
 
 def configure_openai() -> None:
     clear_codex_token_session_env()
     os.environ["LLM_PROVIDER"] = "openai"
+    clear_screen()
+    print_screen("OpenAI API Key", ["Paste an API key for this terminal session."])
     api_key = getpass.getpass("OPENAI_API_KEY: ").strip()
     if api_key:
         os.environ["OPENAI_API_KEY"] = api_key
@@ -554,11 +572,19 @@ def configure_offline() -> None:
     os.environ["LLM_PROVIDER"] = "offline"
     clear_codex_token_session_env()
     clear_openai_session_env()
+    clear_screen()
+    print_screen("Offline fallback", ["Live LLM calls disabled for this session."])
 
 
 def configure_model_names(prefix: str) -> None:
-    print("")
-    print("Model names. Press Enter to keep current/default.")
+    clear_screen()
+    print_screen(
+        "Model Routes",
+        [
+            f"Provider: {os.getenv('LLM_PROVIDER') or 'offline_fallback'}",
+            "Press Enter to keep each current/default route.",
+        ],
+    )
     for tier, label in [
         ("FAST", "fast / cheap"),
         ("REASONING", "reasoning"),
@@ -592,7 +618,12 @@ def clear_openai_session_env() -> None:
 
 def print_current_model_config() -> None:
     provider = os.getenv("LLM_PROVIDER") or "offline_fallback"
-    if provider == "codex_oauth":
+    if provider == "codex_cli":
+        fast = os.getenv("CODEX_CLI_MODEL_FAST") or "<Codex default>"
+        reasoning = os.getenv("CODEX_CLI_MODEL_REASONING") or os.getenv("CODEX_CLI_MODEL_STRONG") or "<Codex default>"
+        writing = os.getenv("CODEX_CLI_MODEL_WRITING") or os.getenv("CODEX_CLI_MODEL_STRONG") or "<Codex default>"
+        token_source = codex_login_status()
+    elif provider == "codex_oauth":
         fast = os.getenv("CODEX_OAUTH_MODEL_FAST") or "<default>"
         reasoning = os.getenv("CODEX_OAUTH_MODEL_REASONING") or os.getenv("CODEX_OAUTH_MODEL_STRONG") or "<default>"
         writing = os.getenv("CODEX_OAUTH_MODEL_WRITING") or os.getenv("CODEX_OAUTH_MODEL_STRONG") or "<default>"
@@ -606,7 +637,8 @@ def print_current_model_config() -> None:
         fast = reasoning = writing = "offline_fallback"
         token_source = "not required"
 
-    print_box(
+    print_screen(
+        "Model Config",
         [
             f"Provider: {provider}",
             f"Fast model: {fast}",
@@ -625,6 +657,52 @@ def configured_codex_token_source() -> str:
     if os.getenv("CODEX_OAUTH_TOKEN_COMMAND"):
         return "command configured"
     return "not set"
+
+
+def run_codex_device_login() -> None:
+    if shutil.which("codex") is None:
+        print_screen(
+            "Codex OAuth",
+            [
+                "Codex CLI was not found on PATH.",
+                "Install or expose Codex first, then run /models again.",
+            ],
+        )
+        return
+
+    print("")
+    print("Starting Codex device login. Follow the browser/code instructions shown by Codex.")
+    subprocess.run(["codex", "login", "--device-auth"], check=False)
+
+
+def codex_login_status() -> str:
+    if shutil.which("codex") is None:
+        return "Codex CLI not found"
+    completed = subprocess.run(
+        ["codex", "login", "status"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    text = (completed.stdout or completed.stderr).strip()
+    return text or "Codex login status unknown"
+
+
+def clear_screen() -> None:
+    if not sys.stdout.isatty():
+        print("")
+        return
+    os.system("cls" if os.name == "nt" else "clear")
+
+
+def print_screen(title: str, lines: list[str]) -> None:
+    print("")
+    print(f"[{title}]")
+    for line in lines:
+        if line:
+            print(f"  {line}")
+        else:
+            print("")
 
 
 def make_event_printer() -> object:

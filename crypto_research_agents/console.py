@@ -31,11 +31,11 @@ class JimmoriaConsole:
 
     def print_intro(self) -> None:
         self.rule("=")
+        print_jimmoria_logo()
         print(f" {APP_NAME} v{__version__}")
         print(" Multi-agent crypto research company")
-        print(" Chat with the company. Watch the agents work.")
+        print(" Type a request. The company opens a room and the agents work.")
         self.rule("=")
-        self.print_company(active_only=True)
 
     def print_help(self) -> None:
         lines = [
@@ -258,3 +258,14 @@ class JimmoriaConsole:
 
     def rule(self, char: str = "-") -> None:
         print(char * self.width)
+
+
+def print_jimmoria_logo() -> None:
+    print(
+        r"""
+       JJJJJJJ  III  MM    MM  MM    MM   OOOOO   RRRRR    III    AAAAA
+          JJ     I   MMM  MMM  MMM  MMM  OO   OO  RR  RR    I    AA   AA
+          JJ     I   MM MM MM  MM MM MM  OO   OO  RRRRR     I    AAAAAAA
+       JJ JJ     I   MM    MM  MM    MM  OO   OO  RR  RR    I    AA   AA
+        JJJ     III  MM    MM  MM    MM   OOOOO   RR   RR  III   AA   AA"""
+    )

@@ -1,6 +1,7 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import json
+import os
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
@@ -8,7 +9,7 @@ from unittest.mock import patch
 
 from crypto_research_agents.runtime import ResearchRuntime
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
-from crypto_research_agents.cli import main as cli_main, print_banner
+from crypto_research_agents.cli import configure_model_panel, main as cli_main, print_banner
 from crypto_research_agents.core.llm_provider import OAuthTokenProvider, provider_from_env
 from crypto_research_agents.core.model_gateway import ModelGateway
 from crypto_research_agents.core.capabilities import collect_capabilities
@@ -23,6 +24,7 @@ class SmokeTest(unittest.TestCase):
         text = output.getvalue()
         self.assertIn("JIMMORIA v0.1.0", text)
         self.assertIn("Multi-agent crypto research company", text)
+        self.assertNotIn("Company roster", text)
 
     def test_article_research_loop_writes_outputs(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -126,6 +128,24 @@ class SmokeTest(unittest.TestCase):
 
         self.assertEqual(provider.provider_name, "codex_oauth")
 
+    def test_codex_cli_provider_can_be_selected(self) -> None:
+        with patch.dict("os.environ", {"LLM_PROVIDER": "codex_cli"}, clear=True):
+            provider = provider_from_env()
+
+        self.assertEqual(provider.provider_name, "codex_cli")
+
+    def test_model_setup_offline_choice_uses_screen_flow(self) -> None:
+        output = StringIO()
+        with patch.dict("os.environ", {}, clear=True):
+            with patch("builtins.input", return_value="3"):
+                with redirect_stdout(output):
+                    configure_model_panel()
+            self.assertEqual(os.environ["LLM_PROVIDER"], "offline")
+
+        text = output.getvalue()
+        self.assertIn("[Model Setup]", text)
+        self.assertIn("[Offline fallback]", text)
+
     def test_oauth_token_provider_reads_explicit_env(self) -> None:
         with patch.dict("os.environ", {"CODEX_OAUTH_TOKEN": "abc123"}, clear=True):
             token = OAuthTokenProvider().get_token()
@@ -136,14 +156,15 @@ class SmokeTest(unittest.TestCase):
         with patch.dict(
             "os.environ",
             {
-                "CODEX_OAUTH_MODEL_FAST": "codex-fast",
+                "CODEX_CLI_MODEL_FAST": "codex-cli-fast",
+                "CODEX_OAUTH_MODEL_FAST": "codex-oauth-fast",
                 "OPENAI_MODEL_FAST": "openai-fast",
             },
             clear=True,
         ):
             gateway = ModelGateway(provider=None)
 
-        self.assertEqual(gateway.default_model, "codex-fast")
+        self.assertEqual(gateway.default_model, "codex-cli-fast")
 
     def test_doctor_marks_live_connectors_as_placeholders(self) -> None:
         statuses = {item.name: item.status for item in collect_capabilities()}
