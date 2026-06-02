@@ -108,6 +108,31 @@ class SmokeTest(unittest.TestCase):
         self.assertTrue(box_lines[1].endswith("|"))
         self.assertTrue(box_lines[2].endswith("|"))
         self.assertTrue(box_lines[3].startswith("+"))
+        self.assertIn("\033[4M", output.getvalue())
+
+    def test_user_message_prints_compact_log_not_panel(self) -> None:
+        output = StringIO()
+        console = JimmoriaConsole()
+        console.use_rich = False
+
+        with redirect_stdout(output):
+            console.print_user_message("안녕하세요")
+
+        text = output.getvalue()
+        self.assertIn("You > 안녕하세요", text)
+        self.assertNotIn("[You]", text)
+
+    def test_supervisor_working_prints_compact_log(self) -> None:
+        output = StringIO()
+        console = JimmoriaConsole()
+        console.use_rich = False
+
+        with redirect_stdout(output):
+            console.print_supervisor_working("Reading and routing.")
+
+        text = output.getvalue()
+        self.assertIn("Supervisor > Reading and routing.", text)
+        self.assertNotIn("[Supervisor]", text)
 
     def test_chat_help_does_not_show_static_agent_roster(self) -> None:
         output = StringIO()

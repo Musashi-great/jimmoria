@@ -328,6 +328,7 @@ def chat_command(args: argparse.Namespace) -> None:
             continue
 
         console.print_user_message(line)
+        console.print_supervisor_working("Reading the message, choosing the response shape, and routing the company.")
         settings_path = company_settings_path_for(args.memory)
         settings = load_company_settings(settings_path)
         intake_decision = decide_supervisor_intake(line, settings)
@@ -494,6 +495,7 @@ def handle_chat_command(
         title, content, url = chat_input_to_source(rest)
         runtime = ResearchRuntime(load_memory(args.memory))
         console.print_user_message(rest)
+        console.print_supervisor_working("Saving this as a source-only task and assigning the archivist.")
         runtime.event_handler = console.make_event_handler()
         result = runtime.run_source_ingestion(
             title=title,

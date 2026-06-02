@@ -133,6 +133,9 @@ class JimmoriaConsole:
     def print_supervisor_reply(self, lines: list[str]) -> None:
         self.block("Supervisor", lines)
 
+    def print_supervisor_working(self, activity: str = "Reading your request and choosing the next move.") -> None:
+        self.print_log_line("Supervisor", activity, muted=True)
+
     def print_company_settings_updated(self, settings: Any, applied: list[str], path: str | Path) -> None:
         lines = [
             "No Research Room opened.",
@@ -152,7 +155,34 @@ class JimmoriaConsole:
         self.block("Company instruction applied", lines)
 
     def print_user_message(self, text: str) -> None:
-        self.block("You", self.wrap(text))
+        self.print_log_line("You", text)
+
+    def print_log_line(self, label: str, text: str, *, muted: bool = False) -> None:
+        wrapped = self.wrap(text)
+        if not wrapped:
+            return
+        if supports_color():
+            label_style = "\033[38;2;255;92;212m"
+            body_style = "\033[38;2;160;132;188m" if muted else "\033[38;2;230;214;255m"
+            reset = "\033[0m"
+            prefix = f"{label_style}{label}{reset} {label_style}>{reset} "
+            continuation = " " * (len(label) + 3)
+            print("")
+            for index, line in enumerate(wrapped):
+                if index == 0:
+                    print(f"{prefix}{body_style}{line}{reset}")
+                else:
+                    print(f"{continuation}{body_style}{line}{reset}")
+            return
+
+        prefix = f"{label} > "
+        continuation = " " * len(prefix)
+        print("")
+        for index, line in enumerate(wrapped):
+            if index == 0:
+                print(f"{prefix}{line}")
+            else:
+                print(f"{continuation}{line}")
 
     def read_chat_input(self) -> str:
         if not sys.stdin.isatty():
@@ -173,8 +203,12 @@ class JimmoriaConsole:
         try:
             return input(self.input_cursor_sequence())
         finally:
-            sys.stdout.write("\033[1B\r")
+            self.clear_submitted_input_box()
             sys.stdout.flush()
+
+    def clear_submitted_input_box(self) -> None:
+        # Move below the drawn input box, then delete the four submitted prompt lines.
+        sys.stdout.write("\033[1B\r\033[4A\033[4M\r")
 
     def read_basic_boxed_input(self) -> str:
         hint = "Type a request, URL, /command, or @path/to/file"

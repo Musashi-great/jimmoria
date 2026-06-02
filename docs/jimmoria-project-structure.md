@@ -183,6 +183,8 @@ completed
 
 CLI는 `room_created`, `agent_start`, `agent_done`, `agent_failed`, `room_completed` 이벤트를 받아 보라/핑크 테마의 로그를 출력한다. `room_created`와 `room_completed`에는 전체 `Live agent board`를 보여주고, 각 `agent_start`/`agent_done` 이벤트는 짧은 작업 카드로 출력해서 로그가 과도하게 반복되지 않게 한다. 사용자가 작업 지시를 넣으면 각 에이전트가 `WAIT`, `RUN`, `DONE`, `FAIL` 중 어떤 상태인지와 현재 무엇을 하는지 바로 볼 수 있다.
 
+채팅 입력 UX는 "고정 입력창 + 위쪽 로그"에 가깝게 유지한다. 사용자가 입력을 제출하면 ANSI 터미널에서는 제출된 입력 박스를 지우고, 입력 내용은 큰 `You` 패널이 아니라 `You > ...` 한 줄 로그로 위에 남긴다. 그 다음 `Supervisor > ...` 진행 로그가 나오고, Supervisor 답변 또는 Research Room 이벤트가 이어진다.
+
 예시:
 
 ```text
@@ -503,7 +505,7 @@ doctor_command()
 
 ### `crypto_research_agents/console.py`
 
-터미널 UI를 담당한다. 시작 로고, 보라/핑크 3D 느낌의 JIMMORIA 배너, 닫힌 박스형 입력창, `/help` 명령어 목록, `rich` 기반 Panel/Table 로그, `Live agent board`, agent work cards, 보고서 preview를 담당한다. `JIMMORIA_PLAIN_LOGS=1`을 설정하면 rich 테마 로그 대신 plain text fallback을 사용할 수 있다.
+터미널 UI를 담당한다. 시작 로고, 보라/핑크 3D 느낌의 JIMMORIA 배너, 닫힌 박스형 입력창, 제출된 입력 박스 제거, `You > ...`/`Supervisor > ...` 대화 로그, `/help` 명령어 목록, `rich` 기반 Panel/Table 로그, `Live agent board`, agent work cards, 보고서 preview를 담당한다. `JIMMORIA_PLAIN_LOGS=1`을 설정하면 rich 테마 로그 대신 plain text fallback을 사용할 수 있다.
 
 중요 함수:
 
@@ -861,6 +863,8 @@ Runtime 연결:
 
 - `chat_command()`는 먼저 `decide_supervisor_intake()`로 Supervisor Intake 결정을 만든다.
 - CLI는 일반 채팅에서 `Supervisor` 대화 응답을 먼저 출력한다.
+- 입력창에 제출한 문장은 별도 `You` 박스로 반복하지 않고 `You > ...` 로그로만 남긴다.
+- Supervisor는 답변 전 `Supervisor > ...` 진행 로그를 남겨 지금 메시지를 읽고 라우팅 중이라는 느낌을 준다.
 - intent/action/output mode는 내부 `SupervisorIntakeDecision`으로 유지되어 Research Room이 열릴 때 기록된다.
 - `company_config`면 `apply_company_instruction()`으로 설정을 저장하고 종료한다.
 - `supervisor_chat`이면 `Supervisor reply`로 바로 답하고 종료한다.
