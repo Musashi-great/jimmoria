@@ -172,10 +172,11 @@ JIMMORIA의 일반 채팅 입력은 모두 Supervisor를 먼저 거친다. Super
 ```text
 리서치/분석/보고서 요청        -> Research Room + agent workflow + dossier
 설정/운영/UX/역할 변경        -> company_settings.json 업데이트
+확인 질문/운영 대화           -> Supervisor reply
 상태/설정 확인                -> settings/status panel 출력
 소스만 저장                   -> 작은 ingestion room + Obsidian Source Note
 ```
 
-예를 들어 `pearl 프로젝트를 분석해봐`는 리서치 방을 열지만, `보고서는 한글로 만들어`, `슈퍼바이저 권한을 더 크게 가져가`, `로그 스타일을 바꿔` 같은 말은 보고서를 만들지 않고 회사 운영 설정으로 반영된다.
+예를 들어 `pearl 프로젝트를 분석해봐`는 리서치 방을 열지만, `보고서는 한글로 만들어`, `슈퍼바이저 권한을 더 크게 가져가`, `로그 스타일을 바꿔` 같은 말은 보고서를 만들지 않고 회사 운영 설정으로 반영된다. `지금 보고서 작성은 한글 위주로 세팅된 게 맞지?` 같은 말은 Research Room 없이 Supervisor가 직접 답한다.
 
 채팅 화면에는 먼저 `Supervisor intake` 카드가 뜬다. 여기서 `Intent`, `Action`, `Output mode`, `Research Room open/not needed`를 확인할 수 있다.

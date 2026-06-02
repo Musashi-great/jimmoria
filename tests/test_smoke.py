@@ -151,6 +151,7 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(classify_chat_input("보고서는 한글로 만들어봐 영어단어는 써도 돼"), "company_config")
         self.assertEqual(classify_chat_input("현재 회사 상태랑 설정 보여줘"), "company_status")
         self.assertEqual(classify_chat_input("이 링크는 소스만 저장해줘"), "source_ingestion")
+        self.assertEqual(classify_chat_input("지금 보고서 작성은 한글 위주로 세팅된게 맞지?"), "supervisor_chat")
 
     def test_company_instruction_expands_supervisor_role(self) -> None:
         settings = CompanySettings()
@@ -179,6 +180,37 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(config.output_mode, "settings_update")
         self.assertFalse(status.needs_research_room)
         self.assertEqual(status.output_mode, "settings_panel")
+        chat = decide_supervisor_intake("지금 보고서 작성은 한글 위주로 세팅된게 맞지?", settings)
+        self.assertFalse(chat.needs_research_room)
+        self.assertEqual(chat.output_mode, "supervisor_reply")
+
+    def test_supervisor_chat_answers_without_report(self) -> None:
+        output = StringIO()
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "company_settings.json").write_text(
+                json.dumps(CompanySettings(report_language="ko").to_dict(), ensure_ascii=False),
+                encoding="utf-8",
+            )
+            args = argparse.Namespace(
+                memory=str(root / "memory.json"),
+                vault=str(root / "vault"),
+                reports=str(root / "reports"),
+                skip_model_setup=True,
+            )
+            with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(root / "model_settings.json")}, clear=True):
+                with patch("sys.stdin.isatty", return_value=True):
+                    with patch("builtins.input", side_effect=["지금 보고서 작성은 한글 위주로 세팅된게 맞지?", "/quit"]):
+                        with redirect_stdout(output):
+                            chat_command(args)
+
+            self.assertFalse((root / "reports").exists())
+
+        text = output.getvalue()
+        self.assertIn("Intent: supervisor_chat", text)
+        self.assertIn("Supervisor reply", text)
+        self.assertIn("Research Room은 열지 않았습니다", text)
+        self.assertIn("맞습니다", text)
 
     def test_chat_intake_status_shows_settings_without_report(self) -> None:
         output = StringIO()

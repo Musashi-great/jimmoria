@@ -23,6 +23,46 @@ class SupervisorIntakeDecision:
         return asdict(self)
 
 
+def build_supervisor_reply(
+    line: str,
+    settings: CompanySettings,
+    decision: SupervisorIntakeDecision,
+) -> list[str]:
+    """Build a direct CEO-style reply when no agent room is needed."""
+
+    lowered = line.lower()
+    report_language = settings.report_language
+    terms_policy = "allowed" if settings.allow_english_terms else "restricted"
+    lines = [
+        "Research Room은 열지 않았습니다.",
+        "이 입력은 리서치 지시가 아니라 슈퍼바이저에게 하는 확인/대화로 처리했습니다.",
+    ]
+
+    if any(term in line for term in ["보고서", "리포트", "레포트", "한글", "한국어", "세팅", "설정"]):
+        if report_language == "ko":
+            lines.append("맞습니다. 현재 보고서 출력은 한국어 우선 흐름으로 설정되어 있습니다.")
+        else:
+            lines.append(f"아직 한국어 우선은 아닙니다. 현재 report_language는 `{report_language}`입니다.")
+        lines.append(f"영어 기술 용어 정책은 `{terms_policy}`입니다.")
+    elif any(term in line for term in ["슈퍼바이저", "사장", "대표", "권한", "외주"]):
+        lines.append("Supervisor는 현재 모든 일반 채팅 입력을 먼저 받고 출력 모드를 결정합니다.")
+        lines.append(f"현재 supervisor_mode는 `{settings.supervisor_mode}`입니다.")
+    elif "report" in lowered:
+        lines.append("명시적으로 조사/분석/보고서 작성을 요청할 때만 전체 Research Room을 엽니다.")
+    else:
+        lines.append("필요하면 이 내용을 회사 운영 설정으로 저장할 수도 있고, 리서치 지시로 바꿔 Research Room을 열 수도 있습니다.")
+
+    lines.extend(
+        [
+            "",
+            f"Intent: {decision.intent_type}",
+            f"Output mode: {decision.output_mode}",
+            f"Reason: {decision.rationale}",
+        ]
+    )
+    return lines
+
+
 def decide_supervisor_intake(line: str, settings: CompanySettings | None = None) -> SupervisorIntakeDecision:
     settings = settings or CompanySettings()
     stripped = line.strip()
@@ -53,6 +93,18 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
             supervisor_authority=authority,
         )
 
+    if _looks_like_supervisor_chat(stripped, lowered):
+        return SupervisorIntakeDecision(
+            intent_type="supervisor_chat",
+            action="answer_directly",
+            output_mode="supervisor_reply",
+            needs_research_room=False,
+            confidence=0.84,
+            rationale="The client is asking the Supervisor a confirmation or operating question.",
+            next_step="Reply directly without opening a Research Room or writing a report.",
+            supervisor_authority=authority,
+        )
+
     if _looks_like_source_only_request(stripped, lowered):
         return SupervisorIntakeDecision(
             intent_type="source_ingestion",
@@ -80,6 +132,18 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
     has_config = _has_any(stripped, lowered, COMPANY_CONFIG_TERMS) or _is_meta_instruction(stripped)
     has_research = _has_any(stripped, lowered, RESEARCH_TERMS)
     has_explicit_research_action = _has_any(stripped, lowered, EXPLICIT_RESEARCH_ACTIONS)
+
+    if _looks_like_supervisor_chat(stripped, lowered) and not has_explicit_research_action:
+        return SupervisorIntakeDecision(
+            intent_type="supervisor_chat",
+            action="answer_directly",
+            output_mode="supervisor_reply",
+            needs_research_room=False,
+            confidence=0.8,
+            rationale="The input is phrased as a conversation with the Supervisor rather than a task dispatch.",
+            next_step="Answer as the company president and keep the room closed.",
+            supervisor_authority=authority,
+        )
 
     if has_config and not has_explicit_research_action:
         return SupervisorIntakeDecision(
@@ -131,6 +195,7 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
 
 COMPANY_CONFIG_TERMS = [
     "설정",
+    "세팅",
     "변경",
     "바꿔",
     "고쳐",
@@ -145,6 +210,7 @@ COMPANY_CONFIG_TERMS = [
     "아닐경우",
     "경우엔",
     "보고서는",
+    "보고서 작성",
     "리포트는",
     "레포트는",
     "한글로",
@@ -216,6 +282,7 @@ META_INSTRUCTION_TERMS = [
 
 COMPANY_STATUS_TERMS = [
     "현재 설정",
+    "현재 세팅",
     "설정 보여",
     "회사 상태",
     "상태 보여",
@@ -228,6 +295,30 @@ COMPANY_STATUS_TERMS = [
     "settings",
     "company status",
     "agents",
+]
+
+SUPERVISOR_CHAT_TERMS = [
+    "맞지",
+    "맞아",
+    "맞나요",
+    "맞냐",
+    "맞습니까",
+    "확인",
+    "지금",
+    "현재",
+    "세팅된",
+    "세팅된게",
+    "설정된",
+    "설정된게",
+    "되어있",
+    "돼있",
+    "왜",
+    "어떻게",
+    "뭐야",
+    "뭔데",
+    "가능해",
+    "가능한",
+    "?",
 ]
 
 SOURCE_ONLY_TERMS = [
@@ -255,3 +346,30 @@ def _looks_like_company_status_request(original: str, lowered: str) -> bool:
 
 def _looks_like_source_only_request(original: str, lowered: str) -> bool:
     return _has_any(original, lowered, SOURCE_ONLY_TERMS)
+
+
+def _looks_like_supervisor_chat(original: str, lowered: str) -> bool:
+    if _has_any(original, lowered, EXPLICIT_RESEARCH_ACTIONS):
+        return False
+    if not _has_any(original, lowered, SUPERVISOR_CHAT_TERMS):
+        return False
+    if _has_any(
+        original,
+        lowered,
+        [
+            "보고서",
+            "리포트",
+            "레포트",
+            "설정",
+            "세팅",
+            "슈퍼바이저",
+            "사장",
+            "대표",
+            "권한",
+            "company",
+            "settings",
+            "report",
+        ],
+    ):
+        return True
+    return original.endswith("?")

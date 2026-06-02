@@ -130,6 +130,9 @@ class JimmoriaConsole:
         ]
         self.block("Supervisor intake", lines)
 
+    def print_supervisor_reply(self, lines: list[str]) -> None:
+        self.block("Supervisor reply", lines)
+
     def print_company_settings_updated(self, settings: Any, applied: list[str], path: str | Path) -> None:
         lines = [
             "No Research Room opened.",

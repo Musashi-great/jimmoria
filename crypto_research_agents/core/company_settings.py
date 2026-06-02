@@ -27,6 +27,7 @@ def default_intake_policy() -> dict[str, str]:
         "source_ingestion": "open small ingestion room and save notes",
         "company_config": "apply settings directly without a report",
         "company_status": "show company state without a report",
+        "supervisor_chat": "answer directly without opening a Research Room",
     }
 
 
@@ -53,10 +54,14 @@ class CompanySettings:
         known = {field_name for field_name in cls.__dataclass_fields__}
         filtered = {key: value for key, value in data.items() if key in known}
         settings = cls(**filtered)
-        if not settings.supervisor_authority:
-            settings.supervisor_authority = default_supervisor_authority()
-        if not settings.intake_policy:
-            settings.intake_policy = default_intake_policy()
+        default_authority = default_supervisor_authority()
+        settings.supervisor_authority = [
+            *default_authority,
+            *[item for item in settings.supervisor_authority if item not in default_authority],
+        ]
+        default_policy = default_intake_policy()
+        default_policy.update(settings.intake_policy or {})
+        settings.intake_policy = default_policy
         return settings
 
 

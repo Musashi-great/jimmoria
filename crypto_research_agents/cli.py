@@ -21,7 +21,7 @@ from crypto_research_agents.core.company_settings import (
     load_company_settings,
     save_company_settings,
 )
-from crypto_research_agents.core.supervisor_intake import decide_supervisor_intake
+from crypto_research_agents.core.supervisor_intake import build_supervisor_reply, decide_supervisor_intake
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 from crypto_research_agents.storage.json_store import load_memory
 from crypto_research_agents.storage.run_store import list_run_summaries, load_run_file
@@ -334,6 +334,10 @@ def chat_command(args: argparse.Namespace) -> None:
 
         if intake_decision.intent_type == "company_status":
             console.print_company_settings(settings, settings_path)
+            continue
+
+        if intake_decision.intent_type == "supervisor_chat":
+            console.print_supervisor_reply(build_supervisor_reply(line, settings, intake_decision))
             continue
 
         title, content, url = chat_input_to_source(line)
