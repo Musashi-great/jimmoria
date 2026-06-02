@@ -886,6 +886,8 @@ Runtime 연결:
 
 JIMMORIA CLI의 기본 runtime 이벤트 출력은 compact stream이다. 이 방식은 Goose의 local session/tool logs, Agent Cockpit의 mission event stream, Conduit/Mato 계열의 terminal workspace 패턴을 참고했다. 큰 panel/card가 계속 쌓이면 사용자가 실제 진행 상황을 훑기 어렵기 때문에, 기본 화면에서는 아래 형식의 한 줄 로그가 계속 위로 올라간다.
 
+Research Room이 실행 중일 때도 하단 `JIMMORIA HQ` dock은 유지된다. 새 runtime 이벤트가 도착하면 CLI는 이전 dock을 ANSI escape sequence로 지우고, 이벤트 로그를 출력한 뒤 dock을 다시 그린다. 그래서 사용자는 긴 리서치 런 중에도 채팅창이 사라진 것이 아니라 잠시 잠겨 있는 회사 프런트 데스크를 보고 있는 느낌을 받는다.
+
 ```text
 Room > OPEN room_abc123 | agents 10 | pearl 프로젝트 리서치
 Board > 10 wait/0 done
@@ -894,6 +896,16 @@ Agent > DONE supervisor_agent | Research room initialized | msg 1 / findings 1
 Tool > RUN discovery_agent -> web_search | pearl crypto project
 Output > Report written | reports/pearl-room_abc123.md
 Room > DONE room_abc123 | status completed | msg 14 / findings 10
+```
+
+실행 중 dock 예시:
+
+```text
++--------------------------------------------------------------------------------+
+| JIMMORIA HQ | Supervisor channel | provider: codex_cli | room: room_abc123 ... |
+| Room running. Input returns when Supervisor finishes this room.                 |
+| > working...                                                                   |
++--------------------------------------------------------------------------------+
 ```
 
 상세 정보는 계속 저장된다.

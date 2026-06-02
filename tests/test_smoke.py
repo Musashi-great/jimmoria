@@ -469,6 +469,66 @@ class SmokeTest(unittest.TestCase):
         self.assertNotIn("JIMMORIA opens a Research Room", text)
         self.assertNotIn("Live agent board", text)
 
+    def test_runtime_stream_keeps_input_dock_visible_during_room(self) -> None:
+        output = StringIO()
+        console = JimmoriaConsole()
+
+        with patch("crypto_research_agents.console.supports_color", return_value=True):
+            with redirect_stdout(output):
+                console.handle_event(
+                    {
+                        "type": "room_created",
+                        "room_id": "room_test",
+                        "topic": "pearl pow project",
+                        "goals": ["Investigate the project."],
+                        "agents": ["supervisor_agent", "ingestion_agent"],
+                    }
+                )
+                console.handle_event(
+                    {
+                        "type": "agent_start",
+                        "room_id": "room_test",
+                        "agent_id": "ingestion_agent",
+                        "task_type": "source_ingestion",
+                    }
+                )
+
+        clean = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", output.getvalue())
+        self.assertIn("JIMMORIA HQ", clean)
+        self.assertIn("Room running. Input returns when Supervisor finishes this room.", clean)
+        self.assertIn("> working...", clean)
+        self.assertIn("\033[5A\033[5M", output.getvalue())
+        self.assertEqual(console.runtime_dock_lines, 5)
+
+    def test_runtime_stream_clears_input_dock_when_room_finishes(self) -> None:
+        output = StringIO()
+        console = JimmoriaConsole()
+
+        with patch("crypto_research_agents.console.supports_color", return_value=True):
+            with redirect_stdout(output):
+                console.handle_event(
+                    {
+                        "type": "room_created",
+                        "room_id": "room_test",
+                        "topic": "pearl pow project",
+                        "goals": ["Investigate the project."],
+                        "agents": ["supervisor_agent"],
+                    }
+                )
+                console.handle_event(
+                    {
+                        "type": "room_completed",
+                        "room_id": "room_test",
+                        "status": "completed",
+                        "messages": 2,
+                        "findings": 1,
+                    }
+                )
+
+        self.assertIn("Room", output.getvalue())
+        self.assertEqual(console.runtime_dock_lines, 0)
+        self.assertFalse(console.runtime_room_running)
+
     def test_article_research_loop_writes_outputs(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

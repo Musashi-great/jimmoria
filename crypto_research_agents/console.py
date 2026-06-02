@@ -60,6 +60,8 @@ class JimmoriaConsole:
         self.width = min(shutil.get_terminal_size((100, 30)).columns, 110)
         self.use_rich = RichConsole is not None and not os.getenv("JIMMORIA_PLAIN_LOGS")
         self.event_style = os.getenv("JIMMORIA_EVENT_STYLE", "stream").strip().lower() or "stream"
+        self.runtime_room_running = False
+        self.runtime_dock_lines = 0
 
     def print_intro(self) -> None:
         print_jimmoria_logo(self.width)
@@ -186,10 +188,17 @@ class JimmoriaConsole:
                 print(f"{continuation}{line}")
 
     def print_event_line(self, label: str, text: str, *, muted: bool = False) -> None:
+        if self.use_runtime_dock():
+            self.erase_runtime_dock()
         self.print_log_line(label, text, muted=muted)
+        if self.use_runtime_dock() and self.runtime_room_running:
+            self.print_runtime_dock()
 
     def use_stream_events(self) -> bool:
         return self.event_style not in {"card", "cards", "panel", "panels"}
+
+    def use_runtime_dock(self) -> bool:
+        return self.use_stream_events() and supports_color() and not os.getenv("JIMMORIA_NO_RUNTIME_DOCK")
 
     def read_chat_input(self) -> str:
         if not sys.stdin.isatty():
@@ -217,6 +226,21 @@ class JimmoriaConsole:
     def clear_submitted_input_box(self) -> None:
         # Move below the drawn input dock, then delete its five prompt lines.
         sys.stdout.write("\033[1B\r\033[5A\033[5M\r")
+
+    def erase_runtime_dock(self) -> None:
+        if not self.runtime_dock_lines:
+            return
+        sys.stdout.write(f"\r\033[{self.runtime_dock_lines}A\033[{self.runtime_dock_lines}M\r")
+        self.runtime_dock_lines = 0
+
+    def print_runtime_dock(self) -> None:
+        border = self.input_border()
+        print(self.input_border_style(border))
+        print(self.input_status_line_style(self.input_text_line(self.input_status_text())))
+        print(self.input_border_style(self.input_hint_line("Room running. Input returns when Supervisor finishes this room.")))
+        print(self.input_locked_line_style())
+        print(self.input_border_style(border))
+        self.runtime_dock_lines = 5
 
     def read_basic_boxed_input(self) -> str:
         hint = "Type a request, URL, /command, or @path/to/file"
@@ -303,6 +327,15 @@ class JimmoriaConsole:
         padding = " " * max(inner_width - 2, 0)
         return f"{violet}|{reset} {pink}>{reset} {padding}{violet}|{reset}"
 
+    def input_locked_line_style(self) -> str:
+        violet = "\033[38;2;211;95;255m"
+        muted = "\033[38;2;126;96;154m"
+        reset = "\033[0m"
+        inner_width = self.input_box_width() - 4
+        text = "> working..."
+        padding = " " * max(inner_width - len(text), 0)
+        return f"{violet}|{reset} {muted}{text}{reset}{padding}{violet}|{reset}"
+
     def input_cursor_sequence(self) -> str:
         return "\033[2A\033[4C"
 
@@ -315,6 +348,7 @@ class JimmoriaConsole:
     def handle_event(self, event: dict[str, object]) -> None:
         event_type = str(event.get("type", ""))
         if event_type == "room_created":
+            self.runtime_room_running = True
             self.last_room_id = str(event.get("room_id", ""))
             self.agent_state = {
                 str(agent_id): "queued"
@@ -414,6 +448,7 @@ class JimmoriaConsole:
 
         if event_type == "room_completed":
             if self.use_stream_events():
+                self.runtime_room_running = False
                 self.print_event_line(
                     "Room",
                     f"DONE {event.get('room_id')} | status {event.get('status')} | msg {event.get('messages')} / findings {event.get('findings')}",
@@ -433,6 +468,7 @@ class JimmoriaConsole:
 
         if event_type == "room_failed":
             if self.use_stream_events():
+                self.runtime_room_running = False
                 reason = self.compact_text(str(event.get("summary", "")), 86)
                 self.print_event_line("Room", f"FAIL {event.get('room_id')} | {reason}")
                 return

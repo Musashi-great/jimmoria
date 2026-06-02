@@ -25,6 +25,7 @@ JIMMORIA의 현재 CLI는 full-screen TUI가 아니라 line-oriented CLI다. 따
 - 제출된 문장은 큰 `You` 패널로 반복하지 않고 `You > ...` 로그로 위에 남긴다.
 - Supervisor는 바로 `Supervisor > ...` 진행 로그를 남긴 뒤 답변하거나 Research Room을 연다.
 - Research Room이 열리면 기본적으로 `Room >`, `Board >`, `Agent >`, `Tool >`, `Output >` compact stream이 이어진다.
+- Research Room 실행 중에도 하단 dock을 유지한다. 새 이벤트가 출력될 때는 이전 dock을 지우고 이벤트를 찍은 뒤 다시 dock을 그려, 사용자가 계속 같은 회사 채팅창 안에 있는 느낌을 준다.
 - 큰 `Live agent board`와 agent work card는 `/board` 또는 `JIMMORIA_EVENT_STYLE=cards`에서 사용한다.
 
 ## Target Shape
@@ -48,6 +49,11 @@ Agent > RUN supervisor_agent | Planning direction
 Agent > DONE supervisor_agent | Research room initialized | msg 1 / findings 1
 Agent > RUN ingestion_agent | Extracting source metadata
 Tool > RUN discovery_agent -> web_search | pearl crypto project
++--------------------------------------------------------------------------------+
+| JIMMORIA HQ | Supervisor channel | provider: codex_cli | room: room_abc123 ... |
+| Room running. Input returns when Supervisor finishes this room.                 |
+| > working...                                                                   |
++--------------------------------------------------------------------------------+
 ```
 
 ## Future UI Backlog

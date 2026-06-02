@@ -188,7 +188,7 @@ CLI 입력창은 제출 후 같은 내용을 큰 `You` 패널로 다시 반복�
 
 최근 CLI UX는 Mato, Conduit, Spettro, MetaGPT, ChatDev, ZeroHuman 같은 멀티에이전트/zero-human-company 계열 프로젝트의 terminal workspace와 visible orchestration 패턴을 참고했다. 적용 내용은 [docs/jimmoria-cli-ui-reference-notes.md](docs/jimmoria-cli-ui-reference-notes.md)에 정리되어 있다.
 
-Research Room runtime 로그는 기본적으로 큰 카드가 아니라 compact stream으로 올라간다.
+Research Room runtime 로그는 기본적으로 큰 카드가 아니라 compact stream으로 올라간다. 실행 중에도 하단의 `JIMMORIA HQ` dock은 유지된다. 새 이벤트가 올라오면 이전 dock을 지우고 이벤트를 찍은 뒤 다시 dock을 그려서, 화면 아래에는 항상 회사 채팅창이 남아있는 것처럼 보인다.
 
 ```text
 Room > OPEN room_abc123 | agents 10 | pearl 프로젝트 리서치
