@@ -259,7 +259,13 @@ def default_policy(agent_specs: AgentSpecRegistry | None = None) -> PolicyEngine
         policy.allow("social_kol_agent", tool)
     for tool in ["fetch_url", "parse_html", "archive_source_snapshot"]:
         policy.allow("ingestion_agent", tool)
+    for tool in ["web_search", "github_search_repos", "coingecko_coin_metadata", "dexscreener_search_pairs"]:
+        policy.allow("discovery_agent", tool)
+    for tool in ["web_search", "crawl_website"]:
+        policy.allow("social_kol_agent", tool)
     for tool in ["get_contract_address", "get_dex_pair", "get_token_metadata"]:
+        policy.allow("contract_onchain_agent", tool)
+    for tool in ["coingecko_coin_metadata", "dexscreener_search_pairs"]:
         policy.allow("contract_onchain_agent", tool)
     for tool in ["crawl_docs", "read_github_repo", "crawl_website"]:
         policy.allow("product_tech_agent", tool)

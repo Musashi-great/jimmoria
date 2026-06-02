@@ -4,7 +4,7 @@ JIMMORIA는 크립토 리서치 전용 멀티에이전트 회사 CLI입니다.
 
 사용자는 터미널에서 채팅을 치고, Supervisor가 Research Room을 열어 여러 에이전트에게 일을 나눕니다. 에이전트들은 소스 정리, 내러티브 분석, 후보 프로젝트 발굴, KOL/소셜 체크, 온체인/제품/토큰 체크, 보고서 작성, Obsidian 노트 정리를 담당합니다.
 
-현재는 MVP입니다. 에이전트 협업 구조와 보고서 생성 흐름은 동작하고, URL/Website/Docs/GitHub/DEX Screener/CoinGecko 기본 connector가 ToolGateway 뒤에 붙어 있습니다. X/Twitter, Telegram, Discord, RootData, Explorer/RPC, funding/airdrop 커넥터는 아직 placeholder 상태입니다.
+현재는 MVP입니다. 에이전트 협업 구조와 보고서 생성 흐름은 동작하고, Web Search/URL/Website/Docs/GitHub/DEX Screener/CoinGecko 기본 connector가 ToolGateway 뒤에 붙어 있습니다. X/Twitter, Telegram, Discord, RootData, Explorer/RPC, funding/airdrop 커넥터는 아직 placeholder 상태입니다.
 
 ## Quick Start
 
@@ -80,7 +80,7 @@ jimmoria/
     console.py             터미널 화면, 히어로, 채팅 UI
     runtime.py             Research Room 실행 흐름
     agents/                실제 에이전트 구현
-    connectors/            URL, Docs, GitHub, DEX, CoinGecko connector
+    connectors/            Web Search, URL, Docs, GitHub, DEX, CoinGecko connector
     core/                  Bus, Memory, Room, ModelGateway, ToolGateway
     storage/               JSON 저장소, run snapshot, Obsidian writer
 
@@ -114,7 +114,7 @@ jimmoria/
 - Supervisor + controlled P2P Agent Bus
 - AgentSpec/persona YAML 로딩
 - Codex CLI login, OpenAI API key, offline fallback provider
-- URL/Website/Docs/GitHub/DEX Screener/CoinGecko 기본 connector
+- Web Search/URL/Website/Docs/GitHub/DEX Screener/CoinGecko 기본 connector
 - Source content hash, canonical URL, source snapshot, dedupe
 - Markdown report 생성
 - run snapshot, event log, tool audit log, LLM call log
@@ -128,6 +128,7 @@ jimmoria/
 - Telegram/Discord 채널 읽기
 - Explorer/RPC contract metadata
 - RootData/funding/airdrop/points checker
+- DDGS public web search 품질과 검색 provider 가용성
 - GitHub commits/releases/activity 심화 분석
 - Identity resolver, ticker collision, evidence validator
 ```

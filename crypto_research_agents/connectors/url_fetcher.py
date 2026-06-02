@@ -190,7 +190,7 @@ def extract_official_links(links: list[dict[str, str]]) -> dict[str, list[dict[s
             buckets["telegram"].append(link)
         if any(keyword in text for keyword in ["docs", "documentation", "gitbook", "docusaurus"]):
             buckets["docs"].append(link)
-        if any(keyword in text for keyword in ["app.", "launch app", "dashboard", "waitlist"]):
+        if any(keyword in text for keyword in ["app.", "launch app", "dashboard", "waitlist", "compute platform", "sign-in", "buy"]):
             buckets["app"].append(link)
     return {key: _dedupe_links(value) for key, value in buckets.items()}
 

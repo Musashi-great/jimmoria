@@ -4,7 +4,7 @@
 
 JIMMORIA는 크립토 가격 매매 도구가 아니라, 리서치 전용 멀티에이전트 회사 CLI다. 사용자는 터미널에서 자연어로 리서치 요청을 입력하고, Supervisor가 Research Room을 열어 여러 전문 에이전트에게 일을 나눈다. 에이전트들은 소스 정리, 내러티브 분석, 초기 프로젝트 후보 발굴, KOL/소셜 체크, 온체인/제품/토큰 체크, 보고서 작성, Obsidian 노트 정리를 수행한다.
 
-현재 버전은 MVP다. 멀티에이전트 협업 구조, 보고서 생성, 런 저장, Obsidian-style 노트 생성은 동작한다. URL fetch, Website/Docs crawler, GitHub reader/search, DEX Screener search, CoinGecko search/metadata는 ToolGateway 뒤에 기본 connector로 등록된다. X/Twitter, Telegram, Discord, RootData, Explorer/RPC, funding/airdrop 같은 커넥터는 아직 placeholder 상태다.
+현재 버전은 MVP다. 멀티에이전트 협업 구조, 보고서 생성, 런 저장, Obsidian-style 노트 생성은 동작한다. Web Search, URL fetch, Website/Docs crawler, GitHub reader/search, DEX Screener search, CoinGecko search/metadata는 ToolGateway 뒤에 기본 connector로 등록된다. X/Twitter, Telegram, Discord, RootData, Explorer/RPC, funding/airdrop 같은 커넥터는 아직 placeholder 상태다.
 
 ## 1. 프로젝트 목표
 
@@ -68,7 +68,7 @@ jimmoria
 python -m pip install -e ".[all]"
 ```
 
-기본 dependency에는 콘솔 테마 렌더링을 위한 `rich`가 포함된다. `.[all]` extra는 `openai`, `httpx`, `beautifulsoup4`, `feedparser`까지 설치해서 LLM/API/RSS/HTML connector 확장에 필요한 도구를 함께 준비한다.
+기본 dependency에는 콘솔 테마 렌더링을 위한 `rich`가 포함된다. `.[all]` extra는 `openai`, `httpx`, `beautifulsoup4`, `feedparser`, `ddgs`까지 설치해서 LLM/API/RSS/HTML/Web Search connector 확장에 필요한 도구를 함께 준비한다.
 
 ```toml
 [project.scripts]
@@ -140,7 +140,7 @@ flowchart LR
 | ModelGateway | `core/model_gateway.py` | task type에 따라 모델 라우팅 |
 | LLM Provider | `core/llm_provider.py` | Codex CLI, Codex OAuth, OpenAI, offline fallback 연결 |
 | ToolGateway | `core/tool_gateway.py` | 에이전트별 tool 권한 검사와 audit log |
-| Connectors | `connectors/` | URL, Website/Docs, GitHub, DEX Screener, CoinGecko connector 등록 |
+| Connectors | `connectors/` | Web Search, URL, Website/Docs, GitHub, DEX Screener, CoinGecko connector 등록 |
 | Storage | `storage/` | memory, run snapshot, Obsidian note 저장 |
 
 ## 5. Research Room 실행 흐름
@@ -203,12 +203,12 @@ CLI 시작 도움말에는 정적 에이전트 목록을 길게 보여주지 않
 | `supervisor_agent` | `SupervisorAgent` | 목표와 실행 방향 설정 | Research Room 목표, 참여 에이전트, 모델 선택 정보를 finding으로 기록 |
 | `ingestion_agent` | `IngestionAgent` | 소스 저장과 메타데이터 추출 | 입력 소스를 `SharedMemory.sources`에 저장하고 summary/entities/keywords 추출 |
 | `narrative_agent` | `NarrativeAgent` | 내러티브 분류 | AI wallet, Consumer Crypto, DeFi Automation 등 taxonomy 기반 narrative 분류 |
-| `discovery_agent` | `DiscoveryAgent` | 초기 프로젝트 후보 발굴 | narrative 기반 MVP 후보 프로젝트를 생성하고 검증 에이전트에게 요청 |
-| `social_kol_agent` | `SocialKOLAgent` | KOL/소셜 신호 확인 | `x_search_posts` tool을 호출하지만 현재 connector 미연결이라 placeholder finding 생성 |
-| `contract_onchain_agent` | `ContractOnchainAgent` | 체인, 토큰, 컨트랙트 확인 | `get_contract_address` tool을 호출하지만 현재 Explorer/RPC 미연결 |
+| `discovery_agent` | `DiscoveryAgent` | 초기 프로젝트 후보 발굴 | 프로젝트명 기반 요청이면 `web_search`, GitHub, CoinGecko, DEX Screener로 후보를 resolve하고, 일반 내러티브 요청이면 fallback 후보를 생성 |
+| `social_kol_agent` | `SocialKOLAgent` | KOL/소셜 신호 확인 | X API는 아직 placeholder지만, web search와 공식 링크에서 social/community URL을 우선 추출 |
+| `contract_onchain_agent` | `ContractOnchainAgent` | 체인, 토큰, 컨트랙트 확인 | Explorer/RPC는 아직 placeholder지만 CoinGecko/DEX Screener 결과를 token/market evidence로 반영 |
 | `product_tech_agent` | `ProductTechAgent` | Docs, GitHub, 제품 상태 확인 | 등록된 `crawl_website`/`crawl_docs` connector로 URL이 있는 후보의 제품 상태와 공식 링크를 확인 |
-| `funding_token_agent` | `FundingTokenAgent` | 투자자, 포인트, 토큰 기회 확인 | `check_airdrop_points` tool을 호출하지만 현재 funding/token connector 미연결 |
-| `report_agent` | `ReportAgent` | 보고서 작성 | findings와 candidates를 Markdown dossier로 합성 |
+| `funding_token_agent` | `FundingTokenAgent` | 투자자, 포인트, 토큰 기회 확인 | RootData/funding connector는 아직 placeholder지만 검색/웹/문서 evidence에서 points, airdrop, mining, ticker 힌트를 추출 |
+| `report_agent` | `ReportAgent` | 보고서 작성 | findings와 candidates를 Markdown dossier로 합성하고 Evidence Map에 웹사이트, GitHub, market, search URL을 정리 |
 | `obsidian_curator_agent` | `ObsidianCuratorAgent` | Obsidian-style 노트 정리 | Source, Project, Narrative, Report 노트 작성 |
 
 `config/agents/`에는 기본 실행되지 않는 추가 설계용 agent spec도 있다.
@@ -342,6 +342,7 @@ CLI에서 `/models`를 실행하면 모델/provider 설정 화면이 나온다. 
 `connectors/register_default_connectors()`는 런타임 시작 시 기본 connector를 ToolGateway에 붙인다.
 
 ```text
+web_search
 fetch_url
 parse_html
 archive_source_snapshot
@@ -353,7 +354,7 @@ dexscreener_search_pairs
 coingecko_coin_metadata
 ```
 
-이제 이 tool들은 `unconfigured`가 아니라 실제 connector result를 반환한다. URL이 부족한 경우에는 `missing_input`, 외부 요청이 실패한 경우에는 `failed`, 정상 동작 시에는 `success`로 audit log에 기록된다.
+이제 이 tool들은 `unconfigured`가 아니라 실제 connector result를 반환한다. 검색어나 URL이 부족한 경우에는 `missing_input`, 외부 요청이 실패한 경우에는 `failed`, 정상 동작 시에는 `success`로 audit log에 기록된다.
 
 아직 연결되지 않은 외부 tool을 에이전트가 호출하면 다음 같은 결과가 저장된다.
 
@@ -370,13 +371,14 @@ coingecko_coin_metadata
 
 필요한 tool 목록과 우선순위는 `config/tools/tool_registry.yaml`에 정리되어 있다. 구현된 connector는 `implementation_status: implemented`로 표시된다.
 
-중요한 live stack은 다음이다. 이 중 URL/Website/Docs/GitHub/DEX Screener/CoinGecko 계열은 초안 connector가 구현되어 있고, X/RootData/Explorer/vector 계열은 아직 다음 단계다.
+중요한 live stack은 다음이다. 이 중 Web Search/URL/Website/Docs/GitHub/DEX Screener/CoinGecko 계열은 초안 connector가 구현되어 있고, X/RootData/Explorer/vector 계열은 아직 다음 단계다.
 
 ```text
 x_search_posts
 x_get_user_timeline
 x_build_kol_list
 rss_monitor_feed
+web_search
 crawl_website
 crawl_docs
 github_search_repos
@@ -462,7 +464,7 @@ User input
 이 경우 핵심은 다음이다.
 
 ```text
-아티클/질문/URL -> 기억화 + source hash/snapshot -> 내러티브 추출 -> 유사 후보 생성 -> URL이 있으면 website/docs connector 확인 -> 나머지 미연결 검증은 placeholder -> 보고서
+아티클/질문/URL -> 기억화 + source hash/snapshot -> 내러티브 추출 -> 프로젝트명 요청이면 web/GitHub/market search로 후보 resolve -> website/docs/GitHub connector 확인 -> 나머지 미연결 검증은 placeholder -> Evidence Map 포함 보고서
 ```
 
 ### Case 2. 24시간 모니터가 신호를 발견
@@ -553,11 +555,12 @@ ToolGateway 뒤에 붙는 실제 connector 구현이다.
 __init__.py              register_default_connectors(tool_gateway)
 base.py                  normalized success/missing_input/failed result helper
 url_fetcher.py           fetch_url, parse_html, crawl_website, crawl_docs, source snapshot
+web_search.py            DDGS 기반 public web_search connector
 github_connector.py      github_search_repos, read_github_repo
 market_connectors.py     dexscreener_search_pairs, coingecko_coin_metadata
 ```
 
-현재 connector는 비용이 낮고 API key가 거의 필요 없는 public HTTP 기반으로 시작한다. GitHub는 `GITHUB_TOKEN`이 있으면 사용하지만 없어도 public API로 동작한다. DEX Screener와 CoinGecko도 public endpoint를 먼저 사용한다.
+현재 connector는 비용이 낮고 API key가 거의 필요 없는 public HTTP 기반으로 시작한다. Web Search는 `ddgs`를 사용한다. GitHub는 `GITHUB_TOKEN`이 있으면 사용하지만 없어도 public API로 동작한다. DEX Screener와 CoinGecko도 public endpoint를 먼저 사용한다.
 
 ### `crypto_research_agents/core/`
 
@@ -635,6 +638,8 @@ project_research.yaml
 - tool registry required stack
 - tool audit log
 - default connector registration
+- web search connector registration
+- Pearl-style project name discovery candidate resolution
 - URL/HTML connector metadata extraction
 - SourceRecord content hash/canonical URL dedupe
 - boxed chat input prompt
@@ -658,10 +663,10 @@ python -m unittest discover -s tests -v
 
 - X/Twitter API가 아직 연결되지 않았다.
 - Telegram/Discord reader가 아직 연결되지 않았다.
-- URL/Website/Docs/GitHub/DEX Screener/CoinGecko는 초안 connector가 등록되어 있지만, Playwright fallback, sitemap adapter, GitHub commit/release 상세 분석은 아직 약하다.
+- Web Search/URL/Website/Docs/GitHub/DEX Screener/CoinGecko는 초안 connector가 등록되어 있지만, 검색 품질은 DDGS/provider 가용성에 영향을 받고, Playwright fallback, sitemap adapter, GitHub commit/release 상세 분석은 아직 약하다.
 - Explorer/RPC/RootData connector가 아직 등록되지 않았다.
-- DiscoveryAgent는 현재 live discovery가 아니라 narrative 기반 placeholder 후보를 만든다.
-- Social/Contract/Funding 에이전트의 주요 live tool은 여전히 `unconfigured` audit log를 남긴다. ProductTechAgent는 URL이 있는 경우 Website/Docs connector 결과를 finding에 반영한다.
+- DiscoveryAgent는 프로젝트명 기반 요청에서 web/GitHub/CoinGecko/DEX search로 live candidate를 만들 수 있다. 다만 general narrative discovery는 아직 placeholder 후보 생성이 남아 있다.
+- Social/Contract/Funding 에이전트의 일부 핵심 live tool은 여전히 `unconfigured` audit log를 남긴다. 대신 Social은 web/social URL을 추출하고, Contract는 CoinGecko/DEX Screener를 반영하며, Funding은 evidence text에서 token/points/mining 힌트를 추출한다.
 - Vector DB와 entity graph persistence는 아직 간단한 JSON memory 수준이다.
 
 즉, 지금은 "회사 운영 시스템"에 첫 번째 실제 리서치 도구 묶음이 붙은 상태다. 다음은 이 도구 결과를 Identity/Evidence/Collision 검증 엔진으로 엮어 보고서 신뢰도를 올리는 단계다.
@@ -675,7 +680,7 @@ python -m unittest discover -s tests -v
 2. Identity Resolver + Ticker Collision Engine 추가
 3. Evidence Validator / Citation Checker 추가
 4. GitHub connector를 commits/releases/activity까지 확장
-5. DEX Screener/CoinGecko 결과를 ContractOnchainAgent finding에 반영
+5. Web Search 결과를 source snapshot과 citation checker에 연결
 6. RSS monitor + Signal Queue로 24H Radar 입력원 구축
 7. X/KOL search와 local KOL DB 구현
 8. RootData/Explorer/RPC connector 구현
@@ -702,4 +707,4 @@ python -m unittest discover -s tests -v
 
 ## 21. 한 줄 요약
 
-JIMMORIA는 현재 "채팅형 CLI + Research Room + controlled P2P Agent Bus + Shared Memory + Model Gateway + Tool Gateway + 기본 URL/Website/Docs/GitHub/DEX/CoinGecko connectors + Markdown/Obsidian output"까지 구현된 크립토 리서치 회사 MVP다. 다음 핵심 작업은 Project Research Loop, Identity/Evidence/Collision 검증 엔진, 그리고 Social/Contract/Funding 에이전트의 source-backed finding 업그레이드다.
+JIMMORIA는 현재 "채팅형 CLI + Research Room + controlled P2P Agent Bus + Shared Memory + Model Gateway + Tool Gateway + 기본 Web Search/URL/Website/Docs/GitHub/DEX/CoinGecko connectors + Markdown/Obsidian output"까지 구현된 크립토 리서치 회사 MVP다. 다음 핵심 작업은 Project Research Loop, Identity/Evidence/Collision 검증 엔진, 그리고 Social/Contract/Funding 에이전트의 source-backed finding 업그레이드다.

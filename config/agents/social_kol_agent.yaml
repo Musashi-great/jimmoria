@@ -44,6 +44,8 @@
   "tools": {
     "allow": [
       "x_search_posts",
+      "web_search",
+      "crawl_website",
       "x_count_recent_posts",
       "x_get_recent_mentions",
       "x_get_user_profile",

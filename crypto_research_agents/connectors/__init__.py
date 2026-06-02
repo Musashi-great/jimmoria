@@ -9,6 +9,7 @@ from crypto_research_agents.connectors.url_fetcher import (
     fetch_url,
     parse_html,
 )
+from crypto_research_agents.connectors.web_search import web_search
 from crypto_research_agents.core.tool_gateway import ToolGateway
 
 
@@ -20,6 +21,7 @@ def register_default_connectors(tool_gateway: ToolGateway) -> None:
     tool_gateway.register("archive_source_snapshot", archive_source_snapshot)
     tool_gateway.register("crawl_website", crawl_website)
     tool_gateway.register("crawl_docs", crawl_docs)
+    tool_gateway.register("web_search", web_search)
     tool_gateway.register("github_search_repos", github_search_repos)
     tool_gateway.register("read_github_repo", read_github_repo)
     tool_gateway.register("dexscreener_search_pairs", dexscreener_search_pairs)

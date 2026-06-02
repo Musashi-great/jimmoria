@@ -36,6 +36,20 @@ class ProductTechAgent(BaseAgent):
             )
             website_data = website_result.get("data") if isinstance(website_result.get("data"), dict) else {}
             docs_data = docs_result.get("data") if isinstance(docs_result.get("data"), dict) else {}
+            github_target = _select_github_target(website_data, project.metadata)
+            github_result = self.tool_gateway.call(
+                self.agent_id,
+                "read_github_repo",
+                room_id=room.room_id,
+                repo_url=github_target,
+            )
+            github_data = github_result.get("data") if isinstance(github_result.get("data"), dict) else {}
+            if target_url:
+                project.website = target_url
+            project.metadata["website_crawl"] = _compact_website_data(website_data)
+            project.metadata["docs_crawl"] = _compact_docs_data(docs_data)
+            if github_data:
+                project.metadata["github_read"] = github_data
             rows.append(
                 {
                     "project_id": project_id,
@@ -43,8 +57,10 @@ class ProductTechAgent(BaseAgent):
                     "target_url": target_url,
                     "product_status": website_data.get("product_status", "unknown"),
                     "docs_status": docs_data.get("docs_status", website_data.get("docs_status", "unknown")),
-                    "github_status": website_data.get("github_status", "unknown"),
+                    "github_status": "read" if github_result.get("status") == "success" else website_data.get("github_status", "unknown"),
                     "official_links": website_data.get("official_links", {}),
+                    "github_repo": github_data.get("repo") if isinstance(github_data.get("repo"), dict) else None,
+                    "github_languages": github_data.get("languages", {}),
                     "technical_keywords": docs_data.get("technical_keywords", []),
                     "signals": {
                         "website": website_data.get("signals", {}),
@@ -53,6 +69,7 @@ class ProductTechAgent(BaseAgent):
                     "connector_status": {
                         "crawl_website": website_result.get("status"),
                         "crawl_docs": docs_result.get("status"),
+                        "read_github_repo": github_result.get("status"),
                     },
                     "note": _row_note(website_result, docs_result),
                 }
@@ -122,3 +139,41 @@ def _confidence(rows: list[dict[str, Any]]) -> float:
     if any(row.get("connector_status", {}).get("crawl_website") == "success" for row in rows):
         return 0.65
     return 0.4
+
+
+def _select_github_target(website_data: dict[str, Any], metadata: dict[str, Any]) -> str | None:
+    official_links = website_data.get("official_links") if isinstance(website_data.get("official_links"), dict) else {}
+    github_links = official_links.get("github", []) if isinstance(official_links.get("github"), list) else []
+    for link in github_links:
+        if isinstance(link, dict) and link.get("url"):
+            return str(link["url"])
+    for repo in metadata.get("github_repos", []):
+        if isinstance(repo, dict) and repo.get("html_url"):
+            return str(repo["html_url"])
+    for result in metadata.get("web_results", []):
+        if isinstance(result, dict) and "github.com" in str(result.get("url", "")).lower():
+            return str(result["url"])
+    return None
+
+
+def _compact_website_data(data: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "url": data.get("final_url") or data.get("url"),
+        "title": data.get("title"),
+        "meta_description": data.get("meta_description"),
+        "product_status": data.get("product_status"),
+        "docs_status": data.get("docs_status"),
+        "github_status": data.get("github_status"),
+        "x_status": data.get("x_status"),
+        "official_links": data.get("official_links", {}),
+        "signals": data.get("signals", {}),
+    }
+
+
+def _compact_docs_data(data: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "docs_status": data.get("docs_status"),
+        "pages": data.get("pages", []),
+        "technical_keywords": data.get("technical_keywords", []),
+        "signals": data.get("signals", {}),
+    }

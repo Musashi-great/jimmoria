@@ -52,6 +52,7 @@ def coingecko_coin_metadata(
         for coin in coins[:10]
         if isinstance(coin, dict)
     ]
+    simplified.sort(key=lambda coin: _coin_match_score(coin, query), reverse=True)
     data: dict[str, Any] = {"query": query, "coins": simplified}
     if include_detail and simplified:
         first_id = simplified[0].get("id")
@@ -104,3 +105,24 @@ def _coin_detail_summary(data: dict[str, Any]) -> dict[str, Any]:
         "repos_url": links.get("repos_url", {}) if isinstance(links, dict) else {},
         "twitter_screen_name": links.get("twitter_screen_name") if isinstance(links, dict) else None,
     }
+
+
+def _coin_match_score(coin: dict[str, Any], query: str) -> int:
+    query_lower = query.lower().strip()
+    name = str(coin.get("name") or "").lower()
+    symbol = str(coin.get("symbol") or "").lower()
+    coin_id = str(coin.get("id") or "").lower()
+    score = 0
+    if name == query_lower:
+        score += 30
+    if coin_id in {query_lower, f"{query_lower}-2"}:
+        score += 20
+    if symbol in {query_lower, "prl"}:
+        score += 12
+    if query_lower in name:
+        score += 4
+    if any(word in name for word in ["girl with", "kona", "bridged", "blackpearl"]):
+        score -= 10
+    if coin.get("market_cap_rank") is not None:
+        score += 1
+    return score

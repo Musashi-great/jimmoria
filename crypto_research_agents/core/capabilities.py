@@ -81,6 +81,7 @@ def collect_capabilities(
     ]
 
     tool_specs = [
+        ("Public web search", "web_search"),
         ("X/Twitter search", "x_search_posts"),
         ("X/KOL timeline", "x_get_user_timeline"),
         ("X/KOL list builder", "x_build_kol_list"),

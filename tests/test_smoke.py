@@ -12,6 +12,7 @@ from io import StringIO
 from unittest.mock import patch
 
 from crypto_research_agents.runtime import ResearchRuntime
+from crypto_research_agents.agents.discovery import build_live_candidates, extract_project_query, should_live_discover
 from crypto_research_agents.connectors import register_default_connectors
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
 from crypto_research_agents.cli import chat_command, configure_model_panel, main as cli_main, print_banner
@@ -55,6 +56,7 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(pyproject["tool"]["setuptools"]["packages"]["find"]["include"], ["crypto_research_agents*"])
         self.assertIn("rich>=13.7.0", pyproject["project"]["dependencies"])
         self.assertIn("all", pyproject["project"]["optional-dependencies"])
+        self.assertIn("ddgs>=9.14.0", pyproject["project"]["optional-dependencies"]["all"])
         self.assertIn("feedparser>=6.0.11", pyproject["project"]["optional-dependencies"]["all"])
 
     def test_chat_input_uses_boxed_prompt(self) -> None:
@@ -196,6 +198,7 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("fetch_url", runtime.tool_gateway.registered_tools)
         self.assertIn("crawl_website", runtime.tool_gateway.registered_tools)
         self.assertIn("crawl_docs", runtime.tool_gateway.registered_tools)
+        self.assertIn("web_search", runtime.tool_gateway.registered_tools)
         self.assertIn("github_search_repos", runtime.tool_gateway.registered_tools)
         self.assertIn("read_github_repo", runtime.tool_gateway.registered_tools)
         self.assertIn("dexscreener_search_pairs", runtime.tool_gateway.registered_tools)
@@ -225,6 +228,45 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("points", data["signals"]["points_or_airdrop"])
         self.assertEqual(data["official_links"]["docs"][0]["url"], "https://pearl.example/docs")
         self.assertEqual(data["official_links"]["github"][0]["url"], "https://github.com/pearl-labs/app")
+
+    def test_live_discovery_resolves_pearl_project_candidate(self) -> None:
+        topic = "pearl 크립토 pow 프로젝트에 대해서 리서칭을 진행해봐"
+        query = extract_project_query(topic)
+        live_data = {
+            "web_results": [
+                {
+                    "title": "Pearl Whitepaper",
+                    "url": "https://pearlresearch.ai/",
+                    "snippet": "Pearl Research Labs Proof-of-Useful-Work L1 protocol using matrix multiplication.",
+                    "host": "pearlresearch.ai",
+                },
+                {
+                    "title": "GitHub - pearl-research-labs/pearl",
+                    "url": "https://github.com/pearl-research-labs/pearl",
+                    "snippet": "Monorepo for the Pearl network.",
+                    "host": "github.com",
+                },
+            ],
+            "github_repos": [
+                {
+                    "full_name": "pearl-research-labs/pearl",
+                    "html_url": "https://github.com/pearl-research-labs/pearl",
+                    "description": "Monorepo for the Pearl network",
+                }
+            ],
+            "coingecko_coins": [],
+            "dex_pairs": [],
+        }
+
+        candidates = build_live_candidates(["Unclassified Early Crypto"], ["src_test"], topic, query, live_data)
+
+        self.assertTrue(should_live_discover(topic, query))
+        self.assertEqual(query, "pearl")
+        self.assertEqual(candidates[0].name, "Pearl Network")
+        self.assertEqual(candidates[0].website, "https://pearlresearch.ai/")
+        self.assertEqual(candidates[0].chain, "Pearl L1")
+        self.assertIn("Proof-of-Useful-Work", candidates[0].narratives)
+        self.assertGreater(candidates[0].score, 60)
 
     def test_source_record_dedupes_by_canonical_url(self) -> None:
         memory = SharedMemory()
@@ -496,6 +538,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertIn("rootdata_search_projects", registry["minimum_viable_live_stack"])
         self.assertIn("claim_evidence_check", registry["safety"])
         self.assertEqual(registry["tool_meta"]["fetch_url"]["implementation_status"], "implemented")
+        self.assertEqual(registry["tool_meta"]["web_search"]["implementation_status"], "implemented")
         self.assertEqual(registry["tool_meta"]["crawl_docs"]["implementation_status"], "implemented")
         self.assertEqual(registry["tool_meta"]["x_search_posts"]["priority"], "required")
         self.assertEqual(registry["tool_meta"]["rootdata_get_project"]["owner_agent"], "funding_token_agent")

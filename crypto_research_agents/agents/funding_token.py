@@ -19,40 +19,48 @@ class FundingTokenAgent(BaseAgent):
         rows = []
         for project_id in _collect_candidate_ids(requests):
             project = memory.projects[project_id]
-            self.tool_gateway.call(
+            tool_result = self.tool_gateway.call(
                 self.agent_id,
                 "check_airdrop_points",
                 room_id=room.room_id,
                 project_name=project.name,
             )
+            evidence_text = _evidence_text(project.metadata)
             rows.append(
                 {
                     "project_id": project_id,
                     "project_name": project.name,
                     "funding_status": "unknown",
-                    "points_status": "unknown",
-                    "token_opportunity": "unknown",
-                    "note": "Funding/token connectors are not configured in MVP.",
+                    "points_status": _points_status(evidence_text),
+                    "token_opportunity": _token_opportunity(project.token_status, evidence_text),
+                    "token_status": project.token_status,
+                    "tool_status": tool_result.get("status"),
+                    "note": _note(evidence_text),
                 }
             )
-        summary = "Funding/token check produced MVP placeholders."
+        signal_rows = sum(1 for row in rows if row["points_status"] != "unknown" or row["token_opportunity"] != "unknown")
+        summary = (
+            f"Funding/token check extracted token or incentive hints for {signal_rows}/{len(rows)} candidates from available evidence."
+            if rows
+            else "Funding/token check found no candidate projects to inspect."
+        )
         finding = self.write_finding(
             room=room,
             memory=memory,
             finding_type="funding_token_signal",
             summary=summary,
             data={"rows": rows},
-            confidence=0.35,
+            confidence=0.52 if signal_rows else 0.35,
         )
         for request in requests:
             bus.response(
                 request=request,
                 from_agent=self.agent_id,
                 result={"rows": rows, "finding_id": finding.finding_id},
-                confidence=0.35,
-                notes=["Funding/token connector is not configured."],
+                confidence=finding.confidence,
+                notes=[summary],
             )
-        return AgentResult(self.agent_id, summary, {"finding_id": finding.finding_id, "rows": rows}, confidence=0.35)
+        return AgentResult(self.agent_id, summary, {"finding_id": finding.finding_id, "rows": rows}, confidence=finding.confidence)
 
 
 def _collect_candidate_ids(requests: list[Any]) -> list[str]:
@@ -60,3 +68,37 @@ def _collect_candidate_ids(requests: list[Any]) -> list[str]:
     for request in requests:
         candidate_ids.extend(request.context.get("candidate_ids", []))
     return sorted(set(candidate_ids))
+
+
+def _evidence_text(metadata: dict[str, Any]) -> str:
+    parts: list[str] = []
+    for result in metadata.get("web_results", []):
+        if isinstance(result, dict):
+            parts.extend([str(result.get("title", "")), str(result.get("snippet", "")), str(result.get("url", ""))])
+    for key in ["website_crawl", "docs_crawl"]:
+        value = metadata.get(key)
+        if isinstance(value, dict):
+            parts.append(str(value))
+    return " ".join(parts).lower()
+
+
+def _points_status(evidence_text: str) -> str:
+    if any(keyword in evidence_text for keyword in ["points", "airdrop", "quest", "rewards campaign"]):
+        return "hint_found"
+    return "unknown"
+
+
+def _token_opportunity(project_status: str, evidence_text: str) -> str:
+    if any(keyword in evidence_text for keyword in [" prl", "ticker", "block reward", "mining", "coin", "emissions"]):
+        return "native_or_mining_token_signal"
+    if project_status not in {"unknown", ""}:
+        return project_status
+    return "unknown"
+
+
+def _note(evidence_text: str) -> str:
+    if "mining" in evidence_text or "block reward" in evidence_text:
+        return "Evidence mentions mining/block rewards; treat as token mechanics research, not investment advice."
+    if "points" in evidence_text or "airdrop" in evidence_text:
+        return "Evidence mentions points/airdrop-style incentives; requires official confirmation."
+    return "Funding/token connectors are not configured; only local evidence hints were inspected."

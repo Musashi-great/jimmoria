@@ -15,6 +15,7 @@
     "dexscreener_search_pairs",
     "explorer_lookup",
     "rootdata_search_projects",
+    "web_search",
     "source_cache_write",
     "vector_search",
     "vector_upsert",
@@ -57,6 +58,7 @@
   ],
   "source_ingestion": [
     "fetch_url",
+    "web_search",
     "parse_html",
     "parse_pdf",
     "parse_markdown",
@@ -84,6 +86,7 @@
   ],
   "market_narrative": [
     "coingecko_coin_metadata",
+    "web_search",
     "coingecko_latest_listings",
     "coingecko_category_markets",
     "defillama_protocol_search",
@@ -195,6 +198,15 @@
       "provider_options": ["stdlib urllib HTTP fetcher"],
       "required_secrets": [],
       "source_docs": []
+    },
+    "web_search": {
+      "priority": "required",
+      "owner_agent": "discovery_agent",
+      "implementation_status": "implemented",
+      "purpose": "Search the public web for project discovery evidence before agents verify official links and technical sources.",
+      "provider_options": ["DDGS public web search"],
+      "required_secrets": [],
+      "source_docs": ["https://pypi.org/project/ddgs/"]
     },
     "parse_html": {
       "priority": "required",

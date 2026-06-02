@@ -57,7 +57,7 @@ class ReportAgent(BaseAgent):
         findings: list[FindingRecord],
     ) -> str:
         candidate_lines = []
-        for project in memory.projects.values():
+        for project in current_room_candidates(room, memory, findings):
             candidate_lines.append(
                 f"- {project.name}: {', '.join(project.narratives)}; {project.reason_found}"
             )
@@ -87,12 +87,9 @@ def render_project_dossier(
     model_name: str,
     llm_summary: str,
 ) -> str:
-    candidates = [
-        project
-        for project in memory.projects.values()
-        if set(project.sources).intersection(room.source_inputs)
-    ]
+    candidates = current_room_candidates(room, memory, findings)
     sources = [memory.sources[source_id] for source_id in room.source_inputs if source_id in memory.sources]
+    has_live_evidence = any(project.metadata.get("discovery_mode") == "live_search" for project in candidates)
 
     lines: list[str] = [
         f"# Project Research Dossier: {room.topic}",
@@ -100,11 +97,19 @@ def render_project_dossier(
         "## 1. TL;DR",
         f"- Room ID: `{room.room_id}`",
         "- Current judgment: Research More",
-        f"- LLM synthesis: {llm_summary or 'No LLM synthesis available.'}",
-        "- Note: This MVP uses local placeholders for live social/on-chain/product checks until connectors are configured.",
-        "",
-        "## 2. Goals",
+        f"- Automated synthesis: {render_automatic_tldr(candidates)}",
     ]
+    if should_show_llm_summary(llm_summary):
+        lines.append(f"- LLM synthesis: {llm_summary}")
+    lines.extend(
+        [
+            "- Note: Live web/GitHub/market connectors were used where available; social APIs, RootData, and explorer/RPC may still be placeholders."
+            if has_live_evidence
+            else "- Note: This MVP uses local placeholders for live social/on-chain/product checks until connectors are configured.",
+            "",
+            "## 2. Goals",
+        ]
+    )
     lines.extend(f"- {goal}" for goal in room.goals)
 
     lines.extend(["", "## 3. Sources"])
@@ -119,19 +124,28 @@ def render_project_dossier(
     if candidates:
         lines.extend(
             [
-                "| Project | Narrative | Token Status | Score | Why Found |",
-                "|---|---|---|---:|---|",
+                "| Project | Website | Narrative | Token Status | Score | Evidence | Why Found |",
+                "|---|---|---|---|---:|---:|---|",
             ]
         )
         for project in candidates:
             narrative = ", ".join(project.narratives) or "unknown"
+            website = project.website or "-"
+            evidence_count = len(project.metadata.get("evidence_urls", []))
             lines.append(
-                f"| {project.name} | {narrative} | {project.token_status} | {project.score:.0f} | {project.reason_found} |"
+                f"| {escape_table(project.name)} | {escape_table(website)} | {escape_table(narrative)} | {escape_table(project.token_status)} | {project.score:.0f} | {evidence_count} | {escape_table(project.reason_found)} |"
             )
     else:
         lines.append("- No candidates discovered.")
 
-    lines.extend(["", "## 5. Agent Findings"])
+    lines.extend(["", "## 5. Evidence Map"])
+    if candidates:
+        for project in candidates:
+            lines.extend(render_candidate_evidence(project))
+    else:
+        lines.append("- No candidate evidence available.")
+
+    lines.extend(["", "## 6. Agent Findings"])
     for finding in findings:
         lines.extend(
             [
@@ -147,13 +161,138 @@ def render_project_dossier(
 
     lines.extend(
         [
-            "## 6. Open Questions",
-            "- Configure live X/Twitter, Telegram, GitHub, Docs, Explorer, and funding connectors.",
-            "- Replace MVP-generated candidates with live discovery results.",
+            "## 7. Open Questions",
+            "- Configure live X/Twitter, Telegram, RootData, Explorer/RPC, and funding connectors.",
+            "- Validate official social handles and KOL mention history.",
+            "- Verify token mechanics against explorer/RPC or official chain data.",
             "- Add source-backed KOL mention history and social momentum scores.",
             "",
-            "## 7. Runtime Metadata",
+            "## 8. Runtime Metadata",
             f"- Report model route: `{model_name}`",
         ]
     )
     return "\n".join(lines)
+
+
+def render_candidate_evidence(project: Any) -> list[str]:
+    metadata = project.metadata
+    lines = [
+        f"### {project.name}",
+        f"- Website: {project.website or 'unknown'}",
+        f"- Chain: {project.chain or 'unknown'}",
+        f"- Token status: {project.token_status}",
+    ]
+    website_crawl = metadata.get("website_crawl") if isinstance(metadata.get("website_crawl"), dict) else {}
+    if website_crawl:
+        lines.append(
+            "- Website crawl: "
+            f"product={website_crawl.get('product_status') or 'unknown'}, "
+            f"docs={website_crawl.get('docs_status') or 'unknown'}, "
+            f"github={website_crawl.get('github_status') or 'unknown'}, "
+            f"x={website_crawl.get('x_status') or 'unknown'}"
+        )
+        official_links = website_crawl.get("official_links") if isinstance(website_crawl.get("official_links"), dict) else {}
+        official_url_lines = []
+        for bucket in ["x", "discord", "telegram", "app", "docs"]:
+            for link in official_links.get(bucket, []):
+                if isinstance(link, dict) and link.get("url"):
+                    official_url_lines.append(f"{bucket}: {link['url']}")
+        if official_url_lines:
+            lines.append("- Official/community links:")
+            for value in official_url_lines[:8]:
+                lines.append(f"  - {value}")
+    github_read = metadata.get("github_read") if isinstance(metadata.get("github_read"), dict) else {}
+    github_repo = github_read.get("repo") if isinstance(github_read.get("repo"), dict) else None
+    if github_repo:
+        lines.append(
+            "- GitHub: "
+            f"{github_repo.get('full_name')} "
+            f"stars={github_repo.get('stars')} "
+            f"updated={github_repo.get('updated_at')} "
+            f"url={github_repo.get('html_url')}"
+        )
+        languages = github_read.get("languages") if isinstance(github_read.get("languages"), dict) else {}
+        if languages:
+            lines.append(f"- GitHub languages: {', '.join(list(languages)[:5])}")
+    elif metadata.get("github_repos"):
+        repo = metadata["github_repos"][0]
+        if isinstance(repo, dict):
+            lines.append(f"- GitHub search hit: {repo.get('full_name')} {repo.get('html_url')}")
+
+    top_detail = metadata.get("coingecko_top_detail") if isinstance(metadata.get("coingecko_top_detail"), dict) else {}
+    if top_detail and (top_detail.get("name") or top_detail.get("symbol")):
+        lines.append(
+            "- CoinGecko top match: "
+            f"{top_detail.get('name')} ({top_detail.get('symbol')}) "
+            f"platform={top_detail.get('asset_platform_id') or 'native/unknown'}"
+        )
+    dex_pairs = metadata.get("dex_pairs") if isinstance(metadata.get("dex_pairs"), list) else []
+    if dex_pairs:
+        first_pair = dex_pairs[0]
+        if isinstance(first_pair, dict):
+            lines.append(
+                "- DEX Screener top search hit, unverified collision risk: "
+                f"{first_pair.get('chain')} {first_pair.get('dex')} "
+                f"liquidity={first_pair.get('liquidity_usd')} "
+                f"url={first_pair.get('url')}"
+            )
+
+    evidence_urls = metadata.get("evidence_urls", [])
+    if evidence_urls:
+        lines.append("- Evidence URLs:")
+        for url in evidence_urls[:8]:
+            lines.append(f"  - {url}")
+    return lines + [""]
+
+
+def escape_table(value: object) -> str:
+    return str(value).replace("|", "\\|").replace("\n", " ")
+
+
+def render_automatic_tldr(candidates: list[Any]) -> str:
+    if not candidates:
+        return "No candidate project was resolved in this room."
+    primary = candidates[0]
+    narratives = ", ".join(primary.narratives[:4]) or "unknown narrative"
+    evidence_count = len(primary.metadata.get("evidence_urls", []))
+    return (
+        f"{primary.name} resolved as the primary candidate. "
+        f"Core thesis: {narratives}. "
+        f"Token status: {primary.token_status}; chain: {primary.chain or 'unknown'}. "
+        f"Evidence URLs collected: {evidence_count}. "
+        "Market/social/on-chain details still need official-source verification where connectors are placeholders."
+    )
+
+
+def should_show_llm_summary(summary: str) -> bool:
+    cleaned = summary.strip()
+    if not cleaned:
+        return False
+    if cleaned.startswith("Topic:") and "Goals:" in cleaned:
+        return False
+    return True
+
+
+def current_room_candidates(
+    room: ResearchRoom,
+    memory: SharedMemory,
+    findings: list[FindingRecord],
+) -> list[Any]:
+    candidate_ids: list[str] = []
+    for finding in findings:
+        if finding.finding_type != "candidate_discovery":
+            continue
+        for candidate in finding.data.get("candidates", []):
+            if isinstance(candidate, dict) and candidate.get("project_id"):
+                candidate_ids.append(str(candidate["project_id"]))
+    if candidate_ids:
+        return [
+            memory.projects[project_id]
+            for project_id in candidate_ids
+            if project_id in memory.projects
+        ]
+    return [
+        project
+        for project in memory.projects.values()
+        if set(project.sources).intersection(room.source_inputs)
+    ]
