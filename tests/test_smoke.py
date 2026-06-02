@@ -1,5 +1,6 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import argparse
 import json
 import os
 import tomllib
@@ -10,7 +11,7 @@ from unittest.mock import patch
 
 from crypto_research_agents.runtime import ResearchRuntime
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
-from crypto_research_agents.cli import configure_model_panel, main as cli_main, print_banner
+from crypto_research_agents.cli import chat_command, configure_model_panel, main as cli_main, print_banner
 from crypto_research_agents.core.llm_provider import OAuthTokenProvider, provider_from_env
 from crypto_research_agents.core.model_gateway import ModelGateway
 from crypto_research_agents.core.capabilities import collect_capabilities
@@ -143,15 +144,64 @@ class SmokeTest(unittest.TestCase):
 
     def test_model_setup_offline_choice_uses_screen_flow(self) -> None:
         output = StringIO()
-        with patch.dict("os.environ", {}, clear=True):
-            with patch("builtins.input", return_value="3"):
-                with redirect_stdout(output):
-                    configure_model_panel()
-            self.assertEqual(os.environ["LLM_PROVIDER"], "offline")
+        with TemporaryDirectory() as tmp:
+            settings_path = str(Path(tmp) / "model_settings.json")
+            with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path}, clear=True):
+                with patch("builtins.input", return_value="3"):
+                    with redirect_stdout(output):
+                        configure_model_panel()
+                self.assertEqual(os.environ["LLM_PROVIDER"], "offline")
+                settings = json.loads(Path(settings_path).read_text(encoding="utf-8"))
+                self.assertEqual(settings["LLM_PROVIDER"], "offline")
 
         text = output.getvalue()
         self.assertIn("[Model Setup]", text)
         self.assertIn("[Offline fallback]", text)
+
+    def test_codex_setup_can_use_default_model_routes_without_model_names(self) -> None:
+        output = StringIO()
+        with TemporaryDirectory() as tmp:
+            settings_path = str(Path(tmp) / "model_settings.json")
+            env = {
+                "JIMMORIA_MODEL_SETTINGS_PATH": settings_path,
+                "CODEX_CLI_MODEL_FAST": "bad-manual-value",
+            }
+            with patch.dict("os.environ", env, clear=True):
+                with patch("builtins.input", side_effect=["1", "", ""]):
+                    with patch("crypto_research_agents.cli.codex_login_status", return_value="Logged in using ChatGPT"):
+                        with redirect_stdout(output):
+                            configure_model_panel()
+                self.assertEqual(os.environ["LLM_PROVIDER"], "codex_cli")
+                self.assertNotIn("CODEX_CLI_MODEL_FAST", os.environ)
+                settings = json.loads(Path(settings_path).read_text(encoding="utf-8"))
+                self.assertEqual(settings["LLM_PROVIDER"], "codex_cli")
+                self.assertNotIn("CODEX_CLI_MODEL_FAST", settings)
+
+        text = output.getvalue()
+        self.assertIn("You do not need to know model names.", text)
+        self.assertIn("Using provider default for every agent.", text)
+
+    def test_chat_skips_startup_model_setup_when_provider_is_saved(self) -> None:
+        output = StringIO()
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            settings_path = root / "model_settings.json"
+            settings_path.write_text('{"LLM_PROVIDER": "codex_cli"}', encoding="utf-8")
+            args = argparse.Namespace(
+                memory=str(root / "memory.json"),
+                vault=str(root / "vault"),
+                reports=str(root / "reports"),
+                skip_model_setup=False,
+            )
+            with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(settings_path)}, clear=True):
+                with patch("sys.stdin.isatty", return_value=True):
+                    with patch("builtins.input", return_value="/quit"):
+                        with patch("crypto_research_agents.cli.configure_model_panel") as setup_panel:
+                            with redirect_stdout(output):
+                                chat_command(args)
+                            self.assertFalse(setup_panel.called)
+
+        self.assertIn("JIMMORIA v0.1.0", output.getvalue())
 
     def test_oauth_token_provider_reads_explicit_env(self) -> None:
         with patch.dict("os.environ", {"CODEX_OAUTH_TOKEN": "abc123"}, clear=True):

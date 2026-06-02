@@ -278,9 +278,19 @@ Funding/airdrop live checker
 Chat mode 시작 시 모델 설정 패널을 보여준다.
 
 ```text
-1. Codex OAuth
+1. Codex OAuth / ChatGPT login code
 2. OpenAI API Key
 3. Offline fallback
+```
+
+Current CLI behavior:
+
+```text
+Codex login: codex login --device-auth
+Login persistence: reused until sign-out, machine change, or session expiry
+Saved local settings: data/model_settings.json
+Recommended model route: Use provider default for every agent
+Advanced model route: custom model id input only when the user already knows it
 ```
 
 Codex OAuth 선택 시 현재 CLI 세션에만 다음 값을 넣는다.
@@ -404,6 +414,12 @@ Agent
 OpenAIChatProvider
 - OPENAI_API_KEY가 있고 openai 패키지가 설치되어 있으면 사용
 - 모델명은 환경 변수로 지정
+
+CodexCliProvider
+- LLM_PROVIDER=codex_cli
+- Uses the local Codex CLI ChatGPT login session
+- Login is created with codex login --device-auth
+- Model route can stay on provider default; exact model ids are optional advanced input
 
 CodexOAuthChatProvider
 - LLM_PROVIDER=codex_oauth일 때 사용

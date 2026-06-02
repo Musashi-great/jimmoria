@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import json
 import os
 import shutil
 import subprocess
@@ -25,6 +26,28 @@ The core thesis combines agent automation, intent routing, consumer crypto, poin
 and pre-token projects building on testnet. It also mentions that docs and GitHub activity
 can reveal early infrastructure before broad KOL attention appears on X or Telegram.
 """
+
+MODEL_ROUTE_TIERS = [
+    ("FAST", "fast / cheap"),
+    ("REASONING", "reasoning"),
+    ("WRITING", "writing"),
+    ("STRONG", "strong fallback"),
+]
+MODEL_SETTING_ENV_NAMES = [
+    "LLM_PROVIDER",
+    "CODEX_CLI_MODEL_FAST",
+    "CODEX_CLI_MODEL_REASONING",
+    "CODEX_CLI_MODEL_WRITING",
+    "CODEX_CLI_MODEL_STRONG",
+    "CODEX_OAUTH_MODEL_FAST",
+    "CODEX_OAUTH_MODEL_REASONING",
+    "CODEX_OAUTH_MODEL_WRITING",
+    "CODEX_OAUTH_MODEL_STRONG",
+    "OPENAI_MODEL_FAST",
+    "OPENAI_MODEL_REASONING",
+    "OPENAI_MODEL_WRITING",
+    "OPENAI_MODEL_STRONG",
+]
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -255,12 +278,13 @@ def inspect_command(args: argparse.Namespace) -> None:
 
 
 def chat_command(args: argparse.Namespace) -> None:
+    apply_saved_model_settings()
     console = JimmoriaConsole(
         memory_path=args.memory,
         runs_dir=Path(args.memory).parent / "runs",
     )
     console.print_intro()
-    if not args.skip_model_setup and sys.stdin.isatty():
+    if not args.skip_model_setup and sys.stdin.isatty() and not os.getenv("LLM_PROVIDER"):
         configure_model_panel(clear_before=False)
     console.print_help()
     last_room_id = ""
@@ -476,6 +500,7 @@ def print_agent_table(*, active_only: bool = False) -> None:
 
 
 def configure_model_panel(*, clear_before: bool = True) -> None:
+    apply_saved_model_settings()
     if clear_before:
         clear_screen()
     print_screen(
@@ -554,7 +579,8 @@ def configure_codex_oauth() -> None:
         if token_command:
             os.environ["CODEX_OAUTH_TOKEN_COMMAND"] = token_command
 
-    configure_model_names(prefix="CODEX_CLI_MODEL" if os.getenv("LLM_PROVIDER") == "codex_cli" else "CODEX_OAUTH_MODEL")
+    configure_model_routes(prefix="CODEX_CLI_MODEL" if os.getenv("LLM_PROVIDER") == "codex_cli" else "CODEX_OAUTH_MODEL")
+    save_model_settings()
 
 
 def configure_openai() -> None:
@@ -565,7 +591,8 @@ def configure_openai() -> None:
     api_key = getpass.getpass("OPENAI_API_KEY: ").strip()
     if api_key:
         os.environ["OPENAI_API_KEY"] = api_key
-    configure_model_names(prefix="OPENAI_MODEL")
+    configure_model_routes(prefix="OPENAI_MODEL")
+    save_model_settings()
 
 
 def configure_offline() -> None:
@@ -574,27 +601,80 @@ def configure_offline() -> None:
     clear_openai_session_env()
     clear_screen()
     print_screen("Offline fallback", ["Live LLM calls disabled for this session."])
+    save_model_settings()
 
 
-def configure_model_names(prefix: str) -> None:
+def configure_model_routes(prefix: str) -> None:
     clear_screen()
     print_screen(
         "Model Routes",
         [
             f"Provider: {os.getenv('LLM_PROVIDER') or 'offline_fallback'}",
-            "Press Enter to keep each current/default route.",
+            "You do not need to know model names.",
+            "Provider default uses whatever your account and CLI config support.",
+            "",
+            "1. Use provider default for every agent (Recommended)",
+            "2. Keep current routes",
+            "3. Advanced: one custom model for every route",
+            "4. Advanced: custom model per route",
+            "Enter. Use provider default",
         ],
     )
-    for tier, label in [
-        ("FAST", "fast / cheap"),
-        ("REASONING", "reasoning"),
-        ("WRITING", "writing"),
-        ("STRONG", "strong fallback"),
-    ]:
+    choice = input("Choose model route [1/2/3/4/Enter]: ").strip().lower()
+    if choice in {"", "1", "default", "recommended"}:
+        clear_model_route_env(prefix)
+        clear_screen()
+        print_screen("Model Routes", ["Using provider default for every agent."])
+        return
+
+    if choice in {"2", "keep"}:
+        clear_screen()
+        print_screen("Model Routes", ["Keeping current model routes."])
+        return
+
+    if choice in {"3", "same", "one"}:
+        clear_screen()
+        print_screen(
+            "Custom Model",
+            [
+                "Only use this if you already know the exact model id.",
+                "Press Enter to fall back to provider default.",
+            ],
+        )
+        model = input("Model id for every route: ").strip()
+        clear_model_route_env(prefix)
+        if model:
+            for tier, _label in MODEL_ROUTE_TIERS:
+                os.environ[f"{prefix}_{tier}"] = model
+        return
+
+    if choice in {"4", "advanced"}:
+        configure_model_routes_advanced(prefix)
+        return
+
+    clear_screen()
+    print_screen("Model Routes", ["Unknown choice. Keeping current model routes."])
+
+
+def configure_model_routes_advanced(prefix: str) -> None:
+    clear_screen()
+    print_screen(
+        "Advanced Routes",
+        [
+            "Only use exact model ids you know are available.",
+            "Press Enter on each route to keep its current value.",
+        ],
+    )
+    for tier, label in MODEL_ROUTE_TIERS:
         env_name = f"{prefix}_{tier}"
-        value = input_with_default(env_name, os.getenv(env_name, ""))
+        value = input_with_default(f"{env_name} ({label})", os.getenv(env_name, ""))
         if value:
             os.environ[env_name] = value
+
+
+def clear_model_route_env(prefix: str) -> None:
+    for tier, _label in MODEL_ROUTE_TIERS:
+        os.environ.pop(f"{prefix}_{tier}", None)
 
 
 def input_with_default(label: str, default: str) -> str:
@@ -657,6 +737,37 @@ def configured_codex_token_source() -> str:
     if os.getenv("CODEX_OAUTH_TOKEN_COMMAND"):
         return "command configured"
     return "not set"
+
+
+def model_settings_path() -> Path:
+    return Path(os.getenv("JIMMORIA_MODEL_SETTINGS_PATH", "data/model_settings.json"))
+
+
+def apply_saved_model_settings() -> None:
+    path = model_settings_path()
+    if not path.exists():
+        return
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    if not isinstance(data, dict):
+        return
+    for name in MODEL_SETTING_ENV_NAMES:
+        value = data.get(name)
+        if isinstance(value, str) and value and name not in os.environ:
+            os.environ[name] = value
+
+
+def save_model_settings() -> None:
+    data = {
+        name: os.environ[name]
+        for name in MODEL_SETTING_ENV_NAMES
+        if os.getenv(name)
+    }
+    path = model_settings_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def run_codex_device_login() -> None:

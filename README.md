@@ -64,6 +64,19 @@ Codex shows the browser/code login flow, then JIMMORIA uses the local Codex CLI
 ChatGPT login session for model calls. Manual bearer-token entry is still
 available as a fallback. Tokens are not written to config files.
 
+After Codex login succeeds once, you normally do not need to log in again unless
+you sign out, change machines, or the Codex session expires. JIMMORIA stores only
+non-secret model/provider preferences in `data/model_settings.json`; it does not
+store bearer tokens.
+
+If a provider is already saved, `jimmoria` skips the startup model setup panel
+and goes straight into chat. Use `/models` anytime to change provider or model
+routes.
+
+Model routing is selectable. Choose the recommended `Use provider default for
+every agent` route if you do not know model ids. JIMMORIA will let Codex use the
+default model your Codex CLI account/config supports.
+
 Inside chat mode:
 
 ```text
@@ -122,7 +135,6 @@ Use the Codex CLI ChatGPT login session:
 
 ```powershell
 codex login --device-auth
-$env:LLM_PROVIDER="codex_cli"
 jimmoria
 ```
 
@@ -148,6 +160,9 @@ jimmoria demo
 The manual bearer-token provider does not automatically read Codex internal auth
 files. If you want the ChatGPT code-login flow, use `codex_cli` through
 `codex login --device-auth`.
+
+Once you pick Codex CLI in `/models`, JIMMORIA remembers `LLM_PROVIDER=codex_cli`
+locally. The next startup can reuse the existing Codex login session.
 
 If no live provider is configured, the runtime uses a deterministic offline fallback so the agent loop still runs.
 
