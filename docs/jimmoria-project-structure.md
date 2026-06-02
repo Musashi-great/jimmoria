@@ -771,6 +771,7 @@ JIMMORIA는 이제 모든 일반 채팅 입력을 바로 보고서 생성으로 
 | 리서치/분석/보고서 요청 | Research Room을 열고 에이전트에게 배정 |
 | 설정/운영/UX/역할 변경 지시 | Research Room을 열지 않고 company settings에 반영 |
 | 확인 질문/운영 대화 | Research Room을 열지 않고 Supervisor가 직접 답변 |
+| 인사/잡담/애매한 입력 | Research Room을 열지 않고 Supervisor가 방향을 확인 |
 | 상태/설정 확인 요청 | Research Room을 열지 않고 settings/status panel 출력 |
 | source-only ingestion 요청 | 작은 ingestion room을 열고 Source Note만 저장 |
 | URL 입력 | 기본적으로 research flow로 라우팅하되 source-only 표현이 있으면 ingestion만 실행 |
@@ -796,6 +797,11 @@ pearl 프로젝트 리서치 보고서 만들어봐
 -> supervisor_chat
 -> Supervisor reply
 -> Research Room not opened
+
+안녕
+-> supervisor_chat
+-> Supervisor reply
+-> company_settings.json에 저장하지 않음
 ```
 
 설정 파일:
@@ -857,6 +863,7 @@ Runtime 연결:
 - CLI는 `Supervisor intake` 카드를 출력해 어떤 intent/action/output mode로 판단했는지 보여준다.
 - `company_config`면 `apply_company_instruction()`으로 설정을 저장하고 종료한다.
 - `supervisor_chat`이면 `Supervisor reply`로 바로 답하고 종료한다.
+- 인사와 애매한 입력은 `company_config`로 저장하지 않고 `supervisor_chat`으로 처리한다.
 - `company_status`면 `/settings`와 같은 settings/status panel을 보여주고 종료한다.
 - `source_ingestion`이면 작은 ingestion room을 열어 Source Note만 저장한다.
 - `research_request`면 기존처럼 `ResearchRuntime.run_article_research()`를 실행한다.

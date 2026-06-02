@@ -152,6 +152,7 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(classify_chat_input("현재 회사 상태랑 설정 보여줘"), "company_status")
         self.assertEqual(classify_chat_input("이 링크는 소스만 저장해줘"), "source_ingestion")
         self.assertEqual(classify_chat_input("지금 보고서 작성은 한글 위주로 세팅된게 맞지?"), "supervisor_chat")
+        self.assertEqual(classify_chat_input("안녕"), "supervisor_chat")
 
     def test_company_instruction_expands_supervisor_role(self) -> None:
         settings = CompanySettings()
@@ -211,6 +212,31 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("Supervisor reply", text)
         self.assertIn("Research Room은 열지 않았습니다", text)
         self.assertIn("맞습니다", text)
+
+    def test_small_talk_answers_without_saving_settings(self) -> None:
+        output = StringIO()
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            args = argparse.Namespace(
+                memory=str(root / "memory.json"),
+                vault=str(root / "vault"),
+                reports=str(root / "reports"),
+                skip_model_setup=True,
+            )
+            with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(root / "model_settings.json")}, clear=True):
+                with patch("sys.stdin.isatty", return_value=True):
+                    with patch("builtins.input", side_effect=["안녕", "/quit"]):
+                        with redirect_stdout(output):
+                            chat_command(args)
+
+            self.assertFalse((root / "reports").exists())
+            self.assertFalse((root / "company_settings.json").exists())
+
+        text = output.getvalue()
+        self.assertIn("Intent: supervisor_chat", text)
+        self.assertIn("Supervisor reply", text)
+        self.assertIn("안녕하세요. JIMMORIA Supervisor입니다.", text)
+        self.assertNotIn("Company instruction applied", text)
 
     def test_chat_intake_status_shows_settings_without_report(self) -> None:
         output = StringIO()

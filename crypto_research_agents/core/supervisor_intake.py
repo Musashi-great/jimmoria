@@ -38,7 +38,10 @@ def build_supervisor_reply(
         "이 입력은 리서치 지시가 아니라 슈퍼바이저에게 하는 확인/대화로 처리했습니다.",
     ]
 
-    if any(term in line for term in ["보고서", "리포트", "레포트", "한글", "한국어", "세팅", "설정"]):
+    if _looks_like_small_talk(line.strip(), lowered):
+        lines.append("안녕하세요. JIMMORIA Supervisor입니다.")
+        lines.append("리서치 지시, 회사 설정 변경, 상태 확인 중 무엇을 원하는지 말해주면 제가 먼저 분류해서 처리하겠습니다.")
+    elif any(term in line for term in ["보고서", "리포트", "레포트", "한글", "한국어", "세팅", "설정"]):
         if report_language == "ko":
             lines.append("맞습니다. 현재 보고서 출력은 한국어 우선 흐름으로 설정되어 있습니다.")
         else:
@@ -78,6 +81,18 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
             confidence=1.0,
             rationale="Empty input.",
             next_step="Wait for the next client instruction.",
+            supervisor_authority=authority,
+        )
+
+    if _looks_like_small_talk(stripped, lowered):
+        return SupervisorIntakeDecision(
+            intent_type="supervisor_chat",
+            action="answer_directly",
+            output_mode="supervisor_reply",
+            needs_research_room=False,
+            confidence=0.9,
+            rationale="The client is greeting or casually talking to the Supervisor.",
+            next_step="Reply directly and wait for a concrete research, settings, or status request.",
             supervisor_authority=authority,
         )
 
@@ -182,13 +197,13 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
         )
 
     return SupervisorIntakeDecision(
-        intent_type="company_config",
-        action="apply_company_instruction",
-        output_mode="settings_update",
+        intent_type="supervisor_chat",
+        action="ask_for_direction",
+        output_mode="supervisor_reply",
         needs_research_room=False,
         confidence=0.62,
-        rationale="No explicit research action was found; defaulting to company-level instruction handling.",
-        next_step="Save the instruction so the company can adapt before future research rooms.",
+        rationale="No explicit research, settings, source, or status action was found.",
+        next_step="Ask the client what kind of work should be done before opening a room or saving settings.",
         supervisor_authority=authority,
     )
 
@@ -196,6 +211,8 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
 COMPANY_CONFIG_TERMS = [
     "설정",
     "세팅",
+    "선택",
+    "추가",
     "변경",
     "바꿔",
     "고쳐",
@@ -204,6 +221,11 @@ COMPANY_CONFIG_TERMS = [
     "업데이트",
     "앞으로",
     "항상",
+    "해야지",
+    "되게",
+    "처럼",
+    "느낌",
+    "개선",
     "기본",
     "그러지말고",
     "하지말고",
@@ -321,6 +343,22 @@ SUPERVISOR_CHAT_TERMS = [
     "?",
 ]
 
+SMALL_TALK_TERMS = [
+    "안녕",
+    "안녕하세요",
+    "하이",
+    "ㅎㅇ",
+    "hello",
+    "hi",
+    "hey",
+    "yo",
+    "반가워",
+    "고마워",
+    "감사",
+    "thanks",
+    "thank you",
+]
+
 SOURCE_ONLY_TERMS = [
     "저장만",
     "소스만",
@@ -373,3 +411,12 @@ def _looks_like_supervisor_chat(original: str, lowered: str) -> bool:
     ):
         return True
     return original.endswith("?")
+
+
+def _looks_like_small_talk(original: str, lowered: str) -> bool:
+    compact = original.strip().lower()
+    if compact in SMALL_TALK_TERMS:
+        return True
+    if len(compact) <= 12 and _has_any(original, lowered, SMALL_TALK_TERMS):
+        return True
+    return False
