@@ -71,6 +71,8 @@ JIMMORIA는 토큰을 저장하지 않습니다. 저장하는 것은 `data/model
 
 ## Project Structure
 
+더 자세한 구조와 런타임 설명은 [docs/jimmoria-project-structure.md](docs/jimmoria-project-structure.md)에 정리되어 있습니다.
+
 ```text
 jimmoria/
   crypto_research_agents/
