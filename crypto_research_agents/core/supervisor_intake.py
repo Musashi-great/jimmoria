@@ -33,37 +33,71 @@ def build_supervisor_reply(
     lowered = line.lower()
     report_language = settings.report_language
     terms_policy = "allowed" if settings.allow_english_terms else "restricted"
-    lines = [
-        "Research Room은 열지 않았습니다.",
-        "이 입력은 리서치 지시가 아니라 슈퍼바이저에게 하는 확인/대화로 처리했습니다.",
-    ]
 
     if _looks_like_small_talk(line.strip(), lowered):
-        lines.append("안녕하세요. JIMMORIA Supervisor입니다.")
-        lines.append("리서치 지시, 회사 설정 변경, 상태 확인 중 무엇을 원하는지 말해주면 제가 먼저 분류해서 처리하겠습니다.")
+        lines = [
+            "안녕하세요. JIMMORIA Supervisor입니다.",
+            "리서치 지시, 회사 설정 변경, 상태 확인 중 무엇을 원하는지 말해주면 제가 먼저 분류해서 처리하겠습니다.",
+        ]
     elif any(term in line for term in ["보고서", "리포트", "레포트", "한글", "한국어", "세팅", "설정"]):
+        lines = []
         if report_language == "ko":
             lines.append("맞습니다. 현재 보고서 출력은 한국어 우선 흐름으로 설정되어 있습니다.")
         else:
             lines.append(f"아직 한국어 우선은 아닙니다. 현재 report_language는 `{report_language}`입니다.")
         lines.append(f"영어 기술 용어 정책은 `{terms_policy}`입니다.")
     elif any(term in line for term in ["슈퍼바이저", "사장", "대표", "권한", "외주"]):
-        lines.append("Supervisor는 현재 모든 일반 채팅 입력을 먼저 받고 출력 모드를 결정합니다.")
-        lines.append(f"현재 supervisor_mode는 `{settings.supervisor_mode}`입니다.")
+        lines = [
+            "Supervisor는 현재 모든 일반 채팅 입력을 먼저 받고 출력 모드를 결정합니다.",
+            f"현재 supervisor_mode는 `{settings.supervisor_mode}`입니다.",
+        ]
     elif "report" in lowered:
-        lines.append("명시적으로 조사/분석/보고서 작성을 요청할 때만 전체 Research Room을 엽니다.")
+        lines = ["명시적으로 조사/분석/보고서 작성을 요청할 때만 전체 Research Room을 엽니다."]
     else:
-        lines.append("필요하면 이 내용을 회사 운영 설정으로 저장할 수도 있고, 리서치 지시로 바꿔 Research Room을 열 수도 있습니다.")
+        lines = ["아직 구체적인 작업 지시는 아닌 것 같습니다. 리서치, 설정 변경, 상태 확인 중 원하는 방향을 말해주면 제가 바로 이어서 처리하겠습니다."]
+    return lines
 
+
+def build_company_instruction_reply(
+    applied: list[str],
+    settings: CompanySettings,
+    settings_path: object,
+) -> list[str]:
+    lines = [
+        "좋습니다. 이건 리서치 방을 열 일이 아니라 회사 운영 지시로 보고 바로 반영했습니다.",
+        f"설정 파일: {settings_path}",
+        "",
+        "반영한 내용:",
+    ]
+    lines.extend(f"- {item}" for item in applied)
     lines.extend(
         [
             "",
-            f"Intent: {decision.intent_type}",
-            f"Output mode: {decision.output_mode}",
-            f"Reason: {decision.rationale}",
+            f"현재 보고서 언어: {settings.report_language}",
+            f"현재 Supervisor mode: {settings.supervisor_mode}",
         ]
     )
     return lines
+
+
+def build_supervisor_dispatch_reply(decision: SupervisorIntakeDecision, agent_count: int) -> list[str]:
+    if decision.intent_type == "source_ingestion":
+        return [
+            "좋습니다. 이건 전체 리서치가 아니라 소스 저장 작업으로 처리하겠습니다.",
+            "작은 Research Room을 열고 Ingestion과 Obsidian 정리만 실행하겠습니다.",
+        ]
+    return [
+        "좋습니다. 이건 리서치 요청으로 판단했습니다.",
+        f"Research Room을 열고 {agent_count}개 에이전트에게 작업을 배정하겠습니다.",
+        "제가 먼저 목표와 우선순위를 잡고, 이후 각 전문 에이전트가 조사에 들어갑니다.",
+    ]
+
+
+def build_company_status_reply(settings: CompanySettings) -> list[str]:
+    return [
+        "현재 회사 설정을 보여드리겠습니다.",
+        f"Supervisor mode는 `{settings.supervisor_mode}`이고, 보고서 언어는 `{settings.report_language}`입니다.",
+    ]
 
 
 def decide_supervisor_intake(line: str, settings: CompanySettings | None = None) -> SupervisorIntakeDecision:

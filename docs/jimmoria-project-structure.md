@@ -764,7 +764,7 @@ room_failed
 Report runtime metadata에는 `LLM provider`와 `Report model route`가 들어간다. provider가 `offline_fallback`이면 TL;DR에 `Live LLM: not configured`가 표시되어 deterministic fallback을 실제 LLM 판단처럼 오해하지 않게 한다.
 ## 23. Supervisor Intake And Company Settings
 
-JIMMORIA는 이제 모든 일반 채팅 입력을 바로 보고서 생성으로 처리하지 않는다. Supervisor는 회사 사장/총괄 PM처럼 먼저 intent를 분류한다.
+JIMMORIA는 이제 모든 일반 채팅 입력을 바로 보고서 생성으로 처리하지 않는다. 사용자는 기본적으로 Supervisor와 대화하고, Supervisor는 회사 사장/총괄 PM처럼 intent와 output mode를 내부적으로 분류한다. 화면에는 기계적인 분류 카드보다 Supervisor의 대화 응답이 먼저 나온다.
 
 | Input Type | 처리 방식 |
 |---|---|
@@ -860,7 +860,8 @@ SupervisorIntakeDecision
 Runtime 연결:
 
 - `chat_command()`는 먼저 `decide_supervisor_intake()`로 Supervisor Intake 결정을 만든다.
-- CLI는 `Supervisor intake` 카드를 출력해 어떤 intent/action/output mode로 판단했는지 보여준다.
+- CLI는 일반 채팅에서 `Supervisor` 대화 응답을 먼저 출력한다.
+- intent/action/output mode는 내부 `SupervisorIntakeDecision`으로 유지되어 Research Room이 열릴 때 기록된다.
 - `company_config`면 `apply_company_instruction()`으로 설정을 저장하고 종료한다.
 - `supervisor_chat`이면 `Supervisor reply`로 바로 답하고 종료한다.
 - 인사와 애매한 입력은 `company_config`로 저장하지 않고 `supervisor_chat`으로 처리한다.

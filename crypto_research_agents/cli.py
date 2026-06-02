@@ -22,6 +22,11 @@ from crypto_research_agents.core.company_settings import (
     save_company_settings,
 )
 from crypto_research_agents.core.supervisor_intake import build_supervisor_reply, decide_supervisor_intake
+from crypto_research_agents.core.supervisor_intake import (
+    build_company_instruction_reply,
+    build_company_status_reply,
+    build_supervisor_dispatch_reply,
+)
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 from crypto_research_agents.storage.json_store import load_memory
 from crypto_research_agents.storage.run_store import list_run_summaries, load_run_file
@@ -324,15 +329,15 @@ def chat_command(args: argparse.Namespace) -> None:
         settings_path = company_settings_path_for(args.memory)
         settings = load_company_settings(settings_path)
         intake_decision = decide_supervisor_intake(line, settings)
-        console.print_supervisor_intake(intake_decision)
 
         if intake_decision.intent_type == "company_config":
             applied = apply_company_instruction(line, settings)
             save_company_settings(settings, settings_path)
-            console.print_company_settings_updated(settings, applied, settings_path)
+            console.print_supervisor_reply(build_company_instruction_reply(applied, settings, settings_path))
             continue
 
         if intake_decision.intent_type == "company_status":
+            console.print_supervisor_reply(build_company_status_reply(settings))
             console.print_company_settings(settings, settings_path)
             continue
 
@@ -343,6 +348,7 @@ def chat_command(args: argparse.Namespace) -> None:
         title, content, url = chat_input_to_source(line)
         runtime = ResearchRuntime(load_memory(args.memory))
         runtime.event_handler = console.make_event_handler()
+        console.print_supervisor_reply(build_supervisor_dispatch_reply(intake_decision, len(DEFAULT_AGENTS)))
         if intake_decision.intent_type == "source_ingestion":
             result = runtime.run_source_ingestion(
                 title=title,

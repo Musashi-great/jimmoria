@@ -167,7 +167,7 @@ data/company_settings.json   company operating settings
 
 ## Supervisor Intake
 
-JIMMORIA의 일반 채팅 입력은 모두 Supervisor를 먼저 거친다. Supervisor는 회사 사장/총괄 PM처럼 요청의 종류를 판단하고 출력 방식을 고른다.
+JIMMORIA의 일반 채팅 상대는 Supervisor다. 사용자는 먼저 Supervisor와 대화하고, Supervisor가 회사 사장/총괄 PM처럼 요청의 종류를 판단해 출력 방식과 내부 작업 여부를 고른다. 화면에는 기계적인 분류 카드 대신 Supervisor의 대화 응답이 먼저 나온다.
 
 ```text
 리서치/분석/보고서 요청        -> Research Room + agent workflow + dossier
@@ -180,4 +180,4 @@ JIMMORIA의 일반 채팅 입력은 모두 Supervisor를 먼저 거친다. Super
 
 예를 들어 `pearl 프로젝트를 분석해봐`는 리서치 방을 열지만, `보고서는 한글로 만들어`, `슈퍼바이저 권한을 더 크게 가져가`, `로그 스타일을 바꿔` 같은 말은 보고서를 만들지 않고 회사 운영 설정으로 반영된다. `지금 보고서 작성은 한글 위주로 세팅된 게 맞지?` 같은 말은 Research Room 없이 Supervisor가 직접 답한다. `안녕` 같은 인사는 설정으로 저장하지 않는다.
 
-채팅 화면에는 먼저 `Supervisor intake` 카드가 뜬다. 여기서 `Intent`, `Action`, `Output mode`, `Research Room open/not needed`를 확인할 수 있다.
+Research Room이 필요한 경우에만 Supervisor가 방을 열고 에이전트들에게 작업을 배정한다. 그렇지 않으면 Supervisor가 바로 답하거나 설정을 반영하고 끝낸다.

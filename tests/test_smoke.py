@@ -143,8 +143,9 @@ class SmokeTest(unittest.TestCase):
             self.assertFalse((root / "reports").exists())
 
         text = output.getvalue()
-        self.assertIn("Company instruction applied", text)
-        self.assertIn("No Research Room opened", text)
+        self.assertIn("Supervisor", text)
+        self.assertIn("회사 운영 지시", text)
+        self.assertIn("반영한 내용", text)
 
     def test_chat_intake_classifies_research_vs_settings(self) -> None:
         self.assertEqual(classify_chat_input("pearl 프로젝트에 대해서 리서치 보고서 만들어봐"), "research_request")
@@ -208,9 +209,9 @@ class SmokeTest(unittest.TestCase):
             self.assertFalse((root / "reports").exists())
 
         text = output.getvalue()
-        self.assertIn("Intent: supervisor_chat", text)
-        self.assertIn("Supervisor reply", text)
-        self.assertIn("Research Room은 열지 않았습니다", text)
+        self.assertIn("Supervisor", text)
+        self.assertNotIn("Supervisor intake", text)
+        self.assertNotIn("Report preview", text)
         self.assertIn("맞습니다", text)
 
     def test_small_talk_answers_without_saving_settings(self) -> None:
@@ -233,8 +234,8 @@ class SmokeTest(unittest.TestCase):
             self.assertFalse((root / "company_settings.json").exists())
 
         text = output.getvalue()
-        self.assertIn("Intent: supervisor_chat", text)
-        self.assertIn("Supervisor reply", text)
+        self.assertIn("Supervisor", text)
+        self.assertNotIn("Supervisor intake", text)
         self.assertIn("안녕하세요. JIMMORIA Supervisor입니다.", text)
         self.assertNotIn("Company instruction applied", text)
 
@@ -257,8 +258,8 @@ class SmokeTest(unittest.TestCase):
             self.assertFalse((root / "reports").exists())
 
         text = output.getvalue()
-        self.assertIn("Supervisor intake", text)
-        self.assertIn("Intent: company_status", text)
+        self.assertIn("Supervisor", text)
+        self.assertNotIn("Supervisor intake", text)
         self.assertIn("Company settings", text)
 
     def test_runtime_records_supervisor_intake_decision(self) -> None:
