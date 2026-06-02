@@ -618,6 +618,23 @@ python -m unittest discover -s tests -v
 10. monitor_24h_agent를 runtime에 연결해서 Daily Radar 자동화
 ```
 
-## 20. 한 줄 요약
+## 20. 문서 업데이트 원칙
+
+이 문서는 JIMMORIA의 기준 설계 문서다. 앞으로 코드, 설정, 에이전트 구성, tool registry, 모델 라우팅, 저장 구조, CLI UX, 출력 폴더, live connector 상태가 바뀌면 이 문서도 함께 업데이트한다.
+
+변경할 때 확인해야 할 항목은 다음이다.
+
+- 새 에이전트를 추가하거나 제거하면 `6. 에이전트 구성`을 업데이트한다.
+- 실행 순서나 Research Room 상태가 바뀌면 `5. Research Room 실행 흐름`을 업데이트한다.
+- CLI 명령이나 시작 UX가 바뀌면 `3. 실행 진입점`, `15. 코드 파일별 설명`을 업데이트한다.
+- 모델 provider, Codex OAuth, OpenAI, offline fallback 흐름이 바뀌면 `10. Model Gateway와 LLM Provider`를 업데이트한다.
+- 외부 tool이나 connector를 추가하면 `11. Tool Gateway와 외부 커넥터`, `18. 현재 한계`, `19. 다음 개발 순서 제안`을 업데이트한다.
+- 저장 파일, run snapshot, Obsidian Vault 구조가 바뀌면 `12. Storage와 출력 파일`, `13. Obsidian Vault 구조`를 업데이트한다.
+- 테스트 범위가 늘어나면 `17. 테스트 구조`를 업데이트한다.
+- README의 간단 설명과 이 문서의 상세 설명이 서로 어긋나지 않게 확인한다.
+
+즉, JIMMORIA를 업데이트할 때는 코드만 고치는 것이 아니라 이 문서도 같이 최신 상태로 유지한다.
+
+## 21. 한 줄 요약
 
 JIMMORIA는 현재 "채팅형 CLI + Research Room + controlled P2P Agent Bus + Shared Memory + Model Gateway + Tool Gateway + Markdown/Obsidian output"까지 구현된 크립토 리서치 회사 MVP다. 다음 핵심 작업은 외부 live research connectors를 ToolGateway 뒤에 붙이고, Discovery/Social/Product/Funding 에이전트를 실제 데이터 기반으로 업그레이드하는 것이다.
