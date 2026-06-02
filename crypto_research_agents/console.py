@@ -269,35 +269,35 @@ def print_color_hero(width: int) -> None:
     reset = "\033[0m"
     bold = "\033[1m"
     dim = "\033[2m"
-    cyan = "\033[38;2;84;202;255m"
-    blue = "\033[38;2;44;118;255m"
-    green = "\033[38;2;76;255;158m"
-    muted = "\033[38;2;145;157;183m"
-    line = "=" * width
-    mark = block_mark(block_char())
+    cyan = "\033[38;2;64;204;255m"
+    blue = "\033[38;2;55;120;255m"
+    silver = "\033[38;2;172;184;210m"
+    muted = "\033[38;2;92;103;130m"
+    line = "-" * width
+    name = "JIMMORIA"
+    eyebrow = "RESEARCH HQ"
     subtitle = "Multi-agent crypto research company"
+    workflow = "research rooms  /  agent bus  /  obsidian memory"
 
     print(f"{blue}{line}{reset}")
     print("")
-    for row in mark:
-        print(center_ansi(f"{bold}{cyan}{row}{reset}", width))
+    print(center_ansi(f"{dim}{silver}{eyebrow}{reset}", width))
+    print(center_ansi(f"{bold}{cyan}{name} v{__version__}{reset}", width))
+    print(center_ansi(f"{silver}{subtitle}{reset}", width))
     print("")
-    print(center_ansi(f"{bold}{green}JIMMORIA v{__version__}{reset}", width))
-    print(center_ansi(f"{muted}{subtitle}{reset}", width))
-    print(center_ansi(f"{dim}{muted}Research rooms. Agent bus. Obsidian memory.{reset}", width))
+    print(center_ansi(f"{dim}{muted}{workflow}{reset}", width))
     print(f"{blue}{line}{reset}")
 
 
 def print_plain_hero(width: int) -> None:
-    line = "=" * width
+    line = "-" * width
     print(line)
     print("")
-    for row in block_mark(block_char()):
-        print(center_text(row, width))
-    print("")
+    print(center_text("RESEARCH HQ", width))
     print(center_text(f"JIMMORIA v{__version__}", width))
     print(center_text("Multi-agent crypto research company", width))
-    print(center_text("Research rooms. Agent bus. Obsidian memory.", width))
+    print("")
+    print(center_text("research rooms  /  agent bus  /  obsidian memory", width))
     print(line)
 
 
@@ -307,29 +307,6 @@ def supports_color() -> bool:
     if not sys.stdout.isatty() and not os.getenv("JIMMORIA_FORCE_COLOR"):
         return False
     if os.name == "nt" and not enable_windows_ansi():
-        return False
-    return True
-
-
-def block_mark(fill: str) -> list[str]:
-    return [
-        f"{fill * 6}    {fill * 3}    {fill * 3}   {fill * 6}",
-        f"  {fill * 2}      {fill * 4}  {fill * 4}   {fill * 2}   {fill * 2}",
-        f"  {fill * 2}      {fill * 2} {fill * 4} {fill * 2}   {fill * 6}",
-        f"{fill * 2} {fill * 2}     {fill * 2}  {fill * 2}  {fill * 2}   {fill * 2}  {fill * 2}",
-        f" {fill * 3}      {fill * 2}      {fill * 2}   {fill * 2}   {fill * 2}",
-    ]
-
-
-def block_char() -> str:
-    return "█" if can_encode("█") else "#"
-
-
-def can_encode(text: str) -> bool:
-    encoding = sys.stdout.encoding or "utf-8"
-    try:
-        text.encode(encoding)
-    except UnicodeEncodeError:
         return False
     return True
 
