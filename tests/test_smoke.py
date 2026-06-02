@@ -12,7 +12,7 @@ from unittest.mock import patch
 from crypto_research_agents.runtime import ResearchRuntime
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
 from crypto_research_agents.cli import chat_command, configure_model_panel, main as cli_main, print_banner
-from crypto_research_agents.console import JimmoriaConsole
+from crypto_research_agents.console import JimmoriaConsole, print_jimmoria_logo
 from crypto_research_agents.core.llm_provider import OAuthTokenProvider, provider_from_env
 from crypto_research_agents.core.model_gateway import ModelGateway
 from crypto_research_agents.core.capabilities import collect_capabilities
@@ -29,6 +29,19 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("Multi-agent crypto research company", text)
         self.assertNotIn("JJJJJJJ", text)
         self.assertNotIn("Company roster", text)
+
+    def test_color_banner_uses_purple_pink_3d_palette(self) -> None:
+        output = StringIO()
+
+        with patch("crypto_research_agents.console.supports_color", return_value=True):
+            with redirect_stdout(output):
+                print_jimmoria_logo(100)
+
+        text = output.getvalue()
+        self.assertIn("38;2;255;79;216", text)
+        self.assertIn("38;2;90;38;137", text)
+        self.assertNotIn("38;2;64;204;255", text)
+        self.assertNotIn("38;2;55;120;255", text)
 
     def test_pyproject_exposes_jimmoria_command(self) -> None:
         pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))

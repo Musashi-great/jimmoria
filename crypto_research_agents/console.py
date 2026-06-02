@@ -96,15 +96,15 @@ class JimmoriaConsole:
     def input_border_style(self, text: str) -> str:
         if not supports_color():
             return text
-        return f"\033[38;2;64;204;255m{text}\033[0m"
+        return f"\033[38;2;211;95;255m{text}\033[0m"
 
     def input_prompt(self) -> str:
         if not supports_color():
             return "| > "
-        cyan = "\033[38;2;64;204;255m"
-        white = "\033[38;2;230;244;255m"
+        violet = "\033[38;2;211;95;255m"
+        pink = "\033[38;2;255;92;212m"
         reset = "\033[0m"
-        return f"{cyan}|{reset} {white}>{reset} "
+        return f"{violet}|{reset} {pink}>{reset} "
 
     def make_event_handler(self) -> Any:
         def handle(event: dict[str, object]) -> None:
@@ -304,24 +304,24 @@ def print_color_hero(width: int) -> None:
     reset = "\033[0m"
     bold = "\033[1m"
     dim = "\033[2m"
-    cyan = "\033[38;2;64;204;255m"
-    blue = "\033[38;2;55;120;255m"
-    silver = "\033[38;2;172;184;210m"
-    muted = "\033[38;2;92;103;130m"
+    violet = "\033[38;2;181;92;255m"
+    pink = "\033[38;2;255;79;216m"
+    silver = "\033[38;2;230;214;255m"
+    muted = "\033[38;2;126;96;154m"
     line = "=" * width
-    logo = jimmoria_block_logo()
+    logo = jimmoria_3d_logo_layers()
     subtitle = "Multi-agent crypto research company"
     workflow = "research rooms  /  agent bus  /  obsidian memory"
 
-    print(f"{blue}{line}{reset}")
+    print(f"{violet}{line}{reset}")
     print("")
-    for row in logo:
-        print(center_ansi(f"{bold}{cyan}{row}{reset}", width))
+    for row_index, (row, layers) in enumerate(logo):
+        print(center_ansi(style_logo_layer_line(row, layers, row_index), width))
     print("")
-    print(center_ansi(f"{bold}{silver}JIMMORIA v{__version__}{reset}", width))
+    print(center_ansi(f"{bold}{pink}JIMMORIA v{__version__}{reset}", width))
     print(center_ansi(f"{silver}{subtitle}{reset}", width))
     print(center_ansi(f"{dim}{muted}{workflow}{reset}", width))
-    print(f"{blue}{line}{reset}")
+    print(f"{pink}{line}{reset}")
 
 
 def print_plain_hero(width: int) -> None:
@@ -339,6 +339,62 @@ def print_plain_hero(width: int) -> None:
 
 def jimmoria_block_logo() -> list[str]:
     return render_block_text("JIMMORIA")
+
+
+def jimmoria_3d_logo_layers() -> list[tuple[str, str]]:
+    rows = jimmoria_block_logo()
+    canvas_width = max(len(row) for row in rows) + 2
+    canvas_height = len(rows) + 1
+    chars = [[" "] * canvas_width for _ in range(canvas_height)]
+    layers = [[" "] * canvas_width for _ in range(canvas_height)]
+
+    for row_index, row in enumerate(rows):
+        for column_index, char in enumerate(row):
+            if char == " ":
+                continue
+            shadow_column = column_index + 2
+            if shadow_column < canvas_width:
+                chars[row_index + 1][shadow_column] = char
+                layers[row_index + 1][shadow_column] = "S"
+
+    for row_index, row in enumerate(rows):
+        for column_index, char in enumerate(row):
+            if char == " ":
+                continue
+            chars[row_index][column_index] = char
+            layers[row_index][column_index] = "F"
+
+    output: list[tuple[str, str]] = []
+    for char_row, layer_row in zip(chars, layers, strict=True):
+        text = "".join(char_row).rstrip()
+        layer_text = "".join(layer_row)[: len(text)]
+        output.append((text, layer_text))
+    return output
+
+
+def style_logo_layer_line(text: str, layers: str, row_index: int) -> str:
+    reset = "\033[0m"
+    front_palette = [
+        "\033[38;2;255;132;235m",
+        "\033[38;2;240;98;232m",
+        "\033[38;2;224;86;244m",
+        "\033[38;2;202;95;255m",
+        "\033[38;2;183;89;255m",
+        "\033[38;2;215;83;245m",
+        "\033[38;2;255;96;213m",
+        "\033[38;2;116;51;180m",
+    ]
+    shadow = "\033[38;2;90;38;137m"
+    front = "\033[1m" + front_palette[row_index % len(front_palette)]
+    styled = []
+    for char, layer in zip(text, layers, strict=True):
+        if layer == "F":
+            styled.append(f"{front}{char}{reset}")
+        elif layer == "S":
+            styled.append(f"{shadow}{char}{reset}")
+        else:
+            styled.append(char)
+    return "".join(styled)
 
 
 def render_block_text(text: str) -> list[str]:
