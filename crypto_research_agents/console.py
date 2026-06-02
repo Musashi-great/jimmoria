@@ -273,32 +273,75 @@ def print_color_hero(width: int) -> None:
     blue = "\033[38;2;55;120;255m"
     silver = "\033[38;2;172;184;210m"
     muted = "\033[38;2;92;103;130m"
-    line = "-" * width
-    name = "JIMMORIA"
-    eyebrow = "RESEARCH HQ"
+    line = "=" * width
+    logo = jimmoria_block_logo()
     subtitle = "Multi-agent crypto research company"
     workflow = "research rooms  /  agent bus  /  obsidian memory"
 
     print(f"{blue}{line}{reset}")
     print("")
-    print(center_ansi(f"{dim}{silver}{eyebrow}{reset}", width))
-    print(center_ansi(f"{bold}{cyan}{name} v{__version__}{reset}", width))
-    print(center_ansi(f"{silver}{subtitle}{reset}", width))
+    for row in logo:
+        print(center_ansi(f"{bold}{cyan}{row}{reset}", width))
     print("")
+    print(center_ansi(f"{bold}{silver}JIMMORIA v{__version__}{reset}", width))
+    print(center_ansi(f"{silver}{subtitle}{reset}", width))
     print(center_ansi(f"{dim}{muted}{workflow}{reset}", width))
     print(f"{blue}{line}{reset}")
 
 
 def print_plain_hero(width: int) -> None:
-    line = "-" * width
+    line = "=" * width
     print(line)
     print("")
-    print(center_text("RESEARCH HQ", width))
+    for row in jimmoria_block_logo():
+        print(center_text(row, width))
+    print("")
     print(center_text(f"JIMMORIA v{__version__}", width))
     print(center_text("Multi-agent crypto research company", width))
-    print("")
     print(center_text("research rooms  /  agent bus  /  obsidian memory", width))
     print(line)
+
+
+def jimmoria_block_logo() -> list[str]:
+    return render_block_text("JIMMORIA")
+
+
+def render_block_text(text: str) -> list[str]:
+    letters = {
+        "A": [" ### ", "#   #", "#   #", "#####", "#   #", "#   #", "#   #"],
+        "I": ["#####", "  #  ", "  #  ", "  #  ", "  #  ", "  #  ", "#####"],
+        "J": ["#####", "   # ", "   # ", "   # ", "#  # ", "#  # ", " ##  "],
+        "M": ["#   #", "## ##", "# # #", "#   #", "#   #", "#   #", "#   #"],
+        "O": [" ### ", "#   #", "#   #", "#   #", "#   #", "#   #", " ### "],
+        "R": ["#### ", "#   #", "#   #", "#### ", "# #  ", "#  # ", "#   #"],
+    }
+    fill = block_fill()
+    rows = [""] * 7
+    for char in text.upper():
+        glyph = letters.get(char)
+        if glyph is None:
+            glyph = ["     "] * 7
+        for index, row in enumerate(glyph):
+            rows[index] += expand_block_row(row, fill) + "  "
+    return [row.rstrip() for row in rows]
+
+
+def expand_block_row(row: str, fill: str) -> str:
+    empty = " " * len(fill)
+    return "".join(fill if char == "#" else empty for char in row)
+
+
+def block_fill() -> str:
+    return "██" if can_encode("█") else "##"
+
+
+def can_encode(text: str) -> bool:
+    encoding = sys.stdout.encoding or "utf-8"
+    try:
+        text.encode(encoding)
+    except UnicodeEncodeError:
+        return False
+    return True
 
 
 def supports_color() -> bool:
