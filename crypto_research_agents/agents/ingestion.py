@@ -32,6 +32,54 @@ class IngestionAgent(BaseAgent):
         entities = _list_or_fallback(llm_data.get("entities"), extract_entities(content))
         keywords = _list_or_fallback(llm_data.get("keywords"), extract_keywords(content))
         llm_summary = str(llm_data.get("summary") or "").strip()
+        source_metadata: dict[str, Any] = {
+            "summary": llm_summary,
+            "entities": entities,
+            "keywords": keywords,
+        }
+        content_hash = None
+        canonical_url = None
+        raw_path = None
+        source_quality_score = 0.55
+
+        if url:
+            fetch_result = self.tool_gateway.call(
+                self.agent_id,
+                "fetch_url",
+                room_id=room.room_id,
+                url=str(url),
+            )
+            fetch_data = fetch_result.get("data") if isinstance(fetch_result.get("data"), dict) else {}
+            if fetch_result.get("status") == "success":
+                content_hash = str(fetch_data.get("content_hash") or "") or None
+                canonical_url = str(fetch_data.get("canonical_url") or "") or None
+                source_quality_score = 0.75
+                source_metadata["url_fetch"] = {
+                    "status": fetch_result.get("status"),
+                    "title": fetch_data.get("title"),
+                    "meta_description": fetch_data.get("meta_description"),
+                    "canonical_url": canonical_url,
+                    "content_hash": content_hash,
+                    "official_links": fetch_data.get("official_links", {}),
+                    "signals": fetch_data.get("signals", {}),
+                }
+            else:
+                source_metadata["url_fetch"] = {
+                    "status": fetch_result.get("status"),
+                    "message": fetch_result.get("message"),
+                }
+
+        if content:
+            snapshot_result = self.tool_gateway.call(
+                self.agent_id,
+                "archive_source_snapshot",
+                room_id=room.room_id,
+                content=str(content),
+                url=str(url) if url else None,
+            )
+            snapshot_data = snapshot_result.get("data") if isinstance(snapshot_result.get("data"), dict) else {}
+            raw_path = str(snapshot_data.get("raw_path") or "") or None
+            content_hash = content_hash or str(snapshot_data.get("content_hash") or "") or None
 
         source = memory.add_source(
             SourceRecord(
@@ -39,11 +87,11 @@ class IngestionAgent(BaseAgent):
                 content=content,
                 source_type=source_type,
                 url=url,
-                metadata={
-                    "summary": llm_summary,
-                    "entities": entities,
-                    "keywords": keywords,
-                },
+                metadata=source_metadata,
+                content_hash=content_hash,
+                canonical_url=canonical_url,
+                raw_path=raw_path,
+                source_quality_score=source_quality_score,
             )
         )
         room.add_source(source.source_id)

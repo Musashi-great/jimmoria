@@ -4,7 +4,7 @@
 
 JIMMORIA는 크립토 가격 매매 도구가 아니라, 리서치 전용 멀티에이전트 회사 CLI다. 사용자는 터미널에서 자연어로 리서치 요청을 입력하고, Supervisor가 Research Room을 열어 여러 전문 에이전트에게 일을 나눈다. 에이전트들은 소스 정리, 내러티브 분석, 초기 프로젝트 후보 발굴, KOL/소셜 체크, 온체인/제품/토큰 체크, 보고서 작성, Obsidian 노트 정리를 수행한다.
 
-현재 버전은 MVP다. 멀티에이전트 협업 구조, 보고서 생성, 런 저장, Obsidian-style 노트 생성은 동작한다. X/Twitter, Telegram, Discord, RootData, GitHub, Explorer 같은 실시간 외부 리서치 커넥터는 ToolGateway에 연결될 자리와 권한 구조만 잡혀 있고 아직 placeholder 상태다.
+현재 버전은 MVP다. 멀티에이전트 협업 구조, 보고서 생성, 런 저장, Obsidian-style 노트 생성은 동작한다. URL fetch, Website/Docs crawler, GitHub reader/search, DEX Screener search, CoinGecko search/metadata는 ToolGateway 뒤에 기본 connector로 등록된다. X/Twitter, Telegram, Discord, RootData, Explorer/RPC, funding/airdrop 같은 커넥터는 아직 placeholder 상태다.
 
 ## 1. 프로젝트 목표
 
@@ -29,6 +29,7 @@ jimmoria/
     console.py
     runtime.py
     agents/
+    connectors/
     core/
     storage/
 
@@ -49,7 +50,7 @@ jimmoria/
   vault/
 ```
 
-핵심은 `crypto_research_agents/`가 실제 실행 코드이고, `config/`가 회사의 에이전트 정의와 도구/모델 정책을 담는다는 점이다. `data/`, `reports/`, `vault/`는 실행하면서 생성되는 로컬 출력 폴더라 Git에는 올리지 않는다.
+핵심은 `crypto_research_agents/`가 실제 실행 코드이고, `config/`가 회사의 에이전트 정의와 도구/모델 정책을 담는다는 점이다. `connectors/`는 ToolGateway 뒤에 붙는 실제 외부/HTTP 리서치 도구 구현을 담는다. `data/`, `reports/`, `vault/`는 실행하면서 생성되는 로컬 출력 폴더라 Git에는 올리지 않는다.
 
 ## 3. 실행 진입점
 
@@ -105,7 +106,7 @@ flowchart LR
     Runtime --> Events[Event Log]
 
     Model --> Provider[Codex CLI / Codex OAuth / OpenAI / Offline]
-    Tools --> External[External Connectors Placeholder]
+    Tools --> External[Registered Connectors + Placeholder Connectors]
 
     Runtime --> Agents[Agents]
     Agents --> Bus
@@ -131,6 +132,7 @@ flowchart LR
 | ModelGateway | `core/model_gateway.py` | task type에 따라 모델 라우팅 |
 | LLM Provider | `core/llm_provider.py` | Codex CLI, Codex OAuth, OpenAI, offline fallback 연결 |
 | ToolGateway | `core/tool_gateway.py` | 에이전트별 tool 권한 검사와 audit log |
+| Connectors | `connectors/` | URL, Website/Docs, GitHub, DEX Screener, CoinGecko connector 등록 |
 | Storage | `storage/` | memory, run snapshot, Obsidian note 저장 |
 
 ## 5. Research Room 실행 흐름
@@ -196,7 +198,7 @@ CLI 시작 도움말에는 정적 에이전트 목록을 길게 보여주지 않
 | `discovery_agent` | `DiscoveryAgent` | 초기 프로젝트 후보 발굴 | narrative 기반 MVP 후보 프로젝트를 생성하고 검증 에이전트에게 요청 |
 | `social_kol_agent` | `SocialKOLAgent` | KOL/소셜 신호 확인 | `x_search_posts` tool을 호출하지만 현재 connector 미연결이라 placeholder finding 생성 |
 | `contract_onchain_agent` | `ContractOnchainAgent` | 체인, 토큰, 컨트랙트 확인 | `get_contract_address` tool을 호출하지만 현재 Explorer/RPC 미연결 |
-| `product_tech_agent` | `ProductTechAgent` | Docs, GitHub, 제품 상태 확인 | `crawl_docs` tool을 호출하지만 현재 crawler 미연결 |
+| `product_tech_agent` | `ProductTechAgent` | Docs, GitHub, 제품 상태 확인 | 등록된 `crawl_website`/`crawl_docs` connector로 URL이 있는 후보의 제품 상태와 공식 링크를 확인 |
 | `funding_token_agent` | `FundingTokenAgent` | 투자자, 포인트, 토큰 기회 확인 | `check_airdrop_points` tool을 호출하지만 현재 funding/token connector 미연결 |
 | `report_agent` | `ReportAgent` | 보고서 작성 | findings와 candidates를 Markdown dossier로 합성 |
 | `obsidian_curator_agent` | `ObsidianCuratorAgent` | Obsidian-style 노트 정리 | Source, Project, Narrative, Report 노트 작성 |
@@ -277,6 +279,8 @@ discovery_agent -> funding_token_agent
 | Finding | `FindingRecord` | 각 에이전트가 남긴 조사 결과 |
 | Entity Graph | `dict[str, set[str]]` | 프로젝트와 narrative 등 엔티티 관계 |
 
+`SourceRecord`에는 `content_hash`, `canonical_url`, `captured_at`, `raw_path`, `source_quality_score`가 포함된다. 같은 canonical URL이나 같은 content hash가 다시 들어오면 `SharedMemory.add_source()`가 기존 SourceRecord를 재사용해서 중복 ingestion을 줄인다.
+
 실행 중에는 메모리 객체로 존재하고, 실행 후 `storage/json_store.py`를 통해 `data/memory.json`에 저장된다.
 
 현재는 간단한 JSON 메모리다. 나중에 붙일 수 있는 확장 방향은 다음이다.
@@ -327,7 +331,23 @@ CLI에서 `/models`를 실행하면 모델/provider 설정 화면이 나온다. 
 3. tool audit log 기록
 ```
 
-현재 MVP에서는 많은 외부 tool이 등록되어 있지 않다. 그래서 에이전트가 tool을 호출하면 다음 같은 결과가 저장된다.
+`connectors/register_default_connectors()`는 런타임 시작 시 기본 connector를 ToolGateway에 붙인다.
+
+```text
+fetch_url
+parse_html
+archive_source_snapshot
+crawl_website
+crawl_docs
+github_search_repos
+read_github_repo
+dexscreener_search_pairs
+coingecko_coin_metadata
+```
+
+이제 이 tool들은 `unconfigured`가 아니라 실제 connector result를 반환한다. URL이 부족한 경우에는 `missing_input`, 외부 요청이 실패한 경우에는 `failed`, 정상 동작 시에는 `success`로 audit log에 기록된다.
+
+아직 연결되지 않은 외부 tool을 에이전트가 호출하면 다음 같은 결과가 저장된다.
 
 ```json
 {
@@ -340,9 +360,9 @@ CLI에서 `/models`를 실행하면 모델/provider 설정 화면이 나온다. 
 
 이 로그는 `data/runs/<room_id>/tool_audit_log.json`에 저장된다.
 
-필요한 tool 목록과 우선순위는 `config/tools/tool_registry.yaml`에 정리되어 있다.
+필요한 tool 목록과 우선순위는 `config/tools/tool_registry.yaml`에 정리되어 있다. 구현된 connector는 `implementation_status: implemented`로 표시된다.
 
-중요한 live stack은 다음이다.
+중요한 live stack은 다음이다. 이 중 URL/Website/Docs/GitHub/DEX Screener/CoinGecko 계열은 초안 connector가 구현되어 있고, X/RootData/Explorer/vector 계열은 아직 다음 단계다.
 
 ```text
 x_search_posts
@@ -434,7 +454,7 @@ User input
 이 경우 핵심은 다음이다.
 
 ```text
-아티클/질문 -> 기억화 -> 내러티브 추출 -> 유사 후보 생성 -> 검증 placeholder -> 보고서
+아티클/질문/URL -> 기억화 + source hash/snapshot -> 내러티브 추출 -> 유사 후보 생성 -> URL이 있으면 website/docs connector 확인 -> 나머지 미연결 검증은 placeholder -> 보고서
 ```
 
 ### Case 2. 24시간 모니터가 신호를 발견
@@ -517,6 +537,20 @@ report.py
 obsidian_curator.py
 ```
 
+### `crypto_research_agents/connectors/`
+
+ToolGateway 뒤에 붙는 실제 connector 구현이다.
+
+```text
+__init__.py              register_default_connectors(tool_gateway)
+base.py                  normalized success/missing_input/failed result helper
+url_fetcher.py           fetch_url, parse_html, crawl_website, crawl_docs, source snapshot
+github_connector.py      github_search_repos, read_github_repo
+market_connectors.py     dexscreener_search_pairs, coingecko_coin_metadata
+```
+
+현재 connector는 비용이 낮고 API key가 거의 필요 없는 public HTTP 기반으로 시작한다. GitHub는 `GITHUB_TOKEN`이 있으면 사용하지만 없어도 public API로 동작한다. DEX Screener와 CoinGecko도 public endpoint를 먼저 사용한다.
+
 ### `crypto_research_agents/core/`
 
 런타임의 공통 도메인 객체가 들어 있다.
@@ -525,7 +559,7 @@ obsidian_curator.py
 agent_spec.py       YAML persona/spec loader
 bus.py              CollaborationBus
 message.py          AgentMessage model
-memory.py           SharedMemory, SourceRecord, ProjectCandidate, FindingRecord
+memory.py           SharedMemory, SourceRecord, ProjectCandidate, FindingRecord, source dedupe
 model_gateway.py    model route selector
 llm_provider.py     Codex/OpenAI/offline provider
 room.py             ResearchRoom
@@ -592,6 +626,9 @@ project_research.yaml
 - doctor capability status
 - tool registry required stack
 - tool audit log
+- default connector registration
+- URL/HTML connector metadata extraction
+- SourceRecord content hash/canonical URL dedupe
 - boxed chat input prompt
 - live agent board current-work display
 - purple/pink 3D logo palette
@@ -605,35 +642,35 @@ python -m unittest discover -s tests -v
 
 ## 18. 현재 한계
 
-현재 MVP는 리서치 회사의 뼈대와 협업 흐름을 구현한 단계다.
+현재 MVP는 리서치 회사의 뼈대와 협업 흐름에 더해, 저비용 HTTP connector 일부가 붙은 단계다.
 
 구체적인 한계는 다음과 같다.
 
 - X/Twitter API가 아직 연결되지 않았다.
 - Telegram/Discord reader가 아직 연결되지 않았다.
-- GitHub/docs crawler가 아직 실제 connector로 등록되지 않았다.
-- Explorer/RPC/DEX Screener/CoinGecko/RootData connector가 아직 등록되지 않았다.
+- URL/Website/Docs/GitHub/DEX Screener/CoinGecko는 초안 connector가 등록되어 있지만, Playwright fallback, sitemap adapter, GitHub commit/release 상세 분석은 아직 약하다.
+- Explorer/RPC/RootData connector가 아직 등록되지 않았다.
 - DiscoveryAgent는 현재 live discovery가 아니라 narrative 기반 placeholder 후보를 만든다.
-- Social/Contract/Product/Funding 에이전트는 tool call을 시도하지만 `unconfigured` audit log를 남기는 상태다.
+- Social/Contract/Funding 에이전트의 주요 live tool은 여전히 `unconfigured` audit log를 남긴다. ProductTechAgent는 URL이 있는 경우 Website/Docs connector 결과를 finding에 반영한다.
 - Vector DB와 entity graph persistence는 아직 간단한 JSON memory 수준이다.
 
-즉, 지금은 "회사 운영 시스템"이 먼저 만들어졌고, 외부 리서치 직원들이 사용할 실제 live 도구를 붙이는 단계가 다음이다.
+즉, 지금은 "회사 운영 시스템"에 첫 번째 실제 리서치 도구 묶음이 붙은 상태다. 다음은 이 도구 결과를 Identity/Evidence/Collision 검증 엔진으로 엮어 보고서 신뢰도를 올리는 단계다.
 
 ## 19. 다음 개발 순서 제안
 
 현재 구조 기준으로 다음 순서가 자연스럽다.
 
 ```text
-1. ToolGateway에 실제 connector registration 구조 추가
-2. RSS monitor부터 붙여서 비용 적은 24h signal input 구현
-3. GitHub/docs crawler 구현
-4. X/KOL search와 KOL profile DB 구현
-5. RootData/CoinGecko/DEX Screener/Explorer connector 구현
-6. DiscoveryAgent를 placeholder 후보 생성에서 live source 기반 후보 생성으로 변경
-7. ReportAgent에 citation/evidence validator 추가
-8. events.json 기반 CLI replay 또는 web visualizer 구현
+1. Project Research Loop 추가: `jimmoria project --url/--ca/--x`
+2. Identity Resolver + Ticker Collision Engine 추가
+3. Evidence Validator / Citation Checker 추가
+4. GitHub connector를 commits/releases/activity까지 확장
+5. DEX Screener/CoinGecko 결과를 ContractOnchainAgent finding에 반영
+6. RSS monitor + Signal Queue로 24H Radar 입력원 구축
+7. X/KOL search와 local KOL DB 구현
+8. RootData/Explorer/RPC connector 구현
 9. SharedMemory를 SQLite/vector DB로 확장
-10. monitor_24h_agent를 runtime에 연결해서 Daily Radar 자동화
+10. events.json 기반 CLI replay 또는 web visualizer 구현
 ```
 
 ## 20. 문서 업데이트 원칙
@@ -655,4 +692,4 @@ python -m unittest discover -s tests -v
 
 ## 21. 한 줄 요약
 
-JIMMORIA는 현재 "채팅형 CLI + Research Room + controlled P2P Agent Bus + Shared Memory + Model Gateway + Tool Gateway + Markdown/Obsidian output"까지 구현된 크립토 리서치 회사 MVP다. 다음 핵심 작업은 외부 live research connectors를 ToolGateway 뒤에 붙이고, Discovery/Social/Product/Funding 에이전트를 실제 데이터 기반으로 업그레이드하는 것이다.
+JIMMORIA는 현재 "채팅형 CLI + Research Room + controlled P2P Agent Bus + Shared Memory + Model Gateway + Tool Gateway + 기본 URL/Website/Docs/GitHub/DEX/CoinGecko connectors + Markdown/Obsidian output"까지 구현된 크립토 리서치 회사 MVP다. 다음 핵심 작업은 Project Research Loop, Identity/Evidence/Collision 검증 엔진, 그리고 Social/Contract/Funding 에이전트의 source-backed finding 업그레이드다.

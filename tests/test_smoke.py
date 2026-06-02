@@ -12,12 +12,15 @@ from io import StringIO
 from unittest.mock import patch
 
 from crypto_research_agents.runtime import ResearchRuntime
+from crypto_research_agents.connectors import register_default_connectors
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
 from crypto_research_agents.cli import chat_command, configure_model_panel, main as cli_main, print_banner
 from crypto_research_agents.console import JimmoriaConsole, print_jimmoria_logo
 from crypto_research_agents.core.llm_provider import CodexCliProvider, LLMRequest, OAuthTokenProvider, provider_from_env
+from crypto_research_agents.core.memory import SharedMemory, SourceRecord
 from crypto_research_agents.core.model_gateway import ModelGateway
 from crypto_research_agents.core.capabilities import collect_capabilities
+from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 
 
 class SmokeTest(unittest.TestCase):
@@ -182,6 +185,53 @@ class SmokeTest(unittest.TestCase):
             self.assertGreaterEqual(len(runtime.model_gateway.call_log), 3)
             self.assertGreaterEqual(len(result.bus.messages), 8)
             self.assertGreaterEqual(len(result.memory.get_room_findings(result.room.room_id)), 8)
+
+    def test_default_connectors_register_low_cost_research_stack(self) -> None:
+        runtime = ResearchRuntime()
+
+        self.assertIn("fetch_url", runtime.tool_gateway.registered_tools)
+        self.assertIn("crawl_website", runtime.tool_gateway.registered_tools)
+        self.assertIn("crawl_docs", runtime.tool_gateway.registered_tools)
+        self.assertIn("github_search_repos", runtime.tool_gateway.registered_tools)
+        self.assertIn("read_github_repo", runtime.tool_gateway.registered_tools)
+        self.assertIn("dexscreener_search_pairs", runtime.tool_gateway.registered_tools)
+        self.assertIn("coingecko_coin_metadata", runtime.tool_gateway.registered_tools)
+
+    def test_parse_html_connector_extracts_official_links(self) -> None:
+        policy = PolicyEngine()
+        policy.allow("ingestion_agent", "parse_html")
+        gateway = ToolGateway(policy)
+        register_default_connectors(gateway)
+
+        result = gateway.call(
+            "ingestion_agent",
+            "parse_html",
+            html=(
+                "<html><head><title>Pearl</title><meta name='description' content='testnet docs'>"
+                "</head><body><a href='/docs'>Docs</a><a href='https://github.com/pearl-labs/app'>GitHub</a>"
+                "<a href='https://x.com/pearl'>X</a><p>Join the waitlist and points campaign.</p></body></html>"
+            ),
+            base_url="https://pearl.example",
+        )
+
+        data = result["data"]
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(data["title"], "Pearl")
+        self.assertIn("waitlist", data["signals"]["stage"])
+        self.assertIn("points", data["signals"]["points_or_airdrop"])
+        self.assertEqual(data["official_links"]["docs"][0]["url"], "https://pearl.example/docs")
+        self.assertEqual(data["official_links"]["github"][0]["url"], "https://github.com/pearl-labs/app")
+
+    def test_source_record_dedupes_by_canonical_url(self) -> None:
+        memory = SharedMemory()
+
+        first = memory.add_source(SourceRecord(title="One", content="same content", url="https://Example.com/a#frag"))
+        second = memory.add_source(SourceRecord(title="Two", content="other content", url="https://example.com/a"))
+
+        self.assertEqual(first.source_id, second.source_id)
+        self.assertEqual(len(memory.sources), 1)
+        self.assertEqual(first.canonical_url, "https://example.com/a")
+        self.assertTrue(first.content_hash)
 
     def test_agent_specs_load(self) -> None:
         registry = AgentSpecRegistry.load_dir("config/agents")
@@ -428,7 +478,11 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(statuses["X/Twitter search"], "placeholder")
         self.assertEqual(statuses["RootData project directory"], "placeholder")
         self.assertEqual(statuses["Explorer contract lookup"], "placeholder")
-        self.assertEqual(statuses["GitHub reader"], "placeholder")
+        self.assertEqual(statuses["Docs crawler"], "configured")
+        self.assertEqual(statuses["GitHub reader"], "configured")
+        self.assertEqual(statuses["GitHub repo search"], "configured")
+        self.assertEqual(statuses["CoinGecko metadata"], "configured")
+        self.assertEqual(statuses["DEX Screener pair search"], "configured")
         self.assertEqual(statuses["Overall"], "placeholder")
 
     def test_tool_registry_contains_required_research_stack(self) -> None:
@@ -437,6 +491,8 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertIn("x_search_posts", registry["minimum_viable_live_stack"])
         self.assertIn("rootdata_search_projects", registry["minimum_viable_live_stack"])
         self.assertIn("claim_evidence_check", registry["safety"])
+        self.assertEqual(registry["tool_meta"]["fetch_url"]["implementation_status"], "implemented")
+        self.assertEqual(registry["tool_meta"]["crawl_docs"]["implementation_status"], "implemented")
         self.assertEqual(registry["tool_meta"]["x_search_posts"]["priority"], "required")
         self.assertEqual(registry["tool_meta"]["rootdata_get_project"]["owner_agent"], "funding_token_agent")
 
@@ -460,7 +516,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
             text = output.getvalue()
             self.assertIn("Runtime scaffold", text)
             self.assertIn("X/Twitter search: placeholder", text)
-            self.assertIn("MVP scaffold runs, but live research connectors are not connected yet.", text)
+            self.assertIn("Core runtime and low-cost connectors run", text)
 
     def test_tool_audit_log_records_unconfigured_live_connectors(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -480,7 +536,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
 
             self.assertIn(("x_search_posts", "unconfigured"), statuses)
             self.assertIn(("get_contract_address", "unconfigured"), statuses)
-            self.assertIn(("crawl_docs", "unconfigured"), statuses)
+            self.assertIn(("crawl_docs", "missing_input"), statuses)
             self.assertIn(("check_airdrop_points", "unconfigured"), statuses)
 
 

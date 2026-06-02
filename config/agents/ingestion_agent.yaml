@@ -38,7 +38,7 @@
     "no_access": ["oauth_tokens", "billing"]
   },
   "tools": {
-    "allow": ["fetch_url", "parse_html", "parse_pdf", "parse_tweet_thread", "source_cache_write"],
+    "allow": ["fetch_url", "parse_html", "parse_pdf", "parse_tweet_thread", "archive_source_snapshot", "source_cache_write"],
     "deny": ["x_post_tweet", "telegram_send_message"]
   },
   "output_schema": {

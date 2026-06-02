@@ -19,40 +19,62 @@ class ProductTechAgent(BaseAgent):
         rows = []
         for project_id in _collect_candidate_ids(requests):
             project = memory.projects[project_id]
-            self.tool_gateway.call(
+            target_url = _select_project_url(project.website, room, memory)
+            website_result = self.tool_gateway.call(
+                self.agent_id,
+                "crawl_website",
+                room_id=room.room_id,
+                url=target_url,
+                project_name=project.name,
+            )
+            docs_result = self.tool_gateway.call(
                 self.agent_id,
                 "crawl_docs",
                 room_id=room.room_id,
+                website_url=target_url,
                 project_name=project.name,
             )
+            website_data = website_result.get("data") if isinstance(website_result.get("data"), dict) else {}
+            docs_data = docs_result.get("data") if isinstance(docs_result.get("data"), dict) else {}
             rows.append(
                 {
                     "project_id": project_id,
                     "project_name": project.name,
-                    "product_status": "unknown",
-                    "docs_status": "not_checked_live",
-                    "github_status": "not_checked_live",
-                    "note": "Docs/GitHub connector is not configured in MVP.",
+                    "target_url": target_url,
+                    "product_status": website_data.get("product_status", "unknown"),
+                    "docs_status": docs_data.get("docs_status", website_data.get("docs_status", "unknown")),
+                    "github_status": website_data.get("github_status", "unknown"),
+                    "official_links": website_data.get("official_links", {}),
+                    "technical_keywords": docs_data.get("technical_keywords", []),
+                    "signals": {
+                        "website": website_data.get("signals", {}),
+                        "docs": docs_data.get("signals", {}),
+                    },
+                    "connector_status": {
+                        "crawl_website": website_result.get("status"),
+                        "crawl_docs": docs_result.get("status"),
+                    },
+                    "note": _row_note(website_result, docs_result),
                 }
             )
-        summary = "Product/Tech check produced MVP placeholders; docs/GitHub connectors are not configured."
+        summary = _summary(rows)
         finding = self.write_finding(
             room=room,
             memory=memory,
             finding_type="product_tech_signal",
             summary=summary,
             data={"rows": rows},
-            confidence=0.35,
+            confidence=_confidence(rows),
         )
         for request in requests:
             bus.response(
                 request=request,
                 from_agent=self.agent_id,
                 result={"rows": rows, "finding_id": finding.finding_id},
-                confidence=0.35,
-                notes=["Docs/GitHub connector is not configured."],
+                confidence=finding.confidence,
+                notes=[summary],
             )
-        return AgentResult(self.agent_id, summary, {"finding_id": finding.finding_id, "rows": rows}, confidence=0.35)
+        return AgentResult(self.agent_id, summary, {"finding_id": finding.finding_id, "rows": rows}, confidence=finding.confidence)
 
 
 def _collect_candidate_ids(requests: list[Any]) -> list[str]:
@@ -60,3 +82,43 @@ def _collect_candidate_ids(requests: list[Any]) -> list[str]:
     for request in requests:
         candidate_ids.extend(request.context.get("candidate_ids", []))
     return sorted(set(candidate_ids))
+
+
+def _select_project_url(project_website: str | None, room: ResearchRoom, memory: SharedMemory) -> str | None:
+    if project_website:
+        return project_website
+    for source_id in room.source_inputs:
+        source = memory.sources.get(source_id)
+        if source and source.url:
+            return source.url
+    return None
+
+
+def _row_note(website_result: dict[str, Any], docs_result: dict[str, Any]) -> str:
+    if website_result.get("status") == "success" or docs_result.get("status") == "success":
+        return "Website/docs connector returned source-backed product data."
+    if website_result.get("status") == "missing_input":
+        return "No website URL available yet; provide a project URL for live product checks."
+    return "Website/docs connector could not fetch live product data."
+
+
+def _summary(rows: list[dict[str, Any]]) -> str:
+    if not rows:
+        return "Product/Tech check found no candidate projects to inspect."
+    successful = sum(
+        1
+        for row in rows
+        if row.get("connector_status", {}).get("crawl_website") == "success"
+        or row.get("connector_status", {}).get("crawl_docs") == "success"
+    )
+    if successful:
+        return f"Product/Tech check inspected {successful}/{len(rows)} candidates with live website/docs connectors."
+    return "Product/Tech check ran registered connectors, but no candidate website URL was available."
+
+
+def _confidence(rows: list[dict[str, Any]]) -> float:
+    if not rows:
+        return 0.3
+    if any(row.get("connector_status", {}).get("crawl_website") == "success" for row in rows):
+        return 0.65
+    return 0.4

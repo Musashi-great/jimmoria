@@ -8,10 +8,9 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from urllib.error import URLError
-from urllib.request import Request, urlopen
 
 from crypto_research_agents import APP_NAME, __version__
+from crypto_research_agents.connectors.url_fetcher import fetch_url as connector_fetch_url
 from crypto_research_agents.console import JimmoriaConsole
 from crypto_research_agents.runtime import ResearchRuntime
 from crypto_research_agents.runtime import DEFAULT_AGENTS
@@ -208,14 +207,11 @@ def read_source_input(args: argparse.Namespace) -> tuple[str, str, str | None]:
 
 
 def fetch_url_text(url: str) -> str:
-    request = Request(url, headers={"User-Agent": f"jimmoria-cli/{__version__}"})
-    try:
-        with urlopen(request, timeout=20) as response:
-            raw = response.read()
-            charset = response.headers.get_content_charset() or "utf-8"
-    except URLError as exc:
-        raise SystemExit(f"Failed to fetch URL: {exc}") from exc
-    return raw.decode(charset, errors="replace")
+    result = connector_fetch_url(url)
+    data = result.get("data") if isinstance(result.get("data"), dict) else {}
+    if result.get("status") != "success":
+        raise SystemExit(f"Failed to fetch URL: {result.get('message')}")
+    return str(data.get("text") or "")
 
 
 def infer_title(content: str, url: str | None) -> str:

@@ -187,6 +187,33 @@
     "request_human_approval"
   ],
   "tool_meta": {
+    "fetch_url": {
+      "priority": "required",
+      "owner_agent": "ingestion_agent",
+      "implementation_status": "implemented",
+      "purpose": "Fetch a URL, decode text, extract basic HTML metadata, links, official links, and product signals.",
+      "provider_options": ["stdlib urllib HTTP fetcher"],
+      "required_secrets": [],
+      "source_docs": []
+    },
+    "parse_html": {
+      "priority": "required",
+      "owner_agent": "ingestion_agent",
+      "implementation_status": "implemented",
+      "purpose": "Parse HTML into title, description, text, links, official links, and product signals.",
+      "provider_options": ["stdlib html.parser"],
+      "required_secrets": [],
+      "source_docs": []
+    },
+    "archive_source_snapshot": {
+      "priority": "recommended",
+      "owner_agent": "ingestion_agent",
+      "implementation_status": "implemented",
+      "purpose": "Persist source text snapshots by content hash for dedupe and later replay.",
+      "provider_options": ["local filesystem"],
+      "required_secrets": [],
+      "source_docs": []
+    },
     "x_search_posts": {
       "priority": "required",
       "owner_agent": "social_kol_agent",
@@ -262,7 +289,7 @@
     "crawl_website": {
       "priority": "required",
       "owner_agent": "product_tech_agent",
-      "implementation_status": "external_connector_required",
+      "implementation_status": "implemented",
       "purpose": "Fetch project websites and extract official links, team/product claims, and waitlist/testnet status.",
       "provider_options": ["HTTP crawler", "Playwright fallback"],
       "required_secrets": [],
@@ -271,7 +298,7 @@
     "crawl_docs": {
       "priority": "required",
       "owner_agent": "product_tech_agent",
-      "implementation_status": "external_connector_required",
+      "implementation_status": "implemented",
       "purpose": "Crawl documentation pages for product state, technical depth, API references, and change signals.",
       "provider_options": ["HTTP crawler", "site map crawler", "Mintlify/GitBook/Docusaurus adapters"],
       "required_secrets": [],
@@ -280,19 +307,19 @@
     "github_search_repos": {
       "priority": "required",
       "owner_agent": "product_tech_agent",
-      "implementation_status": "external_connector_required",
+      "implementation_status": "implemented",
       "purpose": "Find likely official repositories and related open-source activity.",
       "provider_options": ["GitHub REST API search"],
-      "required_secrets": ["GITHUB_TOKEN"],
+      "required_secrets": [],
       "source_docs": ["https://docs.github.com/en/rest"]
     },
     "read_github_repo": {
       "priority": "required",
       "owner_agent": "product_tech_agent",
-      "implementation_status": "external_connector_required",
+      "implementation_status": "implemented",
       "purpose": "Read repository metadata, README, languages, stars, forks, and default branch info.",
       "provider_options": ["GitHub REST API repositories"],
-      "required_secrets": ["GITHUB_TOKEN"],
+      "required_secrets": [],
       "source_docs": ["https://docs.github.com/en/rest/repos"]
     },
     "github_get_repo_activity": {
@@ -307,10 +334,10 @@
     "coingecko_coin_metadata": {
       "priority": "recommended",
       "owner_agent": "contract_onchain_agent",
-      "implementation_status": "external_connector_required",
+      "implementation_status": "implemented",
       "purpose": "Fetch coin metadata, official links, socials, descriptions, and contract addresses.",
       "provider_options": ["CoinGecko /coins/{id}", "CoinGecko contract endpoints"],
-      "required_secrets": ["COINGECKO_API_KEY"],
+      "required_secrets": [],
       "source_docs": ["https://docs.coingecko.com/reference/endpoint-overview"]
     },
     "coingecko_latest_listings": {
@@ -343,7 +370,7 @@
     "dexscreener_search_pairs": {
       "priority": "recommended",
       "owner_agent": "contract_onchain_agent",
-      "implementation_status": "external_connector_required",
+      "implementation_status": "implemented",
       "purpose": "Search DEX pairs by token/project query and cross-check whether a tradable pair exists.",
       "provider_options": ["DEX Screener search"],
       "required_secrets": [],

@@ -16,6 +16,7 @@ from crypto_research_agents.agents import (
     SocialKOLAgent,
     SupervisorAgent,
 )
+from crypto_research_agents.connectors import register_default_connectors
 from crypto_research_agents.core.bus import CollaborationBus
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
 from crypto_research_agents.core.hooks import HookEngine
@@ -62,6 +63,7 @@ class ResearchRuntime:
         self.model_gateway = ModelGateway()
         self.agent_specs = AgentSpecRegistry.load_dir(agent_spec_dir)
         self.tool_gateway = ToolGateway(default_policy(self.agent_specs))
+        register_default_connectors(self.tool_gateway)
         self.event_log: list[dict[str, Any]] = []
         self.agents = {
             "supervisor_agent": SupervisorAgent(model_gateway=self.model_gateway, tool_gateway=self.tool_gateway, spec=self.agent_specs.get("supervisor_agent")),
@@ -255,6 +257,8 @@ def default_policy(agent_specs: AgentSpecRegistry | None = None) -> PolicyEngine
                 policy.allow(agent_id, tool)
     for tool in ["x_search_posts", "telegram_read_channel", "discord_read_channel"]:
         policy.allow("social_kol_agent", tool)
+    for tool in ["fetch_url", "parse_html", "archive_source_snapshot"]:
+        policy.allow("ingestion_agent", tool)
     for tool in ["get_contract_address", "get_dex_pair", "get_token_metadata"]:
         policy.allow("contract_onchain_agent", tool)
     for tool in ["crawl_docs", "read_github_repo", "crawl_website"]:

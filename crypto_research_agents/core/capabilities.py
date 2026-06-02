@@ -30,6 +30,10 @@ def collect_capabilities(
     reports_dir: str | Path = "reports",
 ) -> list[CapabilityStatus]:
     gateway = tool_gateway or ToolGateway()
+    if tool_gateway is None:
+        from crypto_research_agents.connectors import register_default_connectors
+
+        register_default_connectors(gateway)
     provider = provider_from_env()
     agent_spec_status = _agent_spec_status(agent_spec_dir)
     capabilities = [
@@ -172,7 +176,7 @@ def _overall_status(capabilities: list[CapabilityStatus]) -> CapabilityStatus:
         return CapabilityStatus(
             "Overall",
             "placeholder",
-            "MVP scaffold runs, but live research connectors are not connected yet.",
+            "Core runtime and low-cost connectors run, but some live research connectors are still placeholders.",
         )
     return CapabilityStatus(
         "Overall",

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import asdict, dataclass, field
 from typing import Any
 from uuid import uuid4
+from urllib.parse import urlparse, urlunparse
 
 from .time import utc_now
 
@@ -14,8 +16,19 @@ class SourceRecord:
     source_type: str = "article"
     url: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    content_hash: str | None = None
+    canonical_url: str | None = None
+    captured_at: str = field(default_factory=utc_now)
+    raw_path: str | None = None
+    source_quality_score: float = 0.5
     source_id: str = field(default_factory=lambda: f"src_{uuid4().hex[:10]}")
     created_at: str = field(default_factory=utc_now)
+
+    def __post_init__(self) -> None:
+        if self.content_hash is None:
+            self.content_hash = _content_hash(self.content)
+        if self.canonical_url is None and self.url:
+            self.canonical_url = _canonicalize_url(self.url)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -66,8 +79,20 @@ class SharedMemory:
         self.entity_graph: dict[str, set[str]] = {}
 
     def add_source(self, source: SourceRecord) -> SourceRecord:
+        existing = self.find_duplicate_source(source)
+        if existing is not None:
+            existing.metadata.update({key: value for key, value in source.metadata.items() if key not in existing.metadata})
+            return existing
         self.sources[source.source_id] = source
         return source
+
+    def find_duplicate_source(self, source: SourceRecord) -> SourceRecord | None:
+        for existing in self.sources.values():
+            if source.canonical_url and existing.canonical_url == source.canonical_url:
+                return existing
+            if source.content.strip() and existing.content_hash == source.content_hash:
+                return existing
+        return None
 
     def upsert_project(self, project: ProjectCandidate) -> ProjectCandidate:
         self.projects[project.project_id] = project
@@ -144,3 +169,19 @@ class SharedMemory:
 
 def _tokens(text: str) -> set[str]:
     return {part.strip(".,:;!?()[]{}").lower() for part in text.split() if len(part) > 2}
+
+
+def _content_hash(content: str) -> str:
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def _canonicalize_url(url: str) -> str:
+    parsed = urlparse(url.strip())
+    if not parsed.scheme or not parsed.netloc:
+        return url.strip()
+    normalized = parsed._replace(
+        scheme=parsed.scheme.lower(),
+        netloc=parsed.netloc.lower(),
+        fragment="",
+    )
+    return urlunparse(normalized).rstrip("/")
