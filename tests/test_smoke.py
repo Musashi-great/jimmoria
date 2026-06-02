@@ -634,6 +634,10 @@ class SmokeTest(unittest.TestCase):
             self.assertGreaterEqual(len(result.memory.get_room_findings(result.room.room_id)), 8)
 
             report = Path(result.room.output_paths["report"]).read_text(encoding="utf-8")
+            self.assertEqual(result.room.project_card["research_quality_status"], "insufficient_evidence")
+            self.assertIn("## 0. Research Quality Gate", report)
+            self.assertIn("Status: `INSUFFICIENT_EVIDENCE`", report)
+            self.assertIn("This is not a completed research report.", report)
             self.assertIn("| Project | Origin | Source Backing |", report)
             self.assertIn("mvp_placeholder", report)
             self.assertIn("[MVP Placeholder]", report)
@@ -664,9 +668,12 @@ class SmokeTest(unittest.TestCase):
             )
 
             report = Path(result.room.output_paths["report"]).read_text(encoding="utf-8")
-            self.assertIn("# 프로젝트 리서치 보고서", report)
+            self.assertIn("# 리서치 미완료 / Research Not Completed", report)
+            self.assertIn("## 0. Research Quality Gate", report)
+            self.assertIn("Status: `INSUFFICIENT_EVIDENCE`", report)
             self.assertIn("## 2. 목표", report)
             self.assertIn("Report language: `ko`", report)
+            self.assertEqual(result.room.project_card["research_quality_status"], "insufficient_evidence")
 
     def test_default_connectors_register_low_cost_research_stack(self) -> None:
         runtime = ResearchRuntime()

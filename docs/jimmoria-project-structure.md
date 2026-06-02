@@ -989,3 +989,45 @@ jimmoria
 ```
 
 이 경우 `room_created`, `agent_start`, `agent_done`, `room_completed`가 이전처럼 panel/card 중심으로 출력된다. 기본 compact stream에서 현재 agent board를 보고 싶으면 `/board`를 사용한다.
+
+## 25. Research Quality Gate
+
+JIMMORIA는 이제 Research Room이 끝났다고 해서 무조건 "리서치 완료 보고서"로 표시하지 않는다. 프로세스 종료 상태와 리서치 품질 상태를 분리한다.
+
+ReportAgent는 후보 프로젝트와 근거 URL을 확인한 뒤 `research_quality_status`를 계산한다.
+
+```text
+research_complete       source-backed 후보와 evidence URL이 있는 경우
+insufficient_evidence   후보가 없거나, 후보가 전부 mvp_placeholder이거나, evidence URL이 0개인 경우
+```
+
+`insufficient_evidence`가 나오면 Markdown 파일은 계속 저장되지만 제목과 상단 섹션이 바뀐다.
+
+```text
+# 리서치 미완료 / Research Not Completed: <topic>
+
+## 0. Research Quality Gate
+- Status: INSUFFICIENT_EVIDENCE
+- Evidence URLs: 0
+- This is not a completed research report.
+- Treat the content below as a diagnostic memo, not as final research.
+```
+
+이 상태에서는 사용자가 받은 파일을 실제 조사 결과로 해석하면 안 된다. 예를 들어 `mvp_placeholder`, `Evidence URLs: 0`, `no source-backed evidence URLs were collected`가 보이면 "리서치가 완료된 것"이 아니라 "JIMMORIA가 아직 충분한 근거를 모으지 못했다"는 뜻이다.
+
+런타임 저장 위치도 같은 상태를 남긴다.
+
+```text
+room.project_card.research_quality_status
+data/runs/<room_id>/room.json
+data/runs/<room_id>/events.json
+```
+
+콘솔은 `room_completed` 이벤트에서 다음처럼 표시한다.
+
+```text
+Room > DONE room_abc123 | status completed | quality insufficient_evidence | msg 14 / findings 10
+Output > Research gate | Research gate blocked completed report: insufficient source-backed evidence...
+```
+
+따라서 "이게 리서칭 진행된 거임?"이라는 상황에서는 먼저 Quality Gate를 확인해야 한다. `insufficient_evidence`라면 방은 실행됐지만, 리서치 보고서로 받아볼 수준은 아니다. 다음 개발 우선순위는 이 quality gate를 통과할 수 있도록 live connector와 source-backed verification을 더 붙이는 것이다.

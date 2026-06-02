@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -7,7 +8,6 @@ from crypto_research_agents.agents.base import AgentResult, BaseAgent
 from crypto_research_agents.core.bus import CollaborationBus
 from crypto_research_agents.core.company_settings import CompanySettings
 from crypto_research_agents.core.memory import FindingRecord, SharedMemory
-from crypto_research_agents.core.model_gateway import ModelGateway
 from crypto_research_agents.core.room import ResearchRoom
 from crypto_research_agents.storage.paths import safe_filename
 
@@ -22,6 +22,13 @@ class ReportAgent(BaseAgent):
         reports_dir.mkdir(parents=True, exist_ok=True)
         decision = self.model_gateway.select(agent_id=self.agent_id, task_type=self.task_type)
         findings = memory.get_room_findings(room.room_id)
+        candidates = current_room_candidates(room, memory, findings)
+        quality = assess_report_quality(candidates)
+        room.project_card["research_quality"] = quality.to_dict()
+        room.project_card["research_quality_status"] = quality.status
+        if quality.is_blocking:
+            room.add_open_question("Collect source-backed evidence before treating this as a completed research report.")
+
         company_settings = kwargs.get("company_settings")
         if not isinstance(company_settings, CompanySettings):
             company_settings = CompanySettings()
@@ -41,32 +48,47 @@ class ReportAgent(BaseAgent):
         room.report_draft = report
         room.output_paths["report"] = str(report_path)
 
+        summary = quality.result_summary(report_path)
+        confidence = 0.35 if quality.is_blocking else 0.7
         finding = self.write_finding(
             room=room,
             memory=memory,
             finding_type="report",
-            summary=f"Report written to {report_path}",
+            summary=summary,
             data={
                 "report_path": str(report_path),
                 "model": decision.selected_model,
                 "provider": provider_name,
                 "report_language": company_settings.report_language,
                 "llm_summary": llm_summary,
+                "quality_status": quality.status,
+                "quality_reasons": quality.reasons,
+                "evidence_url_count": quality.evidence_url_count,
+                "placeholder_only": quality.placeholder_only,
+                "has_live_source_backed": quality.has_live_source_backed,
             },
-            confidence=0.7,
+            confidence=confidence,
         )
         bus.handoff(
             room_id=room.room_id,
             from_agent=self.agent_id,
             to_agent="obsidian_curator_agent",
-            summary="Final report is ready for Obsidian sync.",
+            summary=(
+                "Research memo is ready for Obsidian sync; quality gate marked it insufficient."
+                if quality.is_blocking
+                else "Final report is ready for Obsidian sync."
+            ),
             payload={"report_path": str(report_path), "finding_id": finding.finding_id},
         )
         return AgentResult(
             self.agent_id,
-            f"Report written to {report_path}",
-            {"finding_id": finding.finding_id, "report_path": str(report_path)},
-            confidence=0.7,
+            summary,
+            {
+                "finding_id": finding.finding_id,
+                "report_path": str(report_path),
+                "quality_status": quality.status,
+            },
+            confidence=confidence,
         )
 
     def _write_llm_summary(
@@ -99,6 +121,45 @@ class ReportAgent(BaseAgent):
         return response.text.strip()
 
 
+@dataclass(slots=True)
+class ReportQuality:
+    status: str
+    evidence_url_count: int
+    candidate_count: int
+    live_source_backed_count: int
+    placeholder_count: int
+    reasons: list[str]
+
+    @property
+    def is_blocking(self) -> bool:
+        return self.status == "insufficient_evidence"
+
+    @property
+    def placeholder_only(self) -> bool:
+        return self.candidate_count > 0 and self.placeholder_count == self.candidate_count
+
+    @property
+    def has_live_source_backed(self) -> bool:
+        return self.live_source_backed_count > 0
+
+    def result_summary(self, report_path: Path) -> str:
+        if self.is_blocking:
+            return f"Research gate blocked completed report: insufficient source-backed evidence. Diagnostic memo written to {report_path}"
+        return f"Report written to {report_path}"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "evidence_url_count": self.evidence_url_count,
+            "candidate_count": self.candidate_count,
+            "live_source_backed_count": self.live_source_backed_count,
+            "placeholder_count": self.placeholder_count,
+            "placeholder_only": self.placeholder_only,
+            "has_live_source_backed": self.has_live_source_backed,
+            "reasons": self.reasons,
+        }
+
+
 def render_project_dossier(
     room: ResearchRoom,
     memory: SharedMemory,
@@ -111,45 +172,72 @@ def render_project_dossier(
     settings = company_settings or CompanySettings()
     korean = settings.report_language == "ko"
     candidates = current_room_candidates(room, memory, findings)
+    quality = assess_report_quality(candidates)
     sources = [memory.sources[source_id] for source_id in room.source_inputs if source_id in memory.sources]
     has_live_evidence = any(project.metadata.get("discovery_mode") == "live_search" for project in candidates)
     has_placeholder_candidates = any(candidate_origin(project) == "mvp_placeholder" for project in candidates)
+
     if has_placeholder_candidates:
         origin_note = (
-            "- 후보 origin 규칙: `mvp_placeholder`는 검증된 live 후보가 아님. `live_source_backed` 행만 source-backed lead로 취급."
+            "- 후보 origin 규칙: `mvp_placeholder`는 검증된 live 후보가 아니다. `live_source_backed` 행만 source-backed lead로 취급한다."
             if korean
             else "- Candidate origin rule: MVP placeholders are not verified live candidates. Treat only `live_source_backed` rows as source-backed leads."
         )
     else:
         origin_note = (
-            "- 후보 origin 규칙: 각 후보 행에 source-backing level을 표시함."
+            "- 후보 origin 규칙: 각 후보 행에 source-backing level을 표시한다."
             if korean
             else "- Candidate origin rule: Current candidate rows are marked with their source-backing level."
         )
     if has_live_evidence:
         connector_note = (
-            "- 참고: 가능한 곳에서는 live web/GitHub/market connector를 사용함. Social API, RootData, explorer/RPC는 아직 placeholder일 수 있음."
+            "- 참고: 가능한 곳에서는 live web/GitHub/market connector를 사용했다. Social API, RootData, explorer/RPC는 아직 placeholder일 수 있다."
             if korean
             else "- Note: Live web/GitHub/market connectors were used where available; social APIs, RootData, and explorer/RPC may still be placeholders."
         )
     else:
         connector_note = (
-            "- 참고: connector 설정 전까지 live social/on-chain/product check는 local placeholder를 사용함."
+            "- 참고: connector 설정 전까지 live social/on-chain/product check는 local placeholder 또는 미설정 결과를 사용할 수 있다."
             if korean
             else "- Note: This MVP uses local placeholders for live social/on-chain/product checks until connectors are configured."
         )
 
+    report_title = (
+        "리서치 미완료 / Research Not Completed"
+        if quality.is_blocking
+        else ("프로젝트 리서치 보고서" if korean else "Project Research Dossier")
+    )
     lines: list[str] = [
-        f"# {'프로젝트 리서치 보고서' if korean else 'Project Research Dossier'}: {room.topic}",
+        f"# {report_title}: {room.topic}",
         "",
-        "## 1. TL;DR",
-        f"- {'방 ID' if korean else 'Room ID'}: `{room.room_id}`",
-        f"- {'현재 판단' if korean else 'Current judgment'}: Research More",
-        f"- {'자동 요약' if korean else 'Automated synthesis'}: {render_automatic_tldr(candidates, korean=korean)}",
+        "## 0. Research Quality Gate",
+        f"- Status: `{quality.status.upper()}`",
+        f"- Evidence URLs: {quality.evidence_url_count}",
+        f"- Live source-backed candidates: {quality.live_source_backed_count}",
+        f"- Placeholder-only candidates: {'yes' if quality.placeholder_only else 'no'}",
     ]
+    if quality.is_blocking:
+        lines.extend(
+            [
+                "- This is not a completed research report.",
+                "- The room did not collect enough source-backed evidence to support a candidate dossier.",
+                "- Treat the content below as a diagnostic memo, not as final research.",
+            ]
+        )
+    if quality.reasons:
+        lines.append("- Gate reasons: " + "; ".join(quality.reasons))
+    lines.extend(
+        [
+            "",
+            "## 1. TL;DR",
+            f"- {'Room ID' if korean else 'Room ID'}: `{room.room_id}`",
+            f"- {'현재 판단' if korean else 'Current judgment'}: {'Insufficient Evidence' if quality.is_blocking else 'Research More'}",
+            f"- {'자동 요약' if korean else 'Automated synthesis'}: {render_automatic_tldr(candidates, korean=korean)}",
+        ]
+    )
     if provider_name == "offline_fallback":
         lines.append(
-            "- Live LLM: 설정되지 않음. Offline fallback이 deterministic summary만 생성함."
+            "- Live LLM: 설정되지 않음. Offline fallback은 deterministic summary만 생성한다."
             if korean
             else "- Live LLM: not configured. Offline fallback generated deterministic summaries only."
         )
@@ -218,19 +306,19 @@ def render_project_dossier(
     lines.extend(
         [
             "## 7. 남은 질문" if korean else "## 7. Open Questions",
-            "- `mvp_placeholder` 후보는 실제 project lead로 보기 전에 `live_source_backed` 후보로 교체해야 함."
+            "- `mvp_placeholder` 후보는 실제 project lead로 보기 전에 `live_source_backed` 후보로 교체해야 한다."
             if korean
             else "- If a candidate is marked `mvp_placeholder`, replace it with a `live_source_backed` candidate before treating it as a real project lead.",
-            "- Live X/Twitter, Telegram, RootData, Explorer/RPC, funding connector 설정 필요."
+            "- Live X/Twitter, Telegram, RootData, Explorer/RPC, funding connector 설정이 필요하다."
             if korean
             else "- Configure live X/Twitter, Telegram, RootData, Explorer/RPC, and funding connectors.",
-            "- 공식 social handle과 KOL mention history 검증 필요."
+            "- 공식 social handle과 KOL mention history 검증이 필요하다."
             if korean
             else "- Validate official social handles and KOL mention history.",
-            "- Explorer/RPC 또는 공식 chain data로 token mechanics 검증 필요."
+            "- Explorer/RPC 또는 공식 chain data로 token mechanics 검증이 필요하다."
             if korean
             else "- Verify token mechanics against explorer/RPC or official chain data.",
-            "- Source-backed KOL mention history와 social momentum score 추가 필요."
+            "- Source-backed KOL mention history와 social momentum score 추가가 필요하다."
             if korean
             else "- Add source-backed KOL mention history and social momentum scores.",
             "",
@@ -238,9 +326,44 @@ def render_project_dossier(
             f"- LLM provider: `{provider_name}`",
             f"- Report model route: `{model_name}`",
             f"- Report language: `{settings.report_language}`",
+            f"- Research quality: `{quality.status}`",
         ]
     )
     return "\n".join(lines)
+
+
+def assess_report_quality(candidates: list[Any]) -> ReportQuality:
+    evidence_url_count = 0
+    placeholder_count = 0
+    live_source_backed_count = 0
+    for project in candidates:
+        metadata = project.metadata if isinstance(project.metadata, dict) else {}
+        evidence_urls = metadata.get("evidence_urls", [])
+        if isinstance(evidence_urls, list):
+            evidence_url_count += len([url for url in evidence_urls if url])
+        origin = candidate_origin(project)
+        if origin == "mvp_placeholder":
+            placeholder_count += 1
+        if origin == "live_source_backed":
+            live_source_backed_count += 1
+
+    reasons: list[str] = []
+    if not candidates:
+        reasons.append("no candidate project was resolved")
+    if candidates and placeholder_count == len(candidates):
+        reasons.append("all candidates are MVP placeholders")
+    if evidence_url_count == 0 and live_source_backed_count == 0:
+        reasons.append("no source-backed evidence URLs were collected")
+
+    status = "insufficient_evidence" if reasons else "research_complete"
+    return ReportQuality(
+        status=status,
+        evidence_url_count=evidence_url_count,
+        candidate_count=len(candidates),
+        live_source_backed_count=live_source_backed_count,
+        placeholder_count=placeholder_count,
+        reasons=reasons,
+    )
 
 
 def render_candidate_evidence(project: Any) -> list[str]:
@@ -322,18 +445,18 @@ def escape_table(value: object) -> str:
 
 def render_automatic_tldr(candidates: list[Any], *, korean: bool = False) -> str:
     if not candidates:
-        return "이 Research Room에서 후보 프로젝트가 resolve되지 않음." if korean else "No candidate project was resolved in this room."
+        return "Research Room에서 후보 프로젝트가 resolve되지 않았다." if korean else "No candidate project was resolved in this room."
     primary = candidates[0]
     narratives = ", ".join(primary.narratives[:4]) or "unknown narrative"
     evidence_count = len(primary.metadata.get("evidence_urls", []))
     origin = candidate_origin(primary)
     if korean:
         return (
-            f"{primary.name}가 primary candidate로 resolve됨 ({origin}). "
+            f"{primary.name}가 primary candidate로 resolve되었다({origin}). "
             f"Core thesis: {narratives}. "
             f"Token status: {primary.token_status}; chain: {primary.chain or 'unknown'}. "
             f"수집된 Evidence URL: {evidence_count}. "
-            "Market/social/on-chain detail은 placeholder connector 영역에서 추가 검증 필요."
+            "Market/social/on-chain detail은 placeholder connector 영역에서 추가 검증이 필요하다."
         )
     return (
         f"{primary.name} resolved as the primary candidate ({origin}). "

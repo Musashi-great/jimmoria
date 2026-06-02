@@ -476,22 +476,24 @@ class JimmoriaConsole:
             return
 
         if event_type == "room_completed":
+            quality_status = str(event.get("research_quality_status") or "")
+            quality_suffix = f" | quality {quality_status}" if quality_status else ""
             if self.use_stream_events():
                 self.runtime_room_running = False
                 self.print_event_line(
                     "Room",
-                    f"DONE {event.get('room_id')} | status {event.get('status')} | msg {event.get('messages')} / findings {event.get('findings')}",
+                    f"DONE {event.get('room_id')} | status {event.get('status')}{quality_suffix} | msg {event.get('messages')} / findings {event.get('findings')}",
                 )
                 return
-            self.block(
-                "JIMMORIA finalizes the room",
-                [
-                    f"Room: {event.get('room_id')}",
-                    f"Status: {event.get('status')}",
-                    f"Messages: {event.get('messages')}",
-                    f"Findings: {event.get('findings')}",
-                ],
-            )
+            lines = [
+                f"Room: {event.get('room_id')}",
+                f"Status: {event.get('status')}",
+                f"Messages: {event.get('messages')}",
+                f"Findings: {event.get('findings')}",
+            ]
+            if quality_status:
+                lines.append(f"Research quality: {quality_status}")
+            self.block("JIMMORIA finalizes the room", lines)
             self.print_agent_state()
             return
 
@@ -523,6 +525,11 @@ class JimmoriaConsole:
             f"Messages: {len(bus.messages)}",
             f"Findings: {len(memory.get_room_findings(room.room_id))}",
         ]
+        quality = room.project_card.get("research_quality") if isinstance(room.project_card, dict) else {}
+        if isinstance(quality, dict) and quality.get("status"):
+            lines.append(f"Research quality: {quality.get('status')}")
+            if quality.get("reasons"):
+                lines.append(f"Quality reasons: {'; '.join(str(item) for item in quality.get('reasons', []))}")
         if report_path:
             lines.append(f"Report: {report_path}")
         if vault_path:
@@ -637,6 +644,8 @@ class JimmoriaConsole:
             "report_written": "Report written",
             "note_written": "Vault note written",
         }
+        if event_type == "report_written" and event.get("quality_status") == "insufficient_evidence":
+            labels = {**labels, "report_written": "Research gate"}
         summary = str(event.get("summary") or labels.get(event_type, event_type))
         if event.get("path"):
             summary = f"{summary}"

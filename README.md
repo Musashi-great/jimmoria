@@ -222,3 +222,12 @@ Output > Report written | reports/pearl-room_abc123.md
 ```
 
 예전처럼 큰 카드/보드 중심으로 보고 싶으면 `JIMMORIA_EVENT_STYLE=cards`를 설정한다. 현재 board만 보고 싶으면 채팅 중 `/board`를 입력한다.
+
+## Research Quality Gate
+
+JIMMORIA는 이제 Research Room이 끝났다고 해서 무조건 완료 보고서라고 부르지 않습니다.
+
+- `research_complete`: source-backed 후보와 evidence URL이 있는 경우
+- `insufficient_evidence`: 후보가 전부 `mvp_placeholder`이거나 evidence URL이 0개인 경우
+
+`insufficient_evidence`가 나오면 파일은 저장되지만, 제목이 `리서치 미완료 / Research Not Completed`로 표시됩니다. 이 경우는 실제 리서치 완료본이 아니라 "근거가 부족해서 아직 보고서로 확정할 수 없음"이라는 진단 메모입니다.

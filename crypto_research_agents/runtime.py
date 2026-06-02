@@ -251,11 +251,16 @@ class ResearchRuntime:
             self.event_handler(event)
 
     def _emit_room_completed(self, room: ResearchRoom) -> None:
+        quality = room.project_card.get("research_quality") if isinstance(room.project_card, dict) else {}
+        if not isinstance(quality, dict):
+            quality = {}
         self._emit(
             "room_completed",
             room_id=room.room_id,
             topic=room.topic,
             status=room.status,
+            research_quality_status=quality.get("status"),
+            research_quality=quality,
             output_paths=room.output_paths,
             messages=len(self.bus.messages),
             findings=len(self.memory.get_room_findings(room.room_id)),
@@ -289,6 +294,7 @@ class ResearchRuntime:
                 agent_id=result.agent_id,
                 report_path=report_path,
                 summary=result.summary,
+                quality_status=data.get("quality_status"),
             )
         paths = data.get("paths")
         if isinstance(paths, list):
