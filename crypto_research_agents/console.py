@@ -72,6 +72,7 @@ class JimmoriaConsole:
             "  /models                  Configure LLM provider/models",
             "  /doctor                  Show configured vs placeholder capabilities",
             "  /company                 Show active and planned agents",
+            "  /settings                Show company operating settings",
             "  /board                   Show current live agent board",
             "  /context                 Show shared memory and latest run context",
             "  /runs                    Show previous runs",
@@ -97,6 +98,39 @@ class JimmoriaConsole:
                 one_liner = spec.identity.one_liner or spec.role.description
             rows.append(f"{agent_id:<28} {persona:<34} {status:<8} {one_liner}")
         self.block("Company roster", rows)
+
+    def print_company_settings(self, settings: Any, path: str | Path) -> None:
+        principles = list(getattr(settings, "operating_principles", []) or [])
+        lines = [
+            f"Settings file: {path}",
+            f"Report language: {getattr(settings, 'report_language', 'en')}",
+            f"English technical terms: {'allowed' if getattr(settings, 'allow_english_terms', True) else 'restricted'}",
+            f"Supervisor mode: {getattr(settings, 'supervisor_mode', 'research_director')}",
+            f"Client relationship: {getattr(settings, 'client_relationship', 'user')}",
+            f"Auto-apply company instructions: {getattr(settings, 'auto_apply_company_instructions', True)}",
+        ]
+        if principles:
+            lines.extend(["", "Operating principles:"])
+            lines.extend(f"- {item}" for item in principles[-8:])
+        self.block("Company settings", lines)
+
+    def print_company_settings_updated(self, settings: Any, applied: list[str], path: str | Path) -> None:
+        lines = [
+            "No Research Room opened.",
+            "This was treated as a company operating instruction.",
+            f"Settings file: {path}",
+            "",
+            "Applied:",
+        ]
+        lines.extend(f"- {item}" for item in applied)
+        lines.extend(
+            [
+                "",
+                f"Report language: {getattr(settings, 'report_language', 'en')}",
+                f"Supervisor mode: {getattr(settings, 'supervisor_mode', 'research_director')}",
+            ]
+        )
+        self.block("Company instruction applied", lines)
 
     def print_user_message(self, text: str) -> None:
         self.block("You", self.wrap(text))

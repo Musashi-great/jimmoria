@@ -148,3 +148,19 @@ config/models/model_router.yaml              모델 라우팅 기준
 docs/crypto-research-company-v1.4-execution-spec.md
 data/runs/<room_id>/events.json              나중에 시각화 UI에서 쓸 replay event stream
 ```
+## Chat Intake Rule
+
+JIMMORIA는 이제 모든 일반 입력을 바로 보고서로 만들지 않는다.
+
+- `pearl 프로젝트 리서치 보고서 만들어봐`처럼 리서치/분석/보고서 요청이 명확하면 Research Room을 연다.
+- `보고서는 한글로 만들어봐`, `로그 스타일 바꿔`, `슈퍼바이저 역할을 사장처럼 가져가` 같은 말은 회사 운영 설정으로 반영한다.
+- 설정은 `data/company_settings.json`에 저장된다.
+- `/settings`로 현재 회사 설정을 확인할 수 있다.
+
+Supervisor는 단순 진행자가 아니라 회사 사장/총괄 PM처럼 동작한다. 사용자는 JIMMORIA에 외주를 주는 클라이언트이고, Supervisor가 먼저 의도를 분류한 뒤 Research Room을 열지, 설정을 바꿀지 결정한다.
+
+Important new file:
+
+```text
+data/company_settings.json   company operating settings
+```

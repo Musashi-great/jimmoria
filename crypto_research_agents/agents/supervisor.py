@@ -17,7 +17,13 @@ class SupervisorAgent(BaseAgent):
     def run(self, room: ResearchRoom, memory: SharedMemory, bus: CollaborationBus, **kwargs: Any) -> AgentResult:
         decision = self.model_gateway.select(agent_id=self.agent_id, task_type=self.task_type)
         goals = kwargs.get("goals") or room.goals
-        summary = "Research room initialized with controlled P2P collaboration."
+        company_settings = kwargs.get("company_settings") if isinstance(kwargs.get("company_settings"), dict) else {}
+        supervisor_mode = company_settings.get("supervisor_mode", "research_director")
+        summary = (
+            "Research room initialized by CEO-style supervisor intake."
+            if supervisor_mode == "company_ceo"
+            else "Research room initialized with controlled P2P collaboration."
+        )
         finding = self.write_finding(
             room=room,
             memory=memory,
@@ -28,13 +34,14 @@ class SupervisorAgent(BaseAgent):
                 "goals": goals,
                 "agents": room.agents,
                 "model_decision": asdict(decision),
+                "company_settings": company_settings,
             },
             confidence=0.9,
         )
         bus.update(
             room_id=room.room_id,
             from_agent=self.agent_id,
-            summary="Research room created and goals set.",
+            summary="Research room created after supervisor intake and goals set.",
             payload={"finding_id": finding.finding_id, "goals": goals},
         )
         return AgentResult(self.agent_id, summary, {"finding_id": finding.finding_id}, confidence=0.9)

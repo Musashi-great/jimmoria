@@ -19,6 +19,7 @@ from crypto_research_agents.agents import (
 from crypto_research_agents.connectors import register_default_connectors
 from crypto_research_agents.core.bus import CollaborationBus
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
+from crypto_research_agents.core.company_settings import company_settings_path_for, load_company_settings
 from crypto_research_agents.core.hooks import HookEngine
 from crypto_research_agents.core.memory import SharedMemory
 from crypto_research_agents.core.model_gateway import ModelGateway
@@ -90,6 +91,7 @@ class ResearchRuntime:
         reports_dir: str | Path = "reports",
         memory_path: str | Path | None = "data/memory.json",
     ) -> ResearchRunResult:
+        company_settings = load_company_settings(company_settings_path_for(memory_path))
         room = ResearchRoom(
             topic=title,
             goals=[
@@ -110,7 +112,7 @@ class ResearchRuntime:
         )
 
         try:
-            self._run_agent("supervisor_agent", room, goals=room.goals)
+            self._run_agent("supervisor_agent", room, goals=room.goals, company_settings=company_settings.to_dict())
             room.set_status(RuntimeState.RUNNING)
             self._run_agent("ingestion_agent", room, title=title, content=content, url=url, source_type="article")
             self._run_agent("narrative_agent", room)
@@ -122,7 +124,7 @@ class ResearchRuntime:
             self._run_agent("funding_token_agent", room)
             room.set_status(RuntimeState.READY_FOR_REPORT)
             room.set_status(RuntimeState.WRITING_REPORT)
-            self._run_agent("report_agent", room, reports_dir=reports_dir)
+            self._run_agent("report_agent", room, reports_dir=reports_dir, company_settings=company_settings)
             room.set_status(RuntimeState.OBSIDIAN_SYNCING)
             self._run_agent("obsidian_curator_agent", room, vault_dir=vault_dir)
         except Exception as exc:
@@ -151,6 +153,7 @@ class ResearchRuntime:
         vault_dir: str | Path = "vault",
         memory_path: str | Path | None = "data/memory.json",
     ) -> ResearchRunResult:
+        company_settings = load_company_settings(company_settings_path_for(memory_path))
         room = ResearchRoom(
             topic=title,
             goals=[
@@ -174,7 +177,7 @@ class ResearchRuntime:
         )
 
         try:
-            self._run_agent("supervisor_agent", room, goals=room.goals)
+            self._run_agent("supervisor_agent", room, goals=room.goals, company_settings=company_settings.to_dict())
             room.set_status(RuntimeState.RUNNING)
             self._run_agent("ingestion_agent", room, title=title, content=content, url=url, source_type="article")
             room.set_status(RuntimeState.OBSIDIAN_SYNCING)

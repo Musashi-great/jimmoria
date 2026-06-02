@@ -762,3 +762,73 @@ room_failed
 따라서 `data/runs/<room_id>/events.json`은 나중에 웹/비주얼 replay 화면에서 에이전트 실행, tool 호출, 보고서/노트 저장 흐름을 그대로 재생하는 기반이 된다.
 
 Report runtime metadata에는 `LLM provider`와 `Report model route`가 들어간다. provider가 `offline_fallback`이면 TL;DR에 `Live LLM: not configured`가 표시되어 deterministic fallback을 실제 LLM 판단처럼 오해하지 않게 한다.
+## 23. Supervisor Intake And Company Settings
+
+JIMMORIA는 이제 모든 일반 채팅 입력을 바로 보고서 생성으로 처리하지 않는다. Supervisor는 회사 사장/총괄 PM처럼 먼저 intent를 분류한다.
+
+| Input Type | 처리 방식 |
+|---|---|
+| 리서치/분석/보고서 요청 | Research Room을 열고 에이전트에게 배정 |
+| 설정/운영/UX/역할 변경 지시 | Research Room을 열지 않고 company settings에 반영 |
+| URL 또는 source ingestion 명령 | source 저장 또는 research flow로 라우팅 |
+
+예시:
+
+```text
+pearl 프로젝트 리서치 보고서 만들어봐
+-> research_request
+-> Research Room opened
+
+보고서는 한글로 만들어봐 영어단어는 사용해도 좋아
+-> company_config
+-> data/company_settings.json 업데이트
+-> Research Room not opened
+
+슈퍼바이저는 회사 사장 느낌으로 외주를 받는 역할로 가져가자
+-> company_config
+-> supervisor_mode = company_ceo
+-> client_relationship = outsourcing_client
+```
+
+설정 파일:
+
+```text
+data/company_settings.json
+```
+
+주요 필드:
+
+```text
+report_language
+allow_english_terms
+auto_apply_company_instructions
+supervisor_mode
+client_relationship
+operating_principles
+raw_instructions
+```
+
+현재 지원하는 대표 설정:
+
+| Setting | Meaning |
+|---|---|
+| `report_language: ko` | 보고서 기본 섹션과 핵심 라벨을 한국어로 작성 |
+| `allow_english_terms: true` | crypto/technical term은 영어 그대로 허용 |
+| `supervisor_mode: company_ceo` | Supervisor를 회사 사장/총괄 PM처럼 동작시킴 |
+| `client_relationship: outsourcing_client` | 사용자를 외주를 주는 클라이언트로 취급 |
+
+CLI 명령:
+
+```text
+/settings
+```
+
+이 명령은 현재 company settings를 출력한다.
+
+Runtime 연결:
+
+- `chat_command()`는 먼저 `classify_chat_input()`으로 입력을 분류한다.
+- `company_config`면 `apply_company_instruction()`으로 설정을 저장하고 종료한다.
+- `research_request`면 기존처럼 `ResearchRuntime.run_article_research()`를 실행한다.
+- `ResearchRuntime`은 `company_settings.json`을 읽어 SupervisorAgent와 ReportAgent에 전달한다.
+- ReportAgent는 `report_language`를 보고 한국어/영문 report shell을 선택한다.

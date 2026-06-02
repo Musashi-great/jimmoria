@@ -15,8 +15,17 @@ from crypto_research_agents.runtime import ResearchRuntime
 from crypto_research_agents.agents.discovery import build_live_candidates, extract_project_query, should_live_discover
 from crypto_research_agents.connectors import register_default_connectors
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
-from crypto_research_agents.cli import chat_command, configure_model_panel, main as cli_main, message_summary, print_banner
+from crypto_research_agents.cli import (
+    apply_company_instruction,
+    chat_command,
+    classify_chat_input,
+    configure_model_panel,
+    main as cli_main,
+    message_summary,
+    print_banner,
+)
 from crypto_research_agents.console import JimmoriaConsole, print_jimmoria_logo
+from crypto_research_agents.core.company_settings import CompanySettings
 from crypto_research_agents.core.llm_provider import CodexCliProvider, LLMRequest, OAuthTokenProvider, provider_from_env
 from crypto_research_agents.core.memory import SharedMemory, SourceRecord
 from crypto_research_agents.core.model_gateway import ModelGateway
@@ -106,7 +115,51 @@ class SmokeTest(unittest.TestCase):
 
         text = output.getvalue()
         self.assertIn("JIMMORIA commands", text)
+        self.assertIn("/settings", text)
         self.assertNotIn("Agents at work:", text)
+
+    def test_chat_intake_routes_company_settings_without_report(self) -> None:
+        output = StringIO()
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            args = argparse.Namespace(
+                memory=str(root / "memory.json"),
+                vault=str(root / "vault"),
+                reports=str(root / "reports"),
+                skip_model_setup=True,
+            )
+            with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(root / "model_settings.json")}, clear=True):
+                with patch("sys.stdin.isatty", return_value=True):
+                    with patch("builtins.input", side_effect=["보고서는 한글로 만들어봐 영어단어는 사용해도 좋아", "/quit"]):
+                        with redirect_stdout(output):
+                            chat_command(args)
+
+            settings_path = root / "company_settings.json"
+            self.assertTrue(settings_path.exists())
+            settings = json.loads(settings_path.read_text(encoding="utf-8"))
+            self.assertEqual(settings["report_language"], "ko")
+            self.assertTrue(settings["allow_english_terms"])
+            self.assertFalse((root / "reports").exists())
+
+        text = output.getvalue()
+        self.assertIn("Company instruction applied", text)
+        self.assertIn("No Research Room opened", text)
+
+    def test_chat_intake_classifies_research_vs_settings(self) -> None:
+        self.assertEqual(classify_chat_input("pearl 프로젝트에 대해서 리서치 보고서 만들어봐"), "research_request")
+        self.assertEqual(classify_chat_input("보고서는 한글로 만들어봐 영어단어는 써도 돼"), "company_config")
+
+    def test_company_instruction_expands_supervisor_role(self) -> None:
+        settings = CompanySettings()
+
+        applied = apply_company_instruction(
+            "슈퍼바이저는 회사의 사장 느낌으로 외주를 받는 역할로 가져가자",
+            settings,
+        )
+
+        self.assertEqual(settings.supervisor_mode, "company_ceo")
+        self.assertEqual(settings.client_relationship, "outsourcing_client")
+        self.assertIn("Supervisor mode: company CEO / outsourcing intake", applied)
 
     def test_live_agent_board_shows_current_work(self) -> None:
         output = StringIO()
@@ -210,6 +263,28 @@ class SmokeTest(unittest.TestCase):
             note_text = project_notes[0].read_text(encoding="utf-8")
             self.assertIn("candidate_origin: mvp_placeholder", note_text)
             self.assertIn("source_backing: narrative_seed_only", note_text)
+
+    def test_report_uses_korean_company_setting(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            settings = CompanySettings(report_language="ko")
+            (root / "company_settings.json").write_text(
+                json.dumps(settings.to_dict(), ensure_ascii=False),
+                encoding="utf-8",
+            )
+            runtime = ResearchRuntime()
+            result = runtime.run_article_research(
+                title="AI Wallet Automation",
+                content="AI agent wallet automation with points and testnet docs.",
+                vault_dir=root / "vault",
+                reports_dir=root / "reports",
+                memory_path=root / "memory.json",
+            )
+
+            report = Path(result.room.output_paths["report"]).read_text(encoding="utf-8")
+            self.assertIn("# 프로젝트 리서치 보고서", report)
+            self.assertIn("## 2. 목표", report)
+            self.assertIn("Report language: `ko`", report)
 
     def test_default_connectors_register_low_cost_research_stack(self) -> None:
         runtime = ResearchRuntime()
@@ -322,6 +397,12 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("oauth_tokens", social.memory_scope.no_access)
         self.assertEqual(social.persona_name, "The Signal Listener")
         self.assertIn("소셜/KOL", social.mission.primary_goal)
+
+        supervisor = registry.get("supervisor_agent")
+        self.assertIsNotNone(supervisor)
+        assert supervisor is not None
+        self.assertEqual(supervisor.persona_name, "The Company President")
+        self.assertIn("company_settings", supervisor.memory_scope.write)
 
         product = registry.get("product_tech_agent")
         self.assertIsNotNone(product)

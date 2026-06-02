@@ -5,6 +5,7 @@ from typing import Any
 
 from crypto_research_agents.agents.base import AgentResult, BaseAgent
 from crypto_research_agents.core.bus import CollaborationBus
+from crypto_research_agents.core.company_settings import CompanySettings
 from crypto_research_agents.core.memory import FindingRecord, SharedMemory
 from crypto_research_agents.core.model_gateway import ModelGateway
 from crypto_research_agents.core.room import ResearchRoom
@@ -21,6 +22,9 @@ class ReportAgent(BaseAgent):
         reports_dir.mkdir(parents=True, exist_ok=True)
         decision = self.model_gateway.select(agent_id=self.agent_id, task_type=self.task_type)
         findings = memory.get_room_findings(room.room_id)
+        company_settings = kwargs.get("company_settings")
+        if not isinstance(company_settings, CompanySettings):
+            company_settings = CompanySettings()
         llm_summary = self._write_llm_summary(room, memory, findings)
         provider_name = getattr(self.model_gateway.provider, "provider_name", "unknown")
         report = render_project_dossier(
@@ -30,6 +34,7 @@ class ReportAgent(BaseAgent):
             decision.selected_model,
             provider_name,
             llm_summary,
+            company_settings,
         )
         report_path = reports_dir / f"{safe_filename(room.topic)}-{room.room_id}.md"
         report_path.write_text(report, encoding="utf-8")
@@ -45,6 +50,7 @@ class ReportAgent(BaseAgent):
                 "report_path": str(report_path),
                 "model": decision.selected_model,
                 "provider": provider_name,
+                "report_language": company_settings.report_language,
                 "llm_summary": llm_summary,
             },
             confidence=0.7,
@@ -100,39 +106,66 @@ def render_project_dossier(
     model_name: str,
     provider_name: str,
     llm_summary: str,
+    company_settings: CompanySettings | None = None,
 ) -> str:
+    settings = company_settings or CompanySettings()
+    korean = settings.report_language == "ko"
     candidates = current_room_candidates(room, memory, findings)
     sources = [memory.sources[source_id] for source_id in room.source_inputs if source_id in memory.sources]
     has_live_evidence = any(project.metadata.get("discovery_mode") == "live_search" for project in candidates)
     has_placeholder_candidates = any(candidate_origin(project) == "mvp_placeholder" for project in candidates)
+    if has_placeholder_candidates:
+        origin_note = (
+            "- 후보 origin 규칙: `mvp_placeholder`는 검증된 live 후보가 아님. `live_source_backed` 행만 source-backed lead로 취급."
+            if korean
+            else "- Candidate origin rule: MVP placeholders are not verified live candidates. Treat only `live_source_backed` rows as source-backed leads."
+        )
+    else:
+        origin_note = (
+            "- 후보 origin 규칙: 각 후보 행에 source-backing level을 표시함."
+            if korean
+            else "- Candidate origin rule: Current candidate rows are marked with their source-backing level."
+        )
+    if has_live_evidence:
+        connector_note = (
+            "- 참고: 가능한 곳에서는 live web/GitHub/market connector를 사용함. Social API, RootData, explorer/RPC는 아직 placeholder일 수 있음."
+            if korean
+            else "- Note: Live web/GitHub/market connectors were used where available; social APIs, RootData, and explorer/RPC may still be placeholders."
+        )
+    else:
+        connector_note = (
+            "- 참고: connector 설정 전까지 live social/on-chain/product check는 local placeholder를 사용함."
+            if korean
+            else "- Note: This MVP uses local placeholders for live social/on-chain/product checks until connectors are configured."
+        )
 
     lines: list[str] = [
-        f"# Project Research Dossier: {room.topic}",
+        f"# {'프로젝트 리서치 보고서' if korean else 'Project Research Dossier'}: {room.topic}",
         "",
         "## 1. TL;DR",
-        f"- Room ID: `{room.room_id}`",
-        "- Current judgment: Research More",
-        f"- Automated synthesis: {render_automatic_tldr(candidates)}",
+        f"- {'방 ID' if korean else 'Room ID'}: `{room.room_id}`",
+        f"- {'현재 판단' if korean else 'Current judgment'}: Research More",
+        f"- {'자동 요약' if korean else 'Automated synthesis'}: {render_automatic_tldr(candidates, korean=korean)}",
     ]
     if provider_name == "offline_fallback":
-        lines.append("- Live LLM: not configured. Offline fallback generated deterministic summaries only.")
+        lines.append(
+            "- Live LLM: 설정되지 않음. Offline fallback이 deterministic summary만 생성함."
+            if korean
+            else "- Live LLM: not configured. Offline fallback generated deterministic summaries only."
+        )
     elif should_show_llm_summary(llm_summary):
-        lines.append(f"- LLM synthesis: {llm_summary}")
+        lines.append(f"- {'LLM 종합' if korean else 'LLM synthesis'}: {llm_summary}")
     lines.extend(
         [
-            "- Candidate origin rule: MVP placeholders are not verified live candidates. Treat only `live_source_backed` rows as source-backed leads."
-            if has_placeholder_candidates
-            else "- Candidate origin rule: Current candidate rows are marked with their source-backing level.",
-            "- Note: Live web/GitHub/market connectors were used where available; social APIs, RootData, and explorer/RPC may still be placeholders."
-            if has_live_evidence
-            else "- Note: This MVP uses local placeholders for live social/on-chain/product checks until connectors are configured.",
+            origin_note,
+            connector_note,
             "",
-            "## 2. Goals",
+            "## 2. 목표" if korean else "## 2. Goals",
         ]
     )
     lines.extend(f"- {goal}" for goal in room.goals)
 
-    lines.extend(["", "## 3. Sources"])
+    lines.extend(["", "## 3. 소스" if korean else "## 3. Sources"])
     if sources:
         for source in sources:
             url = f" ({source.url})" if source.url else ""
@@ -140,7 +173,7 @@ def render_project_dossier(
     else:
         lines.append("- No sources attached.")
 
-    lines.extend(["", "## 4. Candidate Projects"])
+    lines.extend(["", "## 4. 후보 프로젝트" if korean else "## 4. Candidate Projects"])
     if candidates:
         lines.extend(
             [
@@ -161,14 +194,14 @@ def render_project_dossier(
     else:
         lines.append("- No candidates discovered.")
 
-    lines.extend(["", "## 5. Evidence Map"])
+    lines.extend(["", "## 5. 근거 맵" if korean else "## 5. Evidence Map"])
     if candidates:
         for project in candidates:
             lines.extend(render_candidate_evidence(project))
     else:
         lines.append("- No candidate evidence available.")
 
-    lines.extend(["", "## 6. Agent Findings"])
+    lines.extend(["", "## 6. 에이전트 조사 결과" if korean else "## 6. Agent Findings"])
     for finding in findings:
         lines.extend(
             [
@@ -184,16 +217,27 @@ def render_project_dossier(
 
     lines.extend(
         [
-            "## 7. Open Questions",
-            "- If a candidate is marked `mvp_placeholder`, replace it with a `live_source_backed` candidate before treating it as a real project lead.",
-            "- Configure live X/Twitter, Telegram, RootData, Explorer/RPC, and funding connectors.",
-            "- Validate official social handles and KOL mention history.",
-            "- Verify token mechanics against explorer/RPC or official chain data.",
-            "- Add source-backed KOL mention history and social momentum scores.",
+            "## 7. 남은 질문" if korean else "## 7. Open Questions",
+            "- `mvp_placeholder` 후보는 실제 project lead로 보기 전에 `live_source_backed` 후보로 교체해야 함."
+            if korean
+            else "- If a candidate is marked `mvp_placeholder`, replace it with a `live_source_backed` candidate before treating it as a real project lead.",
+            "- Live X/Twitter, Telegram, RootData, Explorer/RPC, funding connector 설정 필요."
+            if korean
+            else "- Configure live X/Twitter, Telegram, RootData, Explorer/RPC, and funding connectors.",
+            "- 공식 social handle과 KOL mention history 검증 필요."
+            if korean
+            else "- Validate official social handles and KOL mention history.",
+            "- Explorer/RPC 또는 공식 chain data로 token mechanics 검증 필요."
+            if korean
+            else "- Verify token mechanics against explorer/RPC or official chain data.",
+            "- Source-backed KOL mention history와 social momentum score 추가 필요."
+            if korean
+            else "- Add source-backed KOL mention history and social momentum scores.",
             "",
-            "## 8. Runtime Metadata",
+            "## 8. 런타임 메타데이터" if korean else "## 8. Runtime Metadata",
             f"- LLM provider: `{provider_name}`",
             f"- Report model route: `{model_name}`",
+            f"- Report language: `{settings.report_language}`",
         ]
     )
     return "\n".join(lines)
@@ -276,13 +320,21 @@ def escape_table(value: object) -> str:
     return str(value).replace("|", "\\|").replace("\n", " ")
 
 
-def render_automatic_tldr(candidates: list[Any]) -> str:
+def render_automatic_tldr(candidates: list[Any], *, korean: bool = False) -> str:
     if not candidates:
-        return "No candidate project was resolved in this room."
+        return "이 Research Room에서 후보 프로젝트가 resolve되지 않음." if korean else "No candidate project was resolved in this room."
     primary = candidates[0]
     narratives = ", ".join(primary.narratives[:4]) or "unknown narrative"
     evidence_count = len(primary.metadata.get("evidence_urls", []))
     origin = candidate_origin(primary)
+    if korean:
+        return (
+            f"{primary.name}가 primary candidate로 resolve됨 ({origin}). "
+            f"Core thesis: {narratives}. "
+            f"Token status: {primary.token_status}; chain: {primary.chain or 'unknown'}. "
+            f"수집된 Evidence URL: {evidence_count}. "
+            "Market/social/on-chain detail은 placeholder connector 영역에서 추가 검증 필요."
+        )
     return (
         f"{primary.name} resolved as the primary candidate ({origin}). "
         f"Core thesis: {narratives}. "

@@ -15,6 +15,12 @@ from crypto_research_agents.console import JimmoriaConsole
 from crypto_research_agents.runtime import ResearchRuntime
 from crypto_research_agents.runtime import DEFAULT_AGENTS
 from crypto_research_agents.core.capabilities import collect_capabilities
+from crypto_research_agents.core.company_settings import (
+    CompanySettings,
+    company_settings_path_for,
+    load_company_settings,
+    save_company_settings,
+)
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 from crypto_research_agents.storage.json_store import load_memory
 from crypto_research_agents.storage.run_store import list_run_summaries, load_run_file
@@ -314,6 +320,15 @@ def chat_command(args: argparse.Namespace) -> None:
             continue
 
         console.print_user_message(line)
+        settings_path = company_settings_path_for(args.memory)
+        route = classify_chat_input(line)
+        if route == "company_config":
+            settings = load_company_settings(settings_path)
+            applied = apply_company_instruction(line, settings)
+            save_company_settings(settings, settings_path)
+            console.print_company_settings_updated(settings, applied, settings_path)
+            continue
+
         title, content, url = chat_input_to_source(line)
         runtime = ResearchRuntime(load_memory(args.memory))
         runtime.event_handler = console.make_event_handler()
@@ -362,6 +377,11 @@ def handle_chat_command(
 
     if command == "/context":
         console.print_context()
+        return False, last_room_id
+
+    if command in {"/settings", "/company-settings"}:
+        settings = load_company_settings(company_settings_path_for(args.memory))
+        console.print_company_settings(settings, company_settings_path_for(args.memory))
         return False, last_room_id
 
     if command == "/last":
@@ -445,6 +465,142 @@ def handle_chat_command(
 
     print("Unknown command. Type /help.")
     return False, last_room_id
+
+
+def classify_chat_input(line: str) -> str:
+    stripped = line.strip()
+    lowered = stripped.lower()
+    if not stripped:
+        return "empty"
+    if stripped.startswith(("http://", "https://")):
+        return "research_request"
+
+    strong_config_terms = [
+        "설정",
+        "변경",
+        "바꿔",
+        "고쳐",
+        "수정",
+        "반영",
+        "업데이트",
+        "앞으로",
+        "항상",
+        "기본",
+        "그러지말고",
+        "하지말고",
+        "아닐경우",
+        "경우엔",
+        "보고서는",
+        "리포트는",
+        "레포트는",
+        "한글로",
+        "한국어",
+        "영어단어",
+        "슈퍼바이저",
+        "supervisor",
+        "사장",
+        "외주",
+        "역할",
+        "로그",
+        "테마",
+        "색상",
+        "보여주",
+        "나오게",
+        "작동하게",
+    ]
+    research_terms = [
+        "조사",
+        "리서치",
+        "분석",
+        "보고서",
+        "리포트",
+        "레포트",
+        "research",
+        "analyze",
+        "analyse",
+        "investigate",
+        "report",
+    ]
+    explicit_research_actions = [
+        "조사해",
+        "조사 진행",
+        "리서칭",
+        "리서치해",
+        "분석해",
+        "보고서 만들어",
+        "보고서를 만들어",
+        "리포트 만들어",
+        "레포트 만들어",
+        "research",
+        "analyze",
+        "investigate",
+    ]
+    has_config = any(term in lowered for term in strong_config_terms) or any(term in stripped for term in strong_config_terms)
+    has_research = any(term in lowered for term in research_terms) or any(term in stripped for term in research_terms)
+    has_explicit_research_action = any(term in lowered for term in explicit_research_actions) or any(
+        term in stripped for term in explicit_research_actions
+    )
+
+    if has_config and not has_explicit_research_action:
+        return "company_config"
+    if has_config and has_research and is_meta_instruction(stripped):
+        return "company_config"
+    if has_research:
+        return "research_request"
+    return "company_config"
+
+
+def is_meta_instruction(text: str) -> bool:
+    meta_terms = [
+        "모든 부분",
+        "그러지말고",
+        "아닐경우",
+        "설정 변경",
+        "자체 반영",
+        "역할",
+        "광범위",
+        "사장",
+        "외주",
+        "회사에다가",
+    ]
+    return any(term in text for term in meta_terms)
+
+
+def apply_company_instruction(line: str, settings: CompanySettings) -> list[str]:
+    applied: list[str] = []
+    lowered = line.lower()
+
+    if any(term in line for term in ["한글", "한국어", "한글로"]) or "korean" in lowered:
+        settings.report_language = "ko"
+        applied.append("Report language: Korean")
+    if "영어단어" in line or "영어 단어" in line or "english term" in lowered:
+        settings.allow_english_terms = True
+        applied.append("English technical terms allowed")
+
+    if any(term in line for term in ["슈퍼바이저", "사장", "외주", "회사에다가", "광범위"]):
+        settings.supervisor_mode = "company_ceo"
+        settings.client_relationship = "outsourcing_client"
+        _add_unique(settings.operating_principles, "Supervisor acts as company CEO: classify intent before opening a Research Room.")
+        _add_unique(settings.operating_principles, "Treat the user as an outsourcing client giving company-level work orders.")
+        applied.append("Supervisor mode: company CEO / outsourcing intake")
+
+    if any(term in line for term in ["설정 변경", "자체 반영", "아닐경우", "그러지말고"]):
+        settings.auto_apply_company_instructions = True
+        _add_unique(settings.operating_principles, "Only open a Research Room for explicit research, analysis, or report requests.")
+        _add_unique(settings.operating_principles, "Apply company configuration instructions directly instead of creating reports.")
+        applied.append("Chat routing: settings instructions are applied directly")
+
+    if not applied:
+        _add_unique(settings.operating_principles, line.strip())
+        applied.append("Saved as company operating instruction")
+
+    _add_unique(settings.raw_instructions, line.strip())
+    return applied
+
+
+def _add_unique(values: list[str], value: str) -> None:
+    if value and value not in values:
+        values.append(value)
 
 
 def chat_input_to_source(line: str) -> tuple[str, str, str | None]:
