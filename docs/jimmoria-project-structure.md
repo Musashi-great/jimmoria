@@ -183,7 +183,9 @@ completed
 
 CLI는 `room_created`, `agent_start`, `agent_done`, `agent_failed`, `room_completed` 이벤트를 받아 보라/핑크 테마의 로그를 출력한다. `room_created`와 `room_completed`에는 전체 `Live agent board`를 보여주고, 각 `agent_start`/`agent_done` 이벤트는 짧은 작업 카드로 출력해서 로그가 과도하게 반복되지 않게 한다. 사용자가 작업 지시를 넣으면 각 에이전트가 `WAIT`, `RUN`, `DONE`, `FAIL` 중 어떤 상태인지와 현재 무엇을 하는지 바로 볼 수 있다.
 
-채팅 입력 UX는 "고정 입력창 + 위쪽 로그"에 가깝게 유지한다. 사용자가 입력을 제출하면 ANSI 터미널에서는 제출된 입력 박스를 지우고, 입력 내용은 큰 `You` 패널이 아니라 `You > ...` 한 줄 로그로 위에 남긴다. 그 다음 `Supervisor > ...` 진행 로그가 나오고, Supervisor 답변 또는 Research Room 이벤트가 이어진다.
+채팅 입력 UX는 "고정 입력창 + 위쪽 로그"에 가깝게 유지한다. 사용자가 입력을 제출하면 ANSI 터미널에서는 제출된 입력 박스를 지우고, 입력 내용은 큰 `You` 패널이 아니라 `You > ...` 한 줄 로그로 위에 남긴다. 그 다음 `Supervisor > ...` 진행 로그가 나오고, Supervisor 답변 또는 Research Room 이벤트가 이어진다. 입력 박스는 `JIMMORIA HQ` dock처럼 동작하며, `Supervisor channel`, 현재 provider, 최신 room, agent 상태 요약을 함께 보여준다.
+
+CLI/UI 개선 방향은 [jimmoria-cli-ui-reference-notes.md](jimmoria-cli-ui-reference-notes.md)에 따로 정리한다. 이 문서는 Mato, Conduit, Spettro, MetaGPT, ChatDev, ZeroHuman 계열의 terminal workspace, visible orchestration, manifest/runbook 패턴을 JIMMORIA식으로 해석한 기준 문서다.
 
 예시:
 
@@ -505,7 +507,7 @@ doctor_command()
 
 ### `crypto_research_agents/console.py`
 
-터미널 UI를 담당한다. 시작 로고, 보라/핑크 3D 느낌의 JIMMORIA 배너, 닫힌 박스형 입력창, 제출된 입력 박스 제거, `You > ...`/`Supervisor > ...` 대화 로그, `/help` 명령어 목록, `rich` 기반 Panel/Table 로그, `Live agent board`, agent work cards, 보고서 preview를 담당한다. `JIMMORIA_PLAIN_LOGS=1`을 설정하면 rich 테마 로그 대신 plain text fallback을 사용할 수 있다.
+터미널 UI를 담당한다. 시작 로고, 보라/핑크 3D 느낌의 JIMMORIA 배너, `JIMMORIA HQ` 상태 입력 dock, 제출된 입력 박스 제거, `You > ...`/`Supervisor > ...` 대화 로그, `/help` 명령어 목록, `rich` 기반 Panel/Table 로그, `Live agent board`, agent work cards, 보고서 preview를 담당한다. `JIMMORIA_PLAIN_LOGS=1`을 설정하면 rich 테마 로그 대신 plain text fallback을 사용할 수 있다.
 
 중요 함수:
 
@@ -699,6 +701,7 @@ python -m unittest discover -s tests -v
 - 새 에이전트를 추가하거나 제거하면 `6. 에이전트 구성`을 업데이트한다.
 - 실행 순서나 Research Room 상태가 바뀌면 `5. Research Room 실행 흐름`을 업데이트한다.
 - CLI 명령이나 시작 UX가 바뀌면 `3. 실행 진입점`, `15. 코드 파일별 설명`을 업데이트한다.
+- CLI/UI 레퍼런스나 terminal interaction 기준이 바뀌면 `jimmoria-cli-ui-reference-notes.md`도 업데이트한다.
 - 모델 provider, Codex OAuth, OpenAI, offline fallback 흐름이 바뀌면 `10. Model Gateway와 LLM Provider`를 업데이트한다.
 - 외부 tool이나 connector를 추가하면 `11. Tool Gateway와 외부 커넥터`, `18. 현재 한계`, `19. 다음 개발 순서 제안`을 업데이트한다.
 - 저장 파일, run snapshot, Obsidian Vault 구조가 바뀌면 `12. Storage와 출력 파일`, `13. Obsidian Vault 구조`를 업데이트한다.

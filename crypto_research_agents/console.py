@@ -197,6 +197,7 @@ class JimmoriaConsole:
         border = self.input_border()
         print("")
         print(self.input_border_style(border))
+        print(self.input_status_line_style(self.input_text_line(self.input_status_text())))
         print(self.input_border_style(self.input_hint_line(hint)))
         print(self.input_edit_line_style())
         print(self.input_border_style(border))
@@ -207,14 +208,15 @@ class JimmoriaConsole:
             sys.stdout.flush()
 
     def clear_submitted_input_box(self) -> None:
-        # Move below the drawn input box, then delete the four submitted prompt lines.
-        sys.stdout.write("\033[1B\r\033[4A\033[4M\r")
+        # Move below the drawn input dock, then delete its five prompt lines.
+        sys.stdout.write("\033[1B\r\033[5A\033[5M\r")
 
     def read_basic_boxed_input(self) -> str:
         hint = "Type a request, URL, /command, or @path/to/file"
         border = self.input_border()
         print("")
         print(border)
+        print(self.input_text_line(self.input_status_text()))
         print(self.input_hint_line(hint))
         try:
             return input("| > ")
@@ -228,19 +230,63 @@ class JimmoriaConsole:
     def input_border(self) -> str:
         return "+" + "-" * (self.input_box_width() - 2) + "+"
 
-    def input_hint_line(self, text: str) -> str:
+    def input_text_line(self, text: str) -> str:
         inner_width = self.input_box_width() - 4
         clipped = text[:inner_width]
         return "| " + clipped.ljust(inner_width) + " |"
+
+    def input_hint_line(self, text: str) -> str:
+        return self.input_text_line(text)
 
     def input_edit_line(self) -> str:
         inner_width = self.input_box_width() - 4
         return "| " + "> ".ljust(inner_width) + " |"
 
+    def input_status_text(self) -> str:
+        provider = os.getenv("LLM_PROVIDER") or "offline"
+        room = self.short_room_label()
+        agents = self.agent_state_label()
+        return f"JIMMORIA HQ | Supervisor channel | provider: {provider} | room: {room} | agents: {agents}"
+
+    def short_room_label(self) -> str:
+        if not self.last_room_id:
+            return "none"
+        if len(self.last_room_id) <= 18:
+            return self.last_room_id
+        return self.last_room_id[:10] + "..." + self.last_room_id[-5:]
+
+    def agent_state_label(self) -> str:
+        if not self.agent_state:
+            return "idle"
+        running = sum(1 for state in self.agent_state.values() if state == "running")
+        queued = sum(1 for state in self.agent_state.values() if state == "queued")
+        done = sum(1 for state in self.agent_state.values() if state == "done")
+        failed = sum(1 for state in self.agent_state.values() if state == "failed")
+        if failed:
+            return f"{failed} fail/{running} run/{queued} wait"
+        if running:
+            return f"{running} run/{queued} wait/{done} done"
+        if queued:
+            return f"{queued} wait/{done} done"
+        return f"{done} done"
+
     def input_border_style(self, text: str) -> str:
         if not supports_color():
             return text
         return f"\033[38;2;211;95;255m{text}\033[0m"
+
+    def input_status_line_style(self, text: str) -> str:
+        if not supports_color():
+            return text
+        violet = "\033[38;2;211;95;255m"
+        dim = "\033[38;2;126;96;154m"
+        pink = "\033[38;2;255;92;212m"
+        reset = "\033[0m"
+        return text.replace("|", f"{violet}|{reset}", 2).replace("JIMMORIA HQ", f"{pink}JIMMORIA HQ{reset}", 1).replace(
+            "Supervisor channel",
+            f"{dim}Supervisor channel{reset}",
+            1,
+        )
 
     def input_edit_line_style(self) -> str:
         violet = "\033[38;2;211;95;255m"

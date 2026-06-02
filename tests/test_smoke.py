@@ -81,6 +81,7 @@ class SmokeTest(unittest.TestCase):
 
         self.assertEqual(value, "/quit")
         self.assertIn("+", output.getvalue())
+        self.assertIn("Supervisor channel", output.getvalue())
         self.assertIn("@path/to/file", output.getvalue())
         self.assertEqual(mocked_input.call_args[0][0], "| > ")
 
@@ -103,12 +104,30 @@ class SmokeTest(unittest.TestCase):
         ]
         self.assertEqual(value, "/quit")
         self.assertEqual(mocked_input.call_args[0][0], "\033[2A\033[4C")
-        self.assertGreaterEqual(len(box_lines), 4)
+        self.assertGreaterEqual(len(box_lines), 5)
         self.assertTrue(box_lines[0].startswith("+"))
+        self.assertIn("Supervisor channel", box_lines[1])
         self.assertTrue(box_lines[1].endswith("|"))
         self.assertTrue(box_lines[2].endswith("|"))
-        self.assertTrue(box_lines[3].startswith("+"))
-        self.assertIn("\033[4M", output.getvalue())
+        self.assertTrue(box_lines[3].endswith("|"))
+        self.assertTrue(box_lines[4].startswith("+"))
+        self.assertIn("\033[5M", output.getvalue())
+
+    def test_input_status_line_tracks_room_and_agents(self) -> None:
+        console = JimmoriaConsole()
+        console.last_room_id = "room_1234567890abcdef"
+        console.agent_state = {
+            "supervisor_agent": "done",
+            "ingestion_agent": "running",
+            "narrative_agent": "queued",
+        }
+
+        status = console.input_status_text()
+
+        self.assertIn("JIMMORIA HQ", status)
+        self.assertIn("Supervisor channel", status)
+        self.assertIn("room_12345...bcdef", status)
+        self.assertIn("1 run/1 wait/1 done", status)
 
     def test_user_message_prints_compact_log_not_panel(self) -> None:
         output = StringIO()

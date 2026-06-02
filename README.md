@@ -185,3 +185,5 @@ Research Room이 필요한 경우에만 Supervisor가 방을 열고 에이전트
 Supervisor 대화는 `supervisor_chat` 모델 라우트를 사용한다. live LLM이 설정되어 있으면 일반 챗봇처럼 자연어로 답하고, 모델이 없으면 로컬 fallback이 짧게 응답한다.
 
 CLI 입력창은 제출 후 같은 내용을 큰 `You` 패널로 다시 반복하지 않는다. 입력 박스는 다음 입력용으로 다시 그려지고, 사용자가 보낸 문장은 위쪽 대화 로그에 `You > ...` 형태로 올라간다. 그 다음 Supervisor가 현재 처리 중인 일을 짧게 보여주고 답변하거나 Research Room을 연다.
+
+최근 CLI UX는 Mato, Conduit, Spettro, MetaGPT, ChatDev, ZeroHuman 같은 멀티에이전트/zero-human-company 계열 프로젝트의 terminal workspace와 visible orchestration 패턴을 참고했다. 적용 내용은 [docs/jimmoria-cli-ui-reference-notes.md](docs/jimmoria-cli-ui-reference-notes.md)에 정리되어 있다.
