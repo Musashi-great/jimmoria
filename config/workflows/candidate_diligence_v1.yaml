@@ -1,0 +1,78 @@
+workflow:
+  id: candidate_diligence_v1
+  description: Candidate-level diligence workflow for one Web3 project at a time.
+  metadata:
+    domain: crypto_research
+    input: candidate
+  nodes:
+    - id: Identity Verifier
+      type: agent
+      agent_ref: contract_onchain_agent
+
+    - id: Website Crawler
+      type: agent
+      agent_ref: product_tech_agent
+
+    - id: GitHub Reviewer
+      type: agent
+      agent_ref: product_tech_agent
+
+    - id: Market Pair Checker
+      type: agent
+      agent_ref: contract_onchain_agent
+
+    - id: Social Pulse Checker
+      type: agent
+      agent_ref: social_kol_agent
+
+    - id: Funding Signal Checker
+      type: agent
+      agent_ref: funding_token_agent
+
+    - id: Risk Challenger
+      type: agent
+      agent_ref: tool_policy_agent
+
+    - id: Identity Verification Loop
+      type: loop_counter
+      config:
+        max_iterations: 3
+        reset_on_emit: true
+
+  edges:
+    - from: Identity Verifier
+      to: Website Crawler
+      trigger: true
+      condition: true
+
+    - from: Website Crawler
+      to: GitHub Reviewer
+      trigger: true
+      condition:
+        type: has_sources
+
+    - from: GitHub Reviewer
+      to: Market Pair Checker
+      trigger: true
+      condition: true
+
+    - from: Market Pair Checker
+      to: Social Pulse Checker
+      trigger: true
+      condition: true
+
+    - from: Social Pulse Checker
+      to: Funding Signal Checker
+      trigger: true
+      condition: true
+
+    - from: Funding Signal Checker
+      to: Risk Challenger
+      trigger: true
+      condition: true
+
+    - from: Risk Challenger
+      to: Identity Verification Loop
+      trigger: true
+      condition:
+        type: has_risk_flags

@@ -1,0 +1,77 @@
+workflow:
+  id: early_radar_v1
+  description: Web3 early radar workflow for broad candidate discovery and evidence-first triage.
+  metadata:
+    domain: crypto_research
+    output: korean_radar_report
+  nodes:
+    - id: Supervisor
+      type: agent
+      agent_ref: supervisor_agent
+      context_window: 0
+
+    - id: Discovery Scout
+      type: agent
+      agent_ref: discovery_agent
+      context_window: 10
+
+    - id: Candidate Diligence
+      type: subgraph
+      workflow_ref: candidate_diligence_v1
+
+    - id: Risk Reviewer
+      type: agent
+      agent_ref: tool_policy_agent
+
+    - id: Report Writer
+      type: agent
+      agent_ref: report_agent
+
+    - id: Quality Reviewer
+      type: agent
+      agent_ref: tool_policy_agent
+
+    - id: Citation QA Loop
+      type: loop_counter
+      config:
+        max_iterations: 2
+        reset_on_emit: true
+
+  edges:
+    - from: Supervisor
+      to: Discovery Scout
+      trigger: true
+      condition: true
+      carry_data: true
+
+    - from: Discovery Scout
+      to: Candidate Diligence
+      trigger: true
+      condition:
+        type: has_candidates
+      dynamic:
+        type: map
+        input_key: candidates
+        max_parallel: 5
+
+    - from: Candidate Diligence
+      to: Risk Reviewer
+      trigger: true
+      condition:
+        type: has_findings
+
+    - from: Risk Reviewer
+      to: Report Writer
+      trigger: true
+      condition:
+        type: no_kill_switch
+
+    - from: Report Writer
+      to: Quality Reviewer
+      trigger: true
+
+    - from: Quality Reviewer
+      to: Citation QA Loop
+      trigger: true
+      condition:
+        type: quality_failed

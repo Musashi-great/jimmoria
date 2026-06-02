@@ -29,6 +29,14 @@ from crypto_research_agents.core.supervisor_intake import (
 )
 from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
+from crypto_research_agents.core.workflow_executor import WorkflowExecutor
+from crypto_research_agents.core.workflow_loader import (
+    WorkflowSpecRegistry,
+    load_workflow_spec,
+    workflow_spec_to_json,
+    workflow_summary,
+)
+from crypto_research_agents.storage.artifact_store import ArtifactStore
 from crypto_research_agents.storage.json_store import load_memory
 from crypto_research_agents.storage.paths import default_project_path, resolve_project_path
 from crypto_research_agents.storage.run_store import list_run_summaries, load_run_file
@@ -100,10 +108,14 @@ def main(argv: list[str] | None = None) -> None:
     research_parser = subparsers.add_parser("research", help="Run the full article/project research loop.")
     add_source_args(research_parser, title_required=False)
     add_run_args(research_parser)
+    research_parser.add_argument("--workflow", help="Archive this run with a workflow definition.")
+    research_parser.add_argument("--json", action="store_true", help="Print a JSON result.")
 
     article_parser = subparsers.add_parser("article", help="Alias for research.")
     add_source_args(article_parser, title_required=True)
     add_run_args(article_parser)
+    article_parser.add_argument("--workflow", help="Archive this run with a workflow definition.")
+    article_parser.add_argument("--json", action="store_true", help="Print a JSON result.")
 
     add_source_parser = subparsers.add_parser("add-source", help="Ingest a source and write an Obsidian Source Note.")
     add_source_args(add_source_parser, title_required=False)
@@ -133,6 +145,29 @@ def main(argv: list[str] | None = None) -> None:
     doctor_parser = subparsers.add_parser("doctor", help="Show configured and placeholder capabilities.")
     add_run_args(doctor_parser)
 
+    workflow_parser = subparsers.add_parser("workflow", help="Inspect and run YAML company workflows.")
+    workflow_subparsers = workflow_parser.add_subparsers(dest="workflow_command")
+
+    workflow_list_parser = workflow_subparsers.add_parser("list", help="List available workflows.")
+    workflow_list_parser.add_argument("--workflow-dir", default=default_project_path("config/workflows"))
+
+    workflow_show_parser = workflow_subparsers.add_parser("show", help="Show a workflow JSON view.")
+    workflow_show_parser.add_argument("workflow_id")
+    workflow_show_parser.add_argument("--workflow-dir", default=default_project_path("config/workflows"))
+
+    workflow_run_parser = workflow_subparsers.add_parser("run", help="Run a workflow-backed research room.")
+    workflow_run_parser.add_argument("workflow_id")
+    workflow_run_parser.add_argument("--workflow-dir", default=default_project_path("config/workflows"))
+    add_source_args(workflow_run_parser, title_required=False)
+    add_run_args(workflow_run_parser)
+    workflow_run_parser.add_argument("--json", action="store_true", help="Print a JSON result.")
+
+    workflow_events_parser = workflow_subparsers.add_parser("events", help="Show workflow event JSONL for a run.")
+    workflow_events_parser.add_argument("run_id")
+    workflow_events_parser.add_argument("--tail", action="store_true")
+    workflow_events_parser.add_argument("--limit", type=int, default=30)
+    workflow_events_parser.add_argument("--runs-dir", default=default_project_path("data/runs"))
+
     args = parser.parse_args(argv)
     if args.command is None:
         if sys.stdin.isatty():
@@ -143,6 +178,10 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.command == "doctor":
         doctor_command(args)
+        return
+
+    if args.command == "workflow":
+        workflow_command(args)
         return
 
     if args.command in {"runs", "status", "messages", "events", "show-report"}:
@@ -184,6 +223,33 @@ def main(argv: list[str] | None = None) -> None:
                 reports_dir=args.reports,
                 memory_path=args.memory,
             )
+            workflow_id = getattr(args, "workflow", None)
+            if workflow_id:
+                artifact_dir = archive_workflow_for_result(
+                    workflow_id=workflow_id,
+                    result=result,
+                    runtime=runtime,
+                    memory_path=args.memory,
+                    workflow_dir=default_project_path("config/workflows"),
+                    context={
+                        "sources": result.room.source_inputs,
+                        "findings": result.room.shared_findings,
+                    },
+                )
+                if getattr(args, "json", False):
+                    print(
+                        json.dumps(
+                            {
+                                "workflow_id": workflow_id,
+                                "room_id": result.room.room_id,
+                                "status": result.room.status,
+                                "artifact_dir": str(artifact_dir),
+                            },
+                            ensure_ascii=False,
+                            indent=2,
+                        )
+                    )
+                    return
 
     print_run_result(result)
 
@@ -252,6 +318,128 @@ def infer_title(content: str, url: str | None) -> str:
     if url:
         return url.rstrip("/").split("/")[-1] or url
     return "Untitled Research Source"
+
+
+def workflow_command(args: argparse.Namespace) -> None:
+    if not args.workflow_command:
+        raise SystemExit("Provide a workflow command: list, show, run, or events.")
+
+    if args.workflow_command == "list":
+        registry = WorkflowSpecRegistry.load_dir(args.workflow_dir)
+        if not registry.specs:
+            print("No workflows found.")
+            return
+        for spec in registry.specs.values():
+            summary = workflow_summary(spec)
+            print(
+                f"{summary['workflow_id']} | nodes={summary['nodes']} "
+                f"edges={summary['edges']} dynamic={summary['dynamic_edges']} | {summary['description']}"
+            )
+        return
+
+    if args.workflow_command == "show":
+        spec = load_workflow_spec(args.workflow_id, args.workflow_dir)
+        print(workflow_spec_to_json(spec))
+        return
+
+    if args.workflow_command == "events":
+        events_path = Path(args.runs_dir) / args.run_id / "events.jsonl"
+        if not events_path.exists():
+            fallback = Path(args.runs_dir) / args.run_id / "events.json"
+            if not fallback.exists():
+                raise SystemExit(f"No workflow events found for run: {args.run_id}")
+            events = json.loads(fallback.read_text(encoding="utf-8"))
+            selected = events[-args.limit :] if args.tail else events[: args.limit]
+            for event in selected:
+                print(json.dumps(event, ensure_ascii=False))
+            return
+        lines = events_path.read_text(encoding="utf-8").splitlines()
+        selected_lines = lines[-args.limit :] if args.tail else lines[: args.limit]
+        for line in selected_lines:
+            print(line)
+        return
+
+    if args.workflow_command == "run":
+        spec = load_workflow_spec(args.workflow_id, args.workflow_dir)
+        title, content, url = read_source_input(args)
+        runtime = ResearchRuntime(load_memory(args.memory))
+        result = runtime.run_article_research(
+            title=title,
+            content=content,
+            url=url,
+            vault_dir=args.vault,
+            reports_dir=args.reports,
+            memory_path=args.memory,
+        )
+        artifact_dir = archive_workflow_for_result(
+            workflow_id=spec.workflow_id,
+            result=result,
+            runtime=runtime,
+            memory_path=args.memory,
+            workflow_dir=args.workflow_dir,
+            context=workflow_context_from_result(result),
+        )
+        payload = {
+            "workflow_id": spec.workflow_id,
+            "room_id": result.room.room_id,
+            "status": result.room.status,
+            "quality": result.room.project_card.get("research_quality", {}),
+            "artifact_dir": str(artifact_dir),
+        }
+        if args.json:
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            print(f"workflow_id: {payload['workflow_id']}")
+            print(f"room_id: {payload['room_id']}")
+            print(f"status: {payload['status']}")
+            print(f"artifact_dir: {payload['artifact_dir']}")
+        return
+
+    raise SystemExit(f"Unknown workflow command: {args.workflow_command}")
+
+
+def workflow_context_from_result(result: object) -> dict[str, object]:
+    room = result.room
+    memory = result.memory
+    candidates = []
+    for project in memory.projects.values():
+        if set(project.sources).intersection(room.source_inputs):
+            candidates.append(
+                {
+                    "project": project.name,
+                    "website": project.website,
+                    "chain": project.chain,
+                    "token_status": project.token_status,
+                    "candidate_origin": project.metadata.get("candidate_origin"),
+                }
+            )
+    findings = [finding.to_dict() for finding in memory.get_room_findings(room.room_id)]
+    return {
+        "run_id": room.room_id,
+        "sources": room.source_inputs,
+        "findings": findings,
+        "candidates": candidates,
+        "quality": room.project_card.get("research_quality", {}),
+    }
+
+
+def archive_workflow_for_result(
+    *,
+    workflow_id: str,
+    result: object,
+    runtime: ResearchRuntime,
+    memory_path: str | Path,
+    workflow_dir: str | Path,
+    context: dict[str, object] | None = None,
+) -> Path:
+    workflow = load_workflow_spec(workflow_id, workflow_dir)
+    execution = WorkflowExecutor().execute(workflow, context or workflow_context_from_result(result))
+    return ArtifactStore(Path(memory_path).parent / "runs").archive_workflow_run(
+        result=result,
+        workflow=workflow,
+        workflow_trace=execution.trace,
+        event_log=runtime.event_log,
+    )
 
 
 def inspect_command(args: argparse.Namespace) -> None:

@@ -1,0 +1,97 @@
+workflow:
+  id: project_diligence_v1
+  description: Deeper diligence workflow when the user provides one project name, URL, or contract address.
+  metadata:
+    domain: crypto_research
+    output: source_backed_project_report
+  nodes:
+    - id: Supervisor
+      type: agent
+      agent_ref: supervisor_agent
+
+    - id: Ingestion
+      type: agent
+      agent_ref: ingestion_agent
+
+    - id: Product and Docs
+      type: agent
+      agent_ref: product_tech_agent
+
+    - id: Onchain and Market
+      type: agent
+      agent_ref: contract_onchain_agent
+
+    - id: Social and KOL
+      type: agent
+      agent_ref: social_kol_agent
+
+    - id: Funding and Token
+      type: agent
+      agent_ref: funding_token_agent
+
+    - id: Risk Reviewer
+      type: agent
+      agent_ref: tool_policy_agent
+
+    - id: Report Writer
+      type: agent
+      agent_ref: report_agent
+
+    - id: Quality Reviewer
+      type: agent
+      agent_ref: tool_policy_agent
+
+    - id: Risk Review Loop
+      type: loop_counter
+      config:
+        max_iterations: 2
+        reset_on_emit: true
+
+  edges:
+    - from: Supervisor
+      to: Ingestion
+      trigger: true
+      condition: true
+
+    - from: Ingestion
+      to: Product and Docs
+      trigger: true
+      condition:
+        type: has_sources
+
+    - from: Product and Docs
+      to: Onchain and Market
+      trigger: true
+      condition: true
+
+    - from: Onchain and Market
+      to: Social and KOL
+      trigger: true
+      condition: true
+
+    - from: Social and KOL
+      to: Funding and Token
+      trigger: true
+      condition: true
+
+    - from: Funding and Token
+      to: Risk Reviewer
+      trigger: true
+      condition:
+        type: has_findings
+
+    - from: Risk Reviewer
+      to: Report Writer
+      trigger: true
+      condition:
+        type: no_kill_switch
+
+    - from: Report Writer
+      to: Quality Reviewer
+      trigger: true
+
+    - from: Quality Reviewer
+      to: Risk Review Loop
+      trigger: true
+      condition:
+        type: quality_failed

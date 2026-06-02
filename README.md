@@ -231,3 +231,17 @@ JIMMORIA는 이제 Research Room이 끝났다고 해서 무조건 완료 보고�
 - `insufficient_evidence`: 후보가 전부 `mvp_placeholder`이거나 evidence URL이 0개인 경우
 
 `insufficient_evidence`가 나오면 파일은 저장되지만, 제목이 `리서치 미완료 / Research Not Completed`로 표시됩니다. 이 경우는 실제 리서치 완료본이 아니라 "근거가 부족해서 아직 보고서로 확정할 수 없음"이라는 진단 메모입니다.
+
+## Workflow Commands
+
+ChatDev식 YAML workflow layer가 추가되었습니다. 기존 Research Room을 대체하지 않고, 회사 업무 흐름과 replay artifact를 남기는 레이어입니다.
+
+```powershell
+jimmoria workflow list
+jimmoria workflow show early_radar_v1
+jimmoria workflow run project_diligence_v1 --text "pearl crypto project" --json
+jimmoria workflow events <room_id> --tail
+jimmoria research --workflow early_radar_v1 --text "new PoW projects" --json
+```
+
+Workflow artifact는 `data/runs/<room_id>/workflow_trace.json`, `events.jsonl`, `sources.json`, `findings.json`, `candidates.json`, `report.json`에 저장됩니다.

@@ -1031,3 +1031,68 @@ Output > Research gate | Research gate blocked completed report: insufficient so
 ```
 
 따라서 "이게 리서칭 진행된 거임?"이라는 상황에서는 먼저 Quality Gate를 확인해야 한다. `insufficient_evidence`라면 방은 실행됐지만, 리서치 보고서로 받아볼 수준은 아니다. 다음 개발 우선순위는 이 quality gate를 통과할 수 있도록 live connector와 source-backed verification을 더 붙이는 것이다.
+
+## 26. Company Workflow Layer
+
+ChatDev에서 가져올 수 있는 핵심 패턴은 프론트엔드나 범용 multi-agent platform이 아니라, YAML로 회사 업무 흐름을 정의하고 node/edge/condition/dynamic map/loop/artifact trace를 남기는 구조다. JIMMORIA는 이 패턴을 CLI-first crypto research company에 맞게 제한적으로 도입한다.
+
+새 core 파일:
+
+```text
+crypto_research_agents/core/workflow.py
+crypto_research_agents/core/workflow_loader.py
+crypto_research_agents/core/workflow_executor.py
+crypto_research_agents/core/edge_conditions.py
+crypto_research_agents/core/dynamic_dispatch.py
+crypto_research_agents/core/quality_gate.py
+crypto_research_agents/storage/artifact_store.py
+```
+
+새 workflow config:
+
+```text
+config/workflows/early_radar_v1.yaml
+config/workflows/candidate_diligence_v1.yaml
+config/workflows/project_diligence_v1.yaml
+```
+
+역할:
+
+- `WorkflowSpec`: 회사 업무 흐름의 노드와 엣지 정의
+- `WorkflowNode`: Supervisor, agent, subgraph, loop_counter 같은 업무 단위
+- `WorkflowEdge`: 다음 업무로 넘어가는 연결
+- `evaluate_edge_condition`: `has_candidates`, `has_sources`, `quality_failed`, `no_kill_switch` 같은 조건 판단
+- `DynamicCandidateDispatcher`: 후보별 CandidateTask를 만들고 실패한 후보를 risk finding으로 남김
+- `LoopCounter`: citation/identity/risk review loop가 무한 반복되지 않도록 제한
+- `ArtifactStore`: workflow run의 trace, events, messages, sources, findings, candidates, report 파일을 저장
+- `review_report_quality`: missing citation과 buy/sell/long/short 같은 투자 조언성 문구를 차단하는 report-level QA
+
+현재 WorkflowExecutor는 기존 ResearchRuntime을 대체하지 않는다. 실제 에이전트 실행은 여전히 ResearchRuntime이 담당하고, Workflow layer는 그 위에서 업무 그래프와 trace/archive contract를 제공한다. 이 방식이면 기존 Research Room, Agent Bus, Shared Memory, ToolGateway 구조를 해치지 않고 ChatDev식 workflow graph를 단계적으로 붙일 수 있다.
+
+CLI 명령:
+
+```powershell
+jimmoria workflow list
+jimmoria workflow show early_radar_v1
+jimmoria workflow run project_diligence_v1 --text "pearl crypto project" --json
+jimmoria workflow events <room_id> --tail
+jimmoria research --workflow early_radar_v1 --text "new PoW projects" --json
+```
+
+Workflow run은 기존 run directory에 추가 artifact를 남긴다.
+
+```text
+data/runs/<room_id>/
+  workflow.yaml
+  workflow_trace.json
+  events.jsonl
+  messages.jsonl
+  sources.json
+  findings.json
+  candidates.json
+  report.md
+  report.telegram.md
+  report.json
+```
+
+이 레이어의 다음 단계는 실제 candidate diligence subgraph를 병렬 실행하고, Quality Reviewer가 fail을 내면 ReportAgent로 bounded revision loop를 돌리는 것이다.

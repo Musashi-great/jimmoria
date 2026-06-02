@@ -31,10 +31,17 @@ from crypto_research_agents.core.llm_provider import CodexCliProvider, LLMReques
 from crypto_research_agents.core.memory import SharedMemory, SourceRecord
 from crypto_research_agents.core.model_gateway import ModelGateway
 from crypto_research_agents.core.process_spec import ProcessSpecRegistry, load_process_spec
+from crypto_research_agents.core.dynamic_dispatch import DynamicCandidateDispatcher
+from crypto_research_agents.core.edge_conditions import evaluate_edge_condition
+from crypto_research_agents.core.quality_gate import review_report_quality
 from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
 from crypto_research_agents.core.supervisor_intake import decide_supervisor_intake
 from crypto_research_agents.core.capabilities import collect_capabilities
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
+from crypto_research_agents.core.workflow import LoopCounter
+from crypto_research_agents.core.workflow_executor import WorkflowExecutor
+from crypto_research_agents.core.workflow_loader import WorkflowSpecRegistry, load_workflow_spec
+from crypto_research_agents.storage.artifact_store import ArtifactStore
 
 
 class SmokeTest(unittest.TestCase):
@@ -834,6 +841,141 @@ class SmokeTest(unittest.TestCase):
 
         self.assertEqual(loaded_research.process_id, "project_research_room")
         self.assertIsNotNone(registry.get("supervisor_agent"))
+
+    def test_workflow_yaml_loads(self) -> None:
+        registry = WorkflowSpecRegistry.load_dir("config/workflows")
+        early = registry.get("early_radar_v1")
+        candidate = registry.get("candidate_diligence_v1")
+        project = registry.get("project_diligence_v1")
+
+        self.assertIsNotNone(early)
+        self.assertIsNotNone(candidate)
+        self.assertIsNotNone(project)
+        assert early is not None
+        self.assertEqual(early.workflow_id, "early_radar_v1")
+        self.assertTrue(any(edge.dynamic.get("type") == "map" for edge in early.edges))
+
+    def test_workflow_graph_validates_edges(self) -> None:
+        workflow = load_workflow_spec("early_radar_v1")
+
+        workflow.validate()
+        node_ids = workflow.node_ids
+        for edge in workflow.edges:
+            self.assertIn(edge.from_node, node_ids)
+            self.assertIn(edge.to_node, node_ids)
+
+    def test_dynamic_candidate_map_dispatch(self) -> None:
+        dispatcher = DynamicCandidateDispatcher(max_parallel=2)
+        candidates = [{"project": "Example"}, {"project": "Second"}]
+
+        results = dispatcher.dispatch(candidates, handler=lambda task: {"status": "completed", "name": task.display_name})
+
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[0].status, "completed")
+        self.assertEqual(results[0].result["name"], "Example")
+
+    def test_candidate_task_failure_becomes_risk_finding(self) -> None:
+        dispatcher = DynamicCandidateDispatcher(max_parallel=2)
+
+        def fail_candidate(_task: object) -> dict[str, object]:
+            raise RuntimeError("source unavailable")
+
+        results = dispatcher.dispatch([{"project": "Broken"}], handler=fail_candidate)
+
+        self.assertEqual(results[0].status, "failed")
+        self.assertIsNotNone(results[0].risk_finding)
+        assert results[0].risk_finding is not None
+        self.assertEqual(results[0].risk_finding["type"], "candidate_task_failure")
+
+    def test_edge_condition_has_candidates(self) -> None:
+        self.assertTrue(evaluate_edge_condition({"type": "has_candidates"}, {"candidates": [{"project": "A"}]}))
+        self.assertFalse(evaluate_edge_condition({"type": "has_candidates"}, {"candidates": []}))
+        self.assertTrue(evaluate_edge_condition({"type": "no_kill_switch"}, {"kill_switch": False}))
+        self.assertFalse(evaluate_edge_condition({"type": "has_kill_switch"}, {"kill_switch": False}))
+
+    def test_loop_counter_stops_after_max_iterations(self) -> None:
+        counter = LoopCounter(counter_id="Citation QA Loop", max_iterations=2, reset_on_emit=True)
+
+        self.assertTrue(counter.tick())
+        self.assertTrue(counter.tick())
+        self.assertFalse(counter.tick())
+        self.assertFalse(counter.can_continue())
+        counter.reset()
+        self.assertTrue(counter.can_continue())
+
+    def test_artifact_store_writes_workflow_trace(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runtime = ResearchRuntime()
+            result = runtime.run_source_ingestion(
+                title="Workflow Source",
+                content="Store this source for workflow artifact testing.",
+                vault_dir=root / "vault",
+                memory_path=root / "memory.json",
+            )
+            workflow = load_workflow_spec("project_diligence_v1")
+            trace = WorkflowExecutor().execute(workflow, {"run_id": result.room.room_id, "sources": result.room.source_inputs}).trace
+            artifact_dir = ArtifactStore(root / "runs").archive_workflow_run(
+                result=result,
+                workflow=workflow,
+                workflow_trace=trace,
+                event_log=runtime.event_log,
+            )
+
+            self.assertTrue((artifact_dir / "workflow.yaml").exists())
+            self.assertTrue((artifact_dir / "workflow_trace.json").exists())
+            self.assertTrue((artifact_dir / "events.jsonl").exists())
+            self.assertTrue((artifact_dir / "sources.json").exists())
+
+    def test_workflow_cli_list(self) -> None:
+        output = StringIO()
+
+        with redirect_stdout(output):
+            cli_main(["workflow", "list"])
+
+        self.assertIn("early_radar_v1", output.getvalue())
+        self.assertIn("candidate_diligence_v1", output.getvalue())
+
+    def test_workflow_cli_run_json(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = StringIO()
+
+            with redirect_stdout(output):
+                cli_main(
+                    [
+                        "workflow",
+                        "run",
+                        "project_diligence_v1",
+                        "--text",
+                        "Pearl crypto project diligence request.",
+                        "--memory",
+                        str(root / "memory.json"),
+                        "--vault",
+                        str(root / "vault"),
+                        "--reports",
+                        str(root / "reports"),
+                        "--json",
+                    ]
+                )
+
+            payload = json.loads(output.getvalue())
+            self.assertEqual(payload["workflow_id"], "project_diligence_v1")
+            self.assertTrue((Path(payload["artifact_dir"]) / "workflow_trace.json").exists())
+            self.assertTrue((Path(payload["artifact_dir"]) / "report.json").exists())
+
+    def test_quality_gate_rejects_missing_citation(self) -> None:
+        result = review_report_quality("Project looks promising. Evidence URLs: 0")
+
+        self.assertFalse(result.passed)
+        self.assertEqual(result.next_action, "revise_report")
+        self.assertEqual(result.issues[0].issue_type, "missing_citation")
+
+    def test_quality_gate_blocks_investment_advice_language(self) -> None:
+        result = review_report_quality("You should buy this token. https://example.com")
+
+        self.assertFalse(result.passed)
+        self.assertTrue(any(issue.issue_type == "investment_advice_language" for issue in result.issues))
 
     def test_runtime_room_created_event_includes_process_spec(self) -> None:
         with TemporaryDirectory() as tmp:
