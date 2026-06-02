@@ -52,6 +52,18 @@ class JimmoriaConsole:
             "  /last                    Show the latest run card",
             "  /help                    Show this help",
             "  /quit                    Exit",
+            "",
+            "Agents at work:",
+            "  supervisor_agent         Sets goals, priority, and final research direction",
+            "  ingestion_agent          Stores sources and extracts entities, keywords, metadata",
+            "  narrative_agent          Maps market narratives and thesis categories",
+            "  discovery_agent          Finds early project candidates from narrative signals",
+            "  social_kol_agent         Checks KOL handles, social mentions, and community signal",
+            "  contract_onchain_agent   Verifies chain, token, contract, and DEX/explorer data",
+            "  product_tech_agent       Checks website, docs, GitHub, and product readiness",
+            "  funding_token_agent      Reviews investors, points, airdrop, and token status",
+            "  report_agent             Turns agent findings into a human-readable dossier",
+            "  obsidian_curator_agent   Saves sources, projects, narratives, and reports to Vault",
         ]
         self.block("JIMMORIA commands", lines)
 

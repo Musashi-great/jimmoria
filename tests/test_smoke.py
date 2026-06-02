@@ -89,6 +89,19 @@ class SmokeTest(unittest.TestCase):
         self.assertTrue(box_lines[2].endswith("|"))
         self.assertTrue(box_lines[3].startswith("+"))
 
+    def test_chat_help_shows_agent_role_summary(self) -> None:
+        output = StringIO()
+
+        with redirect_stdout(output):
+            JimmoriaConsole().print_help()
+
+        text = output.getvalue()
+        self.assertIn("Agents at work:", text)
+        self.assertIn("supervisor_agent", text)
+        self.assertIn("social_kol_agent", text)
+        self.assertIn("obsidian_curator_agent", text)
+        self.assertIn("Turns agent findings into a human-readable dossier", text)
+
     def test_article_research_loop_writes_outputs(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
