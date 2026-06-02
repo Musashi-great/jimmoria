@@ -276,22 +276,24 @@ Usage: codex exec [OPTIONS] [PROMPT]
   -m, --model <MODEL>
 """
         commands: list[list[str]] = []
+        run_kwargs: list[dict[str, object]] = []
 
-        def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[object]:
             commands.append(command)
+            run_kwargs.append(kwargs)
             if command == ["codex", "exec", "--help"]:
                 return subprocess.CompletedProcess(command, 0, stdout=help_text, stderr="")
 
             output_index = command.index("--output-last-message") + 1
             Path(command[output_index]).write_text('{"summary": "ok"}', encoding="utf-8")
-            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+            return subprocess.CompletedProcess(command, 0, stdout=b"", stderr=b"")
 
         request = LLMRequest(
             agent_id="ingestion_agent",
             task_type="source_ingestion",
             model="codex-test-model",
             system_prompt="Return JSON.",
-            user_prompt="pearl pow project",
+            user_prompt="pearl 크립토 프로젝트",
             max_tokens=100,
             temperature=0.1,
             response_format="json",
@@ -307,6 +309,10 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertIn("--model", exec_command)
         self.assertNotIn("--ask-for-approval", exec_command)
         self.assertEqual(exec_command[-1], "-")
+        exec_kwargs = run_kwargs[1]
+        self.assertIsInstance(exec_kwargs["input"], bytes)
+        self.assertIn("pearl 크립토 프로젝트", exec_kwargs["input"].decode("utf-8"))
+        self.assertIs(exec_kwargs["text"], False)
 
     def test_model_setup_offline_choice_uses_screen_flow(self) -> None:
         output = StringIO()

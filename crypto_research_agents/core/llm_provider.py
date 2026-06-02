@@ -131,18 +131,25 @@ class CodexCliProvider:
 
             completed = subprocess.run(
                 command,
-                input=prompt,
+                input=prompt.encode("utf-8"),
                 check=False,
                 capture_output=True,
-                text=True,
+                text=False,
                 timeout=self.timeout,
             )
             if completed.returncode != 0:
                 raise RuntimeError(
                     "Codex CLI provider failed: "
-                    + (completed.stderr.strip() or completed.stdout.strip())
+                    + (
+                        _decode_process_output(completed.stderr).strip()
+                        or _decode_process_output(completed.stdout).strip()
+                    )
                 )
-            text = output_path.read_text(encoding="utf-8").strip() if output_path.exists() else completed.stdout.strip()
+            text = (
+                output_path.read_text(encoding="utf-8").strip()
+                if output_path.exists()
+                else _decode_process_output(completed.stdout).strip()
+            )
 
         return LLMResponse(
             text=text,
@@ -311,6 +318,14 @@ def _load_codex_exec_help(command: str) -> str:
     except (OSError, subprocess.SubprocessError):
         return ""
     return "\n".join(part for part in [completed.stdout, completed.stderr] if part)
+
+
+def _decode_process_output(value: bytes | str | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
 
 
 def _build_codex_exec_command(

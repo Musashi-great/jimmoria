@@ -311,7 +311,7 @@ discovery_agent -> funding_token_agent
 | `openai` | `OPENAI_API_KEY` | OpenAI Python SDK 사용 |
 | `offline_fallback` | 설정 없음 | deterministic local fallback, 테스트와 MVP 안전장치 |
 
-`codex_cli` provider는 `codex exec --help`를 읽고 현재 설치된 Codex CLI가 지원하는 옵션만 붙인다. 예를 들어 어떤 버전은 `--ask-for-approval`을 지원하지 않으므로, JIMMORIA는 이 옵션을 하드코딩하지 않는다. 현재 provider는 지원 여부를 확인한 뒤 `--ephemeral`, `--skip-git-repo-check`, `--sandbox`, `--output-last-message`, `--model` 같은 옵션을 선택적으로 사용한다. 이 방식은 Codex CLI 버전 차이 때문에 리서치 런이 중간에 죽는 일을 줄이기 위한 호환성 장치다.
+`codex_cli` provider는 `codex exec --help`를 읽고 현재 설치된 Codex CLI가 지원하는 옵션만 붙인다. 예를 들어 어떤 버전은 `--ask-for-approval`을 지원하지 않으므로, JIMMORIA는 이 옵션을 하드코딩하지 않는다. 현재 provider는 지원 여부를 확인한 뒤 `--ephemeral`, `--skip-git-repo-check`, `--sandbox`, `--output-last-message`, `--model` 같은 옵션을 선택적으로 사용한다. 또한 한국어 리서치 요청이 Windows 코드페이지를 타며 깨지지 않도록 `codex exec -` stdin에는 프롬프트를 UTF-8 bytes로 직접 전달한다. 이 방식은 Codex CLI 버전 차이와 터미널 인코딩 차이 때문에 리서치 런이 중간에 죽는 일을 줄이기 위한 호환성 장치다.
 
 CLI에서 `/models`를 실행하면 모델/provider 설정 화면이 나온다. 설정은 `data/model_settings.json`에 저장된다. 토큰 자체는 저장하지 않고 provider/model preference만 저장한다.
 
@@ -586,6 +586,7 @@ project_research.yaml
 - CLI research/events command
 - Codex OAuth/Codex CLI/OpenAI/offline provider selection
 - Codex CLI exec flag compatibility
+- Codex CLI UTF-8 stdin handling for Korean prompts
 - model setup flow
 - startup model setup skip
 - doctor capability status
