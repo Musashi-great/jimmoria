@@ -29,6 +29,7 @@ from crypto_research_agents.core.company_settings import CompanySettings
 from crypto_research_agents.core.llm_provider import CodexCliProvider, LLMRequest, OAuthTokenProvider, provider_from_env
 from crypto_research_agents.core.memory import SharedMemory, SourceRecord
 from crypto_research_agents.core.model_gateway import ModelGateway
+from crypto_research_agents.core.supervisor_intake import decide_supervisor_intake
 from crypto_research_agents.core.capabilities import collect_capabilities
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 
@@ -148,6 +149,8 @@ class SmokeTest(unittest.TestCase):
     def test_chat_intake_classifies_research_vs_settings(self) -> None:
         self.assertEqual(classify_chat_input("pearl 프로젝트에 대해서 리서치 보고서 만들어봐"), "research_request")
         self.assertEqual(classify_chat_input("보고서는 한글로 만들어봐 영어단어는 써도 돼"), "company_config")
+        self.assertEqual(classify_chat_input("현재 회사 상태랑 설정 보여줘"), "company_status")
+        self.assertEqual(classify_chat_input("이 링크는 소스만 저장해줘"), "source_ingestion")
 
     def test_company_instruction_expands_supervisor_role(self) -> None:
         settings = CompanySettings()
@@ -159,7 +162,66 @@ class SmokeTest(unittest.TestCase):
 
         self.assertEqual(settings.supervisor_mode, "company_ceo")
         self.assertEqual(settings.client_relationship, "outsourcing_client")
+        self.assertIn("route_all_plain_chat_inputs", settings.supervisor_authority)
+        self.assertIn("choose_response_shape_per_request", settings.supervisor_authority)
         self.assertIn("Supervisor mode: company CEO / outsourcing intake", applied)
+
+    def test_supervisor_intake_returns_output_modes(self) -> None:
+        settings = CompanySettings(supervisor_mode="company_ceo")
+
+        research = decide_supervisor_intake("pearl 프로젝트를 분석해봐", settings)
+        config = decide_supervisor_intake("로그 출력 스타일을 바꿔봐", settings)
+        status = decide_supervisor_intake("현재 회사 상태 보여줘", settings)
+
+        self.assertTrue(research.needs_research_room)
+        self.assertEqual(research.output_mode, "research_dossier")
+        self.assertFalse(config.needs_research_room)
+        self.assertEqual(config.output_mode, "settings_update")
+        self.assertFalse(status.needs_research_room)
+        self.assertEqual(status.output_mode, "settings_panel")
+
+    def test_chat_intake_status_shows_settings_without_report(self) -> None:
+        output = StringIO()
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            args = argparse.Namespace(
+                memory=str(root / "memory.json"),
+                vault=str(root / "vault"),
+                reports=str(root / "reports"),
+                skip_model_setup=True,
+            )
+            with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(root / "model_settings.json")}, clear=True):
+                with patch("sys.stdin.isatty", return_value=True):
+                    with patch("builtins.input", side_effect=["현재 회사 상태랑 설정 보여줘", "/quit"]):
+                        with redirect_stdout(output):
+                            chat_command(args)
+
+            self.assertFalse((root / "reports").exists())
+
+        text = output.getvalue()
+        self.assertIn("Supervisor intake", text)
+        self.assertIn("Intent: company_status", text)
+        self.assertIn("Company settings", text)
+
+    def test_runtime_records_supervisor_intake_decision(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            decision = decide_supervisor_intake("pearl 프로젝트를 분석해봐").to_dict()
+            runtime = ResearchRuntime()
+            result = runtime.run_article_research(
+                title="Pearl",
+                content="Pearl Proof-of-Useful-Work project",
+                vault_dir=root / "vault",
+                reports_dir=root / "reports",
+                memory_path=root / "memory.json",
+                intake_decision=decision,
+            )
+
+            findings = result.memory.get_room_findings(result.room.room_id)
+            supervision = [item for item in findings if item.finding_type == "supervision_plan"]
+            self.assertTrue(supervision)
+            self.assertEqual(supervision[0].data["intake_decision"]["intent_type"], "research_request")
+            self.assertEqual(supervision[0].data["intake_decision"]["output_mode"], "research_dossier")
 
     def test_live_agent_board_shows_current_work(self) -> None:
         output = StringIO()

@@ -21,6 +21,7 @@ from crypto_research_agents.core.company_settings import (
     load_company_settings,
     save_company_settings,
 )
+from crypto_research_agents.core.supervisor_intake import decide_supervisor_intake
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 from crypto_research_agents.storage.json_store import load_memory
 from crypto_research_agents.storage.run_store import list_run_summaries, load_run_file
@@ -321,25 +322,42 @@ def chat_command(args: argparse.Namespace) -> None:
 
         console.print_user_message(line)
         settings_path = company_settings_path_for(args.memory)
-        route = classify_chat_input(line)
-        if route == "company_config":
-            settings = load_company_settings(settings_path)
+        settings = load_company_settings(settings_path)
+        intake_decision = decide_supervisor_intake(line, settings)
+        console.print_supervisor_intake(intake_decision)
+
+        if intake_decision.intent_type == "company_config":
             applied = apply_company_instruction(line, settings)
             save_company_settings(settings, settings_path)
             console.print_company_settings_updated(settings, applied, settings_path)
             continue
 
+        if intake_decision.intent_type == "company_status":
+            console.print_company_settings(settings, settings_path)
+            continue
+
         title, content, url = chat_input_to_source(line)
         runtime = ResearchRuntime(load_memory(args.memory))
         runtime.event_handler = console.make_event_handler()
-        result = runtime.run_article_research(
-            title=title,
-            content=content,
-            url=url,
-            vault_dir=args.vault,
-            reports_dir=args.reports,
-            memory_path=args.memory,
-        )
+        if intake_decision.intent_type == "source_ingestion":
+            result = runtime.run_source_ingestion(
+                title=title,
+                content=content,
+                url=url,
+                vault_dir=args.vault,
+                memory_path=args.memory,
+                intake_decision=intake_decision.to_dict(),
+            )
+        else:
+            result = runtime.run_article_research(
+                title=title,
+                content=content,
+                url=url,
+                vault_dir=args.vault,
+                reports_dir=args.reports,
+                memory_path=args.memory,
+                intake_decision=intake_decision.to_dict(),
+            )
         last_room_id = result.room.room_id
         console.last_room_id = last_room_id
         console.print_run_summary(result)
@@ -468,6 +486,10 @@ def handle_chat_command(
 
 
 def classify_chat_input(line: str) -> str:
+    return decide_supervisor_intake(line).intent_type
+
+
+def legacy_classify_chat_input(line: str) -> str:
     stripped = line.strip()
     lowered = stripped.lower()
     if not stripped:
@@ -577,17 +599,24 @@ def apply_company_instruction(line: str, settings: CompanySettings) -> list[str]
         settings.allow_english_terms = True
         applied.append("English technical terms allowed")
 
-    if any(term in line for term in ["슈퍼바이저", "사장", "외주", "회사에다가", "광범위"]):
+    if any(term in line for term in ["슈퍼바이저", "사장", "대표", "CEO", "외주", "회사에다가", "광범위", "권한"]):
         settings.supervisor_mode = "company_ceo"
         settings.client_relationship = "outsourcing_client"
         _add_unique(settings.operating_principles, "Supervisor acts as company CEO: classify intent before opening a Research Room.")
         _add_unique(settings.operating_principles, "Treat the user as an outsourcing client giving company-level work orders.")
+        _add_unique(settings.operating_principles, "Every plain chat input passes through Supervisor intake before any agent room is opened.")
+        _add_unique(settings.supervisor_authority, "route_all_plain_chat_inputs")
+        _add_unique(settings.supervisor_authority, "choose_response_shape_per_request")
+        _add_unique(settings.supervisor_authority, "block_unnecessary_report_generation")
         applied.append("Supervisor mode: company CEO / outsourcing intake")
 
-    if any(term in line for term in ["설정 변경", "자체 반영", "아닐경우", "그러지말고"]):
+    if any(term in line for term in ["설정 변경", "자체 반영", "아닐경우", "그러지말고", "출력하는게 달라", "입력하는거에 따라서"]):
         settings.auto_apply_company_instructions = True
         _add_unique(settings.operating_principles, "Only open a Research Room for explicit research, analysis, or report requests.")
         _add_unique(settings.operating_principles, "Apply company configuration instructions directly instead of creating reports.")
+        settings.intake_policy["company_config"] = "apply settings directly without report generation"
+        settings.intake_policy["company_status"] = "show status/settings panel without report generation"
+        settings.intake_policy["research_request"] = "open Research Room only for explicit research, analysis, or report requests"
         applied.append("Chat routing: settings instructions are applied directly")
 
     if not applied:

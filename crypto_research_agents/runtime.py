@@ -90,6 +90,7 @@ class ResearchRuntime:
         vault_dir: str | Path = "vault",
         reports_dir: str | Path = "reports",
         memory_path: str | Path | None = "data/memory.json",
+        intake_decision: dict[str, Any] | None = None,
     ) -> ResearchRunResult:
         company_settings = load_company_settings(company_settings_path_for(memory_path))
         room = ResearchRoom(
@@ -112,7 +113,13 @@ class ResearchRuntime:
         )
 
         try:
-            self._run_agent("supervisor_agent", room, goals=room.goals, company_settings=company_settings.to_dict())
+            self._run_agent(
+                "supervisor_agent",
+                room,
+                goals=room.goals,
+                company_settings=company_settings.to_dict(),
+                intake_decision=intake_decision,
+            )
             room.set_status(RuntimeState.RUNNING)
             self._run_agent("ingestion_agent", room, title=title, content=content, url=url, source_type="article")
             self._run_agent("narrative_agent", room)
@@ -152,6 +159,7 @@ class ResearchRuntime:
         url: str | None = None,
         vault_dir: str | Path = "vault",
         memory_path: str | Path | None = "data/memory.json",
+        intake_decision: dict[str, Any] | None = None,
     ) -> ResearchRunResult:
         company_settings = load_company_settings(company_settings_path_for(memory_path))
         room = ResearchRoom(
@@ -177,7 +185,13 @@ class ResearchRuntime:
         )
 
         try:
-            self._run_agent("supervisor_agent", room, goals=room.goals, company_settings=company_settings.to_dict())
+            self._run_agent(
+                "supervisor_agent",
+                room,
+                goals=room.goals,
+                company_settings=company_settings.to_dict(),
+                intake_decision=intake_decision,
+            )
             room.set_status(RuntimeState.RUNNING)
             self._run_agent("ingestion_agent", room, title=title, content=content, url=url, source_type="article")
             room.set_status(RuntimeState.OBSIDIAN_SYNCING)

@@ -770,7 +770,9 @@ JIMMORIA는 이제 모든 일반 채팅 입력을 바로 보고서 생성으로 
 |---|---|
 | 리서치/분석/보고서 요청 | Research Room을 열고 에이전트에게 배정 |
 | 설정/운영/UX/역할 변경 지시 | Research Room을 열지 않고 company settings에 반영 |
-| URL 또는 source ingestion 명령 | source 저장 또는 research flow로 라우팅 |
+| 상태/설정 확인 요청 | Research Room을 열지 않고 settings/status panel 출력 |
+| source-only ingestion 요청 | 작은 ingestion room을 열고 Source Note만 저장 |
+| URL 입력 | 기본적으로 research flow로 라우팅하되 source-only 표현이 있으면 ingestion만 실행 |
 
 예시:
 
@@ -804,6 +806,8 @@ allow_english_terms
 auto_apply_company_instructions
 supervisor_mode
 client_relationship
+supervisor_authority
+intake_policy
 operating_principles
 raw_instructions
 ```
@@ -816,6 +820,8 @@ raw_instructions
 | `allow_english_terms: true` | crypto/technical term은 영어 그대로 허용 |
 | `supervisor_mode: company_ceo` | Supervisor를 회사 사장/총괄 PM처럼 동작시킴 |
 | `client_relationship: outsourcing_client` | 사용자를 외주를 주는 클라이언트로 취급 |
+| `supervisor_authority` | Supervisor가 가진 라우팅, 설정 반영, agent 배정, quality gate 권한 |
+| `intake_policy` | 입력 유형별 출력 모드와 실행 방식 |
 
 CLI 명령:
 
@@ -825,10 +831,28 @@ CLI 명령:
 
 이 명령은 현재 company settings를 출력한다.
 
+Supervisor Intake 결정 객체:
+
+```text
+SupervisorIntakeDecision
+  intent_type
+  action
+  output_mode
+  needs_research_room
+  confidence
+  rationale
+  next_step
+  supervisor_authority
+```
+
 Runtime 연결:
 
-- `chat_command()`는 먼저 `classify_chat_input()`으로 입력을 분류한다.
+- `chat_command()`는 먼저 `decide_supervisor_intake()`로 Supervisor Intake 결정을 만든다.
+- CLI는 `Supervisor intake` 카드를 출력해 어떤 intent/action/output mode로 판단했는지 보여준다.
 - `company_config`면 `apply_company_instruction()`으로 설정을 저장하고 종료한다.
+- `company_status`면 `/settings`와 같은 settings/status panel을 보여주고 종료한다.
+- `source_ingestion`이면 작은 ingestion room을 열어 Source Note만 저장한다.
 - `research_request`면 기존처럼 `ResearchRuntime.run_article_research()`를 실행한다.
-- `ResearchRuntime`은 `company_settings.json`을 읽어 SupervisorAgent와 ReportAgent에 전달한다.
+- `ResearchRuntime`은 `company_settings.json`과 `intake_decision`을 SupervisorAgent와 ReportAgent에 전달한다.
+- SupervisorAgent는 `supervision_plan` finding에 `intake_decision`을 저장해 왜 해당 Research Room이 열렸는지 남긴다.
 - ReportAgent는 `report_language`를 보고 한국어/영문 report shell을 선택한다.

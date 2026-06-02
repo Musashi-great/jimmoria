@@ -9,6 +9,27 @@ from typing import Any
 from crypto_research_agents.core.time import utc_now
 
 
+def default_supervisor_authority() -> list[str]:
+    return [
+        "classify_every_plain_chat_input",
+        "choose_output_mode",
+        "apply_company_settings_without_research_room",
+        "open_research_room_for_explicit_research",
+        "assign_specialist_agents",
+        "set_report_direction",
+        "final_quality_gate",
+    ]
+
+
+def default_intake_policy() -> dict[str, str]:
+    return {
+        "research_request": "open full Research Room and produce a dossier",
+        "source_ingestion": "open small ingestion room and save notes",
+        "company_config": "apply settings directly without a report",
+        "company_status": "show company state without a report",
+    }
+
+
 @dataclass(slots=True)
 class CompanySettings:
     """Persistent operating preferences for JIMMORIA as a research company."""
@@ -18,6 +39,8 @@ class CompanySettings:
     auto_apply_company_instructions: bool = True
     supervisor_mode: str = "research_director"
     client_relationship: str = "user"
+    supervisor_authority: list[str] = field(default_factory=default_supervisor_authority)
+    intake_policy: dict[str, str] = field(default_factory=default_intake_policy)
     operating_principles: list[str] = field(default_factory=list)
     raw_instructions: list[str] = field(default_factory=list)
     updated_at: str = field(default_factory=utc_now)
@@ -29,7 +52,12 @@ class CompanySettings:
     def from_dict(cls, data: dict[str, Any]) -> "CompanySettings":
         known = {field_name for field_name in cls.__dataclass_fields__}
         filtered = {key: value for key, value in data.items() if key in known}
-        return cls(**filtered)
+        settings = cls(**filtered)
+        if not settings.supervisor_authority:
+            settings.supervisor_authority = default_supervisor_authority()
+        if not settings.intake_policy:
+            settings.intake_policy = default_intake_policy()
+        return settings
 
 
 def company_settings_path_for(memory_path: str | Path | None = None) -> Path:

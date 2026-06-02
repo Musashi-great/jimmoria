@@ -65,7 +65,7 @@ class JimmoriaConsole:
 
     def print_help(self) -> None:
         lines = [
-            "Type a research question, pasted source, or URL to open a Research Room.",
+            "Type a message. The Supervisor decides whether it is research, settings, status, or source ingest.",
             "",
             "Commands:",
             "  /add <text-or-url>       Ingest source only",
@@ -112,7 +112,23 @@ class JimmoriaConsole:
         if principles:
             lines.extend(["", "Operating principles:"])
             lines.extend(f"- {item}" for item in principles[-8:])
+        authority = list(getattr(settings, "supervisor_authority", []) or [])
+        if authority:
+            lines.extend(["", "Supervisor authority:"])
+            lines.extend(f"- {item}" for item in authority[-10:])
         self.block("Company settings", lines)
+
+    def print_supervisor_intake(self, decision: Any) -> None:
+        lines = [
+            f"Intent: {getattr(decision, 'intent_type', 'unknown')}",
+            f"Action: {getattr(decision, 'action', 'unknown')}",
+            f"Output mode: {getattr(decision, 'output_mode', 'unknown')}",
+            f"Research Room: {'open' if getattr(decision, 'needs_research_room', False) else 'not needed'}",
+            f"Confidence: {getattr(decision, 'confidence', 0):.2f}",
+            f"Why: {getattr(decision, 'rationale', '')}",
+            f"Next: {getattr(decision, 'next_step', '')}",
+        ]
+        self.block("Supervisor intake", lines)
 
     def print_company_settings_updated(self, settings: Any, applied: list[str], path: str | Path) -> None:
         lines = [
