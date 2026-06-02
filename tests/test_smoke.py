@@ -395,6 +395,30 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("Full dossier body.", text)
         self.assertNotIn("JIMMORIA opens a Research Room", text)
 
+    def test_chat_research_request_can_be_cancelled_at_supervisor_check(self) -> None:
+        output = StringIO()
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            args = argparse.Namespace(
+                memory=str(root / "memory.json"),
+                vault=str(root / "vault"),
+                reports=str(root / "reports"),
+                skip_model_setup=True,
+            )
+            with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(root / "model_settings.json")}, clear=True):
+                with patch("sys.stdin.isatty", return_value=True):
+                    with patch("builtins.input", side_effect=["pearl 프로젝트에 대해서 리서치 진행해봐", "n", "/quit"]):
+                        with redirect_stdout(output):
+                            chat_command(args)
+
+            self.assertFalse((root / "reports").exists())
+            self.assertFalse((root / "runs").exists())
+
+        text = output.getvalue()
+        self.assertIn("Supervisor check", text)
+        self.assertIn("Research Room은 열지 않겠습니다", text)
+        self.assertNotIn("Room > OPEN", text)
+
     def test_runtime_records_supervisor_intake_decision(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

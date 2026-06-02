@@ -137,6 +137,31 @@ class JimmoriaConsole:
     def print_supervisor_reply(self, lines: list[str]) -> None:
         self.block("Supervisor", lines)
 
+    def confirm_dispatch(
+        self,
+        *,
+        intent_type: str,
+        title: str,
+        agent_count: int,
+    ) -> bool:
+        action = {
+            "research_request": "Open full Research Room",
+            "source_ingestion": "Save source only",
+        }.get(intent_type, intent_type)
+        lines = [
+            "제가 이렇게 이해했습니다.",
+            f"Action: {action}",
+            f"Topic: {title}",
+            f"Agents: {agent_count}",
+            "",
+            "진행하려면 Enter 또는 y, 취소하려면 n을 입력하세요.",
+        ]
+        self.block("Supervisor check", lines)
+        if not sys.stdin.isatty():
+            return True
+        answer = input("Proceed [Enter/Y/n]: ").strip().lower()
+        return answer in {"", "y", "yes", "ye", "go", "proceed", "ㅇ", "예", "네", "응"}
+
     def print_supervisor_working(self, activity: str = "Reading your request and choosing the next move.") -> None:
         self.print_log_line("Supervisor", activity, muted=True)
 

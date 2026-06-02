@@ -152,6 +152,8 @@ flowchart LR
 
 단, 모든 채팅 입력이 Research Room으로 들어가는 것은 아니다. 사용자가 "보고서 만든 거 보내줘", "전체 보고서 보여줘", `/report 3jane`처럼 기존 산출물을 요청하면 Supervisor가 `report_retrieval`로 분류하고 새 Research Room을 열지 않는다. 이 경우 `data/runs/*/room.json`과 `reports/*.md`에서 기존 보고서를 찾아 출력한다.
 
+또한 Research Room을 여는 요청은 바로 실행하지 않는다. Supervisor가 먼저 입력을 해석해 `Supervisor check`를 보여주고, 사용자가 Enter/Y로 확인해야 `project_research_room` 또는 `source_ingestion_room`이 열린다. 사용자가 `n`을 입력하면 에이전트는 실행되지 않고 run/report 산출물도 만들지 않는다.
+
 실행 순서는 현재 다음과 같다.
 
 ```text

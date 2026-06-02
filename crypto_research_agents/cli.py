@@ -385,9 +385,23 @@ def chat_command(args: argparse.Namespace) -> None:
             continue
 
         title, content, url = chat_input_to_source(line)
+        agent_count = 3 if intake_decision.intent_type == "source_ingestion" else len(DEFAULT_AGENTS)
+        if not console.confirm_dispatch(
+            intent_type=intake_decision.intent_type,
+            title=title,
+            agent_count=agent_count,
+        ):
+            reply = [
+                "좋습니다. Research Room은 열지 않겠습니다.",
+                "문장을 고쳐서 다시 지시하거나, 기존 보고서 조회라면 '보고서 보여줘'처럼 말해 주세요.",
+            ]
+            console.print_supervisor_reply(reply)
+            append_supervisor_history(supervisor_history, line, reply)
+            continue
+
         runtime = ResearchRuntime(load_memory(args.memory))
         runtime.event_handler = console.make_event_handler()
-        reply = build_supervisor_dispatch_reply(intake_decision, len(DEFAULT_AGENTS))
+        reply = build_supervisor_dispatch_reply(intake_decision, agent_count)
         console.print_supervisor_reply(reply)
         append_supervisor_history(supervisor_history, line, reply)
         if intake_decision.intent_type == "source_ingestion":
