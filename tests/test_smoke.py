@@ -3,6 +3,7 @@ from tempfile import TemporaryDirectory
 import argparse
 import json
 import os
+import re
 import tomllib
 import unittest
 from contextlib import redirect_stdout
@@ -62,6 +63,31 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("+", output.getvalue())
         self.assertIn("@path/to/file", output.getvalue())
         self.assertEqual(mocked_input.call_args[0][0], "| > ")
+
+    def test_chat_input_renders_closed_ansi_box(self) -> None:
+        output = StringIO()
+        console = JimmoriaConsole()
+        console.width = 72
+
+        with patch("sys.stdin.isatty", return_value=True):
+            with patch("crypto_research_agents.console.supports_color", return_value=True):
+                with patch("builtins.input", return_value="/quit") as mocked_input:
+                    with redirect_stdout(output):
+                        value = console.read_chat_input()
+
+        clean = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", output.getvalue())
+        box_lines = [
+            line
+            for line in clean.splitlines()
+            if line.startswith(("+", "|"))
+        ]
+        self.assertEqual(value, "/quit")
+        self.assertEqual(mocked_input.call_args[0][0], "\033[2A\033[4C")
+        self.assertGreaterEqual(len(box_lines), 4)
+        self.assertTrue(box_lines[0].startswith("+"))
+        self.assertTrue(box_lines[1].endswith("|"))
+        self.assertTrue(box_lines[2].endswith("|"))
+        self.assertTrue(box_lines[3].startswith("+"))
 
     def test_article_research_loop_writes_outputs(self) -> None:
         with TemporaryDirectory() as tmp:

@@ -75,36 +75,66 @@ class JimmoriaConsole:
         if not sys.stdin.isatty():
             return input(f"\n{APP_NAME.lower()}> ")
 
+        if supports_color():
+            return self.read_ansi_boxed_input()
+        return self.read_basic_boxed_input()
+
+    def read_ansi_boxed_input(self) -> str:
         hint = "Type a request, URL, /command, or @path/to/file"
         border = self.input_border()
         print("")
         print(self.input_border_style(border))
         print(self.input_border_style(self.input_hint_line(hint)))
+        print(self.input_edit_line_style())
+        print(self.input_border_style(border))
         try:
-            return input(self.input_prompt())
+            return input(self.input_cursor_sequence())
+        finally:
+            sys.stdout.write("\033[1B\r")
+            sys.stdout.flush()
+
+    def read_basic_boxed_input(self) -> str:
+        hint = "Type a request, URL, /command, or @path/to/file"
+        border = self.input_border()
+        print("")
+        print(border)
+        print(self.input_hint_line(hint))
+        try:
+            return input("| > ")
         finally:
             print(self.input_border_style(border))
 
+    def input_box_width(self) -> int:
+        available_width = max(32, self.width - 4)
+        return max(32, min(available_width, 100))
+
     def input_border(self) -> str:
-        return "+" + "-" * max(20, self.width - 2) + "+"
+        return "+" + "-" * (self.input_box_width() - 2) + "+"
 
     def input_hint_line(self, text: str) -> str:
-        inner_width = max(20, self.width - 4)
+        inner_width = self.input_box_width() - 4
         clipped = text[:inner_width]
         return "| " + clipped.ljust(inner_width) + " |"
+
+    def input_edit_line(self) -> str:
+        inner_width = self.input_box_width() - 4
+        return "| " + "> ".ljust(inner_width) + " |"
 
     def input_border_style(self, text: str) -> str:
         if not supports_color():
             return text
         return f"\033[38;2;211;95;255m{text}\033[0m"
 
-    def input_prompt(self) -> str:
-        if not supports_color():
-            return "| > "
+    def input_edit_line_style(self) -> str:
         violet = "\033[38;2;211;95;255m"
         pink = "\033[38;2;255;92;212m"
         reset = "\033[0m"
-        return f"{violet}|{reset} {pink}>{reset} "
+        inner_width = self.input_box_width() - 4
+        padding = " " * max(inner_width - 2, 0)
+        return f"{violet}|{reset} {pink}>{reset} {padding}{violet}|{reset}"
+
+    def input_cursor_sequence(self) -> str:
+        return "\033[2A\033[4C"
 
     def make_event_handler(self) -> Any:
         def handle(event: dict[str, object]) -> None:
