@@ -204,6 +204,7 @@ class SmokeTest(unittest.TestCase):
 
     def test_chat_intake_classifies_saved_report_request(self) -> None:
         self.assertEqual(classify_chat_input("3jane 보고서 만든거 보내봐 전체"), "report_retrieval")
+        self.assertEqual(classify_chat_input("3jane 보고서 들고와봐"), "report_retrieval")
         self.assertEqual(classify_chat_input("show 3jane full report"), "report_retrieval")
 
     def test_company_instruction_expands_supervisor_role(self) -> None:
@@ -382,7 +383,7 @@ class SmokeTest(unittest.TestCase):
             )
             with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(root / "model_settings.json")}, clear=True):
                 with patch("sys.stdin.isatty", return_value=True):
-                    with patch("builtins.input", side_effect=["3jane 보고서 만든거 보내봐 전체", "/quit"]):
+                    with patch("builtins.input", side_effect=["3jane 보고서 들고와봐", "/quit"]):
                         with redirect_stdout(output):
                             chat_command(args)
 
@@ -840,7 +841,7 @@ class SmokeTest(unittest.TestCase):
             )
 
             found = find_saved_report_for_request(
-                "3jane 보고서 만든거 보내봐 전체",
+                "3jane 보고서 들고와봐",
                 runs_dir=root / "data" / "runs",
                 reports_dir=root / "reports",
             )

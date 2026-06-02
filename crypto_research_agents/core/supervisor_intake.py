@@ -422,6 +422,31 @@ REPORT_RETRIEVAL_TERMS = [
     "꺼내줘",
     "열어줘",
     "출력해줘",
+    "들고와",
+    "들고와봐",
+    "들고 와",
+    "들고 와봐",
+    "가져와",
+    "가져와봐",
+    "가져 와",
+    "가져 와봐",
+    "불러와",
+    "불러와봐",
+    "불러 와",
+    "불러 와봐",
+    "찾아줘",
+    "찾아봐",
+    "내놔",
+    "줘",
+    "전체",
+    "전부",
+    "풀버전",
+    "보내봐",
+    "보내줘",
+    "보여줘",
+    "꺼내줘",
+    "열어줘",
+    "출력해줘",
     "전체",
     "전부",
     "풀버전",
@@ -434,6 +459,10 @@ REPORT_RETRIEVAL_TERMS = [
 ]
 
 REPORT_CREATE_TERMS = [
+    "만들어",
+    "작성해",
+    "생성해",
+    "새로",
     "만들어",
     "작성해",
     "생성해",
@@ -461,6 +490,12 @@ def _looks_like_source_only_request(original: str, lowered: str) -> bool:
 
 
 def _looks_like_report_retrieval_request(original: str, lowered: str) -> bool:
+    normal_report_words = ["보고서", "리포트", "레포트", "report"]
+    if _has_any(original, lowered, normal_report_words):
+        if _has_any(original, lowered, REPORT_CREATE_TERMS):
+            return False
+        if _has_any(original, lowered, REPORT_RETRIEVAL_TERMS):
+            return True
     report_words = ["보고서", "리포트", "레포트", "report"]
     if not _has_any(original, lowered, report_words):
         return False
