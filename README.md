@@ -12,7 +12,7 @@ JIMMORIA는 크립토 리서치 전용 멀티에이전트 회사 CLI입니다.
 
 ```powershell
 cd C:\jimmoria
-python -m pip install -e .
+python -m pip install -e ".[all]"
 ```
 
 이후에는 바로 실행합니다.
@@ -109,6 +109,7 @@ jimmoria/
 
 ```text
 - CLI 채팅 인터페이스
+- 보라/핑크 테마의 Rich 기반 실행 로그
 - Research Room orchestration
 - Supervisor + controlled P2P Agent Bus
 - AgentSpec/persona YAML 로딩

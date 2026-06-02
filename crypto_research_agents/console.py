@@ -13,6 +13,19 @@ from crypto_research_agents.runtime import DEFAULT_AGENTS
 from crypto_research_agents.storage.json_store import load_memory
 from crypto_research_agents.storage.run_store import list_run_summaries, load_run_file
 
+try:
+    from rich import box
+    from rich.console import Console as RichConsole
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.text import Text
+except ImportError:  # pragma: no cover - fallback for non-installed editable checkouts
+    box = None
+    RichConsole = None
+    Panel = None
+    Table = None
+    Text = None
+
 
 AGENT_ACTIVITY = {
     "supervisor_agent": "Planning goals, priorities, and research direction",
@@ -45,6 +58,7 @@ class JimmoriaConsole:
         self.agent_activity: dict[str, str] = {}
         self.last_room_id = ""
         self.width = min(shutil.get_terminal_size((100, 30)).columns, 110)
+        self.use_rich = RichConsole is not None and not os.getenv("JIMMORIA_PLAIN_LOGS")
 
     def print_intro(self) -> None:
         print_jimmoria_logo(self.width)
@@ -189,11 +203,11 @@ class JimmoriaConsole:
             self.block(
                 f"{label} started",
                 [
+                    f"State: {self.state_label('running')}",
                     f"Task type: {event.get('task_type')}",
-                    "Status: running",
+                    f"Now: {self.agent_activity[agent_id]}",
                 ],
             )
-            self.print_agent_state()
             return
 
         if event_type == "agent_done":
@@ -205,12 +219,12 @@ class JimmoriaConsole:
             self.block(
                 f"{label} finished",
                 [
-                    f"Summary: {summary}",
+                    f"State: {self.state_label('done')}",
+                    f"Finished: {summary}",
                     f"Messages: {event.get('messages')}",
                     f"Findings: {event.get('findings')}",
                 ],
             )
-            self.print_agent_state()
             return
 
         if event_type == "agent_failed":
@@ -221,8 +235,9 @@ class JimmoriaConsole:
             self.block(
                 f"{label} failed",
                 [
+                    f"State: {self.state_label('failed')}",
                     f"Task type: {event.get('task_type')}",
-                    f"Error: {event.get('error')}",
+                    f"Stopped: {event.get('error')}",
                 ],
             )
             self.print_agent_state()
@@ -319,14 +334,20 @@ class JimmoriaConsole:
     def print_agent_state(self) -> None:
         if not self.agent_state:
             return
-        rows = []
+        rows: list[tuple[str, str, str]] = []
         for agent_id in DEFAULT_AGENTS:
             if agent_id not in self.agent_state:
                 continue
             state = self.agent_state[agent_id]
             activity = self.agent_activity.get(agent_id) or AGENT_ACTIVITY.get(agent_id, "")
-            rows.append(f"{self.state_label(state):<8} {agent_id:<28} {self.activity_label(state, activity)}")
-        self.block("Live agent board", rows)
+            rows.append((state, agent_id, self.activity_label(state, activity)))
+        if self.use_rich:
+            self.rich_agent_board(rows)
+            return
+        self.block(
+            "Live agent board",
+            [f"{self.state_label(state):<8} {agent_id:<28} {activity}" for state, agent_id, activity in rows],
+        )
 
     def state_label(self, state: str) -> str:
         labels = {
@@ -366,6 +387,9 @@ class JimmoriaConsole:
         return agent_id
 
     def block(self, title: str, lines: list[str]) -> None:
+        if self.use_rich:
+            self.rich_block(title, lines)
+            return
         print("")
         print(f"[{title}]")
         for line in lines:
@@ -381,6 +405,86 @@ class JimmoriaConsole:
 
     def rule(self, char: str = "-") -> None:
         print(char * self.width)
+
+    def rich_console(self) -> Any:
+        assert RichConsole is not None
+        return RichConsole(
+            file=sys.stdout,
+            width=self.width,
+            force_terminal=supports_color(),
+            color_system="truecolor" if supports_color() else None,
+        )
+
+    def rich_block(self, title: str, lines: list[str]) -> None:
+        assert Panel is not None
+        assert Text is not None
+        console = self.rich_console()
+        body = Text()
+        for line in lines:
+            body.append(str(line))
+            body.append("\n")
+        if lines:
+            body = Text(body.plain.rstrip("\n"))
+        console.print("")
+        console.print(
+            Panel(
+                body,
+                title=f"[bold bright_magenta]{title}",
+                border_style="rgb(211,95,255)",
+                padding=(0, 1),
+                box=box.ROUNDED if box is not None else None,
+            )
+        )
+
+    def rich_agent_board(self, rows: list[tuple[str, str, str]]) -> None:
+        assert Panel is not None
+        assert Table is not None
+        console = self.rich_console()
+        table = Table.grid(expand=True)
+        table.add_column("State", width=8)
+        table.add_column("Agent", width=28)
+        table.add_column("Current work", ratio=1)
+        table.add_row(
+            Text("STATE", style="bold rgb(255,92,212)"),
+            Text("AGENT", style="bold rgb(255,92,212)"),
+            Text("CURRENT WORK", style="bold rgb(255,92,212)"),
+        )
+        for state, agent_id, activity in rows:
+            table.add_row(
+                self.rich_state_badge(state),
+                Text(agent_id, style="rgb(230,214,255)"),
+                Text(activity, style=self.rich_activity_style(state)),
+            )
+        console.print("")
+        console.print(
+            Panel(
+                table,
+                title="[bold bright_magenta]Live agent board",
+                subtitle="[rgb(126,96,154)]JIMMORIA runtime",
+                border_style="rgb(255,79,216)",
+                padding=(0, 1),
+                box=box.ROUNDED if box is not None else None,
+            )
+        )
+
+    def rich_state_badge(self, state: str) -> Any:
+        assert Text is not None
+        styles = {
+            "queued": "rgb(126,96,154)",
+            "running": "bold rgb(255,79,216)",
+            "done": "bold rgb(120,255,190)",
+            "failed": "bold rgb(255,92,120)",
+        }
+        return Text(self.state_label(state), style=styles.get(state, "rgb(230,214,255)"))
+
+    def rich_activity_style(self, state: str) -> str:
+        styles = {
+            "queued": "rgb(160,132,188)",
+            "running": "rgb(255,210,245)",
+            "done": "rgb(190,255,220)",
+            "failed": "rgb(255,170,185)",
+        }
+        return styles.get(state, "rgb(230,214,255)")
 
 
 def print_jimmoria_logo(width: int = 100) -> None:

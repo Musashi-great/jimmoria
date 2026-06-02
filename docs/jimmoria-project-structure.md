@@ -62,6 +62,14 @@ jimmoria
 
 이 명령은 `pyproject.toml`의 script entrypoint로 연결된다.
 
+전체 리서치/LLM/콘솔 도구를 한 번에 설치하려면 다음을 사용한다.
+
+```powershell
+python -m pip install -e ".[all]"
+```
+
+기본 dependency에는 콘솔 테마 렌더링을 위한 `rich`가 포함된다. `.[all]` extra는 `openai`, `httpx`, `beautifulsoup4`, `feedparser`까지 설치해서 LLM/API/RSS/HTML connector 확장에 필요한 도구를 함께 준비한다.
+
 ```toml
 [project.scripts]
 jimmoria = "crypto_research_agents.cli:main"
@@ -173,7 +181,7 @@ completed
 
 현재는 순차 실행에 가깝지만, 구조상 각 에이전트의 요청/응답은 `CollaborationBus`에 기록된다. 나중에 병렬 실행, 비동기 큐, UI replay를 붙일 때 이 bus와 event log가 기반이 된다.
 
-CLI는 `room_created`, `agent_start`, `agent_done`, `agent_failed`, `room_completed` 이벤트를 받아 `Live agent board`를 계속 출력한다. 사용자가 작업 지시를 넣으면 각 에이전트가 `WAIT`, `RUN`, `DONE`, `FAIL` 중 어떤 상태인지와 현재 무엇을 하는지 바로 볼 수 있다.
+CLI는 `room_created`, `agent_start`, `agent_done`, `agent_failed`, `room_completed` 이벤트를 받아 보라/핑크 테마의 로그를 출력한다. `room_created`와 `room_completed`에는 전체 `Live agent board`를 보여주고, 각 `agent_start`/`agent_done` 이벤트는 짧은 작업 카드로 출력해서 로그가 과도하게 반복되지 않게 한다. 사용자가 작업 지시를 넣으면 각 에이전트가 `WAIT`, `RUN`, `DONE`, `FAIL` 중 어떤 상태인지와 현재 무엇을 하는지 바로 볼 수 있다.
 
 예시:
 
@@ -188,7 +196,7 @@ CLI는 `room_created`, `agent_start`, `agent_done`, `agent_failed`, `room_comple
 
 현재 실제 런타임에서 기본 실행되는 에이전트는 `runtime.py`의 `DEFAULT_AGENTS`에 정의된 10개다.
 
-CLI 시작 도움말에는 정적 에이전트 목록을 길게 보여주지 않는다. 대신 사용자가 작업을 입력해 Research Room이 열리면 `Live agent board`에서 에이전트별 현재 작업 상태가 실시간으로 표시된다. 전체 agent roster와 planned agent까지 보고 싶을 때는 `/company`를 사용한다.
+CLI 시작 도움말에는 정적 에이전트 목록을 길게 보여주지 않는다. 대신 사용자가 작업을 입력해 Research Room이 열리면 `Live agent board`와 짧은 agent work cards로 에이전트별 현재 작업 상태가 표시된다. 전체 agent roster와 planned agent까지 보고 싶을 때는 `/company`를 사용한다.
 
 | Agent ID | 구현 클래스 | 역할 | 현재 동작 |
 |---|---|---|---|
@@ -493,7 +501,7 @@ doctor_command()
 
 ### `crypto_research_agents/console.py`
 
-터미널 UI를 담당한다. 시작 로고, 보라/핑크 3D 느낌의 JIMMORIA 배너, 닫힌 박스형 입력창, `/help` 명령어 목록, `Live agent board` 실시간 진행 상황판, 보고서 preview를 담당한다.
+터미널 UI를 담당한다. 시작 로고, 보라/핑크 3D 느낌의 JIMMORIA 배너, 닫힌 박스형 입력창, `/help` 명령어 목록, `rich` 기반 Panel/Table 로그, `Live agent board`, agent work cards, 보고서 preview를 담당한다. `JIMMORIA_PLAIN_LOGS=1`을 설정하면 rich 테마 로그 대신 plain text fallback을 사용할 수 있다.
 
 중요 함수:
 
@@ -630,6 +638,8 @@ project_research.yaml
 - URL/HTML connector metadata extraction
 - SourceRecord content hash/canonical URL dedupe
 - boxed chat input prompt
+- rich themed runtime log panels
+- compact agent work cards
 - live agent board current-work display
 - purple/pink 3D logo palette
 ```

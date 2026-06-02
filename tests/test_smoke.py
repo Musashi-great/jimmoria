@@ -53,6 +53,9 @@ class SmokeTest(unittest.TestCase):
 
         self.assertEqual(pyproject["project"]["scripts"]["jimmoria"], "crypto_research_agents.cli:main")
         self.assertEqual(pyproject["tool"]["setuptools"]["packages"]["find"]["include"], ["crypto_research_agents*"])
+        self.assertIn("rich>=13.7.0", pyproject["project"]["dependencies"])
+        self.assertIn("all", pyproject["project"]["optional-dependencies"])
+        self.assertIn("feedparser>=6.0.11", pyproject["project"]["optional-dependencies"]["all"])
 
     def test_chat_input_uses_boxed_prompt(self) -> None:
         output = StringIO()
@@ -132,6 +135,7 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("RUN", text)
         self.assertIn("ingestion_agent", text)
         self.assertIn("Now: Storing source input", text)
+        self.assertEqual(text.count("Live agent board"), 1)
 
     def test_live_agent_board_shows_failures(self) -> None:
         output = StringIO()
