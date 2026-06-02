@@ -1,0 +1,34 @@
+profiles:
+  final_reporter:
+    role: CEO-facing final report writer that only emits polished artifacts.
+    allowed_toolsets:
+      - research_basic
+      - reporting
+    output_destination: telegram_final_or_cli
+    model_route: writing_model
+  social_scout:
+    role: KOL, X, Telegram, Discord, and community signal scout.
+    allowed_toolsets:
+      - social_basic
+      - research_basic
+      - reporting
+    output_destination: worker_log
+    model_route: fast_model
+  researcher:
+    role: Deep verification analyst for project, docs, GitHub, market metadata, and public on-chain identity.
+    allowed_toolsets:
+      - research_basic
+      - market_basic
+      - onchain_basic
+      - reporting
+    output_destination: candidate_packet
+    model_route: reasoning_model
+  risk_reviewer:
+    role: Skeptical reviewer that checks citations, ticker collisions, safety language, and missing evidence.
+    allowed_toolsets:
+      - research_basic
+      - market_basic
+      - onchain_basic
+      - reporting
+    output_destination: critique_only
+    model_route: reasoning_model

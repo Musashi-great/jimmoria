@@ -34,14 +34,19 @@ from crypto_research_agents.core.process_spec import ProcessSpecRegistry, load_p
 from crypto_research_agents.core.dynamic_dispatch import DynamicCandidateDispatcher
 from crypto_research_agents.core.edge_conditions import evaluate_edge_condition
 from crypto_research_agents.core.quality_gate import review_report_quality
+from crypto_research_agents.core.scheduler import CronRegistry
 from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
 from crypto_research_agents.core.supervisor_intake import decide_supervisor_intake
 from crypto_research_agents.core.capabilities import collect_capabilities
+from crypto_research_agents.core.playbook import ResearchPlaybookRegistry
+from crypto_research_agents.core.profile import WorkerProfileRegistry
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 from crypto_research_agents.core.workflow import LoopCounter
 from crypto_research_agents.core.workflow_executor import WorkflowExecutor
 from crypto_research_agents.core.workflow_loader import WorkflowSpecRegistry, load_workflow_spec
 from crypto_research_agents.storage.artifact_store import ArtifactStore
+from crypto_research_agents.storage.session_store import search_sessions
+from crypto_research_agents.tools.registry import load_tool_registry
 
 
 class SmokeTest(unittest.TestCase):
@@ -1345,6 +1350,127 @@ Usage: codex exec [OPTIONS] [PROMPT]
             self.assertIn(("get_contract_address", "unconfigured"), statuses)
             self.assertIn(("crawl_docs", "missing_input"), statuses)
             self.assertIn(("check_airdrop_points", "unconfigured"), statuses)
+
+    def test_tool_registry_registers_existing_connectors(self) -> None:
+        registry = load_tool_registry()
+
+        self.assertEqual(registry.get("web_search").implementation_status, "implemented")
+        self.assertEqual(registry.get("github_search_repos").implementation_status, "implemented")
+        self.assertEqual(registry.get("read_github_repo").implementation_status, "implemented")
+        self.assertEqual(registry.get("dexscreener_search_pairs").implementation_status, "implemented")
+        self.assertEqual(registry.get("coingecko_coin_metadata").implementation_status, "implemented")
+
+    def test_toolset_limits_agent_access(self) -> None:
+        registry = load_tool_registry()
+        tools = registry.allowed_tools_for_toolsets(["research_basic"])
+
+        self.assertIn("web_search", tools)
+        self.assertIn("read_github_repo", tools)
+        self.assertNotIn("wallet_sign", tools)
+
+    def test_read_only_boundary_blocks_dangerous_tools(self) -> None:
+        registry = load_tool_registry()
+
+        self.assertFalse(registry.is_tool_allowed_for_research("swap"))
+        self.assertFalse(registry.is_tool_allowed_for_research("wallet_sign"))
+        with self.assertRaises(PermissionError):
+            registry.assert_toolsets_research_safe(["blocked_by_default"])
+
+    def test_cron_no_signal_silent_output(self) -> None:
+        result = CronRegistry.load().run_job("early_radar_30m")
+
+        self.assertEqual(result.status, "no_signal")
+        self.assertFalse(result.should_notify)
+        self.assertEqual(result.output, "")
+
+    def test_skill_loader_attaches_playbook(self) -> None:
+        workflow = load_workflow_spec("project_diligence_v1")
+        registry = ResearchPlaybookRegistry.load_dir()
+
+        attached = registry.attach_to_workflow(
+            workflow,
+            ["base_token_identity_gate", "ticker_collision_review"],
+        )
+
+        self.assertEqual([item.playbook_id for item in attached], ["base_token_identity_gate", "ticker_collision_review"])
+        self.assertEqual(workflow.metadata["attached_playbooks"], ["base_token_identity_gate", "ticker_collision_review"])
+
+    def test_profile_worker_allowed_tools(self) -> None:
+        tool_registry = load_tool_registry()
+        profile = WorkerProfileRegistry.load().get("researcher")
+
+        self.assertIsNotNone(profile)
+        assert profile is not None
+        allowed = profile.allowed_tools(tool_registry)
+        self.assertIn("web_search", allowed)
+        self.assertIn("dexscreener_search_pairs", allowed)
+        self.assertNotIn("wallet_sign", allowed)
+
+    def test_artifact_store_writes_tool_calls(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runtime = ResearchRuntime()
+            result = runtime.run_source_ingestion(
+                title="Artifact Contract Check",
+                content="Store this source and archive tool calls.",
+                vault_dir=root / "vault",
+                memory_path=root / "memory.json",
+            )
+            workflow = load_workflow_spec("project_diligence_v1")
+            artifact_dir = ArtifactStore(root / "runs").archive_workflow_run(
+                result=result,
+                workflow=workflow,
+                workflow_trace=[],
+                event_log=runtime.event_log,
+                tool_audit_log=[{"tool_name": "fetch_url", "status": "success"}],
+                input_payload={"topic": "Artifact Contract Check"},
+            )
+
+            self.assertTrue((artifact_dir / "input.json").exists())
+            self.assertTrue((artifact_dir / "tool_calls.jsonl").exists())
+            self.assertIn("fetch_url", (artifact_dir / "tool_calls.jsonl").read_text(encoding="utf-8"))
+
+    def test_session_search_by_contract(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "room_contract"
+            run_dir.mkdir()
+            (run_dir / "candidates.json").write_text(
+                json.dumps(
+                    [{"project": "Pearl", "contract": "0xabc123def456"}],
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            results = search_sessions("0xabc123def456", runs_dir=root)
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].room_id, "room_contract")
+        self.assertEqual(results[0].matched_file, "candidates.json")
+
+    def test_doctor_reports_missing_connector(self) -> None:
+        capabilities = {item.name: item for item in collect_capabilities()}
+
+        self.assertEqual(capabilities["Tool registry"].status, "configured")
+        self.assertEqual(capabilities["Scheduled jobs"].status, "configured")
+        self.assertEqual(capabilities["Worker profiles"].status, "configured")
+        self.assertEqual(capabilities["Telegram delivery config"].status, "missing")
+        self.assertIn("connector not registered", capabilities["X/Twitter search"].detail)
+
+    def test_safety_gate_blocks_investment_advice(self) -> None:
+        result = review_report_quality("This is not advice but you should swap into it. https://example.com")
+
+        self.assertFalse(result.passed)
+        self.assertTrue(any(issue.issue_type == "investment_advice_language" for issue in result.issues))
+
+    def test_report_requires_citations_or_unverified_label(self) -> None:
+        without_label = review_report_quality("The token is live on Base and the team is funded.")
+        with_label = review_report_quality("Unverified: the token may be live on Base and the team may be funded.")
+
+        self.assertFalse(without_label.passed)
+        self.assertTrue(any(issue.issue_type == "missing_citation" for issue in without_label.issues))
+        self.assertTrue(with_label.passed)
 
 
 if __name__ == "__main__":

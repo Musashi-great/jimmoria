@@ -1093,6 +1093,180 @@ data/runs/<room_id>/
   report.md
   report.telegram.md
   report.json
+  input.json
+  tool_calls.jsonl
 ```
 
 이 레이어의 다음 단계는 실제 candidate diligence subgraph를 병렬 실행하고, Quality Reviewer가 fail을 내면 ReportAgent로 bounded revision loop를 돌리는 것이다.
+
+## 27. Hermes-Inspired Operating Layer
+
+이번 단계에서는 Hermes의 운영 OS 패턴을 JIMMORIA에 맞게 얇게 적용했다. 핵심은 JIMMORIA를 범용 개인 비서로 바꾸는 것이 아니라, read-only Web3 리서치 회사가 CLI에서 조용히 운영될 수 있도록 도구 권한, 스케줄, 플레이북, 프로필, artifact, doctor, safety boundary를 분리하는 것이다.
+
+새 모듈:
+
+```text
+crypto_research_agents/tools/
+  __init__.py
+  registry.py
+
+crypto_research_agents/core/
+  scheduler.py
+  playbook.py
+  profile.py
+
+crypto_research_agents/storage/
+  session_store.py
+```
+
+새 config:
+
+```text
+config/toolsets.yaml        tool registry, toolsets, mode(read_only/artifact_write/dangerous)
+config/jobs.yaml            early_radar_30m, kol_handle_hourly, daily_digest
+config/profiles.yaml        final_reporter, social_scout, researcher, risk_reviewer
+research_playbooks/*.md     reusable research playbooks
+```
+
+### Tool Registry / Toolsets
+
+`crypto_research_agents/tools/registry.py`는 JIMMORIA에서 쓸 수 있는 도구를 다음 기준으로 분류한다.
+
+```text
+read_only       public web, docs, GitHub, market metadata, public on-chain read
+artifact_write  local report/note/artifact writing
+write           external write operations, default research boundary에서는 사용하지 않음
+dangerous       wallet signing, swap, approve, transfer, private key, seed phrase
+```
+
+기본 리서치 직원들은 `read_only`와 `artifact_write`만 쓸 수 있다. `swap`, `approve`, `transfer`, `wallet_sign`, `private_key_read`, `seed_phrase_read`는 tool registry에 명시적으로 존재하지만 `dangerous`로 표시되어 차단된다.
+
+AgentSpec도 `tools.allowed_toolsets`를 받을 수 있게 확장했다. 앞으로 에이전트 YAML에서는 개별 tool 이름 대신 다음처럼 권한을 줄 수 있다.
+
+```yaml
+tools:
+  allowed_toolsets:
+    - research_basic
+    - reporting
+```
+
+### Scheduled Jobs
+
+`crypto_research_agents/core/scheduler.py`는 CLI에서 cron-style job을 다룬다. 아직 daemon은 아니고, job 정의와 단발 실행/상태 확인 인터페이스다.
+
+```powershell
+jimmoria cron list
+jimmoria cron status
+jimmoria cron run early_radar_30m
+jimmoria cron create my_job --schedule "every 2h" --workflow early_radar_v1
+```
+
+기본 job:
+
+```text
+early_radar_30m      early project signal scan
+kol_handle_hourly    KOL handle and social mention refresh
+daily_digest         final digest when material signals exist
+```
+
+`no_signal` job은 `output=""`, `should_notify=false`를 반환한다. 즉 24시간 레이더가 아무 신호도 못 찾으면 사용자에게 소음을 만들지 않는다.
+
+### Research Playbooks
+
+`research_playbooks/`는 반복 리서치 절차를 스킬처럼 저장한다.
+
+```text
+base_token_identity_gate
+ticker_collision_review
+ai_agent_token_diligence
+kol_shill_quality_review
+telegram_report_style
+```
+
+`ResearchPlaybookRegistry.attach_to_workflow()`는 workflow metadata에 attached playbook 목록을 넣는다. 이후 workflow executor가 각 노드 prompt에 이 playbook을 주입하도록 확장할 수 있다.
+
+### Worker Profiles
+
+`config/profiles.yaml`은 직원 프로필별 toolset과 출력 위치를 정의한다.
+
+```text
+final_reporter  -> research_basic + reporting, telegram_final_or_cli
+social_scout    -> social_basic + research_basic + reporting, worker_log
+researcher      -> research_basic + market_basic + onchain_basic + reporting, candidate_packet
+risk_reviewer   -> research_basic + market_basic + onchain_basic + reporting, critique_only
+```
+
+CLI:
+
+```powershell
+jimmoria profile list
+```
+
+### Artifact / Session Store
+
+`ArtifactStore.archive_workflow_run()`은 이제 workflow archive에 `input.json`과 `tool_calls.jsonl`도 쓴다.
+
+```text
+data/runs/<room_id>/
+  input.json
+  tool_calls.jsonl
+  workflow.yaml
+  workflow_trace.json
+  events.jsonl
+  messages.jsonl
+  sources.json
+  findings.json
+  candidates.json
+  report.md
+  report.telegram.md
+  report.json
+```
+
+`storage/session_store.py`는 이전 run을 project/ticker/contract/source URL로 검색한다.
+
+```powershell
+jimmoria sessions search "0x..."
+```
+
+### Doctor / Status
+
+`jimmoria doctor`는 기존 runtime/model/live connector 상태에 더해 다음도 확인한다.
+
+```text
+Tool registry
+Scheduled jobs
+Worker profiles
+Telegram delivery config
+Artifact directory writable
+```
+
+X/Twitter, Telegram, Discord, RootData, Explorer/RPC 같은 live connector가 아직 등록되지 않은 경우 placeholder/missing으로 표시된다. 이는 실패가 아니라 현재 MVP의 연결 상태를 명확히 보여주는 진단이다.
+
+### Safety Gate
+
+`core/quality_gate.py`는 다음을 막는다.
+
+```text
+buy, sell, swap, transfer, approve, ape, long, short, price target
+매수, 매도
+```
+
+또한 보고서의 factual claim에는 URL이 있거나 `unverified`, `unknown`, `insufficient evidence`, `thin signal`, `미확인`, `불확실` 같은 라벨이 있어야 한다. JIMMORIA는 리서치 회사이지 매매/투자 조언 시스템이 아니다.
+
+### 새 테스트
+
+이번 단계에서 다음 테스트를 추가했다.
+
+```text
+test_tool_registry_registers_existing_connectors
+test_toolset_limits_agent_access
+test_read_only_boundary_blocks_dangerous_tools
+test_cron_no_signal_silent_output
+test_skill_loader_attaches_playbook
+test_profile_worker_allowed_tools
+test_artifact_store_writes_tool_calls
+test_session_search_by_contract
+test_doctor_reports_missing_connector
+test_safety_gate_blocks_investment_advice
+test_report_requires_citations_or_unverified_label
+```

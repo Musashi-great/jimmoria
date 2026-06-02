@@ -57,6 +57,7 @@ class MemoryScope:
 class ToolPolicy:
     allow: list[str] = field(default_factory=list)
     deny: list[str] = field(default_factory=list)
+    allowed_toolsets: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)

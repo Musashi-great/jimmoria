@@ -6,11 +6,24 @@ from dataclasses import dataclass, field
 INVESTMENT_ADVICE_TERMS = [
     "buy",
     "sell",
+    "swap",
+    "transfer",
+    "approve",
     "ape",
     "long",
     "short",
+    "price target",
     "매수",
     "매도",
+]
+
+UNCERTAINTY_LABELS = [
+    "unverified",
+    "unknown",
+    "insufficient evidence",
+    "thin signal",
+    "미확인",
+    "불확실",
 ]
 
 
@@ -48,13 +61,17 @@ def review_report_quality(report_text: str) -> QualityReviewResult:
     lower = report_text.lower()
     issues: list[QualityIssue] = []
 
-    if "evidence urls: 0" in lower or ("http://" not in lower and "https://" not in lower):
+    has_url = "http://" in lower or "https://" in lower
+    has_uncertainty_label = any(label in lower for label in UNCERTAINTY_LABELS)
+    if ("evidence urls: 0" in lower and not has_uncertainty_label) or (
+        not has_url and not has_uncertainty_label
+    ):
         issues.append(
             QualityIssue(
                 issue_type="missing_citation",
                 severity="high",
-                message="The report has no source-backed evidence URLs.",
-                suggested_fix="Add official/source URLs or mark the output as Thin Signal / insufficient evidence.",
+                message="The report has no source-backed evidence URLs or explicit unverified label.",
+                suggested_fix="Add official/source URLs or mark factual claims as unverified/insufficient evidence.",
             )
         )
 
@@ -65,7 +82,7 @@ def review_report_quality(report_text: str) -> QualityReviewResult:
                     issue_type="investment_advice_language",
                     severity="critical",
                     message=f"Report contains prohibited trading/advice language: {term}",
-                    suggested_fix="Remove buy/sell/long/short style language and keep the report research-only.",
+                    suggested_fix="Remove buy/sell/swap/long/short style language and keep the report research-only.",
                 )
             )
             break

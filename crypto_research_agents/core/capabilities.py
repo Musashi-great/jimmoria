@@ -8,6 +8,9 @@ from typing import Any
 from .agent_spec import AgentSpecRegistry
 from .llm_provider import provider_from_env
 from .tool_gateway import ToolGateway
+from .profile import WorkerProfileRegistry
+from .scheduler import CronRegistry
+from crypto_research_agents.tools.registry import load_tool_registry
 
 
 @dataclass(slots=True)
@@ -36,6 +39,9 @@ def collect_capabilities(
         register_default_connectors(gateway)
     provider = provider_from_env()
     agent_spec_status = _agent_spec_status(agent_spec_dir)
+    tool_registry = load_tool_registry()
+    cron_registry = CronRegistry.load()
+    profile_registry = WorkerProfileRegistry.load()
     capabilities = [
         CapabilityStatus(
             "Runtime scaffold",
@@ -78,6 +84,29 @@ def collect_capabilities(
             "configured" if os.getenv("OPENAI_API_KEY") else "missing",
             "OPENAI_API_KEY set" if os.getenv("OPENAI_API_KEY") else "set OPENAI_API_KEY",
         ),
+        CapabilityStatus(
+            "Tool registry",
+            "configured" if tool_registry.definitions else "missing",
+            f"{len(tool_registry.definitions)} tools, {len(tool_registry.toolsets)} toolsets",
+        ),
+        CapabilityStatus(
+            "Scheduled jobs",
+            "configured" if cron_registry.jobs else "missing",
+            f"{len(cron_registry.jobs)} jobs configured",
+        ),
+        CapabilityStatus(
+            "Worker profiles",
+            "configured" if profile_registry.profiles else "missing",
+            f"{len(profile_registry.profiles)} profiles configured",
+        ),
+        CapabilityStatus(
+            "Telegram delivery config",
+            "configured" if os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHAT_ID") else "missing",
+            "TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID set"
+            if os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHAT_ID")
+            else "set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID for final delivery",
+        ),
+        _writable_directory_status(Path(runs_dir), "Artifact directory"),
     ]
 
     tool_specs = [
@@ -161,6 +190,17 @@ def _path_detail(path: str | Path, missing_note: str) -> str:
     if target.exists():
         return f"{target} exists"
     return f"{target} not found yet; {missing_note}"
+
+
+def _writable_directory_status(path: Path, name: str) -> CapabilityStatus:
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        probe = path / ".jimmoria_write_probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+    except OSError as exc:
+        return CapabilityStatus(name, "missing", f"not writable: {exc}")
+    return CapabilityStatus(name, "configured", f"{path} is writable")
 
 
 def _overall_status(capabilities: list[CapabilityStatus]) -> CapabilityStatus:

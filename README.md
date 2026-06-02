@@ -232,6 +232,57 @@ JIMMORIA는 이제 Research Room이 끝났다고 해서 무조건 완료 보고�
 
 `insufficient_evidence`가 나오면 파일은 저장되지만, 제목이 `리서치 미완료 / Research Not Completed`로 표시됩니다. 이 경우는 실제 리서치 완료본이 아니라 "근거가 부족해서 아직 보고서로 확정할 수 없음"이라는 진단 메모입니다.
 
+## Hermes-Inspired Operating Layer
+
+JIMMORIA now has a thin operating layer for toolsets, scheduled jobs, worker profiles, playbooks, session search, and safety boundaries. It is not a generic assistant layer; it stays focused on read-only Web3 research and report artifacts.
+
+```powershell
+jimmoria tools list
+jimmoria tools list --toolset research_basic
+jimmoria cron list
+jimmoria cron status
+jimmoria cron run early_radar_30m
+jimmoria cron create my_job --schedule "every 2h" --workflow early_radar_v1
+jimmoria profile list
+jimmoria playbook list
+jimmoria sessions search "0x..."
+```
+
+New operating files:
+
+```text
+config/toolsets.yaml              tool registry, toolsets, read-only boundary
+config/jobs.yaml                  scheduled research job specs
+config/profiles.yaml              worker profiles and allowed toolsets
+research_playbooks/*.md           reusable research playbooks
+crypto_research_agents/tools/     tool registry loader
+crypto_research_agents/core/      scheduler, profile, playbook modules
+crypto_research_agents/storage/   richer artifact archive and session search
+```
+
+Workflow archives now include:
+
+```text
+data/runs/<room_id>/
+  input.json
+  tool_calls.jsonl
+  sources.json
+  findings.json
+  candidates.json
+  report.md
+  report.telegram.md
+  report.json
+```
+
+Safety boundary:
+
+```text
+- allowed by default: read_only, artifact_write
+- blocked: wallet signing, swap, transfer, approve, private key, seed phrase
+- report guard: no investment-advice language
+- evidence guard: factual claims need a URL or an explicit unverified/insufficient-evidence label
+```
+
 ## Workflow Commands
 
 ChatDev식 YAML workflow layer가 추가되었습니다. 기존 Research Room을 대체하지 않고, 회사 업무 흐름과 replay artifact를 남기는 레이어입니다.

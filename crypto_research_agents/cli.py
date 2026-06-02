@@ -29,6 +29,9 @@ from crypto_research_agents.core.supervisor_intake import (
 )
 from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
+from crypto_research_agents.core.playbook import ResearchPlaybookRegistry
+from crypto_research_agents.core.profile import WorkerProfileRegistry
+from crypto_research_agents.core.scheduler import CronRegistry, create_local_job
 from crypto_research_agents.core.workflow_executor import WorkflowExecutor
 from crypto_research_agents.core.workflow_loader import (
     WorkflowSpecRegistry,
@@ -40,6 +43,8 @@ from crypto_research_agents.storage.artifact_store import ArtifactStore
 from crypto_research_agents.storage.json_store import load_memory
 from crypto_research_agents.storage.paths import default_project_path, resolve_project_path
 from crypto_research_agents.storage.run_store import list_run_summaries, load_run_file
+from crypto_research_agents.storage.session_store import search_sessions
+from crypto_research_agents.tools.registry import load_tool_registry
 
 
 DEMO_TEXT = """
@@ -168,6 +173,42 @@ def main(argv: list[str] | None = None) -> None:
     workflow_events_parser.add_argument("--limit", type=int, default=30)
     workflow_events_parser.add_argument("--runs-dir", default=default_project_path("data/runs"))
 
+    tools_parser = subparsers.add_parser("tools", help="Inspect JIMMORIA tool registry and toolsets.")
+    tools_subparsers = tools_parser.add_subparsers(dest="tools_command")
+    tools_list_parser = tools_subparsers.add_parser("list", help="List registered tools.")
+    tools_list_parser.add_argument("--toolset", help="Limit output to one toolset.")
+    tools_list_parser.add_argument("--json", action="store_true")
+
+    cron_parser = subparsers.add_parser("cron", help="Inspect and run scheduled research jobs.")
+    cron_subparsers = cron_parser.add_subparsers(dest="cron_command")
+    cron_subparsers.add_parser("list", help="List scheduled jobs.")
+    cron_subparsers.add_parser("status", help="Show scheduler status.")
+    cron_run_parser = cron_subparsers.add_parser("run", help="Run a scheduled job once.")
+    cron_run_parser.add_argument("job_id")
+    cron_run_parser.add_argument("--signal", help="Optional JSON signal payload.")
+    cron_run_parser.add_argument("--json", action="store_true")
+    cron_create_parser = cron_subparsers.add_parser("create", help="Create a local scheduled job definition.")
+    cron_create_parser.add_argument("job_id")
+    cron_create_parser.add_argument("--schedule", required=True)
+    cron_create_parser.add_argument("--workflow", required=True)
+    cron_create_parser.add_argument("--output", default="local")
+    cron_create_parser.add_argument("--profile", default="researcher")
+
+    profile_parser = subparsers.add_parser("profile", help="Inspect worker profiles.")
+    profile_subparsers = profile_parser.add_subparsers(dest="profile_command")
+    profile_subparsers.add_parser("list", help="List worker profiles.")
+
+    playbook_parser = subparsers.add_parser("playbook", help="Inspect research playbooks.")
+    playbook_subparsers = playbook_parser.add_subparsers(dest="playbook_command")
+    playbook_subparsers.add_parser("list", help="List research playbooks.")
+
+    sessions_parser = subparsers.add_parser("sessions", help="Search archived research sessions.")
+    sessions_subparsers = sessions_parser.add_subparsers(dest="sessions_command")
+    sessions_search_parser = sessions_subparsers.add_parser("search", help="Search sessions by project, ticker, contract, or URL.")
+    sessions_search_parser.add_argument("query")
+    sessions_search_parser.add_argument("--runs-dir", default=default_project_path("data/runs"))
+    sessions_search_parser.add_argument("--json", action="store_true")
+
     args = parser.parse_args(argv)
     if args.command is None:
         if sys.stdin.isatty():
@@ -182,6 +223,26 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.command == "workflow":
         workflow_command(args)
+        return
+
+    if args.command == "tools":
+        tools_command(args)
+        return
+
+    if args.command == "cron":
+        cron_command(args)
+        return
+
+    if args.command == "profile":
+        profile_command(args)
+        return
+
+    if args.command == "playbook":
+        playbook_command(args)
+        return
+
+    if args.command == "sessions":
+        sessions_command(args)
         return
 
     if args.command in {"runs", "status", "messages", "events", "show-report"}:
@@ -398,6 +459,124 @@ def workflow_command(args: argparse.Namespace) -> None:
     raise SystemExit(f"Unknown workflow command: {args.workflow_command}")
 
 
+def tools_command(args: argparse.Namespace) -> None:
+    if not args.tools_command:
+        raise SystemExit("Provide a tools command: list.")
+    registry = load_tool_registry()
+    if args.tools_command == "list":
+        tool_ids: list[str]
+        if args.toolset:
+            toolset = registry.toolset(args.toolset)
+            if toolset is None:
+                raise SystemExit(f"Unknown toolset: {args.toolset}")
+            tool_ids = toolset.tools
+        else:
+            tool_ids = sorted(registry.definitions)
+        payload = []
+        for tool_id in tool_ids:
+            definition = registry.get(tool_id)
+            if definition is None:
+                continue
+            availability = registry.availability(tool_id)
+            payload.append({**definition.to_dict(), "availability": availability.status})
+        if args.json:
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+            return
+        for item in payload:
+            print(
+                f"{item['tool_id']} | {item['mode']} | {item['implementation_status']} | "
+                f"{item['availability']} | {item['description']}"
+            )
+        return
+    raise SystemExit(f"Unknown tools command: {args.tools_command}")
+
+
+def cron_command(args: argparse.Namespace) -> None:
+    if not args.cron_command:
+        raise SystemExit("Provide a cron command: list, status, run, or create.")
+    registry = CronRegistry.load()
+    if args.cron_command == "list":
+        for job in registry.list_jobs():
+            state = "enabled" if job.enabled else "disabled"
+            print(f"{job.job_id} | {state} | {job.schedule} | {job.workflow_id} | {job.output}")
+        return
+    if args.cron_command == "status":
+        print(f"jobs: {len(registry.jobs)}")
+        print("no_signal_policy: silent by default")
+        return
+    if args.cron_command == "run":
+        signal = None
+        if args.signal:
+            try:
+                signal = json.loads(args.signal)
+            except json.JSONDecodeError as exc:
+                raise SystemExit(f"--signal must be JSON: {exc}") from exc
+        result = registry.run_job(args.job_id, signal=signal)
+        if args.json:
+            print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
+            return
+        if result.output:
+            print(result.output)
+        elif result.status != "no_signal":
+            print(f"{result.job_id}: {result.status} | {result.detail}")
+        return
+    if args.cron_command == "create":
+        path = create_local_job(
+            job_id=args.job_id,
+            schedule=args.schedule,
+            workflow_id=args.workflow,
+            output=args.output,
+            profile=args.profile,
+        )
+        print(f"created: {args.job_id} -> {path}")
+        return
+    raise SystemExit(f"Unknown cron command: {args.cron_command}")
+
+
+def profile_command(args: argparse.Namespace) -> None:
+    if not args.profile_command:
+        raise SystemExit("Provide a profile command: list.")
+    registry = WorkerProfileRegistry.load()
+    tool_registry = load_tool_registry()
+    if args.profile_command == "list":
+        for profile in registry.list_profiles():
+            allowed_count = len(profile.allowed_tools(tool_registry))
+            print(
+                f"{profile.profile_id} | tools={allowed_count} | "
+                f"output={profile.output_destination} | {profile.role}"
+            )
+        return
+    raise SystemExit(f"Unknown profile command: {args.profile_command}")
+
+
+def playbook_command(args: argparse.Namespace) -> None:
+    if not args.playbook_command:
+        raise SystemExit("Provide a playbook command: list.")
+    registry = ResearchPlaybookRegistry.load_dir()
+    if args.playbook_command == "list":
+        for playbook in sorted(registry.playbooks.values(), key=lambda item: item.playbook_id):
+            print(f"{playbook.playbook_id} | {playbook.title}")
+        return
+    raise SystemExit(f"Unknown playbook command: {args.playbook_command}")
+
+
+def sessions_command(args: argparse.Namespace) -> None:
+    if not args.sessions_command:
+        raise SystemExit("Provide a sessions command: search.")
+    if args.sessions_command == "search":
+        results = search_sessions(args.query, runs_dir=args.runs_dir)
+        if args.json:
+            print(json.dumps([item.to_dict() for item in results], ensure_ascii=False, indent=2))
+            return
+        if not results:
+            print("No sessions found.")
+            return
+        for item in results:
+            print(f"{item.room_id} | {item.matched_file} | {item.snippet}")
+        return
+    raise SystemExit(f"Unknown sessions command: {args.sessions_command}")
+
+
 def workflow_context_from_result(result: object) -> dict[str, object]:
     room = result.room
     memory = result.memory
@@ -439,6 +618,13 @@ def archive_workflow_for_result(
         workflow=workflow,
         workflow_trace=execution.trace,
         event_log=runtime.event_log,
+        tool_audit_log=runtime.tool_gateway.audit_log,
+        input_payload={
+            "workflow_id": workflow_id,
+            "room_id": result.room.room_id,
+            "topic": result.room.topic,
+            "context": context or workflow_context_from_result(result),
+        },
     )
 
 
@@ -1080,11 +1266,23 @@ def doctor_command(args: argparse.Namespace | None = None) -> None:
             "Obsidian vault writer",
         },
         "Models": {"LLM provider", "Codex OAuth token", "OpenAI API key"},
+        "Operations": {
+            "Tool registry",
+            "Scheduled jobs",
+            "Worker profiles",
+            "Telegram delivery config",
+            "Artifact directory",
+        },
         "Live research tools": set(),
         "Overall": {"Overall"},
     }
     for capability in capabilities:
-        if capability.name not in groups["Runtime"] and capability.name not in groups["Models"] and capability.name != "Overall":
+        if (
+            capability.name not in groups["Runtime"]
+            and capability.name not in groups["Models"]
+            and capability.name not in groups["Operations"]
+            and capability.name != "Overall"
+        ):
             groups["Live research tools"].add(capability.name)
 
     for group_name, names in groups.items():

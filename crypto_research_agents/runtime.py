@@ -30,6 +30,7 @@ from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 from crypto_research_agents.storage.json_store import save_memory
 from crypto_research_agents.storage.paths import resolve_project_path
 from crypto_research_agents.storage.run_store import save_run_snapshot
+from crypto_research_agents.tools.registry import load_tool_registry
 
 
 DEFAULT_AGENTS = [
@@ -323,11 +324,18 @@ class ResearchRuntime:
 
 def default_policy(agent_specs: AgentSpecRegistry | None = None) -> PolicyEngine:
     policy = PolicyEngine()
+    tool_registry = load_tool_registry()
     for agent_id in DEFAULT_AGENTS:
         policy.allow(agent_id, "source_cache_write")
     if agent_specs is not None:
         for agent_id, spec in agent_specs.specs.items():
-            for tool in spec.tools.allow:
+            allowed_tools = tool_registry.tools_for_agent_policy(
+                spec.tools.allow,
+                spec.tools.allowed_toolsets,
+            )
+            for tool in allowed_tools:
+                if not tool_registry.is_tool_allowed_for_research(tool):
+                    continue
                 policy.allow(agent_id, tool)
     for tool in ["x_search_posts", "telegram_read_channel", "discord_read_channel"]:
         policy.allow("social_kol_agent", tool)

@@ -1,0 +1,237 @@
+version: 1
+default_research_modes:
+  - read_only
+  - artifact_write
+
+toolsets:
+  research_basic:
+    description: Public read-only research connectors.
+    tools:
+      - fetch_url
+      - parse_html
+      - archive_source_snapshot
+      - web_search
+      - crawl_website
+      - crawl_docs
+      - github_search_repos
+      - read_github_repo
+  social_basic:
+    description: Read-only social/KOL signal connectors.
+    tools:
+      - x_search_posts
+      - x_get_user_timeline
+      - x_build_kol_list
+      - telegram_read_channel
+      - discord_read_channel
+  market_basic:
+    description: Read-only market metadata for identity and context, not trading advice.
+    tools:
+      - dexscreener_search_pairs
+      - coingecko_coin_metadata
+      - rootdata_search_projects
+  onchain_basic:
+    description: Public on-chain read tools only.
+    tools:
+      - get_contract_address
+      - explorer_lookup
+      - get_token_metadata
+      - get_dex_pair
+  reporting:
+    description: Local artifact and note writing.
+    tools:
+      - source_cache_write
+      - render_markdown
+      - write_note
+      - artifact_store
+  blocked_by_default:
+    description: Explicitly blocked wallet, signing, and trading actions.
+    tools:
+      - wallet_sign
+      - swap
+      - approve
+      - transfer
+      - private_key_read
+      - seed_phrase_read
+
+tools:
+  fetch_url:
+    connector_name: fetch_url
+    category: source_ingestion
+    mode: read_only
+    implementation_status: implemented
+    description: Fetch a public URL and extract readable source text.
+  parse_html:
+    connector_name: parse_html
+    category: source_ingestion
+    mode: read_only
+    implementation_status: implemented
+    description: Parse fetched HTML into text, links, and metadata.
+  archive_source_snapshot:
+    connector_name: archive_source_snapshot
+    category: source_ingestion
+    mode: artifact_write
+    implementation_status: implemented
+    description: Persist source snapshots for replay and dedupe.
+  web_search:
+    connector_name: web_search
+    category: discovery
+    mode: read_only
+    implementation_status: implemented
+    description: Public web search for project and narrative evidence.
+  crawl_website:
+    connector_name: crawl_website
+    category: product
+    mode: read_only
+    implementation_status: implemented
+    description: Crawl public website metadata and product signals.
+  crawl_docs:
+    connector_name: crawl_docs
+    category: product
+    mode: read_only
+    implementation_status: implemented
+    description: Crawl project documentation.
+  github_search_repos:
+    connector_name: github_search_repos
+    category: product
+    mode: read_only
+    implementation_status: implemented
+    description: Search GitHub repositories for likely project code.
+  read_github_repo:
+    connector_name: read_github_repo
+    category: product
+    mode: read_only
+    implementation_status: implemented
+    description: Read public GitHub repository metadata.
+  dexscreener_search_pairs:
+    connector_name: dexscreener_search_pairs
+    category: market
+    mode: read_only
+    implementation_status: implemented
+    description: Search DEX Screener pairs as identity/context evidence.
+  coingecko_coin_metadata:
+    connector_name: coingecko_coin_metadata
+    category: market
+    mode: read_only
+    implementation_status: implemented
+    description: Read CoinGecko public metadata.
+  x_search_posts:
+    connector_name: x_search_posts
+    category: social
+    mode: read_only
+    implementation_status: external_connector_required
+    required_secrets: [X_BEARER_TOKEN]
+    description: Search public X posts for project and KOL mentions.
+  x_get_user_timeline:
+    connector_name: x_get_user_timeline
+    category: social
+    mode: read_only
+    implementation_status: external_connector_required
+    required_secrets: [X_BEARER_TOKEN]
+    description: Read a KOL timeline for repeated mentions.
+  x_build_kol_list:
+    connector_name: x_build_kol_list
+    category: social
+    mode: read_only
+    implementation_status: planned
+    description: Build reusable KOL handle lists by narrative.
+  telegram_read_channel:
+    connector_name: telegram_read_channel
+    category: social
+    mode: read_only
+    implementation_status: external_connector_required
+    required_secrets: [TELEGRAM_BOT_TOKEN]
+    description: Read approved Telegram channels.
+  discord_read_channel:
+    connector_name: discord_read_channel
+    category: social
+    mode: read_only
+    implementation_status: external_connector_required
+    required_secrets: [DISCORD_BOT_TOKEN]
+    description: Read approved Discord channels.
+  rootdata_search_projects:
+    connector_name: rootdata_search_projects
+    category: discovery
+    mode: read_only
+    implementation_status: external_connector_required
+    required_secrets: [ROOTDATA_API_KEY]
+    description: Search RootData project directory.
+  get_contract_address:
+    connector_name: get_contract_address
+    category: onchain
+    mode: read_only
+    implementation_status: external_connector_required
+    required_secrets: [ETHERSCAN_API_KEY]
+    description: Resolve public contract address data.
+  explorer_lookup:
+    connector_name: explorer_lookup
+    category: onchain
+    mode: read_only
+    implementation_status: external_connector_required
+    required_secrets: [ETHERSCAN_API_KEY]
+    description: Read public explorer metadata.
+  get_token_metadata:
+    connector_name: get_token_metadata
+    category: onchain
+    mode: read_only
+    implementation_status: external_connector_required
+    description: Read token metadata from public sources.
+  get_dex_pair:
+    connector_name: get_dex_pair
+    category: onchain
+    mode: read_only
+    implementation_status: external_connector_required
+    description: Read public DEX pair metadata.
+  source_cache_write:
+    connector_name: source_cache_write
+    category: artifact
+    mode: artifact_write
+    implementation_status: planned
+    description: Write source cache artifacts.
+  render_markdown:
+    connector_name: render_markdown
+    category: report
+    mode: artifact_write
+    implementation_status: planned
+    description: Render markdown reports locally.
+  write_note:
+    connector_name: write_note
+    category: obsidian
+    mode: artifact_write
+    implementation_status: planned
+    description: Write Obsidian-compatible notes.
+  artifact_store:
+    connector_name: artifact_store
+    category: artifact
+    mode: artifact_write
+    implementation_status: implemented
+    description: Archive run/session artifacts.
+  wallet_sign:
+    category: dangerous
+    mode: dangerous
+    implementation_status: blocked
+    description: Blocked. JIMMORIA never signs wallet transactions.
+  swap:
+    category: dangerous
+    mode: dangerous
+    implementation_status: blocked
+    description: Blocked. JIMMORIA never swaps or trades.
+  approve:
+    category: dangerous
+    mode: dangerous
+    implementation_status: blocked
+    description: Blocked. JIMMORIA never approves token allowances.
+  transfer:
+    category: dangerous
+    mode: dangerous
+    implementation_status: blocked
+    description: Blocked. JIMMORIA never transfers assets.
+  private_key_read:
+    category: dangerous
+    mode: dangerous
+    implementation_status: blocked
+    description: Blocked. JIMMORIA never reads private keys.
+  seed_phrase_read:
+    category: dangerous
+    mode: dangerous
+    implementation_status: blocked
+    description: Blocked. JIMMORIA never reads seed phrases.

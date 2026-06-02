@@ -19,15 +19,28 @@ class ArtifactStore:
         workflow: WorkflowSpec,
         workflow_trace: list[dict[str, Any]],
         event_log: list[dict[str, Any]] | None = None,
+        tool_audit_log: list[dict[str, Any]] | None = None,
+        input_payload: dict[str, Any] | None = None,
     ) -> Path:
         room = result.room
         run_dir = self.root_dir / room.room_id
         run_dir.mkdir(parents=True, exist_ok=True)
 
         write_json(run_dir / "workflow.yaml", workflow.to_dict())
+        write_json(
+            run_dir / "input.json",
+            input_payload
+            or {
+                "room_id": room.room_id,
+                "topic": room.topic,
+                "goals": room.goals,
+                "source_inputs": room.source_inputs,
+            },
+        )
         write_json(run_dir / "workflow_trace.json", workflow_trace)
         write_jsonl(run_dir / "events.jsonl", event_log or [])
         write_jsonl(run_dir / "messages.jsonl", result.bus.to_list())
+        write_jsonl(run_dir / "tool_calls.jsonl", tool_audit_log or [])
 
         sources = [
             result.memory.sources[source_id].to_dict()

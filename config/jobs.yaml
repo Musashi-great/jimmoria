@@ -1,0 +1,25 @@
+jobs:
+  early_radar_30m:
+    schedule: every 30m
+    workflow: early_radar_v1
+    output: telegram_final_only
+    profile: researcher
+    enabled: true
+    silent_no_signal: true
+    description: Scan low-cost sources for new early project signals.
+  kol_handle_hourly:
+    schedule: every 1h
+    workflow: early_radar_v1
+    output: local_or_worker_room
+    profile: social_scout
+    enabled: true
+    silent_no_signal: true
+    description: Refresh KOL handle and mention candidates.
+  daily_digest:
+    schedule: 09:00 KST
+    workflow: project_diligence_v1
+    output: telegram_final_only
+    profile: final_reporter
+    enabled: true
+    silent_no_signal: true
+    description: Produce a daily research digest only when material signals exist.
