@@ -614,6 +614,54 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(console.runtime_dock_lines, 0)
         self.assertFalse(console.runtime_room_running)
 
+    def test_workboard_summarizes_multiple_rooms(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runs_dir = root / "runs"
+            room_dir = runs_dir / "room_alpha"
+            room_dir.mkdir(parents=True)
+            (room_dir / "room.json").write_text(
+                json.dumps(
+                    {
+                        "room_id": "room_alpha",
+                        "topic": "pearl pow project research",
+                        "status": "completed",
+                        "project_card": {"research_quality_status": "insufficient_evidence"},
+                        "output_paths": {"report": str(root / "reports" / "pearl.md")},
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (room_dir / "events.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "type": "room_created",
+                            "room_id": "room_alpha",
+                            "agents": ["supervisor_agent", "ingestion_agent"],
+                        },
+                        {"type": "agent_done", "agent_id": "supervisor_agent", "summary": "Planned."},
+                        {"type": "agent_start", "agent_id": "ingestion_agent"},
+                    ],
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            output = StringIO()
+            with patch.dict(os.environ, {"JIMMORIA_PLAIN_LOGS": "1"}):
+                console = JimmoriaConsole(runs_dir=runs_dir)
+                with redirect_stdout(output):
+                    console.print_workboard(limit=5)
+
+            text = output.getvalue()
+            self.assertIn("Workload board", text)
+            self.assertIn("room_alpha", text)
+            self.assertIn("pearl pow project research", text)
+            self.assertIn("insufficient_evidence", text)
+            self.assertIn("ingestion_agent", text)
+
     def test_article_research_loop_writes_outputs(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

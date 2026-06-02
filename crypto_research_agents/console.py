@@ -79,6 +79,7 @@ class JimmoriaConsole:
             "  /settings                Show company operating settings",
             "  /board                   Show current live agent board",
             "  /context                 Show shared memory and latest run context",
+            "  /rooms                   Show multi-room workload board",
             "  /runs                    Show previous runs",
             "  /status [room_id]        Show latest or selected room status",
             "  /messages [room_id]      Show collaboration history",
@@ -594,6 +595,135 @@ class JimmoriaConsole:
             ],
         )
 
+    def print_workboard(self, *, limit: int = 8) -> None:
+        runs = list_run_summaries(self.runs_dir)[:limit]
+        if not runs:
+            self.block("Workload board", ["No saved rooms found."])
+            return
+
+        rows: list[dict[str, str]] = []
+        for item in runs:
+            room_id = str(item.get("room_id", ""))
+            status = str(item.get("status", ""))
+            topic = self.compact_text(str(item.get("topic", "")), 46)
+            report = "report" if item.get("report") else "-"
+            quality = ""
+            progress = "-"
+            latest = "-"
+            try:
+                room = load_run_file(room_id, "room.json", self.runs_dir)
+                events = load_run_file(room_id, "events.json", self.runs_dir)
+                assert isinstance(room, dict)
+                assert isinstance(events, list)
+                quality = self.room_quality_label(room)
+                progress = self.progress_from_events(events)
+                latest = self.latest_work_from_events(events)
+            except (FileNotFoundError, AssertionError, OSError, ValueError):
+                latest = "snapshot incomplete"
+            rows.append(
+                {
+                    "state": self.room_state_label(status),
+                    "room": self.short_id(room_id),
+                    "topic": topic,
+                    "progress": progress,
+                    "quality": quality or "-",
+                    "latest": self.compact_text(latest, 58),
+                    "report": report,
+                }
+            )
+
+        if self.use_rich:
+            self.rich_workboard(rows)
+            return
+
+        lines: list[str] = []
+        for row in rows:
+            lines.append(
+                f"{row['state']:<5} {row['room']:<18} {row['progress']:<22} "
+                f"{row['quality']:<22} {row['report']}"
+            )
+            lines.append(f"      {row['topic']}")
+            lines.append(f"      latest: {row['latest']}")
+        self.block("Workload board", lines)
+
+    def room_state_label(self, status: str) -> str:
+        normalized = status.lower()
+        if normalized in {"completed", "done"}:
+            return "DONE"
+        if normalized in {"failed", "error"}:
+            return "FAIL"
+        if normalized in {"running", "assigned", "waiting_for_tool", "ready_for_report", "writing_report", "obsidian_syncing"}:
+            return "RUN"
+        if normalized in {"created"}:
+            return "NEW"
+        return (status.upper() or "ROOM")[:5]
+
+    def room_quality_label(self, room: dict[str, object]) -> str:
+        project_card = room.get("project_card") if isinstance(room.get("project_card"), dict) else {}
+        assert isinstance(project_card, dict)
+        direct = project_card.get("research_quality_status")
+        if direct:
+            return str(direct)
+        quality = project_card.get("research_quality") if isinstance(project_card.get("research_quality"), dict) else {}
+        assert isinstance(quality, dict)
+        return str(quality.get("status") or "")
+
+    def progress_from_events(self, events: list[object]) -> str:
+        states: dict[str, str] = {}
+        for event in events:
+            if not isinstance(event, dict):
+                continue
+            event_type = str(event.get("type", ""))
+            if event_type == "room_created":
+                for agent_id in event.get("agents", []) or []:
+                    states[str(agent_id)] = "queued"
+            elif event_type == "agent_start":
+                states[str(event.get("agent_id", ""))] = "running"
+            elif event_type == "agent_done":
+                states[str(event.get("agent_id", ""))] = "done"
+            elif event_type == "agent_failed":
+                states[str(event.get("agent_id", ""))] = "failed"
+        if not states:
+            return "-"
+        failed = sum(1 for value in states.values() if value == "failed")
+        running = sum(1 for value in states.values() if value == "running")
+        done = sum(1 for value in states.values() if value == "done")
+        queued = sum(1 for value in states.values() if value == "queued")
+        parts: list[str] = []
+        if failed:
+            parts.append(f"{failed} fail")
+        if running:
+            parts.append(f"{running} run")
+        if queued:
+            parts.append(f"{queued} wait")
+        parts.append(f"{done} done")
+        return "/".join(parts)
+
+    def latest_work_from_events(self, events: list[object]) -> str:
+        for event in reversed(events):
+            if not isinstance(event, dict):
+                continue
+            event_type = str(event.get("type", ""))
+            if event_type == "agent_start":
+                agent_id = str(event.get("agent_id", ""))
+                return f"{agent_id}: {AGENT_ACTIVITY.get(agent_id, 'running')}"
+            if event_type == "agent_done":
+                return f"{event.get('agent_id', '')}: {event.get('summary', 'done')}"
+            if event_type in {"tool_start", "tool_done", "tool_failed", "tool_denied", "tool_unconfigured"}:
+                return f"{event.get('agent_id', '')} -> {event.get('tool_name', '')}: {event.get('summary') or event_type}"
+            if event_type == "report_written":
+                return f"report: {event.get('summary', 'written')}"
+            if event_type == "room_completed":
+                return f"room completed: {event.get('status', '')}"
+            if event_type == "room_failed":
+                return f"room failed: {event.get('summary', '')}"
+        return "-"
+
+    def short_id(self, value: str, *, head: int = 12, tail: int = 4) -> str:
+        if len(value) <= head + tail + 3:
+            return value
+        return f"{value[:head]}...{value[-tail:]}"
+
     def print_agent_state(self) -> None:
         if not self.agent_state:
             return
@@ -783,6 +913,58 @@ class JimmoriaConsole:
                 box=box.ROUNDED if box is not None else None,
             )
         )
+
+    def rich_workboard(self, rows: list[dict[str, str]]) -> None:
+        assert Panel is not None
+        assert Table is not None
+        console = self.rich_console()
+        table = Table.grid(expand=True)
+        table.add_column("State", width=7)
+        table.add_column("Room", width=18)
+        table.add_column("Progress", width=22)
+        table.add_column("Quality", width=22)
+        table.add_column("Topic / latest", ratio=1)
+        table.add_row(
+            Text("STATE", style="bold rgb(255,92,212)"),
+            Text("ROOM", style="bold rgb(255,92,212)"),
+            Text("PROGRESS", style="bold rgb(255,92,212)"),
+            Text("QUALITY", style="bold rgb(255,92,212)"),
+            Text("TOPIC / LATEST", style="bold rgb(255,92,212)"),
+        )
+        for row in rows:
+            work = Text()
+            work.append(row["topic"], style="rgb(230,214,255)")
+            work.append("\nlatest: ", style="rgb(126,96,154)")
+            work.append(row["latest"], style="rgb(230,214,255)")
+            work.append("\nartifact: ", style="rgb(126,96,154)")
+            work.append(row["report"], style="rgb(190,162,235)")
+            table.add_row(
+                Text(row["state"], style=self.rich_room_state_style(row["state"])),
+                Text(row["room"], style="rgb(230,214,255)"),
+                Text(row["progress"], style="rgb(190,162,235)"),
+                Text(row["quality"], style="rgb(160,132,188)"),
+                work,
+            )
+        console.print("")
+        console.print(
+            Panel(
+                table,
+                title="[bold bright_magenta]Workload board",
+                subtitle="[rgb(126,96,154)]multi-room operations",
+                border_style="rgb(255,79,216)",
+                padding=(0, 1),
+                box=box.ROUNDED if box is not None else None,
+            )
+        )
+
+    def rich_room_state_style(self, state: str) -> str:
+        styles = {
+            "DONE": "bold rgb(120,255,190)",
+            "RUN": "bold rgb(255,210,245)",
+            "FAIL": "bold rgb(255,92,120)",
+            "NEW": "rgb(190,162,235)",
+        }
+        return styles.get(state, "rgb(230,214,255)")
 
     def rich_state_badge(self, state: str) -> Any:
         assert Text is not None

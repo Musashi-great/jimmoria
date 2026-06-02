@@ -1305,3 +1305,37 @@ jimmoria --task "..."    # planned headless one-shot request
 jimmoria resume <room>   # planned resume previous room
 jimmoria tui             # planned full-screen terminal UI
 ```
+
+## 29. Multi-Room Workload Board
+
+여러 작업을 병행할 때 JIMMORIA는 화면에 모든 로그를 동시에 펼치지 않는다. Goose/OpenHands/Aider/Hermes 계열에서 공통적으로 보이는 패턴처럼, 기본 대화 채널은 하나로 유지하고 room/session 단위의 상태판을 별도 명령으로 확인한다.
+
+현재 구현된 명령:
+
+```powershell
+jimmoria rooms
+```
+
+채팅 중 alias:
+
+```text
+/rooms
+/work
+/workboard
+```
+
+`JimmoriaConsole.print_workboard()`는 `data/runs/<room_id>/room.json`과 `events.json`을 읽어 최근 room들을 요약한다.
+
+표시 필드:
+
+```text
+state       DONE / RUN / FAIL / NEW
+room        shortened room_id
+topic       room topic
+progress    failed/running/waiting/done agent counts
+quality     research quality status
+latest      latest room/agent/tool/report event
+report      whether report artifact exists
+```
+
+이 기능은 아직 실제 background parallel runner가 아니다. 현재 의미는 "여러 Research Room을 운영자가 한눈에 관리하는 UI"다. 다음 단계에서는 Research Room worker queue를 붙여 `jimmoria` 대화창은 유지한 채 여러 room을 백그라운드에서 돌리고, `/focus <room_id>`로 특정 room stream을 구독하는 방향으로 확장한다.

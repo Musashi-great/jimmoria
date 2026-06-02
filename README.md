@@ -51,6 +51,7 @@ JIMMORIA는 토큰을 저장하지 않습니다. 저장하는 것은 `data/model
 /models                  모델/provider 설정 변경
 /company                 에이전트 목록 보기
 /doctor                  현재 연결 가능한 기능 확인
+/rooms                   Show multi-room workload board
 /runs                    이전 실행 목록
 /status [room_id]        특정 Research Room 상태
 /messages [room_id]      에이전트 협업 메시지
@@ -222,6 +223,24 @@ Output > Report written | reports/pearl-room_abc123.md
 ```
 
 예전처럼 큰 카드/보드 중심으로 보고 싶으면 `JIMMORIA_EVENT_STYLE=cards`를 설정한다. 현재 board만 보고 싶으면 채팅 중 `/board`를 입력한다.
+
+## Multi-Room Workload Board
+
+여러 작업을 동시에 굴리거나 이전 room들을 비교할 때는 workload board를 쓴다. 지금 단계에서는 실제 백그라운드 병렬 실행 큐가 아니라, 저장된 Research Room들을 한 화면에서 운영 보드처럼 보는 기능이다.
+
+```powershell
+jimmoria rooms
+```
+
+채팅 중에는 다음처럼 입력한다.
+
+```text
+/rooms
+/work
+/workboard
+```
+
+보드는 최근 Research Room들을 `state`, `progress`, `quality`, `latest work`, `report` 단위로 요약한다. 자세한 로그는 여전히 `/events <room_id>`, `/messages <room_id>`, `data/runs/<room_id>`에서 확인한다.
 
 ## Research Quality Gate
 

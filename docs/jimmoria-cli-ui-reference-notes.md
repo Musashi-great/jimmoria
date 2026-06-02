@@ -95,6 +95,46 @@ JIMMORIA에 적용할 기준은 다음이다.
 - `jimmoria --task "<request>"`: OpenHands/MetaGPT처럼 headless one-shot run.
 - `jimmoria tui`: 지금 line CLI를 유지하되, 나중에 full-screen bottom-docked input 모드 추가.
 
+## Multi-Task / Parallel Work UI Benchmark
+
+여러 작업을 병행할 때 참고할 UI 기준은 다음이다.
+
+| Reference pattern | What matters | JIMMORIA direction |
+|---|---|---|
+| Aider-style single chat lane | 사용자는 한 대화창에 계속 입력하고, 시스템이 파일/작업 상태를 위로 올린다. | Supervisor channel은 하나로 유지하고, 여러 room은 `/rooms` workboard에서 선택한다. |
+| OpenHands-style task sessions | 각 task는 독립 세션이며, CLI/headless/web 모드가 분리된다. | Research Room은 독립 run artifact를 갖고, 나중에 `resume`/`tui`/`web` 모드가 같은 `events.json`을 읽는다. |
+| Goose-style sessions and logs | 대화 화면은 짧게, 자세한 tool/session log는 diagnostics로 분리된다. | 실시간 화면은 compact stream, 자세한 기록은 `/events`, `/messages`, `data/runs/<room_id>`. |
+| Hermes-style operations layer | tools, cron, profiles, sessions가 별도 운영 명령으로 분리된다. | 여러 작업은 `cron`, `sessions`, `rooms`, `profile` 명령으로 관리한다. |
+| ChatDev/MetaGPT-style company workflow | 여러 role이 움직일 때 phase와 artifact가 보여야 한다. | Workboard는 room 단위, Live board는 agent 단위, event log는 replay 단위로 분리한다. |
+
+현재 적용된 기능:
+
+```text
+jimmoria rooms           # recent Research Room workload board
+/rooms                   # same board inside Supervisor chat
+/work                    # alias
+/workboard               # alias
+```
+
+Workload board는 각 room을 다음 필드로 요약한다.
+
+```text
+STATE     DONE / RUN / FAIL / NEW
+ROOM      shortened room_id
+PROGRESS  failed/running/waiting/done agent counts
+QUALITY   research_complete / insufficient_evidence / unknown
+LATEST    latest meaningful room/agent/tool/output event
+REPORT    whether a report artifact exists
+```
+
+다음 구현 순서:
+
+- Background worker queue: Research Room을 thread/process로 띄우고 Supervisor 채널은 계속 입력 가능하게 만든다.
+- `/focus <room_id>`: 특정 room의 live stream만 구독한다.
+- `/pause <room_id>` / `/cancel <room_id>`: running room 제어. 실제 connector 붙은 뒤 필요하다.
+- `/resume <room_id>`: 이전 room context를 Supervisor 대화에 다시 로드한다.
+- Full-screen TUI: top activity strip, central scrollback, bottom input dock, right room/agent board.
+
 ## Future UI Backlog
 
 - Full-screen TUI mode: bottom-fixed input, scrollback pane, right-side agent board.

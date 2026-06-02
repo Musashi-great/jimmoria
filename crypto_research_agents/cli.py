@@ -129,6 +129,10 @@ def main(argv: list[str] | None = None) -> None:
     runs_parser = subparsers.add_parser("runs", help="List previous research runs.")
     add_inspect_args(runs_parser)
 
+    rooms_parser = subparsers.add_parser("rooms", help="Show the multi-room workload board.")
+    rooms_parser.add_argument("--limit", type=int, default=8)
+    add_inspect_args(rooms_parser)
+
     status_parser = subparsers.add_parser("status", help="Show a run room.json snapshot.")
     status_parser.add_argument("room_id")
     add_inspect_args(status_parser)
@@ -245,7 +249,7 @@ def main(argv: list[str] | None = None) -> None:
         sessions_command(args)
         return
 
-    if args.command in {"runs", "status", "messages", "events", "show-report"}:
+    if args.command in {"runs", "rooms", "status", "messages", "events", "show-report"}:
         inspect_command(args)
         return
 
@@ -638,6 +642,10 @@ def inspect_command(args: argparse.Namespace) -> None:
             print(f"{item['room_id']} | {item['status']} | {item['topic']} | report={item['report']}")
         return
 
+    if args.command == "rooms":
+        JimmoriaConsole(runs_dir=args.runs_dir).print_workboard(limit=args.limit)
+        return
+
     if args.command == "status":
         room = load_run_file(args.room_id, "room.json", args.runs_dir)
         print_room_status(room)
@@ -853,6 +861,11 @@ def handle_chat_command(
 
     if command == "/doctor":
         doctor_command(args)
+        return False, last_room_id
+
+    if command in {"/rooms", "/work", "/workboard"}:
+        limit = int(rest) if rest.isdigit() else 8
+        console.print_workboard(limit=limit)
         return False, last_room_id
 
     if command == "/runs":
