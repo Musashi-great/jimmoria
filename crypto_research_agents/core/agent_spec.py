@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from crypto_research_agents.storage.paths import resolve_project_path
+
 
 @dataclass(slots=True)
 class RoleSpec:
@@ -148,7 +150,7 @@ class AgentSpecRegistry:
 
     @classmethod
     def load_dir(cls, directory: str | Path) -> "AgentSpecRegistry":
-        root = Path(directory)
+        root = resolve_project_path(directory)
         specs: dict[str, AgentSpec] = {}
         if not root.exists():
             return cls(specs)

@@ -28,6 +28,7 @@ from crypto_research_agents.core.room import ResearchRoom
 from crypto_research_agents.core.runtime_state import RuntimeState
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 from crypto_research_agents.storage.json_store import save_memory
+from crypto_research_agents.storage.paths import resolve_project_path
 from crypto_research_agents.storage.run_store import save_run_snapshot
 
 
@@ -64,8 +65,8 @@ class ResearchRuntime:
         self.bus = CollaborationBus()
         self.hooks = HookEngine()
         self.model_gateway = ModelGateway()
-        self.agent_specs = AgentSpecRegistry.load_dir(agent_spec_dir)
-        self.process_spec_dir = Path(process_spec_dir)
+        self.agent_specs = AgentSpecRegistry.load_dir(resolve_project_path(agent_spec_dir))
+        self.process_spec_dir = resolve_project_path(process_spec_dir)
         self.tool_gateway = ToolGateway(default_policy(self.agent_specs))
         register_default_connectors(self.tool_gateway)
         self.event_log: list[dict[str, Any]] = []

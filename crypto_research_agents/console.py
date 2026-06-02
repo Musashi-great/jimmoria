@@ -11,6 +11,7 @@ from crypto_research_agents import APP_NAME, __version__
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
 from crypto_research_agents.runtime import DEFAULT_AGENTS
 from crypto_research_agents.storage.json_store import load_memory
+from crypto_research_agents.storage.paths import resolve_project_path
 from crypto_research_agents.storage.run_store import list_run_summaries, load_run_file
 
 try:
@@ -52,8 +53,8 @@ class JimmoriaConsole:
         runs_dir: str | Path = "data/runs",
     ) -> None:
         self.registry = AgentSpecRegistry.load_dir(agent_spec_dir)
-        self.memory_path = Path(memory_path)
-        self.runs_dir = Path(runs_dir)
+        self.memory_path = resolve_project_path(memory_path)
+        self.runs_dir = resolve_project_path(runs_dir)
         self.agent_state: dict[str, str] = {}
         self.agent_activity: dict[str, str] = {}
         self.last_room_id = ""

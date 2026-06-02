@@ -69,6 +69,13 @@ JIMMORIA는 토큰을 저장하지 않습니다. 저장하는 것은 `data/model
 +------------------------------------------------------------+
 ```
 
+Natural language report retrieval also works. The Supervisor should not open a new Research Room for this shape of request.
+
+```text
+You > 3jane 보고서 만든거 보내봐 전체
+Supervisor > finds and prints the saved report
+```
+
 ## Project Structure
 
 더 자세한 구조와 런타임 설명은 [docs/jimmoria-project-structure.md](docs/jimmoria-project-structure.md)에 정리되어 있습니다.
@@ -103,6 +110,8 @@ jimmoria/
 ```
 
 `data/`, `reports/`, `vault/`는 실행 중 생성되는 로컬 출력 폴더이며 Git에는 올리지 않습니다.
+
+Default CLI paths resolve to the JIMMORIA project root. Running `jimmoria` from `C:\Users\...` still uses `C:\jimmoria\config`, `C:\jimmoria\data`, `C:\jimmoria\reports`, and `C:\jimmoria\vault` unless explicit paths are provided.
 
 ## Current MVP
 

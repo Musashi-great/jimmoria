@@ -144,10 +144,13 @@ flowchart LR
 | ToolGateway | `core/tool_gateway.py` | 에이전트별 tool 권한 검사와 audit log |
 | Connectors | `connectors/` | Web Search, URL, Website/Docs, GitHub, DEX Screener, CoinGecko connector 등록 |
 | Storage | `storage/` | memory, run snapshot, Obsidian note 저장 |
+| Path Resolver | `storage/paths.py` | 설치형 CLI가 어디서 실행되든 JIMMORIA 프로젝트의 config/data/reports/vault 경로를 안정적으로 찾음 |
 
 ## 5. Research Room 실행 흐름
 
 일반 리서치 요청은 `ResearchRuntime.run_article_research()`로 들어간다.
+
+단, 모든 채팅 입력이 Research Room으로 들어가는 것은 아니다. 사용자가 "보고서 만든 거 보내줘", "전체 보고서 보여줘", `/report 3jane`처럼 기존 산출물을 요청하면 Supervisor가 `report_retrieval`로 분류하고 새 Research Room을 열지 않는다. 이 경우 `data/runs/*/room.json`과 `reports/*.md`에서 기존 보고서를 찾아 출력한다.
 
 실행 순서는 현재 다음과 같다.
 
@@ -556,6 +559,7 @@ configure_model_panel()
 configure_codex_oauth()
 configure_model_routes()
 doctor_command()
+find_saved_report_for_request()
 ```
 
 ### `crypto_research_agents/console.py`
@@ -649,6 +653,8 @@ run_store.py        data/runs/<room_id> snapshot save/load
 obsidian_store.py   vault note writer
 paths.py            safe filename helper
 ```
+
+`paths.py`는 단순 filename helper에서 프로젝트 경로 resolver 역할까지 확장되었다. 기본 `config/agents`, `config/processes`, `data/memory.json`, `data/model_settings.json`, `reports`, `vault`는 현재 터미널 위치가 아니라 JIMMORIA 프로젝트 루트를 기준으로 해석된다. 그래서 `C:\Users\...`에서 `jimmoria`를 실행해도 `C:\jimmoria\config\processes`와 기존 run/report를 찾을 수 있다.
 
 ## 16. Config 파일별 설명
 

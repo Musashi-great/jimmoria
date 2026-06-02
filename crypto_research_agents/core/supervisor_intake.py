@@ -166,6 +166,18 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
             supervisor_authority=authority,
         )
 
+    if _looks_like_report_retrieval_request(stripped, lowered):
+        return SupervisorIntakeDecision(
+            intent_type="report_retrieval",
+            action="show_existing_report",
+            output_mode="saved_report",
+            needs_research_room=False,
+            confidence=0.86,
+            rationale="The client is asking to retrieve an existing report, not create a new dossier.",
+            next_step="Find the saved report by room id, topic, or report filename and print it.",
+            supervisor_authority=authority,
+        )
+
     if stripped.startswith(("http://", "https://")):
         return SupervisorIntakeDecision(
             intent_type="research_request",
@@ -403,6 +415,34 @@ SOURCE_ONLY_TERMS = [
     "source only",
 ]
 
+REPORT_RETRIEVAL_TERMS = [
+    "보내봐",
+    "보내줘",
+    "보여줘",
+    "꺼내줘",
+    "열어줘",
+    "출력해줘",
+    "전체",
+    "전부",
+    "풀버전",
+    "show",
+    "send",
+    "print",
+    "view",
+    "open",
+    "full",
+]
+
+REPORT_CREATE_TERMS = [
+    "만들어",
+    "작성해",
+    "생성해",
+    "새로",
+    "create",
+    "write",
+    "generate",
+]
+
 
 def _has_any(original: str, lowered: str, terms: list[str]) -> bool:
     return any(term in lowered for term in terms) or any(term in original for term in terms)
@@ -418,6 +458,15 @@ def _looks_like_company_status_request(original: str, lowered: str) -> bool:
 
 def _looks_like_source_only_request(original: str, lowered: str) -> bool:
     return _has_any(original, lowered, SOURCE_ONLY_TERMS)
+
+
+def _looks_like_report_retrieval_request(original: str, lowered: str) -> bool:
+    report_words = ["보고서", "리포트", "레포트", "report"]
+    if not _has_any(original, lowered, report_words):
+        return False
+    if _has_any(original, lowered, REPORT_CREATE_TERMS):
+        return False
+    return _has_any(original, lowered, REPORT_RETRIEVAL_TERMS)
 
 
 def _looks_like_supervisor_chat(original: str, lowered: str) -> bool:

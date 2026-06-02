@@ -30,6 +30,7 @@ from crypto_research_agents.core.supervisor_intake import (
 from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 from crypto_research_agents.storage.json_store import load_memory
+from crypto_research_agents.storage.paths import default_project_path, resolve_project_path
 from crypto_research_agents.storage.run_store import list_run_summaries, load_run_file
 
 
@@ -188,24 +189,24 @@ def main(argv: list[str] | None = None) -> None:
 
 
 def add_run_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--vault", default="vault", help="Obsidian-style vault output directory.")
-    parser.add_argument("--reports", default="reports", help="Report output directory.")
-    parser.add_argument("--memory", default="data/memory.json", help="Shared memory JSON path.")
+    parser.add_argument("--vault", default=default_project_path("vault"), help="Obsidian-style vault output directory.")
+    parser.add_argument("--reports", default=default_project_path("reports"), help="Report output directory.")
+    parser.add_argument("--memory", default=default_project_path("data/memory.json"), help="Shared memory JSON path.")
 
 
 def default_chat_args() -> argparse.Namespace:
     return argparse.Namespace(
         command="chat",
-        vault="vault",
-        reports="reports",
-        memory="data/memory.json",
+        vault=default_project_path("vault"),
+        reports=default_project_path("reports"),
+        memory=default_project_path("data/memory.json"),
         skip_model_setup=False,
         verbose_board=False,
     )
 
 
 def add_inspect_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--runs-dir", default="data/runs", help="Run snapshot directory.")
+    parser.add_argument("--runs-dir", default=default_project_path("data/runs"), help="Run snapshot directory.")
 
 
 def add_source_args(parser: argparse.ArgumentParser, *, title_required: bool) -> None:
@@ -354,6 +355,35 @@ def chat_command(args: argparse.Namespace) -> None:
             append_supervisor_history(supervisor_history, line, reply)
             continue
 
+        if intake_decision.intent_type == "report_retrieval":
+            report = find_saved_report_for_request(
+                line,
+                runs_dir=Path(args.memory).parent / "runs",
+                reports_dir=args.reports,
+                last_room_id=last_room_id,
+            )
+            if report is None:
+                reply = [
+                    "저장된 보고서를 찾지 못했습니다.",
+                    "프로젝트 이름이나 room_id를 조금 더 정확히 주거나, /runs로 목록을 먼저 확인해 주세요.",
+                ]
+                console.print_supervisor_reply(reply)
+                append_supervisor_history(supervisor_history, line, reply)
+                continue
+            report_path, room_id, topic = report
+            reply = [
+                "찾았습니다. 새 Research Room은 열지 않고 저장된 보고서를 그대로 보여드리겠습니다.",
+                f"Room: {room_id}",
+                f"Topic: {topic}",
+                f"Report: {report_path}",
+            ]
+            console.print_supervisor_reply(reply)
+            console.block("Saved report", report_path.read_text(encoding="utf-8").splitlines())
+            last_room_id = room_id
+            console.last_room_id = last_room_id
+            append_supervisor_history(supervisor_history, line, reply)
+            continue
+
         title, content, url = chat_input_to_source(line)
         runtime = ResearchRuntime(load_memory(args.memory))
         runtime.event_handler = console.make_event_handler()
@@ -480,13 +510,18 @@ def handle_chat_command(
         if not room_id:
             print("No room_id yet. Run a query first or pass /report <room_id>.")
             return False, last_room_id
-        room = load_run_file(room_id, "room.json", Path(args.memory).parent / "runs")
-        report_path = room.get("output_paths", {}).get("report")
-        if not report_path:
-            print("This run does not have a report.")
+        report = find_saved_report_for_request(
+            room_id,
+            runs_dir=Path(args.memory).parent / "runs",
+            reports_dir=args.reports,
+            last_room_id=last_room_id,
+        )
+        if report is None:
+            print("This run or query does not have a matching report.")
             return False, room_id
-        print(Path(report_path).read_text(encoding="utf-8"))
-        return False, room_id
+        report_path, resolved_room_id, _topic = report
+        print(report_path.read_text(encoding="utf-8"))
+        return False, resolved_room_id
 
     if command == "/add":
         if not rest:
@@ -667,6 +702,102 @@ def chat_input_to_source(line: str) -> tuple[str, str, str | None]:
     return infer_title(line, None), line, None
 
 
+def find_saved_report_for_request(
+    line: str,
+    *,
+    runs_dir: str | Path,
+    reports_dir: str | Path,
+    last_room_id: str = "",
+) -> tuple[Path, str, str] | None:
+    runs_root = resolve_project_path(runs_dir)
+    reports_root = resolve_project_path(reports_dir)
+    query = extract_report_lookup_query(line)
+    candidates = list_run_summaries(runs_root)
+
+    if query:
+        for item in candidates:
+            if str(item.get("room_id", "")) == query:
+                report = _report_path_from_summary(item)
+                if report and report.exists():
+                    return report, str(item.get("room_id", "")), str(item.get("topic", ""))
+
+    if last_room_id and not query:
+        for item in candidates:
+            if str(item.get("room_id", "")) == last_room_id:
+                report = _report_path_from_summary(item)
+                if report and report.exists():
+                    return report, last_room_id, str(item.get("topic", ""))
+
+    if query:
+        query_terms = [term for term in query.lower().split() if term]
+        for item in candidates:
+            searchable = " ".join(
+                [
+                    str(item.get("room_id", "")),
+                    str(item.get("topic", "")),
+                    str(item.get("report", "")),
+                ]
+            ).lower()
+            if all(term in searchable for term in query_terms):
+                report = _report_path_from_summary(item)
+                if report and report.exists():
+                    return report, str(item.get("room_id", "")), str(item.get("topic", ""))
+
+    reports = sorted(reports_root.glob("*.md"), key=lambda path: path.stat().st_mtime, reverse=True) if reports_root.exists() else []
+    if query:
+        query_terms = [term for term in query.lower().split() if term]
+        for path in reports:
+            searchable = path.stem.lower()
+            if all(term in searchable for term in query_terms):
+                return path, "", path.stem
+    if reports and not query:
+        return reports[0], "", reports[0].stem
+    return None
+
+
+def extract_report_lookup_query(line: str) -> str:
+    cleaned = line.strip()
+    stopwords = [
+        "보고서",
+        "리포트",
+        "레포트",
+        "만든거",
+        "만든 것",
+        "만들었던",
+        "작성한",
+        "작성했던",
+        "보내봐",
+        "보내줘",
+        "보여줘",
+        "꺼내줘",
+        "열어줘",
+        "출력해줘",
+        "전체",
+        "전부",
+        "다",
+        "풀버전",
+        "report",
+        "send",
+        "show",
+        "print",
+        "view",
+        "open",
+        "full",
+        "all",
+    ]
+    for word in stopwords:
+        cleaned = cleaned.replace(word, " ")
+    cleaned = " ".join(cleaned.replace("/", " ").split())
+    return cleaned
+
+
+def _report_path_from_summary(item: dict[str, object]) -> Path | None:
+    report = str(item.get("report") or "")
+    if not report:
+        return None
+    return resolve_project_path(report)
+
+
 def print_banner() -> None:
     JimmoriaConsole().print_intro()
 
@@ -683,7 +814,7 @@ def print_agent_bar(agent_ids: list[str]) -> None:
 
 
 def doctor_command(args: argparse.Namespace | None = None) -> None:
-    memory_path = getattr(args, "memory", "data/memory.json")
+    memory_path = getattr(args, "memory", default_project_path("data/memory.json"))
     runs_dir = Path(memory_path).parent / "runs"
     vault_dir = getattr(args, "vault", "vault")
     reports_dir = getattr(args, "reports", "reports")
@@ -987,7 +1118,10 @@ def configured_codex_token_source() -> str:
 
 
 def model_settings_path() -> Path:
-    return Path(os.getenv("JIMMORIA_MODEL_SETTINGS_PATH", "data/model_settings.json"))
+    configured = os.getenv("JIMMORIA_MODEL_SETTINGS_PATH")
+    if configured:
+        return Path(configured)
+    return resolve_project_path("data/model_settings.json")
 
 
 def apply_saved_model_settings() -> None:

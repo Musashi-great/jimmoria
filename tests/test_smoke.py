@@ -20,6 +20,7 @@ from crypto_research_agents.cli import (
     chat_command,
     classify_chat_input,
     configure_model_panel,
+    find_saved_report_for_request,
     main as cli_main,
     message_summary,
     print_banner,
@@ -201,6 +202,10 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(classify_chat_input("지금 보고서 작성은 한글 위주로 세팅된게 맞지?"), "supervisor_chat")
         self.assertEqual(classify_chat_input("안녕"), "supervisor_chat")
 
+    def test_chat_intake_classifies_saved_report_request(self) -> None:
+        self.assertEqual(classify_chat_input("3jane 보고서 만든거 보내봐 전체"), "report_retrieval")
+        self.assertEqual(classify_chat_input("show 3jane full report"), "report_retrieval")
+
     def test_company_instruction_expands_supervisor_role(self) -> None:
         settings = CompanySettings()
 
@@ -347,6 +352,47 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("Supervisor", text)
         self.assertNotIn("Supervisor intake", text)
         self.assertIn("Company settings", text)
+
+    def test_chat_saved_report_request_prints_existing_report_without_room(self) -> None:
+        output = StringIO()
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report_path = root / "reports" / "3jane-dossier.md"
+            run_dir = root / "runs" / "room_3jane"
+            report_path.parent.mkdir(parents=True)
+            run_dir.mkdir(parents=True)
+            report_path.write_text("# 3jane Report\n\nFull dossier body.", encoding="utf-8")
+            (run_dir / "room.json").write_text(
+                json.dumps(
+                    {
+                        "room_id": "room_3jane",
+                        "topic": "3jane crypto project research",
+                        "status": "completed",
+                        "output_paths": {"report": str(report_path)},
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            args = argparse.Namespace(
+                memory=str(root / "memory.json"),
+                vault=str(root / "vault"),
+                reports=str(root / "reports"),
+                skip_model_setup=True,
+            )
+            with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(root / "model_settings.json")}, clear=True):
+                with patch("sys.stdin.isatty", return_value=True):
+                    with patch("builtins.input", side_effect=["3jane 보고서 만든거 보내봐 전체", "/quit"]):
+                        with redirect_stdout(output):
+                            chat_command(args)
+
+            self.assertFalse((run_dir / "messages.json").exists())
+
+        text = output.getvalue()
+        self.assertIn("Saved report", text)
+        self.assertIn("# 3jane Report", text)
+        self.assertIn("Full dossier body.", text)
+        self.assertNotIn("JIMMORIA opens a Research Room", text)
 
     def test_runtime_records_supervisor_intake_decision(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -743,6 +789,19 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(source_only.agent_ids, ["supervisor_agent", "ingestion_agent", "obsidian_curator_agent"])
         self.assertIn("prevent unnecessary research", source_only.tasks[0].description)
 
+    def test_process_specs_load_when_cli_runs_outside_project_root(self) -> None:
+        original_cwd = Path.cwd()
+        with TemporaryDirectory() as tmp:
+            try:
+                os.chdir(tmp)
+                loaded_research = load_process_spec("project_research_room")
+                registry = AgentSpecRegistry.load_dir("config/agents")
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(loaded_research.process_id, "project_research_room")
+        self.assertIsNotNone(registry.get("supervisor_agent"))
+
     def test_runtime_room_created_event_includes_process_spec(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -758,6 +817,38 @@ class SmokeTest(unittest.TestCase):
             self.assertEqual(first_event["type"], "room_created")
             self.assertEqual(first_event["process"]["process_id"], "source_ingestion_room")
             self.assertEqual(result.room.agents, ["supervisor_agent", "ingestion_agent", "obsidian_curator_agent"])
+
+    def test_saved_report_request_finds_existing_report_without_new_room(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report_path = root / "reports" / "3jane-dossier.md"
+            run_dir = root / "data" / "runs" / "room_3jane"
+            report_path.parent.mkdir(parents=True)
+            run_dir.mkdir(parents=True)
+            report_path.write_text("# 3jane Report\n\nFull dossier body.", encoding="utf-8")
+            (run_dir / "room.json").write_text(
+                json.dumps(
+                    {
+                        "room_id": "room_3jane",
+                        "topic": "3jane crypto project research",
+                        "status": "completed",
+                        "output_paths": {"report": str(report_path)},
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            found = find_saved_report_for_request(
+                "3jane 보고서 만든거 보내봐 전체",
+                runs_dir=root / "data" / "runs",
+                reports_dir=root / "reports",
+            )
+
+        self.assertIsNotNone(found)
+        assert found is not None
+        self.assertEqual(found[0], report_path)
+        self.assertEqual(found[1], "room_3jane")
 
     def test_cli_research_command(self) -> None:
         with TemporaryDirectory() as tmp:

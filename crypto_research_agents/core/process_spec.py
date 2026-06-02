@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from crypto_research_agents.core.agent_spec import _load_yaml_like
+from crypto_research_agents.storage.paths import resolve_project_path
 
 
 @dataclass(slots=True)
@@ -95,7 +96,7 @@ class ProcessSpecRegistry:
 
     @classmethod
     def load_dir(cls, directory: str | Path) -> "ProcessSpecRegistry":
-        root = Path(directory)
+        root = resolve_project_path(directory)
         specs: dict[str, ProcessSpec] = {}
         if not root.exists():
             return cls(specs)
