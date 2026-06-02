@@ -12,6 +12,7 @@ from unittest.mock import patch
 from crypto_research_agents.runtime import ResearchRuntime
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
 from crypto_research_agents.cli import chat_command, configure_model_panel, main as cli_main, print_banner
+from crypto_research_agents.console import JimmoriaConsole
 from crypto_research_agents.core.llm_provider import OAuthTokenProvider, provider_from_env
 from crypto_research_agents.core.model_gateway import ModelGateway
 from crypto_research_agents.core.capabilities import collect_capabilities
@@ -34,6 +35,20 @@ class SmokeTest(unittest.TestCase):
 
         self.assertEqual(pyproject["project"]["scripts"]["jimmoria"], "crypto_research_agents.cli:main")
         self.assertEqual(pyproject["tool"]["setuptools"]["packages"]["find"]["include"], ["crypto_research_agents*"])
+
+    def test_chat_input_uses_boxed_prompt(self) -> None:
+        output = StringIO()
+        console = JimmoriaConsole()
+
+        with patch("sys.stdin.isatty", return_value=True):
+            with patch("builtins.input", return_value="/quit") as mocked_input:
+                with redirect_stdout(output):
+                    value = console.read_chat_input()
+
+        self.assertEqual(value, "/quit")
+        self.assertIn("+", output.getvalue())
+        self.assertIn("@path/to/file", output.getvalue())
+        self.assertEqual(mocked_input.call_args[0][0], "| > ")
 
     def test_article_research_loop_writes_outputs(self) -> None:
         with TemporaryDirectory() as tmp:

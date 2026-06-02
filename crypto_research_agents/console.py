@@ -71,6 +71,41 @@ class JimmoriaConsole:
     def print_user_message(self, text: str) -> None:
         self.block("You", self.wrap(text))
 
+    def read_chat_input(self) -> str:
+        if not sys.stdin.isatty():
+            return input(f"\n{APP_NAME.lower()}> ")
+
+        hint = "Type a request, URL, /command, or @path/to/file"
+        border = self.input_border()
+        print("")
+        print(self.input_border_style(border))
+        print(self.input_border_style(self.input_hint_line(hint)))
+        try:
+            return input(self.input_prompt())
+        finally:
+            print(self.input_border_style(border))
+
+    def input_border(self) -> str:
+        return "+" + "-" * max(20, self.width - 2) + "+"
+
+    def input_hint_line(self, text: str) -> str:
+        inner_width = max(20, self.width - 4)
+        clipped = text[:inner_width]
+        return "| " + clipped.ljust(inner_width) + " |"
+
+    def input_border_style(self, text: str) -> str:
+        if not supports_color():
+            return text
+        return f"\033[38;2;64;204;255m{text}\033[0m"
+
+    def input_prompt(self) -> str:
+        if not supports_color():
+            return "| > "
+        cyan = "\033[38;2;64;204;255m"
+        white = "\033[38;2;230;244;255m"
+        reset = "\033[0m"
+        return f"{cyan}|{reset} {white}>{reset} "
+
     def make_event_handler(self) -> Any:
         def handle(event: dict[str, object]) -> None:
             self.handle_event(event)

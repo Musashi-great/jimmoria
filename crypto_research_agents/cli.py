@@ -292,7 +292,7 @@ def chat_command(args: argparse.Namespace) -> None:
 
     while True:
         try:
-            line = input(f"\n{APP_NAME.lower()}> ").strip()
+            line = console.read_chat_input().strip()
         except (EOFError, KeyboardInterrupt):
             print("\nbye")
             return

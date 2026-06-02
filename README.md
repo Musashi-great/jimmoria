@@ -63,7 +63,10 @@ JIMMORIA는 토큰을 저장하지 않습니다. 저장하는 것은 `data/model
 일반 문장을 입력하면 Research Room이 열립니다.
 
 ```text
-jimmoria> AI wallet automation 관련 초기 프로젝트 찾아줘
++------------------------------------------------------------+
+| Type a request, URL, /command, or @path/to/file             |
+| > AI wallet automation 관련 초기 프로젝트 찾아줘
++------------------------------------------------------------+
 ```
 
 ## Project Structure
