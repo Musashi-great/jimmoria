@@ -123,7 +123,7 @@ flowchart LR
 | 개념 | 파일 | 역할 |
 |---|---|---|
 | CLI | `crypto_research_agents/cli.py` | 명령어 파싱, 채팅 루프, 모델 설정 패널 |
-| Console | `crypto_research_agents/console.py` | JIMMORIA 로고, 박스형 입력창, 도움말/에이전트 역할 요약, 진행 상황 출력 |
+| Console | `crypto_research_agents/console.py` | JIMMORIA 로고, 박스형 입력창, 도움말, 실시간 에이전트 상황판 출력 |
 | Runtime | `crypto_research_agents/runtime.py` | Research Room 생성과 에이전트 실행 순서 관리 |
 | ResearchRoom | `core/room.py` | 하나의 리서치 작업 단위와 상태 |
 | CollaborationBus | `core/bus.py` | 에이전트 요청, 응답, 핸드오프, 업데이트 로그 |
@@ -171,11 +171,22 @@ completed
 
 현재는 순차 실행에 가깝지만, 구조상 각 에이전트의 요청/응답은 `CollaborationBus`에 기록된다. 나중에 병렬 실행, 비동기 큐, UI replay를 붙일 때 이 bus와 event log가 기반이 된다.
 
+CLI는 `room_created`, `agent_start`, `agent_done`, `agent_failed`, `room_completed` 이벤트를 받아 `Live agent board`를 계속 출력한다. 사용자가 작업 지시를 넣으면 각 에이전트가 `WAIT`, `RUN`, `DONE`, `FAIL` 중 어떤 상태인지와 현재 무엇을 하는지 바로 볼 수 있다.
+
+예시:
+
+```text
+[Live agent board]
+  RUN      ingestion_agent              Now: Storing source input and extracting entities, keywords, metadata
+  WAIT     narrative_agent              Waiting: Mapping market narratives and thesis categories
+  WAIT     discovery_agent              Waiting: Finding early project candidates from narrative signals
+```
+
 ## 6. 에이전트 구성
 
 현재 실제 런타임에서 기본 실행되는 에이전트는 `runtime.py`의 `DEFAULT_AGENTS`에 정의된 10개다.
 
-CLI 시작 도움말의 `Agents at work` 영역에도 이 10개 에이전트의 역할이 짧게 표시된다. 사용자는 `/company`를 입력하지 않아도 처음 화면에서 어떤 에이전트가 어떤 일을 맡는지 바로 볼 수 있다.
+CLI 시작 도움말에는 정적 에이전트 목록을 길게 보여주지 않는다. 대신 사용자가 작업을 입력해 Research Room이 열리면 `Live agent board`에서 에이전트별 현재 작업 상태가 실시간으로 표시된다. 전체 agent roster와 planned agent까지 보고 싶을 때는 `/company`를 사용한다.
 
 | Agent ID | 구현 클래스 | 역할 | 현재 동작 |
 |---|---|---|---|
@@ -462,7 +473,7 @@ doctor_command()
 
 ### `crypto_research_agents/console.py`
 
-터미널 UI를 담당한다. 시작 로고, 보라/핑크 3D 느낌의 JIMMORIA 배너, 닫힌 박스형 입력창, `/help` 명령어 목록, `Agents at work` 역할 요약, 에이전트 진행 상태 출력, 보고서 preview를 담당한다.
+터미널 UI를 담당한다. 시작 로고, 보라/핑크 3D 느낌의 JIMMORIA 배너, 닫힌 박스형 입력창, `/help` 명령어 목록, `Live agent board` 실시간 진행 상황판, 보고서 preview를 담당한다.
 
 중요 함수:
 
@@ -581,7 +592,7 @@ project_research.yaml
 - tool registry required stack
 - tool audit log
 - boxed chat input prompt
-- help screen agent role summary
+- live agent board current-work display
 - purple/pink 3D logo palette
 ```
 

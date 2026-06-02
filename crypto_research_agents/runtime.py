@@ -213,8 +213,20 @@ class ResearchRuntime:
             task_type=agent.task_type,
         )
         self.hooks.run("before_run", agent_id=agent_id, room_id=room.room_id)
-        result = agent.run(room, self.memory, self.bus, **kwargs)
-        self.hooks.run("after_run", agent_id=agent_id, room_id=room.room_id)
+        try:
+            result = agent.run(room, self.memory, self.bus, **kwargs)
+        except Exception as exc:
+            self._emit(
+                "agent_failed",
+                room_id=room.room_id,
+                agent_id=agent_id,
+                agent_name=agent.name,
+                task_type=agent.task_type,
+                error=str(exc),
+            )
+            raise
+        finally:
+            self.hooks.run("after_run", agent_id=agent_id, room_id=room.room_id)
         self._emit(
             "agent_done",
             room_id=room.room_id,

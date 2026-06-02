@@ -14,6 +14,20 @@ from crypto_research_agents.storage.json_store import load_memory
 from crypto_research_agents.storage.run_store import list_run_summaries, load_run_file
 
 
+AGENT_ACTIVITY = {
+    "supervisor_agent": "Planning goals, priorities, and research direction",
+    "ingestion_agent": "Storing source input and extracting entities, keywords, metadata",
+    "narrative_agent": "Mapping market narratives and thesis categories",
+    "discovery_agent": "Finding early project candidates from narrative signals",
+    "social_kol_agent": "Checking KOL handles, social mentions, and community signal",
+    "contract_onchain_agent": "Verifying chain, token, contract, and DEX/explorer data",
+    "product_tech_agent": "Checking website, docs, GitHub, and product readiness",
+    "funding_token_agent": "Reviewing investors, points, airdrop, and token status",
+    "report_agent": "Turning agent findings into a human-readable dossier",
+    "obsidian_curator_agent": "Saving sources, projects, narratives, and reports to Vault",
+}
+
+
 class JimmoriaConsole:
     """Chat-like CLI surface for the multi-agent research company."""
 
@@ -28,6 +42,7 @@ class JimmoriaConsole:
         self.memory_path = Path(memory_path)
         self.runs_dir = Path(runs_dir)
         self.agent_state: dict[str, str] = {}
+        self.agent_activity: dict[str, str] = {}
         self.last_room_id = ""
         self.width = min(shutil.get_terminal_size((100, 30)).columns, 110)
 
@@ -52,18 +67,6 @@ class JimmoriaConsole:
             "  /last                    Show the latest run card",
             "  /help                    Show this help",
             "  /quit                    Exit",
-            "",
-            "Agents at work:",
-            "  supervisor_agent         Sets goals, priority, and final research direction",
-            "  ingestion_agent          Stores sources and extracts entities, keywords, metadata",
-            "  narrative_agent          Maps market narratives and thesis categories",
-            "  discovery_agent          Finds early project candidates from narrative signals",
-            "  social_kol_agent         Checks KOL handles, social mentions, and community signal",
-            "  contract_onchain_agent   Verifies chain, token, contract, and DEX/explorer data",
-            "  product_tech_agent       Checks website, docs, GitHub, and product readiness",
-            "  funding_token_agent      Reviews investors, points, airdrop, and token status",
-            "  report_agent             Turns agent findings into a human-readable dossier",
-            "  obsidian_curator_agent   Saves sources, projects, narratives, and reports to Vault",
         ]
         self.block("JIMMORIA commands", lines)
 
@@ -162,6 +165,10 @@ class JimmoriaConsole:
                 str(agent_id): "queued"
                 for agent_id in event.get("agents", [])
             }
+            self.agent_activity = {
+                str(agent_id): AGENT_ACTIVITY.get(str(agent_id), "Waiting for assignment")
+                for agent_id in event.get("agents", [])
+            }
             lines = [
                 f"Room: {event.get('room_id')}",
                 f"Topic: {event.get('topic')}",
@@ -177,6 +184,7 @@ class JimmoriaConsole:
         if event_type == "agent_start":
             agent_id = str(event.get("agent_id", ""))
             self.agent_state[agent_id] = "running"
+            self.agent_activity[agent_id] = AGENT_ACTIVITY.get(agent_id, f"Running {event.get('task_type')}")
             label = self.agent_label(agent_id)
             self.block(
                 f"{label} started",
@@ -185,11 +193,13 @@ class JimmoriaConsole:
                     "Status: running",
                 ],
             )
+            self.print_agent_state()
             return
 
         if event_type == "agent_done":
             agent_id = str(event.get("agent_id", ""))
             self.agent_state[agent_id] = "done"
+            self.agent_activity[agent_id] = f"Done: {event.get('summary')}"
             label = self.agent_label(agent_id)
             summary = str(event.get("summary", ""))
             self.block(
@@ -200,6 +210,22 @@ class JimmoriaConsole:
                     f"Findings: {event.get('findings')}",
                 ],
             )
+            self.print_agent_state()
+            return
+
+        if event_type == "agent_failed":
+            agent_id = str(event.get("agent_id", ""))
+            self.agent_state[agent_id] = "failed"
+            self.agent_activity[agent_id] = f"Failed: {event.get('error')}"
+            label = self.agent_label(agent_id)
+            self.block(
+                f"{label} failed",
+                [
+                    f"Task type: {event.get('task_type')}",
+                    f"Error: {event.get('error')}",
+                ],
+            )
+            self.print_agent_state()
             return
 
         if event_type == "room_completed":
@@ -297,8 +323,31 @@ class JimmoriaConsole:
         for agent_id in DEFAULT_AGENTS:
             if agent_id not in self.agent_state:
                 continue
-            rows.append(f"{agent_id:<28} {self.agent_state[agent_id]}")
-        self.block("Agent board", rows)
+            state = self.agent_state[agent_id]
+            activity = self.agent_activity.get(agent_id) or AGENT_ACTIVITY.get(agent_id, "")
+            rows.append(f"{self.state_label(state):<8} {agent_id:<28} {self.activity_label(state, activity)}")
+        self.block("Live agent board", rows)
+
+    def state_label(self, state: str) -> str:
+        labels = {
+            "queued": "WAIT",
+            "running": "RUN",
+            "done": "DONE",
+            "failed": "FAIL",
+        }
+        return labels.get(state, state.upper()[:8])
+
+    def activity_label(self, state: str, activity: str) -> str:
+        prefix = {
+            "queued": "Waiting",
+            "running": "Now",
+            "done": "Finished",
+            "failed": "Stopped",
+        }.get(state, "Status")
+        compact = " ".join(str(activity).split())
+        if len(compact) > 92:
+            compact = compact[:89].rstrip() + "..."
+        return f"{prefix}: {compact}"
 
     def print_report_preview(self, report_path: str | Path, *, max_lines: int = 12) -> None:
         path = Path(report_path)

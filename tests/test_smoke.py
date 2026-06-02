@@ -90,18 +90,73 @@ class SmokeTest(unittest.TestCase):
         self.assertTrue(box_lines[2].endswith("|"))
         self.assertTrue(box_lines[3].startswith("+"))
 
-    def test_chat_help_shows_agent_role_summary(self) -> None:
+    def test_chat_help_does_not_show_static_agent_roster(self) -> None:
         output = StringIO()
 
         with redirect_stdout(output):
             JimmoriaConsole().print_help()
 
         text = output.getvalue()
-        self.assertIn("Agents at work:", text)
-        self.assertIn("supervisor_agent", text)
-        self.assertIn("social_kol_agent", text)
-        self.assertIn("obsidian_curator_agent", text)
-        self.assertIn("Turns agent findings into a human-readable dossier", text)
+        self.assertIn("JIMMORIA commands", text)
+        self.assertNotIn("Agents at work:", text)
+
+    def test_live_agent_board_shows_current_work(self) -> None:
+        output = StringIO()
+        console = JimmoriaConsole()
+
+        with redirect_stdout(output):
+            console.handle_event(
+                {
+                    "type": "room_created",
+                    "room_id": "room_test",
+                    "topic": "pearl pow project",
+                    "goals": ["Investigate the project."],
+                    "agents": ["supervisor_agent", "ingestion_agent"],
+                }
+            )
+            console.handle_event(
+                {
+                    "type": "agent_start",
+                    "room_id": "room_test",
+                    "agent_id": "ingestion_agent",
+                    "task_type": "source_ingestion",
+                }
+            )
+
+        text = output.getvalue()
+        self.assertIn("Live agent board", text)
+        self.assertIn("WAIT", text)
+        self.assertIn("RUN", text)
+        self.assertIn("ingestion_agent", text)
+        self.assertIn("Now: Storing source input", text)
+
+    def test_live_agent_board_shows_failures(self) -> None:
+        output = StringIO()
+        console = JimmoriaConsole()
+
+        with redirect_stdout(output):
+            console.handle_event(
+                {
+                    "type": "room_created",
+                    "room_id": "room_test",
+                    "topic": "pearl pow project",
+                    "goals": ["Investigate the project."],
+                    "agents": ["ingestion_agent"],
+                }
+            )
+            console.handle_event(
+                {
+                    "type": "agent_failed",
+                    "room_id": "room_test",
+                    "agent_id": "ingestion_agent",
+                    "task_type": "source_ingestion",
+                    "error": "Codex CLI provider failed",
+                }
+            )
+
+        text = output.getvalue()
+        self.assertIn("FAIL", text)
+        self.assertIn("Stopped: Failed: Codex CLI provider failed", text)
 
     def test_article_research_loop_writes_outputs(self) -> None:
         with TemporaryDirectory() as tmp:
