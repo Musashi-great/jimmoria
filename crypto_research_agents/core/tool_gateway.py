@@ -8,6 +8,7 @@ from .tool_call import ToolCallRecord
 
 
 ToolCallable = Callable[..., dict[str, Any]]
+EventCallback = Callable[..., None]
 
 
 class PolicyEngine:
@@ -29,13 +30,22 @@ class ToolGateway:
     normalized results.
     """
 
-    def __init__(self, policy_engine: PolicyEngine | None = None) -> None:
+    def __init__(
+        self,
+        policy_engine: PolicyEngine | None = None,
+        *,
+        event_callback: EventCallback | None = None,
+    ) -> None:
         self.policy_engine = policy_engine or PolicyEngine()
         self._tools: dict[str, ToolCallable] = {}
         self.audit_log: list[dict[str, Any]] = []
+        self.event_callback = event_callback
 
     def register(self, tool_name: str, func: ToolCallable) -> None:
         self._tools[tool_name] = func
+
+    def set_event_callback(self, callback: EventCallback | None) -> None:
+        self.event_callback = callback
 
     @property
     def registered_tools(self) -> set[str]:
@@ -53,6 +63,13 @@ class ToolGateway:
         **kwargs: Any,
     ) -> dict[str, Any]:
         started = perf_counter()
+        self._emit_tool_event(
+            "tool_start",
+            agent_id=agent_id,
+            tool_name=tool_name,
+            room_id=room_id,
+            input_data=kwargs,
+        )
         if not self.policy_engine.can_call(agent_id, tool_name):
             self._record_tool_call(
                 agent_id=agent_id,
@@ -62,6 +79,15 @@ class ToolGateway:
                 status="denied",
                 latency_ms=_elapsed_ms(started),
                 result={"error": "permission_denied"},
+            )
+            self._emit_tool_event(
+                "tool_denied",
+                agent_id=agent_id,
+                tool_name=tool_name,
+                room_id=room_id,
+                input_data=kwargs,
+                latency_ms=_elapsed_ms(started),
+                message="permission_denied",
             )
             raise PermissionError(f"{agent_id} is not allowed to call {tool_name}")
 
@@ -82,6 +108,15 @@ class ToolGateway:
                 latency_ms=_elapsed_ms(started),
                 result=result,
             )
+            self._emit_tool_event(
+                "tool_unconfigured",
+                agent_id=agent_id,
+                tool_name=tool_name,
+                room_id=room_id,
+                input_data=kwargs,
+                latency_ms=_elapsed_ms(started),
+                message=result.get("message", "Tool connector is not configured."),
+            )
             return result
 
         try:
@@ -96,16 +131,36 @@ class ToolGateway:
                 latency_ms=_elapsed_ms(started),
                 result={"error": str(exc)},
             )
+            self._emit_tool_event(
+                "tool_failed",
+                agent_id=agent_id,
+                tool_name=tool_name,
+                room_id=room_id,
+                input_data=kwargs,
+                latency_ms=_elapsed_ms(started),
+                message=str(exc),
+            )
             raise
 
+        status = result.get("status", "success")
         self._record_tool_call(
             agent_id=agent_id,
             tool_name=tool_name,
             room_id=room_id,
             input_data=kwargs,
-            status=result.get("status", "success"),
+            status=status,
             latency_ms=_elapsed_ms(started),
             result=result,
+        )
+        self._emit_tool_event(
+            "tool_done",
+            agent_id=agent_id,
+            tool_name=tool_name,
+            room_id=room_id,
+            input_data=kwargs,
+            latency_ms=_elapsed_ms(started),
+            status=status,
+            message=str(result.get("message") or status),
         )
         return result
 
@@ -131,6 +186,41 @@ class ToolGateway:
         )
         self.audit_log.append(record.to_dict())
 
+    def _emit_tool_event(
+        self,
+        event_type: str,
+        *,
+        agent_id: str,
+        tool_name: str,
+        room_id: str | None,
+        input_data: dict[str, Any],
+        latency_ms: int | None = None,
+        status: str | None = None,
+        message: str | None = None,
+    ) -> None:
+        if self.event_callback is None:
+            return
+        payload: dict[str, Any] = {
+            "agent_id": agent_id,
+            "tool_name": tool_name,
+            "room_id": room_id,
+            "input_preview": _preview(input_data),
+        }
+        if latency_ms is not None:
+            payload["latency_ms"] = latency_ms
+        if status is not None:
+            payload["status"] = status
+        if message:
+            payload["summary"] = message
+        self.event_callback(event_type, **payload)
+
 
 def _elapsed_ms(started: float) -> int:
     return int((perf_counter() - started) * 1000)
+
+
+def _preview(value: Any, *, limit: int = 180) -> str:
+    text = repr(value)
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rstrip() + "..."

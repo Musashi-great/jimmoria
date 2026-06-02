@@ -15,7 +15,7 @@ from crypto_research_agents.runtime import ResearchRuntime
 from crypto_research_agents.agents.discovery import build_live_candidates, extract_project_query, should_live_discover
 from crypto_research_agents.connectors import register_default_connectors
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
-from crypto_research_agents.cli import chat_command, configure_model_panel, main as cli_main, print_banner
+from crypto_research_agents.cli import chat_command, configure_model_panel, main as cli_main, message_summary, print_banner
 from crypto_research_agents.console import JimmoriaConsole, print_jimmoria_logo
 from crypto_research_agents.core.llm_provider import CodexCliProvider, LLMRequest, OAuthTokenProvider, provider_from_env
 from crypto_research_agents.core.memory import SharedMemory, SourceRecord
@@ -136,7 +136,7 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("WAIT", text)
         self.assertIn("RUN", text)
         self.assertIn("ingestion_agent", text)
-        self.assertIn("Now: Storing source input", text)
+        self.assertIn("Now: Extracting source metadata", text)
         self.assertEqual(text.count("Live agent board"), 1)
 
     def test_live_agent_board_shows_failures(self) -> None:
@@ -188,9 +188,28 @@ class SmokeTest(unittest.TestCase):
             events = json.loads((root / "runs" / result.room.room_id / "events.json").read_text(encoding="utf-8"))
             self.assertGreaterEqual(len(events), 10)
             self.assertEqual(events[0]["type"], "room_created")
+            event_types = {event["type"] for event in events}
+            self.assertIn("tool_start", event_types)
+            self.assertIn("tool_done", event_types)
+            self.assertIn("finding_saved", event_types)
+            self.assertIn("source_saved", event_types)
+            self.assertIn("report_written", event_types)
             self.assertGreaterEqual(len(runtime.model_gateway.call_log), 3)
             self.assertGreaterEqual(len(result.bus.messages), 8)
             self.assertGreaterEqual(len(result.memory.get_room_findings(result.room.room_id)), 8)
+
+            report = Path(result.room.output_paths["report"]).read_text(encoding="utf-8")
+            self.assertIn("| Project | Origin | Source Backing |", report)
+            self.assertIn("mvp_placeholder", report)
+            self.assertIn("[MVP Placeholder]", report)
+            self.assertIn("LLM provider: `offline_fallback`", report)
+            self.assertIn("Live LLM: not configured", report)
+
+            project_notes = list((root / "vault" / "10_Projects").glob("*.md"))
+            self.assertTrue(project_notes)
+            note_text = project_notes[0].read_text(encoding="utf-8")
+            self.assertIn("candidate_origin: mvp_placeholder", note_text)
+            self.assertIn("source_backing: narrative_seed_only", note_text)
 
     def test_default_connectors_register_low_cost_research_stack(self) -> None:
         runtime = ResearchRuntime()
@@ -267,6 +286,18 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(candidates[0].chain, "Pearl L1")
         self.assertIn("Proof-of-Useful-Work", candidates[0].narratives)
         self.assertGreater(candidates[0].score, 60)
+        self.assertEqual(candidates[0].metadata["candidate_origin"], "live_source_backed")
+        self.assertEqual(candidates[0].metadata["source_backing"], "web_github_market_search")
+
+    def test_message_summary_uses_response_result_fallback(self) -> None:
+        message = {
+            "type": "RESPONSE",
+            "task": {},
+            "result": {"status": "complete", "summary": "candidate check complete"},
+            "status": "created",
+        }
+
+        self.assertEqual(message_summary(message), "candidate check complete")
 
     def test_source_record_dedupes_by_canonical_url(self) -> None:
         memory = SharedMemory()

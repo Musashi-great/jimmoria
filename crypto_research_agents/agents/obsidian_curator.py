@@ -25,9 +25,7 @@ class ObsidianCuratorAgent(BaseAgent):
             if source:
                 written.append(str(store.write_source_note(source)))
 
-        for project in memory.projects.values():
-            if not set(project.sources).intersection(room.source_inputs):
-                continue
+        for project in current_room_projects(room, memory):
             written.append(str(store.write_project_note(project)))
 
         if room.report_draft:
@@ -50,3 +48,24 @@ class ObsidianCuratorAgent(BaseAgent):
             payload={"finding_id": finding.finding_id, "paths": written},
         )
         return AgentResult(self.agent_id, summary, {"finding_id": finding.finding_id, "paths": written}, confidence=0.75)
+
+
+def current_room_projects(room: ResearchRoom, memory: SharedMemory) -> list[Any]:
+    project_ids: list[str] = []
+    for finding in memory.get_room_findings(room.room_id):
+        if finding.finding_type != "candidate_discovery":
+            continue
+        for candidate in finding.data.get("candidates", []):
+            if isinstance(candidate, dict) and candidate.get("project_id"):
+                project_ids.append(str(candidate["project_id"]))
+    if project_ids:
+        return [
+            memory.projects[project_id]
+            for project_id in project_ids
+            if project_id in memory.projects
+        ]
+    return [
+        project
+        for project in memory.projects.values()
+        if set(project.sources).intersection(room.source_inputs)
+    ]

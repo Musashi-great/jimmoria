@@ -28,16 +28,16 @@ except ImportError:  # pragma: no cover - fallback for non-installed editable ch
 
 
 AGENT_ACTIVITY = {
-    "supervisor_agent": "Planning goals, priorities, and research direction",
-    "ingestion_agent": "Storing source input and extracting entities, keywords, metadata",
-    "narrative_agent": "Mapping market narratives and thesis categories",
-    "discovery_agent": "Finding early project candidates from narrative signals",
-    "social_kol_agent": "Checking KOL handles, social mentions, and community signal",
-    "contract_onchain_agent": "Verifying chain, token, contract, and DEX/explorer data",
-    "product_tech_agent": "Checking website, docs, GitHub, and product readiness",
-    "funding_token_agent": "Reviewing investors, points, airdrop, and token status",
-    "report_agent": "Turning agent findings into a human-readable dossier",
-    "obsidian_curator_agent": "Saving sources, projects, narratives, and reports to Vault",
+    "supervisor_agent": "Planning direction",
+    "ingestion_agent": "Extracting source metadata",
+    "narrative_agent": "Mapping narratives",
+    "discovery_agent": "Resolving candidates",
+    "social_kol_agent": "Checking social signal",
+    "contract_onchain_agent": "Checking token identity",
+    "product_tech_agent": "Checking docs/GitHub",
+    "funding_token_agent": "Checking funding/token hints",
+    "report_agent": "Writing dossier",
+    "obsidian_curator_agent": "Syncing vault notes",
 }
 
 
@@ -72,6 +72,7 @@ class JimmoriaConsole:
             "  /models                  Configure LLM provider/models",
             "  /doctor                  Show configured vs placeholder capabilities",
             "  /company                 Show active and planned agents",
+            "  /board                   Show current live agent board",
             "  /context                 Show shared memory and latest run context",
             "  /runs                    Show previous runs",
             "  /status [room_id]        Show latest or selected room status",
@@ -243,6 +244,14 @@ class JimmoriaConsole:
             self.print_agent_state()
             return
 
+        if event_type in {"tool_start", "tool_done", "tool_failed", "tool_denied", "tool_unconfigured"}:
+            self.print_tool_event(event_type, event)
+            return
+
+        if event_type in {"finding_saved", "source_saved", "report_written", "note_written"}:
+            self.print_output_event(event_type, event)
+            return
+
         if event_type == "room_completed":
             self.block(
                 "JIMMORIA finalizes the room",
@@ -251,6 +260,18 @@ class JimmoriaConsole:
                     f"Status: {event.get('status')}",
                     f"Messages: {event.get('messages')}",
                     f"Findings: {event.get('findings')}",
+                ],
+            )
+            self.print_agent_state()
+            return
+
+        if event_type == "room_failed":
+            self.block(
+                "JIMMORIA room failed",
+                [
+                    f"Room: {event.get('room_id')}",
+                    f"Status: {event.get('status')}",
+                    f"Reason: {event.get('summary')}",
                 ],
             )
             self.print_agent_state()
@@ -349,6 +370,43 @@ class JimmoriaConsole:
             [f"{self.state_label(state):<8} {agent_id:<28} {activity}" for state, agent_id, activity in rows],
         )
 
+    def print_tool_event(self, event_type: str, event: dict[str, object]) -> None:
+        marker = {
+            "tool_start": "RUN",
+            "tool_done": "DONE",
+            "tool_failed": "FAIL",
+            "tool_denied": "DENY",
+            "tool_unconfigured": "WAIT",
+        }.get(event_type, "TOOL")
+        lines = [
+            f"[TOOL] {event.get('agent_id')} -> {event.get('tool_name')} [{marker}]",
+        ]
+        if event.get("summary"):
+            lines.append(f"Summary: {event.get('summary')}")
+        if event.get("latency_ms") is not None:
+            lines.append(f"Latency: {event.get('latency_ms')}ms")
+        if event.get("input_preview") and event_type == "tool_start":
+            lines.append(f"Input: {event.get('input_preview')}")
+        self.block("Tool activity", lines)
+
+    def print_output_event(self, event_type: str, event: dict[str, object]) -> None:
+        labels = {
+            "finding_saved": "Finding saved",
+            "source_saved": "Source saved",
+            "report_written": "Report written",
+            "note_written": "Vault note written",
+        }
+        summary = str(event.get("summary") or labels.get(event_type, event_type))
+        if event.get("path"):
+            summary = f"{summary}"
+        self.block(
+            labels.get(event_type, event_type),
+            [
+                f"Agent: {event.get('agent_id')}",
+                summary,
+            ],
+        )
+
     def state_label(self, state: str) -> str:
         labels = {
             "queued": "WAIT",
@@ -366,8 +424,8 @@ class JimmoriaConsole:
             "failed": "Stopped",
         }.get(state, "Status")
         compact = " ".join(str(activity).split())
-        if len(compact) > 92:
-            compact = compact[:89].rstrip() + "..."
+        if len(compact) > 64:
+            compact = compact[:61].rstrip() + "..."
         return f"{prefix}: {compact}"
 
     def print_report_preview(self, report_path: str | Path, *, max_lines: int = 12) -> None:

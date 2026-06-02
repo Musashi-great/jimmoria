@@ -10,11 +10,12 @@ import sys
 from pathlib import Path
 
 from crypto_research_agents import APP_NAME, __version__
-from crypto_research_agents.connectors.url_fetcher import fetch_url as connector_fetch_url
+from crypto_research_agents.connectors import register_default_connectors
 from crypto_research_agents.console import JimmoriaConsole
 from crypto_research_agents.runtime import ResearchRuntime
 from crypto_research_agents.runtime import DEFAULT_AGENTS
 from crypto_research_agents.core.capabilities import collect_capabilities
+from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 from crypto_research_agents.storage.json_store import load_memory
 from crypto_research_agents.storage.run_store import list_run_summaries, load_run_file
 
@@ -63,6 +64,11 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Skip the startup model setup panel.",
     )
+    chat_parser.add_argument(
+        "--verbose-board",
+        action="store_true",
+        help="Reserved for fuller agent-board logging in future visual modes.",
+    )
 
     hq_parser = subparsers.add_parser("hq", help="Alias for the chat-like JIMMORIA HQ console.")
     add_run_args(hq_parser)
@@ -70,6 +76,11 @@ def main(argv: list[str] | None = None) -> None:
         "--skip-model-setup",
         action="store_true",
         help="Skip the startup model setup panel.",
+    )
+    hq_parser.add_argument(
+        "--verbose-board",
+        action="store_true",
+        help="Reserved for fuller agent-board logging in future visual modes.",
     )
 
     research_parser = subparsers.add_parser("research", help="Run the full article/project research loop.")
@@ -176,6 +187,7 @@ def default_chat_args() -> argparse.Namespace:
         reports="reports",
         memory="data/memory.json",
         skip_model_setup=False,
+        verbose_board=False,
     )
 
 
@@ -207,7 +219,11 @@ def read_source_input(args: argparse.Namespace) -> tuple[str, str, str | None]:
 
 
 def fetch_url_text(url: str) -> str:
-    result = connector_fetch_url(url)
+    policy = PolicyEngine()
+    policy.allow("cli", "fetch_url")
+    gateway = ToolGateway(policy)
+    register_default_connectors(gateway)
+    result = gateway.call("cli", "fetch_url", url=url)
     data = result.get("data") if isinstance(result.get("data"), dict) else {}
     if result.get("status") != "success":
         raise SystemExit(f"Failed to fetch URL: {result.get('message')}")
@@ -242,12 +258,7 @@ def inspect_command(args: argparse.Namespace) -> None:
     if args.command == "messages":
         messages = load_run_file(args.room_id, "messages.json", args.runs_dir)
         assert isinstance(messages, list)
-        for message in messages[: args.limit]:
-            print(
-                f"{message.get('created_at')} | {message.get('type')} | "
-                f"{message.get('from_agent')} -> {message.get('to_agent')} | "
-                f"{message.get('task', {}).get('summary') or message.get('task', {}).get('objective')}"
-            )
+        print_message_rows(messages, limit=args.limit)
         return
 
     if args.command == "events":
@@ -335,6 +346,10 @@ def handle_chat_command(
 
     if command == "/help":
         console.print_help()
+        return False, last_room_id
+
+    if command == "/board":
+        console.print_agent_state()
         return False, last_room_id
 
     if command == "/models":
@@ -467,14 +482,36 @@ def doctor_command(args: argparse.Namespace | None = None) -> None:
     )
     print("")
     print("Capability status:")
+    groups = {
+        "Runtime": {
+            "Runtime scaffold",
+            "Agent specs/personas",
+            "Shared memory JSON",
+            "Run snapshots",
+            "Report writer",
+            "Obsidian vault writer",
+        },
+        "Models": {"LLM provider", "Codex OAuth token", "OpenAI API key"},
+        "Live research tools": set(),
+        "Overall": {"Overall"},
+    }
     for capability in capabilities:
-        marker = {
-            "configured": "OK",
-            "fallback": "FB",
-            "placeholder": "--",
-            "missing": "!!",
-        }.get(capability.status, "??")
-        print(f"  {marker} {capability.name}: {capability.status} | {capability.detail}")
+        if capability.name not in groups["Runtime"] and capability.name not in groups["Models"] and capability.name != "Overall":
+            groups["Live research tools"].add(capability.name)
+
+    for group_name, names in groups.items():
+        group_items = [capability for capability in capabilities if capability.name in names]
+        if not group_items:
+            continue
+        print(f"\n[{group_name}]")
+        for capability in group_items:
+            marker = {
+                "configured": "OK",
+                "fallback": "FB",
+                "placeholder": "--",
+                "missing": "!!",
+            }.get(capability.status, "??")
+            print(f"  {marker} {capability.name}: {capability.status} | {capability.detail}")
 
 
 def print_agent_table(*, active_only: bool = False) -> None:
@@ -858,6 +895,14 @@ def make_event_printer() -> object:
             )
             return
 
+        if event_type in {"tool_start", "tool_done", "tool_failed", "tool_denied", "tool_unconfigured"}:
+            status = event_type.replace("tool_", "")
+            print(
+                f"[TOOL] {event.get('agent_id')} -> {event.get('tool_name')} "
+                f"{status} | {event.get('summary', '')}"
+            )
+            return
+
         if event_type == "room_completed":
             print_box(
                 [
@@ -865,6 +910,16 @@ def make_event_printer() -> object:
                     f"Status: {event.get('status')}",
                     f"Messages: {event.get('messages')}",
                     f"Findings: {event.get('findings')}",
+                ]
+            )
+            return
+
+        if event_type == "room_failed":
+            print_box(
+                [
+                    f"Failed: {event.get('room_id')}",
+                    f"Status: {event.get('status')}",
+                    f"Reason: {event.get('summary')}",
                 ]
             )
 
@@ -883,13 +938,30 @@ def print_message_rows(messages: list[object], limit: int) -> None:
     for message in messages[:limit]:
         if not isinstance(message, dict):
             continue
-        task = message.get("task") if isinstance(message.get("task"), dict) else {}
-        assert isinstance(task, dict)
-        text = task.get("summary") or task.get("objective") or ""
+        text = message_summary(message)
         print(
             f"{message.get('created_at')} | {message.get('type')} | "
             f"{message.get('from_agent')} -> {message.get('to_agent')} | {text}"
         )
+
+
+def message_summary(message: dict[str, object]) -> str:
+    for field_name in ["task", "result", "payload", "context"]:
+        value = message.get(field_name)
+        if not isinstance(value, dict):
+            continue
+        for key in ["summary", "objective", "status", "message"]:
+            text = value.get(key)
+            if text:
+                return str(text)
+    notes = message.get("notes")
+    if isinstance(notes, list) and notes:
+        return str(notes[0])
+    for key in ["summary", "status"]:
+        text = message.get(key)
+        if text:
+            return str(text)
+    return "(no summary)"
 
 
 def print_mapping(value: object, indent: int = 0) -> None:

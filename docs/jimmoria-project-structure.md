@@ -708,3 +708,57 @@ python -m unittest discover -s tests -v
 ## 21. 한 줄 요약
 
 JIMMORIA는 현재 "채팅형 CLI + Research Room + controlled P2P Agent Bus + Shared Memory + Model Gateway + Tool Gateway + 기본 Web Search/URL/Website/Docs/GitHub/DEX/CoinGecko connectors + Markdown/Obsidian output"까지 구현된 크립토 리서치 회사 MVP다. 다음 핵심 작업은 Project Research Loop, Identity/Evidence/Collision 검증 엔진, 그리고 Social/Contract/Funding 에이전트의 source-backed finding 업그레이드다.
+## 22. Current Runtime Update Notes
+
+최근 변경 기준으로 JIMMORIA는 live/source-backed 후보와 MVP placeholder 후보를 구분한다.
+
+| Field | Value | Meaning |
+|---|---|---|
+| `candidate_origin` | `live_source_backed` | 웹/GitHub/market connector 증거가 붙은 후보 |
+| `candidate_origin` | `mvp_placeholder` | 내러티브만 보고 생성한 MVP용 계획 후보 |
+| `candidate_origin` | `manual_input` | 사용자가 직접 넣은 후보 |
+| `source_backing` | `web_github_market_search` | web search, GitHub, CoinGecko, DEX Screener 계열 evidence |
+| `source_backing` | `narrative_seed_only` | 외부 live evidence 없이 narrative seed만 사용 |
+
+ReportAgent는 Candidate Projects 표에 `Origin`과 `Source Backing` 열을 표시한다. `mvp_placeholder` 후보는 `[MVP Placeholder]` 라벨을 붙이고, TL;DR/Open Questions에서 live 후보가 아님을 명시한다. Obsidian project note도 frontmatter와 본문에 `candidate_origin`, `source_backing`을 저장한다.
+
+CLI live board는 긴 roster를 반복 출력하지 않고 짧은 activity label을 사용한다.
+
+| Agent ID | Current Work Label |
+|---|---|
+| `supervisor_agent` | Planning direction |
+| `ingestion_agent` | Extracting source metadata |
+| `narrative_agent` | Mapping narratives |
+| `discovery_agent` | Resolving candidates |
+| `social_kol_agent` | Checking social signal |
+| `contract_onchain_agent` | Checking token identity |
+| `product_tech_agent` | Checking docs/GitHub |
+| `funding_token_agent` | Checking funding/token hints |
+| `report_agent` | Writing dossier |
+| `obsidian_curator_agent` | Syncing vault notes |
+
+`/board`는 현재 Research Room의 live agent board를 다시 보여준다. `/messages`와 `jimmoria messages <room_id>`는 `task.summary`, `task.objective`, `result.summary`, `result.status`, message-level `status`, `notes` 순서로 요약을 찾아 `None` 대신 사람이 읽을 수 있는 내용을 표시한다.
+
+ToolGateway는 tool 호출을 event stream에도 기록한다.
+
+```text
+tool_start
+tool_done
+tool_failed
+tool_denied
+tool_unconfigured
+```
+
+Runtime은 주요 산출물도 event로 남긴다.
+
+```text
+finding_saved
+source_saved
+report_written
+note_written
+room_failed
+```
+
+따라서 `data/runs/<room_id>/events.json`은 나중에 웹/비주얼 replay 화면에서 에이전트 실행, tool 호출, 보고서/노트 저장 흐름을 그대로 재생하는 기반이 된다.
+
+Report runtime metadata에는 `LLM provider`와 `Report model route`가 들어간다. provider가 `offline_fallback`이면 TL;DR에 `Live LLM: not configured`가 표시되어 deterministic fallback을 실제 LLM 판단처럼 오해하지 않게 한다.

@@ -65,6 +65,7 @@ class ResearchRuntime:
         self.tool_gateway = ToolGateway(default_policy(self.agent_specs))
         register_default_connectors(self.tool_gateway)
         self.event_log: list[dict[str, Any]] = []
+        self.tool_gateway.set_event_callback(self._emit)
         self.agents = {
             "supervisor_agent": SupervisorAgent(model_gateway=self.model_gateway, tool_gateway=self.tool_gateway, spec=self.agent_specs.get("supervisor_agent")),
             "ingestion_agent": IngestionAgent(model_gateway=self.model_gateway, tool_gateway=self.tool_gateway, spec=self.agent_specs.get("ingestion_agent")),
@@ -108,42 +109,37 @@ class ResearchRuntime:
             agents=room.agents,
         )
 
-        self._run_agent("supervisor_agent", room, goals=room.goals)
-        room.set_status(RuntimeState.RUNNING)
-        self._run_agent("ingestion_agent", room, title=title, content=content, url=url, source_type="article")
-        self._run_agent("narrative_agent", room)
-        self._run_agent("discovery_agent", room)
-        room.set_status(RuntimeState.WAITING_FOR_TOOL)
-        self._run_agent("social_kol_agent", room)
-        self._run_agent("contract_onchain_agent", room)
-        self._run_agent("product_tech_agent", room)
-        self._run_agent("funding_token_agent", room)
-        room.set_status(RuntimeState.READY_FOR_REPORT)
-        room.set_status(RuntimeState.WRITING_REPORT)
-        self._run_agent("report_agent", room, reports_dir=reports_dir)
-        room.set_status(RuntimeState.OBSIDIAN_SYNCING)
-        self._run_agent("obsidian_curator_agent", room, vault_dir=vault_dir)
+        try:
+            self._run_agent("supervisor_agent", room, goals=room.goals)
+            room.set_status(RuntimeState.RUNNING)
+            self._run_agent("ingestion_agent", room, title=title, content=content, url=url, source_type="article")
+            self._run_agent("narrative_agent", room)
+            self._run_agent("discovery_agent", room)
+            room.set_status(RuntimeState.WAITING_FOR_TOOL)
+            self._run_agent("social_kol_agent", room)
+            self._run_agent("contract_onchain_agent", room)
+            self._run_agent("product_tech_agent", room)
+            self._run_agent("funding_token_agent", room)
+            room.set_status(RuntimeState.READY_FOR_REPORT)
+            room.set_status(RuntimeState.WRITING_REPORT)
+            self._run_agent("report_agent", room, reports_dir=reports_dir)
+            room.set_status(RuntimeState.OBSIDIAN_SYNCING)
+            self._run_agent("obsidian_curator_agent", room, vault_dir=vault_dir)
+        except Exception as exc:
+            room.set_status(RuntimeState.FAILED)
+            self._emit(
+                "room_failed",
+                room_id=room.room_id,
+                topic=room.topic,
+                status=room.status,
+                summary=str(exc),
+            )
+            self._save_run(room, memory_path)
+            raise
 
         room.close()
-        self._emit(
-            "room_completed",
-            room_id=room.room_id,
-            topic=room.topic,
-            status=room.status,
-            output_paths=room.output_paths,
-            messages=len(self.bus.messages),
-            findings=len(self.memory.get_room_findings(room.room_id)),
-        )
-        if memory_path is not None:
-            save_memory(self.memory, memory_path)
-            save_run_snapshot(
-                room=room,
-                bus=self.bus,
-                audit_log=self.tool_gateway.audit_log,
-                llm_call_log=self.model_gateway.call_log,
-                event_log=self.event_log,
-                root_dir=Path(memory_path).parent / "runs",
-            )
+        self._emit_room_completed(room)
+        self._save_run(room, memory_path)
         return ResearchRunResult(room=room, memory=self.memory, bus=self.bus)
 
     def run_source_ingestion(
@@ -177,32 +173,27 @@ class ResearchRuntime:
             agents=room.agents,
         )
 
-        self._run_agent("supervisor_agent", room, goals=room.goals)
-        room.set_status(RuntimeState.RUNNING)
-        self._run_agent("ingestion_agent", room, title=title, content=content, url=url, source_type="article")
-        room.set_status(RuntimeState.OBSIDIAN_SYNCING)
-        self._run_agent("obsidian_curator_agent", room, vault_dir=vault_dir)
+        try:
+            self._run_agent("supervisor_agent", room, goals=room.goals)
+            room.set_status(RuntimeState.RUNNING)
+            self._run_agent("ingestion_agent", room, title=title, content=content, url=url, source_type="article")
+            room.set_status(RuntimeState.OBSIDIAN_SYNCING)
+            self._run_agent("obsidian_curator_agent", room, vault_dir=vault_dir)
+        except Exception as exc:
+            room.set_status(RuntimeState.FAILED)
+            self._emit(
+                "room_failed",
+                room_id=room.room_id,
+                topic=room.topic,
+                status=room.status,
+                summary=str(exc),
+            )
+            self._save_run(room, memory_path)
+            raise
 
         room.close()
-        self._emit(
-            "room_completed",
-            room_id=room.room_id,
-            topic=room.topic,
-            status=room.status,
-            output_paths=room.output_paths,
-            messages=len(self.bus.messages),
-            findings=len(self.memory.get_room_findings(room.room_id)),
-        )
-        if memory_path is not None:
-            save_memory(self.memory, memory_path)
-            save_run_snapshot(
-                room=room,
-                bus=self.bus,
-                audit_log=self.tool_gateway.audit_log,
-                llm_call_log=self.model_gateway.call_log,
-                event_log=self.event_log,
-                root_dir=Path(memory_path).parent / "runs",
-            )
+        self._emit_room_completed(room)
+        self._save_run(room, memory_path)
         return ResearchRunResult(room=room, memory=self.memory, bus=self.bus)
 
     def _run_agent(self, agent_id: str, room: ResearchRoom, **kwargs: object) -> None:
@@ -239,12 +230,77 @@ class ResearchRuntime:
             messages=len(self.bus.messages),
             findings=len(self.memory.get_room_findings(room.room_id)),
         )
+        self._emit_output_events(room, result)
 
     def _emit(self, event_type: str, **payload: Any) -> None:
         event = {"type": event_type, **payload}
         self.event_log.append(event)
         if self.event_handler is not None:
             self.event_handler(event)
+
+    def _emit_room_completed(self, room: ResearchRoom) -> None:
+        self._emit(
+            "room_completed",
+            room_id=room.room_id,
+            topic=room.topic,
+            status=room.status,
+            output_paths=room.output_paths,
+            messages=len(self.bus.messages),
+            findings=len(self.memory.get_room_findings(room.room_id)),
+        )
+
+    def _emit_output_events(self, room: ResearchRoom, result: Any) -> None:
+        data = result.data if isinstance(getattr(result, "data", None), dict) else {}
+        finding_id = data.get("finding_id")
+        if finding_id:
+            self._emit(
+                "finding_saved",
+                room_id=room.room_id,
+                agent_id=result.agent_id,
+                finding_id=finding_id,
+                summary=result.summary,
+            )
+        source_id = data.get("source_id")
+        if source_id:
+            self._emit(
+                "source_saved",
+                room_id=room.room_id,
+                agent_id=result.agent_id,
+                source_id=source_id,
+                summary=result.summary,
+            )
+        report_path = data.get("report_path")
+        if report_path:
+            self._emit(
+                "report_written",
+                room_id=room.room_id,
+                agent_id=result.agent_id,
+                report_path=report_path,
+                summary=result.summary,
+            )
+        paths = data.get("paths")
+        if isinstance(paths, list):
+            for path in paths:
+                self._emit(
+                    "note_written",
+                    room_id=room.room_id,
+                    agent_id=result.agent_id,
+                    path=path,
+                    summary=f"Wrote note: {path}",
+                )
+
+    def _save_run(self, room: ResearchRoom, memory_path: str | Path | None) -> None:
+        if memory_path is None:
+            return
+        save_memory(self.memory, memory_path)
+        save_run_snapshot(
+            room=room,
+            bus=self.bus,
+            audit_log=self.tool_gateway.audit_log,
+            llm_call_log=self.model_gateway.call_log,
+            event_log=self.event_log,
+            root_dir=Path(memory_path).parent / "runs",
+        )
 
 
 def default_policy(agent_specs: AgentSpecRegistry | None = None) -> PolicyEngine:

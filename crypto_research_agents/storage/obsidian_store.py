@@ -44,11 +44,15 @@ class ObsidianStore:
         path = self.projects_dir / f"{safe_filename(project.name)}.md"
         narratives = "\n".join(f"  - {item}" for item in project.narratives) or "  - unknown"
         source_links = "\n".join(f"- [[{source_id}]]" for source_id in project.sources) or "- none"
+        candidate_origin = str(project.metadata.get("candidate_origin") or "unknown")
+        source_backing = str(project.metadata.get("source_backing") or "unknown")
         body = [
             "---",
             "type: project",
             f"project_id: {project.project_id}",
             f"project_name: {project.name}",
+            f"candidate_origin: {candidate_origin}",
+            f"source_backing: {source_backing}",
             f"chain: {project.chain or 'unknown'}",
             "narrative:",
             narratives,
@@ -61,6 +65,13 @@ class ObsidianStore:
             "",
             "## Summary",
             project.reason_found,
+            "",
+            "## Candidate Origin",
+            f"- Origin: `{candidate_origin}`",
+            f"- Source backing: `{source_backing}`",
+            "- Interpretation: MVP placeholders are planning leads, not verified live project discoveries."
+            if candidate_origin == "mvp_placeholder"
+            else "- Interpretation: This candidate has source-backed discovery metadata.",
             "",
             "## Related Narratives",
         ]

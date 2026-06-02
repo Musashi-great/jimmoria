@@ -210,6 +210,8 @@ def build_live_candidates(
     score = score_live_candidate(website, github_repos, coingecko_coins, dex_pairs, evidence_text)
     metadata = {
         "discovery_mode": "live_search",
+        "candidate_origin": "live_source_backed",
+        "source_backing": "web_github_market_search",
         "project_query": project_query,
         "evidence_urls": evidence_urls(web_results, github_repos),
         "web_results": web_results[:8],
@@ -252,7 +254,11 @@ def build_candidates(narratives: list[str], source_ids: list[str]) -> list[Proje
                 narratives=[narrative],
                 score=max(45.0, 70.0 - index * 5),
                 sources=list(source_ids),
-                metadata={"mvp_generated": True},
+                metadata={
+                    "mvp_generated": True,
+                    "candidate_origin": "mvp_placeholder",
+                    "source_backing": "narrative_seed_only",
+                },
             )
         )
     return candidates

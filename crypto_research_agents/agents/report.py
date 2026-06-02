@@ -22,7 +22,15 @@ class ReportAgent(BaseAgent):
         decision = self.model_gateway.select(agent_id=self.agent_id, task_type=self.task_type)
         findings = memory.get_room_findings(room.room_id)
         llm_summary = self._write_llm_summary(room, memory, findings)
-        report = render_project_dossier(room, memory, findings, decision.selected_model, llm_summary)
+        provider_name = getattr(self.model_gateway.provider, "provider_name", "unknown")
+        report = render_project_dossier(
+            room,
+            memory,
+            findings,
+            decision.selected_model,
+            provider_name,
+            llm_summary,
+        )
         report_path = reports_dir / f"{safe_filename(room.topic)}-{room.room_id}.md"
         report_path.write_text(report, encoding="utf-8")
         room.report_draft = report
@@ -33,7 +41,12 @@ class ReportAgent(BaseAgent):
             memory=memory,
             finding_type="report",
             summary=f"Report written to {report_path}",
-            data={"report_path": str(report_path), "model": decision.selected_model, "llm_summary": llm_summary},
+            data={
+                "report_path": str(report_path),
+                "model": decision.selected_model,
+                "provider": provider_name,
+                "llm_summary": llm_summary,
+            },
             confidence=0.7,
         )
         bus.handoff(
@@ -85,11 +98,13 @@ def render_project_dossier(
     memory: SharedMemory,
     findings: list[FindingRecord],
     model_name: str,
+    provider_name: str,
     llm_summary: str,
 ) -> str:
     candidates = current_room_candidates(room, memory, findings)
     sources = [memory.sources[source_id] for source_id in room.source_inputs if source_id in memory.sources]
     has_live_evidence = any(project.metadata.get("discovery_mode") == "live_search" for project in candidates)
+    has_placeholder_candidates = any(candidate_origin(project) == "mvp_placeholder" for project in candidates)
 
     lines: list[str] = [
         f"# Project Research Dossier: {room.topic}",
@@ -99,10 +114,15 @@ def render_project_dossier(
         "- Current judgment: Research More",
         f"- Automated synthesis: {render_automatic_tldr(candidates)}",
     ]
-    if should_show_llm_summary(llm_summary):
+    if provider_name == "offline_fallback":
+        lines.append("- Live LLM: not configured. Offline fallback generated deterministic summaries only.")
+    elif should_show_llm_summary(llm_summary):
         lines.append(f"- LLM synthesis: {llm_summary}")
     lines.extend(
         [
+            "- Candidate origin rule: MVP placeholders are not verified live candidates. Treat only `live_source_backed` rows as source-backed leads."
+            if has_placeholder_candidates
+            else "- Candidate origin rule: Current candidate rows are marked with their source-backing level.",
             "- Note: Live web/GitHub/market connectors were used where available; social APIs, RootData, and explorer/RPC may still be placeholders."
             if has_live_evidence
             else "- Note: This MVP uses local placeholders for live social/on-chain/product checks until connectors are configured.",
@@ -124,16 +144,19 @@ def render_project_dossier(
     if candidates:
         lines.extend(
             [
-                "| Project | Website | Narrative | Token Status | Score | Evidence | Why Found |",
-                "|---|---|---|---|---:|---:|---|",
+                "| Project | Origin | Source Backing | Website | Narrative | Token Status | Score | Evidence | Why Found |",
+                "|---|---|---|---|---|---|---:|---:|---|",
             ]
         )
         for project in candidates:
             narrative = ", ".join(project.narratives) or "unknown"
             website = project.website or "-"
             evidence_count = len(project.metadata.get("evidence_urls", []))
+            origin = candidate_origin(project)
+            source_backing = candidate_source_backing(project)
+            project_name = candidate_display_name(project)
             lines.append(
-                f"| {escape_table(project.name)} | {escape_table(website)} | {escape_table(narrative)} | {escape_table(project.token_status)} | {project.score:.0f} | {evidence_count} | {escape_table(project.reason_found)} |"
+                f"| {escape_table(project_name)} | {escape_table(origin)} | {escape_table(source_backing)} | {escape_table(website)} | {escape_table(narrative)} | {escape_table(project.token_status)} | {project.score:.0f} | {evidence_count} | {escape_table(project.reason_found)} |"
             )
     else:
         lines.append("- No candidates discovered.")
@@ -162,12 +185,14 @@ def render_project_dossier(
     lines.extend(
         [
             "## 7. Open Questions",
+            "- If a candidate is marked `mvp_placeholder`, replace it with a `live_source_backed` candidate before treating it as a real project lead.",
             "- Configure live X/Twitter, Telegram, RootData, Explorer/RPC, and funding connectors.",
             "- Validate official social handles and KOL mention history.",
             "- Verify token mechanics against explorer/RPC or official chain data.",
             "- Add source-backed KOL mention history and social momentum scores.",
             "",
             "## 8. Runtime Metadata",
+            f"- LLM provider: `{provider_name}`",
             f"- Report model route: `{model_name}`",
         ]
     )
@@ -178,6 +203,8 @@ def render_candidate_evidence(project: Any) -> list[str]:
     metadata = project.metadata
     lines = [
         f"### {project.name}",
+        f"- Candidate origin: {candidate_origin(project)}",
+        f"- Source backing: {candidate_source_backing(project)}",
         f"- Website: {project.website or 'unknown'}",
         f"- Chain: {project.chain or 'unknown'}",
         f"- Token status: {project.token_status}",
@@ -255,8 +282,9 @@ def render_automatic_tldr(candidates: list[Any]) -> str:
     primary = candidates[0]
     narratives = ", ".join(primary.narratives[:4]) or "unknown narrative"
     evidence_count = len(primary.metadata.get("evidence_urls", []))
+    origin = candidate_origin(primary)
     return (
-        f"{primary.name} resolved as the primary candidate. "
+        f"{primary.name} resolved as the primary candidate ({origin}). "
         f"Core thesis: {narratives}. "
         f"Token status: {primary.token_status}; chain: {primary.chain or 'unknown'}. "
         f"Evidence URLs collected: {evidence_count}. "
@@ -271,6 +299,36 @@ def should_show_llm_summary(summary: str) -> bool:
     if cleaned.startswith("Topic:") and "Goals:" in cleaned:
         return False
     return True
+
+
+def candidate_origin(project: Any) -> str:
+    metadata = project.metadata if isinstance(project.metadata, dict) else {}
+    origin = metadata.get("candidate_origin")
+    if origin:
+        return str(origin)
+    if metadata.get("discovery_mode") == "live_search":
+        return "live_source_backed"
+    if metadata.get("mvp_generated"):
+        return "mvp_placeholder"
+    return "unknown"
+
+
+def candidate_source_backing(project: Any) -> str:
+    metadata = project.metadata if isinstance(project.metadata, dict) else {}
+    backing = metadata.get("source_backing")
+    if backing:
+        return str(backing)
+    if candidate_origin(project) == "live_source_backed":
+        return "external_connector_evidence"
+    if candidate_origin(project) == "mvp_placeholder":
+        return "narrative_seed_only"
+    return "unknown"
+
+
+def candidate_display_name(project: Any) -> str:
+    if candidate_origin(project) == "mvp_placeholder":
+        return f"[MVP Placeholder] {project.name}"
+    return project.name
 
 
 def current_room_candidates(
