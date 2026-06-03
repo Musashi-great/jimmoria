@@ -152,7 +152,11 @@ def main(argv: list[str] | None = None) -> None:
     events_parser.add_argument("--limit", type=int, default=30)
     add_inspect_args(events_parser)
 
-    report_parser = subparsers.add_parser("show-report", help="Print the saved report markdown for a run.")
+    report_parser = subparsers.add_parser(
+        "show-report",
+        aliases=["report"],
+        help="Print the saved report markdown for a run.",
+    )
     report_parser.add_argument("room_id")
     add_inspect_args(report_parser)
 
@@ -265,7 +269,7 @@ def main(argv: list[str] | None = None) -> None:
         sessions_command(args)
         return
 
-    if args.command in {"runs", "rooms", "status", "messages", "events", "show-report"}:
+    if args.command in {"runs", "rooms", "status", "messages", "events", "show-report", "report"}:
         inspect_command(args)
         return
 
@@ -699,7 +703,7 @@ def inspect_command(args: argparse.Namespace) -> None:
             print(f"{event_type} | room={room_id} | agent={agent_id} | topic={topic} | {summary}")
         return
 
-    if args.command == "show-report":
+    if args.command in {"show-report", "report"}:
         room = load_run_file(args.room_id, "room.json", args.runs_dir)
         report_path = room.get("output_paths", {}).get("report")
         if not report_path:

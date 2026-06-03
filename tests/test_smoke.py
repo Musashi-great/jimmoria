@@ -1637,6 +1637,35 @@ class SmokeTest(unittest.TestCase):
             self.assertIn("room_created", text)
             self.assertIn("agent_start", text)
 
+    def test_cli_report_alias_prints_saved_report(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report_path = root / "reports" / "3jane-room_alias.md"
+            run_dir = root / "runs" / "room_alias"
+            report_path.parent.mkdir(parents=True)
+            run_dir.mkdir(parents=True)
+            report_path.write_text("# 3Jane Full Report\n\nFull saved body.", encoding="utf-8")
+            (run_dir / "room.json").write_text(
+                json.dumps(
+                    {
+                        "room_id": "room_alias",
+                        "topic": "3jane report",
+                        "status": "completed",
+                        "output_paths": {"report": str(report_path)},
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            output = StringIO()
+            with redirect_stdout(output):
+                cli_main(["report", "room_alias", "--runs-dir", str(root / "runs")])
+
+            text = output.getvalue()
+            self.assertIn("# 3Jane Full Report", text)
+            self.assertIn("Full saved body.", text)
+
     def test_codex_sdk_provider_can_be_selected(self) -> None:
         with patch.dict(
             "os.environ",
