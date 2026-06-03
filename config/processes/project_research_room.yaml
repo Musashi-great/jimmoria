@@ -57,7 +57,7 @@
       "phase": "market_signal_intake",
       "requires": ["ingest_source"],
       "description": "Use X/Twitter recent search when credentials exist, plus public web searches for X posts, KOL opinions, threads, official posts, builder/ecosystem mentions, controversies, clarifications, and articles. Telegram and Discord are out of scope.",
-      "expected_output": "Market signal intake finding with X API status, public X web hits, KOL/profile candidates, article hits, official-post hints, and shill/controversy flags.",
+      "expected_output": "Market signal intake finding with X API status, public X web hits, official/candidate X handles, timeline status, KOL/profile candidates, who-said-what rows, article hits, official-post hints, and shill/controversy flags.",
       "output_channels": ["finding", "tool_audit", "bus.update"]
     },
     {

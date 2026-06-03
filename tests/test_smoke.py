@@ -15,6 +15,11 @@ from unittest.mock import patch
 
 from crypto_research_agents.runtime import ResearchRuntime
 from crypto_research_agents.agents.discovery import build_live_candidates, extract_project_query, project_identity_hints, should_live_discover
+from crypto_research_agents.agents.social_kol import (
+    build_public_social_queries,
+    build_who_said_what,
+    extract_handles_from_social_results,
+)
 from crypto_research_agents.agents.report import assess_report_quality
 from crypto_research_agents.connectors import register_default_connectors
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
@@ -1305,6 +1310,93 @@ class SmokeTest(unittest.TestCase):
         self.assertGreaterEqual(len(candidates[0].metadata["evidence_urls"]), 3)
         self.assertEqual(quality.status, "research_complete")
 
+    def test_social_kol_queries_prioritize_x_kol_and_articles(self) -> None:
+        queries = build_public_social_queries("3jane", "3jane report create")
+
+        self.assertEqual(queries[0], 'site:x.com "3jane" crypto')
+        self.assertIn('site:x.com "3jane" official', queries)
+        self.assertTrue(any("KOL" in query or "thesis" in query for query in queries))
+        self.assertTrue(any("article" in query for query in queries))
+
+    def test_social_kol_normalizes_who_said_what_rows(self) -> None:
+        rows = build_who_said_what(
+            project_name="3jane",
+            official_social_sources=[
+                {
+                    "title": "3Jane official X profile",
+                    "url": "https://x.com/3janexyz",
+                    "source": "identity_hint",
+                }
+            ],
+            x_posts=[
+                {
+                    "author_username": "3janexyz",
+                    "text": "3Jane is building a credit market protocol.",
+                    "url": "https://x.com/3janexyz/status/1",
+                    "created_at": "2026-01-01T00:00:00Z",
+                }
+            ],
+            timeline_results=[
+                {
+                    "handle": "3janexyz",
+                    "status": "missing_secret",
+                    "message": "Set X_BEARER_TOKEN to read X timelines.",
+                    "posts": [],
+                    "url": "https://x.com/3janexyz",
+                }
+            ],
+            public_x_results=[],
+            kol_profiles=[],
+            kol_opinion_results=[
+                {
+                    "title": "3Jane analysis thread",
+                    "url": "https://x.com/example/status/2",
+                    "snippet": "A public thread discusses 3Jane credit mechanics.",
+                }
+            ],
+        )
+
+        self.assertGreaterEqual(len(rows), 3)
+        self.assertIn("@3janexyz", {row["speaker"] for row in rows})
+        self.assertTrue(any(row["source_type"] == "kol_article_or_thread" for row in rows))
+        self.assertEqual(extract_handles_from_social_results([{"url": "https://x.com/3janexyz/status/1"}])[0], "3janexyz")
+
+    def test_live_discovery_uses_social_seed_who_said_what_as_evidence(self) -> None:
+        topic = "3jane report create"
+        query = extract_project_query(topic)
+        live_data = {
+            "web_results": project_identity_hints(query),
+            "github_repos": [],
+            "coingecko_coins": [],
+            "dex_pairs": [],
+            "social_seed": {
+                "project_query": query,
+                "official_social_sources": [
+                    {
+                        "title": "3Jane official X profile",
+                        "url": "https://x.com/3janexyz",
+                        "host": "x.com",
+                        "source": "identity_hint",
+                    }
+                ],
+                "who_said_what": [
+                    {
+                        "source_type": "official_social_source",
+                        "speaker": "@3janexyz",
+                        "claim": "Official/candidate X source identified for 3jane.",
+                        "url": "https://x.com/3janexyz",
+                        "confidence": "medium",
+                    }
+                ],
+            },
+        }
+
+        candidates = build_live_candidates(["Unclassified Early Crypto"], ["src_test"], topic, query, live_data)
+
+        self.assertEqual(candidates[0].metadata["source_backing"], "social_first_web_github_market_search")
+        self.assertIn("https://x.com/3janexyz", candidates[0].metadata["evidence_urls"])
+        self.assertIn("who_said_what", candidates[0].metadata["social_seed"])
+
     def test_runtime_3jane_korean_report_request_uses_source_backed_evidence(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1356,6 +1448,8 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("## 1. Executive Summary", report)
         self.assertIn("## 2. Primary Market Signal Layer", report)
         self.assertIn("X/Twitter + KOL posts", report)
+        self.assertIn("Who said what / first-layer social evidence", report)
+        self.assertIn("Official or candidate project social sources", report)
         self.assertIn("## 3. Project Identity", report)
         self.assertIn("## 5. Product & Protocol Mechanics", report)
         self.assertIn("## 6. Token, Chain & Value Capture", report)

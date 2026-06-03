@@ -548,6 +548,13 @@ def collect_social_seed(memory: SharedMemory, room_id: str) -> dict[str, Any]:
         "x_posts": row.get("x_posts", [])[:12],
         "kol_profiles": row.get("kol_profiles", [])[:12],
         "public_x_results": row.get("public_x_results", [])[:12],
+        "official_social_sources": row.get("official_social_sources", [])[:8],
+        "handles_checked": row.get("handles_checked", [])[:12],
+        "timeline_results": row.get("timeline_results", [])[:8],
+        "kol_opinion_results": row.get("kol_opinion_results", [])[:12],
+        "who_said_what": row.get("who_said_what", [])[:16],
+        "who_said_what_count": row.get("who_said_what_count", 0),
+        "social_search_plan": row.get("social_search_plan", []),
         "article_results": row.get("article_results", [])[:12],
         "source_priority": row.get("source_priority"),
     }
@@ -561,6 +568,12 @@ def merge_social_seed(live_data: dict[str, Any], social_seed: dict[str, Any]) ->
     for result in social_seed.get("public_x_results", []):
         if isinstance(result, dict):
             web_results.append({**result, "source": result.get("source", "x_public_web_search")})
+    for result in social_seed.get("official_social_sources", []):
+        if isinstance(result, dict):
+            web_results.append({**result, "source": result.get("source", "official_social_source")})
+    for result in social_seed.get("kol_opinion_results", []):
+        if isinstance(result, dict):
+            web_results.append({**result, "source": result.get("source", "kol_opinion_source")})
     for result in social_seed.get("article_results", []):
         if isinstance(result, dict):
             web_results.append({**result, "source": result.get("source", "kol_article_web_search")})
@@ -575,6 +588,28 @@ def merge_social_seed(live_data: dict[str, Any], social_seed: dict[str, Any]) ->
                     "source": "x_api_recent_search",
                 }
             )
+    for statement in social_seed.get("who_said_what", []):
+        if isinstance(statement, dict) and statement.get("url"):
+            web_results.append(
+                {
+                    "title": f"Social statement by {statement.get('speaker') or 'unknown'}",
+                    "url": statement.get("url"),
+                    "snippet": statement.get("claim"),
+                    "host": urlparse(str(statement.get("url") or "")).netloc.lower(),
+                    "source": "who_said_what_social_signal",
+                }
+            )
+    for timeline in social_seed.get("timeline_results", []):
+        if isinstance(timeline, dict) and timeline.get("url"):
+            web_results.append(
+                {
+                    "title": f"X timeline for @{timeline.get('handle') or 'unknown'}",
+                    "url": timeline.get("url"),
+                    "snippet": timeline.get("message") or timeline.get("status") or "X timeline source checked.",
+                    "host": "x.com",
+                    "source": "x_timeline_check",
+                }
+            )
     live_data["web_results"] = rank_results(
         str(live_data.get("project_query") or social_seed.get("project_query") or ""),
         dedupe_results(web_results),
@@ -584,7 +619,16 @@ def merge_social_seed(live_data: dict[str, Any], social_seed: dict[str, Any]) ->
 def social_seed_has_signal(social_seed: dict[str, Any]) -> bool:
     return any(
         social_seed.get(bucket)
-        for bucket in ["x_posts", "kol_profiles", "public_x_results", "article_results"]
+        for bucket in [
+            "x_posts",
+            "kol_profiles",
+            "public_x_results",
+            "official_social_sources",
+            "timeline_results",
+            "kol_opinion_results",
+            "who_said_what",
+            "article_results",
+        ]
     )
 
 
@@ -600,7 +644,15 @@ def evidence_urls(web_results: list[Any], github_repos: list[Any], social_seed: 
         if isinstance(repo, dict) and repo.get("html_url") and not is_low_signal_url(str(repo.get("html_url")))
     )
     if social_seed:
-        for bucket in ["public_x_results", "article_results", "x_posts"]:
+        for bucket in [
+            "official_social_sources",
+            "public_x_results",
+            "kol_opinion_results",
+            "article_results",
+            "x_posts",
+            "timeline_results",
+            "who_said_what",
+        ]:
             for item in social_seed.get(bucket, []):
                 if isinstance(item, dict) and item.get("url"):
                     urls.append(str(item["url"]))

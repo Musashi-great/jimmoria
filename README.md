@@ -91,6 +91,7 @@ User request
 -> Supervisor creates a plan and delegates tasks
 -> Ingestion stores the request/source
 -> Social/KOL agent collects X, KOL, public thread, and article market signals first
+   - who said what, official/candidate X handles, timeline status, and article/KOL opinion sources
 -> Narrative and Discovery resolve project identity from those signals
 -> Product/docs/GitHub, token/chain, funding, and candidate-specific social checks verify the project
 -> Agent Council summarizes agreement and risks

@@ -644,6 +644,33 @@ def render_primary_market_signal_layer_v2(project: Any, findings: list[FindingRe
         f"- X API status: `{row.get('x_api_status', 'unknown')}`; KOL builder status: `{row.get('kol_builder_status', 'unknown')}`.",
         f"- Live X posts: {row.get('x_post_count', 0)}; public X web hits: {row.get('public_x_result_count', 0)}; article/web hits: {row.get('article_result_count', 0)}.",
     ]
+    who_said_what = row.get("who_said_what") if isinstance(row.get("who_said_what"), list) else []
+    if who_said_what:
+        lines.append("- Who said what / first-layer social evidence:")
+        for statement in who_said_what[:10]:
+            if isinstance(statement, dict):
+                lines.append(format_social_statement_line(statement))
+    official_social_sources = row.get("official_social_sources") if isinstance(row.get("official_social_sources"), list) else []
+    if official_social_sources:
+        lines.append("- Official or candidate project social sources:")
+        for result in official_social_sources[:5]:
+            if isinstance(result, dict):
+                lines.append(format_result_line(result))
+    timeline_results = row.get("timeline_results") if isinstance(row.get("timeline_results"), list) else []
+    if timeline_results:
+        lines.append("- X timeline checks:")
+        for timeline in timeline_results[:5]:
+            if isinstance(timeline, dict):
+                posts = timeline.get("posts") if isinstance(timeline.get("posts"), list) else []
+                lines.append(
+                    f"  - @{timeline.get('handle', 'unknown')}: status=`{timeline.get('status', 'unknown')}`, posts captured={len(posts)}, url={timeline.get('url', '')}"
+                )
+    kol_opinion_results = row.get("kol_opinion_results") if isinstance(row.get("kol_opinion_results"), list) else []
+    if kol_opinion_results:
+        lines.append("- KOL / article / thread opinion sources:")
+        for result in kol_opinion_results[:5]:
+            if isinstance(result, dict):
+                lines.append(format_result_line(result))
     if korean:
         lines.append(
             "- 해석: X API 토큰이 없으면 실시간 포스트 본문과 KOL별 의견 히스토리는 제한됩니다. 이 경우 공개 X 프로필, 검색 가능한 웹 결과, 공식 문서가 1차 대체 근거가 됩니다."
@@ -668,13 +695,34 @@ def render_primary_market_signal_layer_v2(project: Any, findings: list[FindingRe
         for result in article_results[:5]:
             if isinstance(result, dict):
                 lines.append(f"  - {result.get('title', 'article')} - {result.get('url')}")
-    if not public_x_results and not x_posts and not article_results:
+    if not public_x_results and not x_posts and not article_results and not who_said_what:
         lines.append(
             "- 실사용 가능한 소셜/아티클 결과가 아직 없습니다. `X_BEARER_TOKEN`을 설정하거나 공개 웹 검색을 허용하면 이 레이어가 강화됩니다."
             if korean
             else "- No usable public social/article result was collected yet. Add `X_BEARER_TOKEN` for live X search or allow public web search for social fallback."
         )
     return lines
+
+
+def format_social_statement_line(statement: dict[str, Any]) -> str:
+    speaker = clean_report_text(statement.get("speaker"), fallback="unknown")
+    claim = clean_report_text(statement.get("claim"), fallback="No text captured.")
+    source_type = clean_report_text(statement.get("source_type"), fallback="social_source")
+    confidence = clean_report_text(statement.get("confidence"), fallback="low")
+    url = str(statement.get("url") or "").strip()
+    created_at = str(statement.get("created_at") or "").strip()
+    suffix = f" ({url})" if url else ""
+    time_part = f", {created_at}" if created_at else ""
+    return f"  - **{speaker}** [{source_type}, confidence={confidence}{time_part}]: {claim[:260]}{suffix}"
+
+
+def format_result_line(result: dict[str, Any]) -> str:
+    title = clean_report_text(result.get("title"), fallback="source")
+    snippet = clean_report_text(result.get("snippet"), fallback="")
+    url = str(result.get("url") or "").strip()
+    if snippet:
+        return f"  - {title}: {snippet[:220]} ({url})"
+    return f"  - {title} - {url}"
 
 
 def render_project_identity_v2(project: Any, source_log: list[dict[str, str]], *, korean: bool) -> list[str]:
@@ -928,8 +976,19 @@ def render_signal_briefing_v2(project: Any, findings: list[FindingRecord], *, ko
                 seed_rows.extend(row for row in raw_rows if isinstance(row, dict))
     if seed_rows:
         seed = seed_rows[-1]
+        who_said_what = seed.get("who_said_what") if isinstance(seed.get("who_said_what"), list) else []
+        if who_said_what:
+            lines.append(f"- Who-said-what rows collected before verification: {len(who_said_what)}.")
+            for statement in who_said_what[:4]:
+                if isinstance(statement, dict):
+                    lines.append(format_social_statement_line(statement))
+        official_social_sources = seed.get("official_social_sources") if isinstance(seed.get("official_social_sources"), list) else []
+        if official_social_sources:
+            lines.append(f"- Official/candidate X sources identified: {len(official_social_sources)}.")
         if seed.get("public_x_results"):
             lines.append(f"- Upstream market-signal layer included {len(seed.get('public_x_results', []))} public X/Twitter result(s).")
+        if seed.get("kol_opinion_results"):
+            lines.append(f"- Upstream market-signal layer included {len(seed.get('kol_opinion_results', []))} KOL/article/thread opinion result(s).")
         if seed.get("article_results"):
             lines.append(f"- Upstream market-signal layer included {len(seed.get('article_results', []))} article/public-web result(s).")
     if is_3jane_project(project):
@@ -1372,6 +1431,33 @@ def render_primary_market_signal_layer(project: Any, findings: list[FindingRecor
         f"- X API status: `{row.get('x_api_status', 'unknown')}`; KOL builder status: `{row.get('kol_builder_status', 'unknown')}`.",
         f"- Live X posts: {row.get('x_post_count', 0)}; public X web hits: {row.get('public_x_result_count', 0)}; article/web hits: {row.get('article_result_count', 0)}.",
     ]
+    who_said_what = row.get("who_said_what") if isinstance(row.get("who_said_what"), list) else []
+    if who_said_what:
+        lines.append("- Who said what / first-layer social evidence:")
+        for statement in who_said_what[:10]:
+            if isinstance(statement, dict):
+                lines.append(format_social_statement_line(statement))
+    official_social_sources = row.get("official_social_sources") if isinstance(row.get("official_social_sources"), list) else []
+    if official_social_sources:
+        lines.append("- Official or candidate project social sources:")
+        for result in official_social_sources[:5]:
+            if isinstance(result, dict):
+                lines.append(format_result_line(result))
+    timeline_results = row.get("timeline_results") if isinstance(row.get("timeline_results"), list) else []
+    if timeline_results:
+        lines.append("- X timeline checks:")
+        for timeline in timeline_results[:5]:
+            if isinstance(timeline, dict):
+                posts = timeline.get("posts") if isinstance(timeline.get("posts"), list) else []
+                lines.append(
+                    f"  - @{timeline.get('handle', 'unknown')}: status=`{timeline.get('status', 'unknown')}`, posts captured={len(posts)}, url={timeline.get('url', '')}"
+                )
+    kol_opinion_results = row.get("kol_opinion_results") if isinstance(row.get("kol_opinion_results"), list) else []
+    if kol_opinion_results:
+        lines.append("- KOL / article / thread opinion sources:")
+        for result in kol_opinion_results[:5]:
+            if isinstance(result, dict):
+                lines.append(format_result_line(result))
     public_x_results = row.get("public_x_results") if isinstance(row.get("public_x_results"), list) else []
     if public_x_results:
         lines.append("- Public X/Twitter web hits:")
@@ -1392,7 +1478,7 @@ def render_primary_market_signal_layer(project: Any, findings: list[FindingRecor
         for result in article_results[:5]:
             if isinstance(result, dict):
                 lines.append(f"  - {result.get('title', 'article')} - {result.get('url')}")
-    if not public_x_results and not x_posts and not article_results:
+    if not public_x_results and not x_posts and not article_results and not who_said_what:
         lines.append("- No usable public social/article result was collected yet. Add `X_BEARER_TOKEN` for live X search or allow public web search for social fallback.")
     return lines
 
@@ -1570,8 +1656,19 @@ def render_signal_briefing(project: Any, findings: list[FindingRecord], *, korea
                 seed_rows.extend(row for row in raw_rows if isinstance(row, dict))
     if seed_rows:
         seed = seed_rows[-1]
+        who_said_what = seed.get("who_said_what") if isinstance(seed.get("who_said_what"), list) else []
+        if who_said_what:
+            lines.append(f"- Who-said-what rows collected before verification: {len(who_said_what)}.")
+            for statement in who_said_what[:4]:
+                if isinstance(statement, dict):
+                    lines.append(format_social_statement_line(statement))
+        official_social_sources = seed.get("official_social_sources") if isinstance(seed.get("official_social_sources"), list) else []
+        if official_social_sources:
+            lines.append(f"- Official/candidate X sources identified: {len(official_social_sources)}.")
         if seed.get("public_x_results"):
             lines.append(f"- Upstream market-signal layer included {len(seed.get('public_x_results', []))} public X/Twitter result(s).")
+        if seed.get("kol_opinion_results"):
+            lines.append(f"- Upstream market-signal layer included {len(seed.get('kol_opinion_results', []))} KOL/article/thread opinion result(s).")
         if seed.get("article_results"):
             lines.append(f"- Upstream market-signal layer included {len(seed.get('article_results', []))} article/public-web result(s).")
     if "3jane" in project_evidence_text(project):
@@ -2115,12 +2212,24 @@ def extract_builder_handles(findings: list[FindingRecord], project: Any) -> list
     project_tokens_text = " ".join(project_tokens(project))
     for row in extract_social_seed_rows(findings):
         buckets = []
-        for key in ["public_x_results", "article_results", "x_posts", "kol_profiles"]:
+        for key in [
+            "official_social_sources",
+            "public_x_results",
+            "article_results",
+            "kol_opinion_results",
+            "timeline_results",
+            "who_said_what",
+            "x_posts",
+            "kol_profiles",
+        ]:
             value = row.get(key)
             if isinstance(value, list):
                 buckets.extend(item for item in value if isinstance(item, dict))
         for item in buckets:
-            text = " ".join(str(item.get(key, "")) for key in ["title", "snippet", "text", "url", "author_username"])
+            text = " ".join(
+                str(item.get(key, ""))
+                for key in ["title", "snippet", "text", "claim", "url", "author_username", "username", "handle", "speaker"]
+            )
             for token in text.replace("\n", " ").split():
                 cleaned = token.strip(".,:;()[]{}<>\"'")
                 if cleaned.startswith("@") and len(cleaned) > 2:

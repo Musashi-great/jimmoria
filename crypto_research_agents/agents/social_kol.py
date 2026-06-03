@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 from urllib.parse import urlparse
 
 from crypto_research_agents.agents.base import AgentResult, BaseAgent
-from crypto_research_agents.agents.discovery import extract_project_query
+from crypto_research_agents.agents.discovery import extract_project_query, project_identity_hints
 from crypto_research_agents.core.bus import CollaborationBus
 from crypto_research_agents.core.memory import SharedMemory
 from crypto_research_agents.core.message import MessageType
@@ -53,13 +54,45 @@ class SocialKOLAgent(BaseAgent):
             )
             website_data = website_result.get("data") if isinstance(website_result.get("data"), dict) else {}
             web_data = web_result.get("data") if isinstance(web_result.get("data"), dict) else {}
-            social_urls = _social_urls(project, website_data, web_data.get("results", []))
+            raw_web_results = [
+                tag_search_result(result, query=f"{project.name} X Twitter official community")
+                for result in web_data.get("results", [])
+                if isinstance(result, dict)
+            ]
+            social_urls = _social_urls(project, website_data, raw_web_results)
+            seed = project.metadata.get("social_seed", {}) if isinstance(project.metadata, dict) else {}
+            seed_results = seed_items(seed, ["public_x_results", "official_social_sources", "kol_opinion_results"])
+            handles = extract_handles_from_social_results(
+                [
+                    *seed_results,
+                    *raw_web_results,
+                    *({"url": url, "title": f"{project.name} social source", "source": "candidate_social_url"} for url in social_urls),
+                ]
+            )[:5]
+            timeline_results = fetch_timelines(self, room.room_id, handles, limit=8)
+            public_x_results = [result for result in raw_web_results if _is_x_result(result)]
+            kol_opinion_results = extract_kol_opinion_results([*raw_web_results, *seed_results])
+            who_said_what = build_who_said_what(
+                project_name=project.name,
+                x_posts=_posts_from_result(tool_result),
+                timeline_results=timeline_results,
+                public_x_results=[*public_x_results, *seed_items(seed, ["public_x_results"])],
+                kol_profiles=seed_items(seed, ["kol_profiles"]),
+                kol_opinion_results=kol_opinion_results,
+                official_social_sources=[{"title": f"{project.name} social source", "url": url} for url in social_urls],
+            )
             rows.append(
                 {
                     "project_id": project_id,
                     "project_name": project.name,
                     "mention_trend": _mention_trend(tool_result),
                     "key_accounts": social_urls,
+                    "handles_checked": handles,
+                    "timeline_results": timeline_results,
+                    "public_x_results": public_x_results[:8],
+                    "kol_opinion_results": kol_opinion_results[:8],
+                    "who_said_what": who_said_what[:12],
+                    "who_said_what_count": len(who_said_what),
                     "community_signal": _community_signal(social_urls, tool_result["status"], web_result["status"]),
                     "tool_status": tool_result["status"],
                     "website_status": website_result["status"],
@@ -68,8 +101,9 @@ class SocialKOLAgent(BaseAgent):
             )
 
         linked = sum(1 for row in rows if row["key_accounts"])
+        statement_count = sum(int(row.get("who_said_what_count") or 0) for row in rows)
         summary = (
-            f"Social/KOL check found public social links for {linked}/{len(rows)} candidates; live X status: {_status_summary(rows)}."
+            f"Social/KOL check found public social links for {linked}/{len(rows)} candidates and mapped {statement_count} who-said-what statement(s); live X status: {_status_summary(rows)}."
             if rows
             else "Social/KOL check found no candidate projects to inspect."
         )
@@ -145,9 +179,14 @@ class SocialKOLAgent(BaseAgent):
             )
             if web_result.get("status") == "success":
                 data = web_result.get("data") if isinstance(web_result.get("data"), dict) else {}
-                web_results.extend(result for result in data.get("results", []) if isinstance(result, dict))
+                web_results.extend(
+                    tag_search_result(result, query=query)
+                    for result in data.get("results", [])
+                    if isinstance(result, dict)
+                )
 
         web_results.extend(source_social_results(room, memory, project_query))
+        web_results.extend(identity_social_results(project_query))
         web_results = [
             result
             for result in dedupe_result_dicts(web_results)
@@ -157,16 +196,49 @@ class SocialKOLAgent(BaseAgent):
         article_results = [result for result in web_results if not _is_x_result(result)]
         x_posts = _posts_from_result(x_result)
         kol_profiles = _profiles_from_result(kol_result)
+        official_social_sources = select_official_social_sources(project_query, public_x_results)
+        handles = extract_handles_from_social_results(
+            [
+                *public_x_results,
+                *official_social_sources,
+                *x_posts,
+                *kol_profiles,
+            ]
+        )[:6]
+        timeline_results = fetch_timelines(self, room.room_id, handles, limit=8)
+        kol_opinion_results = extract_kol_opinion_results(web_results)
+        who_said_what = build_who_said_what(
+            project_name=project_query,
+            x_posts=x_posts,
+            timeline_results=timeline_results,
+            public_x_results=public_x_results,
+            kol_profiles=kol_profiles,
+            kol_opinion_results=kol_opinion_results,
+            official_social_sources=official_social_sources,
+        )
         rows = [
             {
                 "project_query": project_query,
                 "x_query": x_query,
                 "public_web_queries": web_queries,
+                "social_search_plan": [
+                    "1. Search live X recent posts when X_BEARER_TOKEN exists.",
+                    "2. Search public X pages and KOL/article/thesis pages through public web.",
+                    "3. Extract handles and read timelines where possible.",
+                    "4. Pass only source-backed social evidence to Discovery/Product/Report.",
+                ],
                 "x_api_status": x_result.get("status"),
                 "kol_builder_status": kol_result.get("status"),
                 "x_post_count": len(x_posts),
                 "public_x_result_count": len(public_x_results),
                 "article_result_count": len(article_results),
+                "official_social_sources": official_social_sources[:8],
+                "handles_checked": handles,
+                "timeline_results": timeline_results[:8],
+                "kol_opinion_results": kol_opinion_results[:12],
+                "kol_opinion_count": len(kol_opinion_results),
+                "who_said_what": who_said_what[:16],
+                "who_said_what_count": len(who_said_what),
                 "x_posts": x_posts[:12],
                 "kol_profiles": kol_profiles[:12],
                 "public_x_results": public_x_results[:12],
@@ -177,7 +249,8 @@ class SocialKOLAgent(BaseAgent):
         summary = (
             "Market signal intake collected "
             f"{len(x_posts)} live X posts, {len(kol_profiles)} KOL profiles, "
-            f"{len(public_x_results)} public X web hits, and {len(article_results)} article/web hits before official-source verification."
+            f"{len(public_x_results)} public X web hits, {len(kol_opinion_results)} KOL/article opinion hits, "
+            f"and {len(who_said_what)} who-said-what rows before official-source verification."
         )
         llm_analysis = self.llm_analysis_pass(
             room=room,
@@ -282,14 +355,291 @@ def build_public_social_queries(project_query: str, topic: str) -> list[str]:
     quoted = f'"{project_query}"'
     queries = [
         f"site:x.com {quoted} crypto",
+        f"site:x.com {quoted} official",
         f"{quoted} crypto KOL opinion",
+        f"{quoted} crypto thesis thread",
         f"{quoted} crypto article analysis",
         f"{quoted} web3 thread",
     ]
     lowered = topic.lower()
     if "pow" in lowered or "proof" in lowered:
         queries.insert(1, f"site:x.com {quoted} proof of work crypto")
-    return _dedupe(queries)[:5]
+    return _dedupe(queries)[:7]
+
+
+def tag_search_result(result: dict[str, Any], *, query: str) -> dict[str, Any]:
+    tagged = dict(result)
+    tagged["query"] = query
+    tagged["search_intent"] = classify_social_query(query)
+    return tagged
+
+
+def classify_social_query(query: str) -> str:
+    lowered = query.lower()
+    if "site:x.com" in lowered or "twitter" in lowered:
+        return "x_public_post_search"
+    if any(word in lowered for word in ["kol", "opinion", "thesis", "thread"]):
+        return "kol_opinion_search"
+    if "article" in lowered or "analysis" in lowered:
+        return "article_analysis_search"
+    return "public_market_signal_search"
+
+
+def identity_social_results(project_query: str) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    for hint in project_identity_hints(project_query):
+        if not isinstance(hint, dict):
+            continue
+        url = str(hint.get("url") or "")
+        if _looks_like_social_url(url):
+            results.append(
+                {
+                    **hint,
+                    "search_intent": "identity_gate_official_social_hint",
+                }
+            )
+    return results
+
+
+def select_official_social_sources(project_query: str, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    tokens = project_tokens(project_query)
+    for result in results:
+        if not isinstance(result, dict) or not _is_x_result(result):
+            continue
+        text = " ".join(str(result.get(key, "")) for key in ["title", "snippet", "url", "source"]).lower()
+        is_hint = result.get("source") in {"identity_hint", "user_supplied_social_source", "embedded_social_source"}
+        looks_official = "official" in text or "profile" in text or any(token and token in text for token in tokens)
+        if is_hint or looks_official:
+            selected.append({**result, "social_role": "official_or_candidate_project_handle"})
+    return dedupe_result_dicts(selected)[:8]
+
+
+def seed_items(seed: dict[str, Any], keys: list[str]) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    if not isinstance(seed, dict):
+        return items
+    for key in keys:
+        value = seed.get(key)
+        if isinstance(value, list):
+            items.extend(item for item in value if isinstance(item, dict))
+    return items
+
+
+def extract_handles_from_social_results(results: list[dict[str, Any]]) -> list[str]:
+    handles: list[str] = []
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+        for key in ["url", "author_username", "username", "handle", "speaker"]:
+            value = str(result.get(key) or "").strip()
+            if not value:
+                continue
+            if key == "url":
+                handle = extract_handle_from_url(value)
+                if handle:
+                    handles.append(handle)
+            elif value.startswith("@"):
+                handles.append(value.lstrip("@"))
+            elif re.fullmatch(r"[A-Za-z0-9_]{2,20}", value):
+                handles.append(value)
+        text = " ".join(str(result.get(key, "")) for key in ["title", "snippet", "text", "claim"])
+        handles.extend(match.lstrip("@") for match in re.findall(r"@[A-Za-z0-9_]{2,20}", text))
+    return _dedupe([handle for handle in handles if is_useful_handle(handle)])[:12]
+
+
+def extract_handle_from_url(url: str) -> str | None:
+    if not _looks_like_social_url(url):
+        return None
+    parsed = urlparse(url)
+    segments = [segment for segment in parsed.path.split("/") if segment]
+    if not segments:
+        return None
+    candidate = segments[0].lstrip("@")
+    return candidate if is_useful_handle(candidate) else None
+
+
+def is_useful_handle(handle: str) -> bool:
+    normalized = str(handle or "").strip().lstrip("@").lower()
+    return bool(normalized) and normalized not in {
+        "x",
+        "twitter",
+        "i",
+        "search",
+        "share",
+        "status",
+        "intent",
+        "home",
+        "explore",
+        "notifications",
+    }
+
+
+def fetch_timelines(agent: Any, room_id: str, handles: list[str], *, limit: int = 8) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for handle in handles[:5]:
+        result = agent.tool_gateway.call(
+            agent.agent_id,
+            "x_get_user_timeline",
+            room_id=room_id,
+            handle=handle,
+            limit=limit,
+        )
+        data = result.get("data") if isinstance(result.get("data"), dict) else {}
+        posts = data.get("posts") if isinstance(data.get("posts"), list) else []
+        rows.append(
+            {
+                "handle": handle,
+                "status": result.get("status"),
+                "message": result.get("message"),
+                "profile": data.get("user") if isinstance(data.get("user"), dict) else {},
+                "posts": [post for post in posts if isinstance(post, dict)][:limit],
+                "url": f"https://x.com/{handle}",
+            }
+        )
+    return rows
+
+
+def extract_kol_opinion_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+        text = " ".join(str(result.get(key, "")) for key in ["title", "snippet", "url", "query", "search_intent"]).lower()
+        if any(term in text for term in ["kol", "opinion", "thesis", "thread", "analysis", "coverage", "introduces"]):
+            selected.append({**result, "social_role": result.get("social_role") or "kol_or_article_opinion"})
+    return dedupe_result_dicts(selected)[:12]
+
+
+def build_who_said_what(
+    *,
+    project_name: str,
+    x_posts: list[dict[str, Any]],
+    timeline_results: list[dict[str, Any]],
+    public_x_results: list[dict[str, Any]],
+    kol_profiles: list[dict[str, Any]],
+    kol_opinion_results: list[dict[str, Any]],
+    official_social_sources: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for source in official_social_sources[:4]:
+        handle = extract_handle_from_url(str(source.get("url") or "")) or str(source.get("speaker") or "official project account")
+        rows.append(
+            social_statement(
+                source_type="official_social_source",
+                speaker=f"@{handle}" if handle and not str(handle).startswith("@") else handle,
+                claim=f"Official/candidate X source identified for {project_name}.",
+                url=source.get("url"),
+                confidence="medium" if source.get("source") == "identity_hint" else "low",
+            )
+        )
+    for post in x_posts[:8]:
+        rows.append(
+            social_statement(
+                source_type="x_recent_post",
+                speaker=f"@{post.get('author_username') or 'unknown'}",
+                claim=post.get("text"),
+                url=post.get("url"),
+                created_at=post.get("created_at"),
+                confidence="medium",
+            )
+        )
+    for timeline in timeline_results[:5]:
+        handle = str(timeline.get("handle") or "unknown").lstrip("@")
+        posts = timeline.get("posts") if isinstance(timeline.get("posts"), list) else []
+        if posts:
+            for post in posts[:3]:
+                if isinstance(post, dict):
+                    rows.append(
+                        social_statement(
+                            source_type="x_timeline_post",
+                            speaker=f"@{handle}",
+                            claim=post.get("text"),
+                            url=post.get("url") or f"https://x.com/{handle}",
+                            created_at=post.get("created_at"),
+                            confidence="medium",
+                        )
+                    )
+        else:
+            rows.append(
+                social_statement(
+                    source_type="x_timeline_status",
+                    speaker=f"@{handle}",
+                    claim=str(timeline.get("message") or timeline.get("status") or "Timeline was requested but not available."),
+                    url=timeline.get("url"),
+                    confidence="low",
+                )
+            )
+    for result in public_x_results[:8]:
+        handle = extract_handle_from_url(str(result.get("url") or "")) or "public X result"
+        rows.append(
+            social_statement(
+                source_type="public_x_web_result",
+                speaker=f"@{handle}" if handle != "public X result" else handle,
+                claim=result.get("snippet") or result.get("title"),
+                url=result.get("url"),
+                confidence="low",
+            )
+        )
+    for profile in kol_profiles[:6]:
+        handle = str(profile.get("username") or profile.get("handle") or "").lstrip("@")
+        rows.append(
+            social_statement(
+                source_type="kol_profile_candidate",
+                speaker=f"@{handle}" if handle else str(profile.get("name") or "KOL profile"),
+                claim=f"KOL/profile candidate connected to the query; followers={profile.get('followers', 'unknown')}.",
+                url=profile.get("url") or (f"https://x.com/{handle}" if handle else None),
+                confidence="low",
+            )
+        )
+    for result in kol_opinion_results[:8]:
+        speaker = extract_handle_from_url(str(result.get("url") or "")) or result.get("host") or "article/KOL source"
+        rows.append(
+            social_statement(
+                source_type="kol_article_or_thread",
+                speaker=f"@{speaker}" if _looks_like_social_url(str(result.get("url") or "")) and not str(speaker).startswith("@") else str(speaker),
+                claim=result.get("snippet") or result.get("title"),
+                url=result.get("url"),
+                confidence="low",
+            )
+        )
+    return dedupe_statement_rows(rows)[:20]
+
+
+def social_statement(
+    *,
+    source_type: str,
+    speaker: object,
+    claim: object,
+    url: object = None,
+    created_at: object = None,
+    confidence: str = "low",
+) -> dict[str, Any]:
+    return {
+        "source_type": source_type,
+        "speaker": clean_statement_text(speaker, fallback="unknown"),
+        "claim": clean_statement_text(claim, fallback="No text captured."),
+        "url": str(url or ""),
+        "created_at": str(created_at or ""),
+        "confidence": confidence,
+    }
+
+
+def clean_statement_text(value: object, *, fallback: str) -> str:
+    text = " ".join(str(value or "").split())
+    return text[:500] if text else fallback
+
+
+def dedupe_statement_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[tuple[str, str, str]] = set()
+    deduped: list[dict[str, Any]] = []
+    for row in rows:
+        key = (str(row.get("source_type") or ""), str(row.get("speaker") or ""), str(row.get("url") or row.get("claim") or ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(row)
+    return deduped
 
 
 def dedupe_result_dicts(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -410,9 +760,11 @@ def _profiles_from_result(result: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _seed_confidence(row: dict[str, Any]) -> float:
+    if row.get("who_said_what_count", 0) or row.get("official_social_sources"):
+        return 0.66
     if row.get("x_post_count", 0) or row.get("public_x_result_count", 0):
         return 0.62
-    if row.get("article_result_count", 0):
+    if row.get("article_result_count", 0) or row.get("kol_opinion_count", 0):
         return 0.5
     return 0.28
 

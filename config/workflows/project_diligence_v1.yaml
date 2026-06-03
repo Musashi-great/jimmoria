@@ -13,6 +13,10 @@ workflow:
       type: agent
       agent_ref: ingestion_agent
 
+    - id: Social and KOL
+      type: agent
+      agent_ref: social_kol_agent
+
     - id: Product and Docs
       type: agent
       agent_ref: product_tech_agent
@@ -20,10 +24,6 @@ workflow:
     - id: Onchain and Market
       type: agent
       agent_ref: contract_onchain_agent
-
-    - id: Social and KOL
-      type: agent
-      agent_ref: social_kol_agent
 
     - id: Funding and Token
       type: agent
@@ -54,10 +54,15 @@ workflow:
       condition: true
 
     - from: Ingestion
-      to: Product and Docs
+      to: Social and KOL
       trigger: true
       condition:
         type: has_sources
+
+    - from: Social and KOL
+      to: Product and Docs
+      trigger: true
+      condition: true
 
     - from: Product and Docs
       to: Onchain and Market
@@ -65,11 +70,6 @@ workflow:
       condition: true
 
     - from: Onchain and Market
-      to: Social and KOL
-      trigger: true
-      condition: true
-
-    - from: Social and KOL
       to: Funding and Token
       trigger: true
       condition: true

@@ -387,6 +387,8 @@ Supervisor plan
    - X recent search when X_BEARER_TOKEN exists
    - public web fallback such as site:x.com project searches
    - KOL/profile candidates
+   - official/candidate X handles and timeline status
+   - who-said-what rows: speaker, claim, URL, timestamp/confidence when available
    - related article/public web mentions
 -> Narrative map
 -> Discovery uses the social seed plus web/GitHub/market evidence
@@ -399,7 +401,7 @@ Supervisor plan
 -> Obsidian sync
 ```
 
-This means Social/KOL is no longer only a later validation desk. It first acts as the market radar that asks: who is talking about this, what posts or articles exist, and which handles or narratives are appearing? After that, Product/Tech and Contract/On-chain answer whether the project is real, documented, shipped, and technically identifiable.
+This means Social/KOL is no longer only a later validation desk. It first acts as the market radar that asks: who is talking about this, what posts or articles exist, which handles or narratives are appearing, and what each source actually said. After that, Product/Tech and Contract/On-chain answer whether the project is real, documented, shipped, and technically identifiable.
 
 ### Hermes-Inspired Tool Guardrails
 
@@ -440,7 +442,7 @@ Agent access is role-based:
 
 - Supervisor gets planning, delegation, playbook, cron, and parallel-intent tools.
 - Ingestion gets source/file/browser text extraction.
-- Social/KOL gets X/public-web/browser snapshots for the first market-signal layer.
+- Social/KOL gets X/public-web/browser snapshots for the first market-signal layer and stores `who_said_what`, official/candidate X sources, timeline checks, KOL/article opinion hits, and public X results.
 - Product/Tech gets website/docs/GitHub plus guarded file search and browser text extraction.
 - Contract/On-chain and Funding/Token get browser snapshots for official/explorer/funding pages.
 - Report gets read/search/score/write tools for evidence packets and final dossiers.
@@ -452,7 +454,7 @@ The agent specs now include a `professional_output_contract` for Supervisor, Dis
 - Supervisor acts as company president and final client-delivery gate.
 - Discovery resolves official identity first and avoids choosing GitHub org pages as the project website when an official domain exists.
 - Product/Tech separates official product/docs evidence from GitHub code/activity evidence.
-- Social/KOL runs market-signal intake before Discovery, then separates official project handles from unrelated personal accounts found by search.
+- Social/KOL runs market-signal intake before Discovery, then separates official project handles from unrelated personal accounts found by search and records speaker/claim/source rows for the report.
 - Funding/Token only marks points or airdrop as `hint_found` when project-specific evidence exists.
 - Report writes a project intelligence report first and keeps logs/audit trails out of the client-facing body.
 

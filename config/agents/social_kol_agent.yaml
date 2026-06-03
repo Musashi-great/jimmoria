@@ -17,6 +17,7 @@
     "secondary_goals": [
       "Search relevant X/Twitter posts and public web mirrors of X posts",
       "Collect KOL opinions, repeated public mentions, and article references",
+      "Convert social and article evidence into who-said-what rows with speaker, claim, URL, and confidence",
       "Collect official X handles from public sources",
       "Separate official links from rumor and scraped context"
     ]
@@ -88,6 +89,7 @@
     "quality_rules": [
       "Run market_signal_intake before Discovery so candidate resolution can use public X/KOL/article evidence.",
       "When X API credentials are unavailable, use public web searches such as site:x.com plus project and narrative keywords as a fallback signal source.",
+      "Every meaningful social source should be normalized into who_said_what when possible.",
       "Only promote an X/Twitter handle as official when it is project-owned or linked by official sources.",
       "Do not treat unrelated personal X accounts from search results as project accounts.",
       "Telegram and Discord connectors are intentionally out of scope for the current public-web research stack."
