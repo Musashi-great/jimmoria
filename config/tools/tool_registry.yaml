@@ -11,6 +11,10 @@
     "crawl_docs",
     "github_search_repos",
     "read_github_repo",
+    "github_get_repo_activity",
+    "defillama_protocol_search",
+    "defillama_tvl_snapshot",
+    "snapshot_get_proposals",
     "coingecko_coin_metadata",
     "dexscreener_search_pairs",
     "explorer_lookup",
@@ -341,7 +345,7 @@
     "rss_monitor_feed": {
       "priority": "required",
       "owner_agent": "monitor_24h_agent",
-      "implementation_status": "external_connector_required",
+      "implementation_status": "implemented",
       "purpose": "Monitor official blogs, GitHub release feeds, media feeds, and ecosystem news feeds.",
       "provider_options": ["RSS 2.0", "Atom"],
       "required_secrets": [],
@@ -386,10 +390,10 @@
     "github_get_repo_activity": {
       "priority": "required",
       "owner_agent": "product_tech_agent",
-      "implementation_status": "external_connector_required",
+      "implementation_status": "implemented",
       "purpose": "Check commits, releases, issues, and contribution recency as early project evidence.",
       "provider_options": ["GitHub REST API"],
-      "required_secrets": ["GITHUB_TOKEN"],
+      "required_secrets": [],
       "source_docs": ["https://docs.github.com/en/rest"]
     },
     "coingecko_coin_metadata": {
@@ -413,7 +417,7 @@
     "defillama_protocol_search": {
       "priority": "recommended",
       "owner_agent": "narrative_agent",
-      "implementation_status": "external_connector_required",
+      "implementation_status": "implemented",
       "purpose": "Resolve DeFi protocols and categories for narrative context.",
       "provider_options": ["DefiLlama free API /protocols"],
       "required_secrets": [],
@@ -422,7 +426,7 @@
     "defillama_tvl_snapshot": {
       "priority": "optional",
       "owner_agent": "narrative_agent",
-      "implementation_status": "external_connector_required",
+      "implementation_status": "implemented",
       "purpose": "Use TVL snapshots only as ecosystem context, not price or investment advice.",
       "provider_options": ["DefiLlama free API"],
       "required_secrets": [],
@@ -485,7 +489,7 @@
     "snapshot_get_proposals": {
       "priority": "optional",
       "owner_agent": "narrative_agent",
-      "implementation_status": "external_connector_required",
+      "implementation_status": "implemented",
       "purpose": "Read governance proposals to detect protocol roadmap and community decisions.",
       "provider_options": ["Snapshot Hub GraphQL API"],
       "required_secrets": [],
@@ -553,6 +557,24 @@
       "provider_options": ["Ethereum JSON-RPC eth_call"],
       "required_secrets": ["ETH_RPC_URL"],
       "source_docs": ["https://ethereum.org/en/developers/docs/apis/json-rpc/"]
+    },
+    "get_token_metadata": {
+      "priority": "recommended",
+      "owner_agent": "contract_onchain_agent",
+      "implementation_status": "implemented",
+      "purpose": "Read token/project metadata through public CoinGecko search/detail endpoints.",
+      "provider_options": ["CoinGecko public API"],
+      "required_secrets": [],
+      "source_docs": ["https://docs.coingecko.com/reference/endpoint-overview"]
+    },
+    "get_dex_pair": {
+      "priority": "recommended",
+      "owner_agent": "contract_onchain_agent",
+      "implementation_status": "implemented",
+      "purpose": "Read a specific DEX Screener pair by chain and pair address for identity checks.",
+      "provider_options": ["DEX Screener pair endpoint"],
+      "required_secrets": [],
+      "source_docs": ["https://docs.dexscreener.com/api/reference"]
     },
     "check_airdrop_points": {
       "priority": "required",

@@ -26,6 +26,8 @@ toolsets:
       - crawl_docs
       - github_search_repos
       - read_github_repo
+      - github_get_repo_activity
+      - rss_monitor_feed
   social_basic:
     description: Read-only public web and X/KOL signal connectors.
     tools:
@@ -41,6 +43,9 @@ toolsets:
       - rootdata_get_project
       - rootdata_get_investors
       - rootdata_get_hot_projects
+      - defillama_protocol_search
+      - defillama_tvl_snapshot
+      - snapshot_get_proposals
   onchain_basic:
     description: Public on-chain read tools only.
     tools:
@@ -52,6 +57,8 @@ toolsets:
       - rpc_read_contract
       - get_token_metadata
       - get_dex_pair
+      - thegraph_query_subgraph
+      - dune_execute_query
   reporting:
     description: Local artifact and note writing.
     tools:
@@ -166,6 +173,18 @@ tools:
     mode: read_only
     implementation_status: implemented
     description: Read public GitHub repository metadata.
+  github_get_repo_activity:
+    connector_name: github_get_repo_activity
+    category: product
+    mode: read_only
+    implementation_status: implemented
+    description: Read public GitHub commits, releases, and issues for product/activity evidence.
+  rss_monitor_feed:
+    connector_name: rss_monitor_feed
+    category: monitor
+    mode: read_only
+    implementation_status: implemented
+    description: Read RSS/Atom feeds for public project, docs, blog, and ecosystem signals.
   dexscreener_search_pairs:
     connector_name: dexscreener_search_pairs
     category: market
@@ -178,6 +197,24 @@ tools:
     mode: read_only
     implementation_status: implemented
     description: Read CoinGecko public metadata.
+  defillama_protocol_search:
+    connector_name: defillama_protocol_search
+    category: market
+    mode: read_only
+    implementation_status: implemented
+    description: Search DefiLlama public protocol metadata for DeFi narrative context.
+  defillama_tvl_snapshot:
+    connector_name: defillama_tvl_snapshot
+    category: market
+    mode: read_only
+    implementation_status: implemented
+    description: Read a DefiLlama protocol TVL snapshot as ecosystem context, not investment advice.
+  snapshot_get_proposals:
+    connector_name: snapshot_get_proposals
+    category: governance
+    mode: read_only
+    implementation_status: implemented
+    description: Read Snapshot governance proposals from the public Snapshot GraphQL API.
   x_search_posts:
     connector_name: x_search_posts
     category: social
@@ -273,14 +310,28 @@ tools:
     connector_name: get_token_metadata
     category: onchain
     mode: read_only
-    implementation_status: external_connector_required
+    implementation_status: implemented
     description: Read token metadata from public sources.
   get_dex_pair:
     connector_name: get_dex_pair
     category: onchain
     mode: read_only
-    implementation_status: external_connector_required
+    implementation_status: implemented
     description: Read public DEX pair metadata.
+  dune_execute_query:
+    connector_name: dune_execute_query
+    category: onchain
+    mode: read_only
+    implementation_status: external_connector_required
+    required_secrets: [DUNE_API_KEY]
+    description: Execute read-only Dune queries when a Dune API key is configured.
+  thegraph_query_subgraph:
+    connector_name: thegraph_query_subgraph
+    category: onchain
+    mode: read_only
+    implementation_status: external_connector_required
+    required_secrets: [THEGRAPH_API_KEY]
+    description: Query a configured The Graph subgraph endpoint when credentials are configured.
   check_airdrop_points:
     connector_name: check_airdrop_points
     category: opportunity

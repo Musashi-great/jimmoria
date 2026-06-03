@@ -43,13 +43,23 @@ class ProductTechAgent(BaseAgent):
                 room_id=room.room_id,
                 repo_url=github_target,
             )
+            github_activity_result = self.tool_gateway.call(
+                self.agent_id,
+                "github_get_repo_activity",
+                room_id=room.room_id,
+                repo_url=github_target,
+                limit=8,
+            )
             github_data = github_result.get("data") if isinstance(github_result.get("data"), dict) else {}
+            github_activity_data = github_activity_result.get("data") if isinstance(github_activity_result.get("data"), dict) else {}
             if target_url:
                 project.website = target_url
             project.metadata["website_crawl"] = _compact_website_data(website_data)
             project.metadata["docs_crawl"] = _compact_docs_data(docs_data)
             if github_data:
                 project.metadata["github_read"] = github_data
+            if github_activity_data:
+                project.metadata["github_activity"] = _compact_github_activity(github_activity_data)
             rows.append(
                 {
                     "project_id": project_id,
@@ -61,6 +71,7 @@ class ProductTechAgent(BaseAgent):
                     "official_links": website_data.get("official_links", {}),
                     "github_repo": github_data.get("repo") if isinstance(github_data.get("repo"), dict) else None,
                     "github_languages": github_data.get("languages", {}),
+                    "github_activity": _compact_github_activity(github_activity_data),
                     "technical_keywords": docs_data.get("technical_keywords", []),
                     "signals": {
                         "website": website_data.get("signals", {}),
@@ -70,6 +81,7 @@ class ProductTechAgent(BaseAgent):
                         "crawl_website": website_result.get("status"),
                         "crawl_docs": docs_result.get("status"),
                         "read_github_repo": github_result.get("status"),
+                        "github_get_repo_activity": github_activity_result.get("status"),
                     },
                     "note": _row_note(website_result, docs_result),
                 }
@@ -182,4 +194,14 @@ def _compact_docs_data(data: dict[str, Any]) -> dict[str, Any]:
         "pages": data.get("pages", []),
         "technical_keywords": data.get("technical_keywords", []),
         "signals": data.get("signals", {}),
+    }
+
+
+def _compact_github_activity(data: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "full_name": data.get("full_name"),
+        "latest_commits": data.get("commits", [])[:5],
+        "latest_releases": data.get("releases", [])[:5],
+        "latest_issues": data.get("issues", [])[:5],
+        "connector_status": data.get("connector_status", {}),
     }

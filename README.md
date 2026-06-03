@@ -14,12 +14,15 @@ JIMMORIA now focuses on sources that can be reached through web-accessible, read
 - URL fetch and HTML parsing
 - Official website crawling
 - Docs crawling
-- GitHub search and repository reading
+- GitHub search, repository reading, and activity checks
+- RSS/public feed monitoring
+- DefiLlama protocol and TVL context
+- Snapshot governance proposals
+- Token metadata and specific DEX pair lookup through public metadata APIs
 - X/Twitter public search and KOL timeline checks, when an X bearer token is configured
 - RootData, when an API key is configured
 - Explorer/RPC read-only checks, when API/RPC secrets are configured
 - DEX Screener and CoinGecko public metadata
-- RSS/public feed monitoring, planned for the 24H monitor phase
 
 Telegram and Discord are intentionally not part of the default connector stack. They can still appear as official community links on a project website, but JIMMORIA will not require Telegram bots, Discord bots, or private chat channel readers for normal research.
 
@@ -121,8 +124,15 @@ crawl_website
 crawl_docs
 github_search_repos
 read_github_repo
+github_get_repo_activity
+rss_monitor_feed
+defillama_protocol_search
+defillama_tvl_snapshot
+snapshot_get_proposals
 coingecko_coin_metadata
 dexscreener_search_pairs
+get_token_metadata
+get_dex_pair
 check_airdrop_points
 archive_source_snapshot
 supervisor_office tools

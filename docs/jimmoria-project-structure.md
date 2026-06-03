@@ -210,8 +210,15 @@ crawl_website
 crawl_docs
 github_search_repos
 read_github_repo
+github_get_repo_activity
+rss_monitor_feed
+defillama_protocol_search
+defillama_tvl_snapshot
+snapshot_get_proposals
 coingecko_coin_metadata
 dexscreener_search_pairs
+get_token_metadata
+get_dex_pair
 check_airdrop_points
 archive_source_snapshot
 supervisor_office tools
@@ -225,6 +232,8 @@ X_BEARER_TOKEN       x_search_posts, x_get_user_timeline, x_build_kol_list
 ROOTDATA_API_KEY     rootdata_search_projects, rootdata_get_project
 ETHERSCAN_API_KEY    explorer_lookup, contract source/supply/holders
 ETH_RPC_URL          rpc_read_contract
+DUNE_API_KEY         dune_execute_query, dune_get_query_results
+THEGRAPH_API_KEY     thegraph_query_subgraph
 ```
 
 Not required:
@@ -349,7 +358,8 @@ Important test coverage:
 
 - Phase 1 is still sequential by design.
 - X/RootData/Explorer/RPC need optional secrets for live API results.
-- RSS and advanced monitor workers are planned.
+- RSS, DefiLlama, Snapshot, GitHub activity, CoinGecko, DEX Screener, token metadata, DEX pair lookup, public web search, website/docs crawling, and airdrop hint search are implemented as public-web/read-only connectors.
+- Advanced monitor workers are planned; the connector layer now has RSS support ready for them.
 - Telegram/Discord private chat connectors are intentionally out of scope for the current default stack.
 - Reports still depend on source-backed evidence; insufficient evidence produces a diagnostic report rather than a final dossier.
 

@@ -63,6 +63,9 @@ def _offline_no_secret_env() -> dict[str, str]:
         "ETHERSCAN_API_KEY": "",
         "ETH_RPC_URL": "",
         "RPC_URL": "",
+        "DUNE_API_KEY": "",
+        "THEGRAPH_API_KEY": "",
+        "GITHUB_TOKEN": "",
     }
 
 
@@ -989,6 +992,11 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("web_search", runtime.tool_gateway.registered_tools)
         self.assertIn("github_search_repos", runtime.tool_gateway.registered_tools)
         self.assertIn("read_github_repo", runtime.tool_gateway.registered_tools)
+        self.assertIn("github_get_repo_activity", runtime.tool_gateway.registered_tools)
+        self.assertIn("rss_monitor_feed", runtime.tool_gateway.registered_tools)
+        self.assertIn("defillama_protocol_search", runtime.tool_gateway.registered_tools)
+        self.assertIn("defillama_tvl_snapshot", runtime.tool_gateway.registered_tools)
+        self.assertIn("snapshot_get_proposals", runtime.tool_gateway.registered_tools)
         self.assertIn("dexscreener_search_pairs", runtime.tool_gateway.registered_tools)
         self.assertIn("coingecko_coin_metadata", runtime.tool_gateway.registered_tools)
         self.assertIn("create_research_room", runtime.tool_gateway.registered_tools)
@@ -1031,6 +1039,21 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["data"]["results"], [])
         self.assertIn("skipped", result["message"])
+
+    def test_public_web_research_connectors_validate_required_inputs(self) -> None:
+        from crypto_research_agents.connectors.defillama_connector import defillama_protocol_search, defillama_tvl_snapshot
+        from crypto_research_agents.connectors.github_connector import github_get_repo_activity
+        from crypto_research_agents.connectors.market_connectors import get_dex_pair, get_token_metadata
+        from crypto_research_agents.connectors.rss_connector import rss_monitor_feed
+        from crypto_research_agents.connectors.snapshot_connector import snapshot_get_proposals
+
+        self.assertEqual(rss_monitor_feed()["status"], "missing_input")
+        self.assertEqual(defillama_protocol_search()["status"], "missing_input")
+        self.assertEqual(defillama_tvl_snapshot()["status"], "missing_input")
+        self.assertEqual(snapshot_get_proposals()["status"], "missing_input")
+        self.assertEqual(github_get_repo_activity()["status"], "missing_input")
+        self.assertEqual(get_dex_pair()["status"], "missing_input")
+        self.assertEqual(get_token_metadata()["status"], "missing_input")
 
     def test_tool_gateway_redacts_sensitive_audit_inputs(self) -> None:
         policy = PolicyEngine()
@@ -1865,8 +1888,14 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(statuses["Docs crawler"], "configured")
         self.assertEqual(statuses["GitHub reader"], "configured")
         self.assertEqual(statuses["GitHub repo search"], "configured")
+        self.assertEqual(statuses["RSS feed monitor"], "configured")
+        self.assertEqual(statuses["DefiLlama protocol data"], "configured")
+        self.assertEqual(statuses["Snapshot governance API"], "configured")
         self.assertEqual(statuses["CoinGecko metadata"], "configured")
+        self.assertEqual(statuses["DEX pair lookup"], "configured")
         self.assertEqual(statuses["DEX Screener pair search"], "configured")
+        self.assertEqual(statuses["Dune query execution"], "missing_secret")
+        self.assertEqual(statuses["The Graph subgraph query"], "missing_secret")
         self.assertEqual(statuses["Overall"], "placeholder")
 
     def test_tool_registry_contains_required_research_stack(self) -> None:
@@ -1880,6 +1909,14 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(registry["tool_meta"]["crawl_docs"]["implementation_status"], "implemented")
         self.assertEqual(registry["tool_meta"]["x_search_posts"]["priority"], "required")
         self.assertEqual(registry["tool_meta"]["rootdata_get_project"]["owner_agent"], "funding_token_agent")
+        self.assertIn("github_get_repo_activity", registry["minimum_viable_live_stack"])
+        self.assertIn("defillama_protocol_search", registry["minimum_viable_live_stack"])
+        self.assertIn("snapshot_get_proposals", registry["minimum_viable_live_stack"])
+        self.assertEqual(registry["tool_meta"]["github_get_repo_activity"]["implementation_status"], "implemented")
+        self.assertEqual(registry["tool_meta"]["defillama_protocol_search"]["implementation_status"], "implemented")
+        self.assertEqual(registry["tool_meta"]["snapshot_get_proposals"]["implementation_status"], "implemented")
+        self.assertEqual(registry["tool_meta"]["get_dex_pair"]["implementation_status"], "implemented")
+        self.assertEqual(registry["tool_meta"]["get_token_metadata"]["implementation_status"], "implemented")
 
     def test_model_router_contains_supervisor_chat_route(self) -> None:
         router = json.loads(Path("config/models/model_router.yaml").read_text(encoding="utf-8"))
@@ -1954,8 +1991,15 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(registry.get("web_search").implementation_status, "implemented")
         self.assertEqual(registry.get("github_search_repos").implementation_status, "implemented")
         self.assertEqual(registry.get("read_github_repo").implementation_status, "implemented")
+        self.assertEqual(registry.get("github_get_repo_activity").implementation_status, "implemented")
+        self.assertEqual(registry.get("rss_monitor_feed").implementation_status, "implemented")
+        self.assertEqual(registry.get("defillama_protocol_search").implementation_status, "implemented")
+        self.assertEqual(registry.get("defillama_tvl_snapshot").implementation_status, "implemented")
+        self.assertEqual(registry.get("snapshot_get_proposals").implementation_status, "implemented")
         self.assertEqual(registry.get("dexscreener_search_pairs").implementation_status, "implemented")
         self.assertEqual(registry.get("coingecko_coin_metadata").implementation_status, "implemented")
+        self.assertEqual(registry.get("get_dex_pair").implementation_status, "implemented")
+        self.assertEqual(registry.get("get_token_metadata").implementation_status, "implemented")
         self.assertEqual(registry.get("create_task").implementation_status, "implemented")
         self.assertEqual(registry.get("assign_task").implementation_status, "implemented")
         self.assertEqual(registry.get("x_search_posts").implementation_status, "implemented")

@@ -64,6 +64,37 @@ def read_github_repo(
     return success("read_github_repo", data, "github repository read")
 
 
+def github_get_repo_activity(
+    repo_url: str | None = None,
+    *,
+    full_name: str | None = None,
+    limit: int = 10,
+) -> dict[str, Any]:
+    repo_name = full_name or _repo_full_name_from_url(repo_url)
+    if not repo_name:
+        return missing_input("github_get_repo_activity", "repo_url or full_name is required")
+
+    capped = max(1, min(limit, 30))
+    commits = _fetch_json(f"{GITHUB_API}/repos/{repo_name}/commits?per_page={capped}")
+    releases = _fetch_json(f"{GITHUB_API}/repos/{repo_name}/releases?per_page={capped}")
+    issues = _fetch_json(f"{GITHUB_API}/repos/{repo_name}/issues?state=all&per_page={capped}")
+
+    data = {
+        "full_name": repo_name,
+        "commits": _commit_summaries(commits.get("data", [])) if commits.get("status") == "success" else [],
+        "releases": _release_summaries(releases.get("data", [])) if releases.get("status") == "success" else [],
+        "issues": _issue_summaries(issues.get("data", [])) if issues.get("status") == "success" else [],
+        "connector_status": {
+            "commits": commits.get("status"),
+            "releases": releases.get("status"),
+            "issues": issues.get("status"),
+        },
+    }
+    if not any(data[key] for key in ["commits", "releases", "issues"]):
+        return failed("github_get_repo_activity", "GitHub activity endpoints returned no readable activity", data)
+    return success("github_get_repo_activity", data, "github activity read")
+
+
 def _fetch_json(url: str) -> dict[str, Any]:
     headers = {
         "Accept": "application/vnd.github+json",
@@ -110,6 +141,61 @@ def _repo_summary(repo: dict[str, Any]) -> dict[str, Any]:
         "archived": repo.get("archived"),
         "fork": repo.get("fork"),
     }
+
+
+def _commit_summaries(items: Any) -> list[dict[str, Any]]:
+    if not isinstance(items, list):
+        return []
+    summaries = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        commit = item.get("commit") if isinstance(item.get("commit"), dict) else {}
+        author = commit.get("author") if isinstance(commit.get("author"), dict) else {}
+        summaries.append(
+            {
+                "sha": str(item.get("sha") or "")[:12],
+                "html_url": item.get("html_url"),
+                "date": author.get("date"),
+                "message": str(commit.get("message") or "").splitlines()[0][:180],
+            }
+        )
+    return summaries
+
+
+def _release_summaries(items: Any) -> list[dict[str, Any]]:
+    if not isinstance(items, list):
+        return []
+    return [
+        {
+            "name": item.get("name") or item.get("tag_name"),
+            "tag_name": item.get("tag_name"),
+            "html_url": item.get("html_url"),
+            "published_at": item.get("published_at"),
+            "prerelease": item.get("prerelease"),
+        }
+        for item in items
+        if isinstance(item, dict)
+    ]
+
+
+def _issue_summaries(items: Any) -> list[dict[str, Any]]:
+    if not isinstance(items, list):
+        return []
+    summaries = []
+    for item in items:
+        if not isinstance(item, dict) or item.get("pull_request"):
+            continue
+        summaries.append(
+            {
+                "number": item.get("number"),
+                "title": item.get("title"),
+                "html_url": item.get("html_url"),
+                "state": item.get("state"),
+                "updated_at": item.get("updated_at"),
+            }
+        )
+    return summaries
 
 
 def _extract_contract_mentions(text: str) -> list[str]:

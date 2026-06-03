@@ -21,6 +21,33 @@ def dexscreener_search_pairs(query: str | None = None, *, limit: int = 10) -> di
     return success("dexscreener_search_pairs", {"query": query, "pairs": simplified}, "DEX pairs searched")
 
 
+def get_dex_pair(
+    chain: str | None = None,
+    pair_address: str | None = None,
+) -> dict[str, Any]:
+    if not chain or not pair_address:
+        return missing_input("get_dex_pair", "chain and pair_address are required")
+    response = _fetch_json(f"https://api.dexscreener.com/latest/dex/pairs/{quote_plus(chain)}/{quote_plus(pair_address)}")
+    if response.get("status") != "success":
+        response["tool"] = "get_dex_pair"
+        return response
+    pairs = response["data"].get("pairs") or []
+    simplified = [_dex_pair_summary(pair) for pair in pairs if isinstance(pair, dict)]
+    return success("get_dex_pair", {"chain": chain, "pair_address": pair_address, "pairs": simplified}, "DEX pair read")
+
+
+def get_token_metadata(
+    query: str | None = None,
+    *,
+    coin_id: str | None = None,
+) -> dict[str, Any]:
+    if not query and not coin_id:
+        return missing_input("get_token_metadata", "query or coin_id is required")
+    result = coingecko_coin_metadata(query=query, coin_id=coin_id, include_detail=True)
+    result["tool"] = "get_token_metadata"
+    return result
+
+
 def coingecko_coin_metadata(
     query: str | None = None,
     *,
