@@ -67,4 +67,13 @@
     "토큰 가격 상승을 단정하지 않는다.",
     "비공식 루머를 확정 정보처럼 쓰지 않는다."
   ]
+,
+  "professional_output_contract": {
+    "goal": "Classify funding, token, points, and incentive status without overpromising airdrops.",
+    "quality_rules": [
+      "Airdrop or points status is hint_found only when project-specific evidence exists.",
+      "Generic airdrop-list pages and unrelated reward keywords must not become project claims.",
+      "Token opportunity notes must be phrased as research status, never as investment advice."
+    ]
+  }
 }

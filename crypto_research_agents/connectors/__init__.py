@@ -17,6 +17,11 @@ from crypto_research_agents.connectors.market_connectors import (
     get_token_metadata,
 )
 from crypto_research_agents.connectors.opportunity_connector import check_airdrop_points
+from crypto_research_agents.connectors.research_guardrails import (
+    source_relevance_filter,
+    tool_call_guardrail,
+    url_safety_check,
+)
 from crypto_research_agents.connectors.rss_connector import rss_monitor_feed
 from crypto_research_agents.connectors.rootdata_connector import (
     rootdata_get_hot_projects,
@@ -89,6 +94,9 @@ def register_default_connectors(tool_gateway: ToolGateway) -> None:
     tool_gateway.register("explorer_get_token_holders", explorer_get_token_holders)
     tool_gateway.register("rpc_read_contract", rpc_read_contract)
     tool_gateway.register("check_airdrop_points", check_airdrop_points)
+    tool_gateway.register("url_safety_check", url_safety_check)
+    tool_gateway.register("source_relevance_filter", source_relevance_filter)
+    tool_gateway.register("tool_call_guardrail", tool_call_guardrail)
 
 
 __all__ = ["register_default_connectors"]

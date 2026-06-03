@@ -351,6 +351,51 @@ Research Room 결과 출력 정책:
 
 즉 ReportAgent는 "누가 무엇을 했는지"보다 "이 프로젝트를 어떻게 이해해야 하는지"를 앞세운다. 에이전트별 실행 로그, council 토론, tool payload, raw LLM output은 최종 보고서 본문에 넣지 않고 `data/runs/<room_id>/messages.json`, `events.json`, `tool_audit_log.json`, `llm_call_log.json`에 감사 trail로 남긴다.
 
+### Current Project Intelligence Report Shape
+
+`research_complete` report output is now written as a project intelligence memo, not an internal agent activity log. The client-facing report uses this shape:
+
+```text
+1. Executive Summary / 핵심 요약
+2. Project Identity / 프로젝트 정체성
+3. Market Problem & Narrative / 시장 문제와 내러티브
+4. Product & Protocol Mechanics / 제품과 프로토콜 구조
+5. Token, Chain & Value Capture / 토큰, 체인, 가치 포착
+6. Traction, Social & Funding Signals / 트랙션, 소셜, 펀딩
+7. Analyst Thesis / 리서치 판단
+8. Risk Register / 리스크
+9. Specialist Coverage / 에이전트별 커버리지
+10. Next Research Checklist / 다음 조사 체크리스트
+11. Verification Status / 검증 범위
+12. Source Appendix / 출처
+13. Research Quality Metadata
+```
+
+Internal Supervisor final review, agent council notes, tool payloads, raw LLM JSON, and execution logs stay in `data/runs/<room_id>/` instead of being appended to the final report body.
+
+### Hermes-Inspired Tool Guardrails
+
+JIMMORIA now mirrors the useful Hermes pattern of routing every tool call through a guarded gateway without copying unsafe or irrelevant tools into the crypto research company. The added research guardrails are:
+
+| Tool | Purpose |
+|---|---|
+| `url_safety_check` | Classifies public URLs before they are treated as research evidence. |
+| `source_relevance_filter` | Filters source URLs against the resolved project identity before final report inclusion. |
+| `tool_call_guardrail` | Records a repeated-failure guardrail pattern so the Supervisor can stop low-value tool loops. |
+
+These are read-only, local connectors. They do not add trading, wallet, Telegram, Discord, or private-channel behavior.
+
+### Agent Persona Updates
+
+The agent specs now include a `professional_output_contract` for Supervisor, Discovery, Product/Tech, Social/KOL, Funding/Token, and Report:
+
+- Supervisor acts as company president and final client-delivery gate.
+- Discovery resolves official identity first and avoids choosing GitHub org pages as the project website when an official domain exists.
+- Product/Tech separates official product/docs evidence from GitHub code/activity evidence.
+- Social/KOL separates official project handles from unrelated personal accounts found by search.
+- Funding/Token only marks points or airdrop as `hint_found` when project-specific evidence exists.
+- Report writes a project intelligence report first and keeps logs/audit trails out of the client-facing body.
+
 ## 12. Web Dashboard
 
 `jimmoria web` starts a local dashboard that reads existing files from:

@@ -71,4 +71,13 @@
     "컨트랙트, 토큰 상태를 직접 확정하지 않는다.",
     "소셜 언급만 보고 과도하게 bullish라고 단정하지 않는다."
   ]
+,
+  "professional_output_contract": {
+    "goal": "Resolve the real project identity before handing work to specialists.",
+    "quality_rules": [
+      "Prefer official homepage, docs, whitepaper, and project-owned repos over social, market, or generic platform pages.",
+      "Do not choose GitHub organization pages as the project website when an official domain exists.",
+      "Every live candidate must carry candidate_origin, source_backing, official site candidate, and evidence URLs."
+    ]
+  }
 }

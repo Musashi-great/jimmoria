@@ -186,6 +186,9 @@
     "source_rights_check",
     "investment_advice_guard",
     "claim_evidence_check",
+    "url_safety_check",
+    "source_relevance_filter",
+    "tool_call_guardrail",
     "request_human_approval"
   ],
   "tool_meta": {
@@ -638,6 +641,33 @@
       "provider_options": ["local scanner"],
       "required_secrets": [],
       "source_docs": []
+    },
+    "url_safety_check": {
+      "priority": "required",
+      "owner_agent": "tool_policy_agent",
+      "implementation_status": "implemented",
+      "purpose": "Hermes-inspired URL safety classifier for read-only public research evidence.",
+      "provider_options": ["local source quality guardrail"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "source_relevance_filter": {
+      "priority": "required",
+      "owner_agent": "report_agent",
+      "implementation_status": "implemented",
+      "purpose": "Filter source URLs against project identity before final report inclusion.",
+      "provider_options": ["local source quality guardrail"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "tool_call_guardrail": {
+      "priority": "recommended",
+      "owner_agent": "supervisor_agent",
+      "implementation_status": "implemented",
+      "purpose": "Hermes-inspired repeated-failure guardrail for read-only research tool calls.",
+      "provider_options": ["local guardrail controller"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
     }
   }
 }

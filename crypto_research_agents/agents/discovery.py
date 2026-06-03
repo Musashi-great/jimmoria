@@ -10,6 +10,12 @@ from crypto_research_agents.core.bus import CollaborationBus
 from crypto_research_agents.core.memory import ProjectCandidate, SharedMemory
 from crypto_research_agents.core.message import MessageType
 from crypto_research_agents.core.room import ResearchRoom
+from crypto_research_agents.core.source_quality import (
+    is_generic_platform_url,
+    is_low_signal_url as is_low_signal_research_url,
+    score_official_url,
+    select_best_official_site,
+)
 
 
 class DiscoveryAgent(BaseAgent):
@@ -453,29 +459,22 @@ def score_live_candidate(
 
 
 def select_project_website(project_query: str, web_results: list[Any]) -> str | None:
+    official_site = select_best_official_site(project_query, web_results)
+    if official_site:
+        return official_site
+
     scored: list[tuple[int, str]] = []
-    query_tokens = [token.lower() for token in project_query.split() if len(token) > 2]
     for result in web_results:
         if not isinstance(result, dict):
             continue
         url = str(result.get("url") or "")
         if not url.startswith(("http://", "https://")):
             continue
-        host = urlparse(url).netloc.lower()
-        text = f"{result.get('title', '')} {result.get('snippet', '')} {host}".lower()
-        score = 0
-        if result.get("source") == "identity_hint":
-            score += 30
-        if any(token in host for token in query_tokens):
-            score += 8
-        if any(word in text for word in ["official", "whitepaper", "docs", "foundation", "research labs"]):
-            score += 4
-        if any(word in text for word in ["proof-of-useful-work", "proof of useful work", "pearl network"]):
-            score += 8
+        score = score_official_url(project_query, result)
+        if is_generic_platform_url(url):
+            score -= 12
         if urlparse(url).path.lower().endswith(".pdf"):
             score -= 12
-        if host in {"github.com", "x.com", "twitter.com"} or any(bad in host for bad in ["coinmarketcap", "coingecko", "tomshardware", "reddit", "lablockchainsummit"]):
-            score -= 8
         scored.append((score, url))
     scored.sort(key=lambda item: item[0], reverse=True)
     return scored[0][1] if scored and scored[0][0] > 0 else None
@@ -496,17 +495,7 @@ def evidence_urls(web_results: list[Any], github_repos: list[Any]) -> list[str]:
 
 
 def is_low_signal_url(url: str) -> bool:
-    lowered = url.lower()
-    return any(
-        marker in lowered
-        for marker in [
-            "cookie-policy",
-            "privacy-policy",
-            "accessibility",
-            "/terms",
-            "/legal",
-        ]
-    )
+    return is_low_signal_research_url(url)
 
 
 def project_identity_hints(project_query: str) -> list[dict[str, Any]]:

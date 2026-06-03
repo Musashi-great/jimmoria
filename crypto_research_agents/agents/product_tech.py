@@ -7,6 +7,11 @@ from crypto_research_agents.core.bus import CollaborationBus
 from crypto_research_agents.core.memory import SharedMemory
 from crypto_research_agents.core.message import MessageType
 from crypto_research_agents.core.room import ResearchRoom
+from crypto_research_agents.core.source_quality import (
+    is_primary_project_site,
+    is_project_github_url,
+    select_best_official_site,
+)
 
 
 class ProductTechAgent(BaseAgent):
@@ -19,7 +24,7 @@ class ProductTechAgent(BaseAgent):
         rows = []
         for project_id in _collect_candidate_ids(requests):
             project = memory.projects[project_id]
-            target_url = _select_project_url(project.website, room, memory)
+            target_url = _select_project_url(project, room, memory)
             website_result = self.tool_gateway.call(
                 self.agent_id,
                 "crawl_website",
@@ -122,12 +127,18 @@ def _collect_candidate_ids(requests: list[Any]) -> list[str]:
     return sorted(set(candidate_ids))
 
 
-def _select_project_url(project_website: str | None, room: ResearchRoom, memory: SharedMemory) -> str | None:
-    if project_website:
-        return project_website
+def _select_project_url(project: Any, room: ResearchRoom, memory: SharedMemory) -> str | None:
+    metadata = project.metadata if isinstance(project.metadata, dict) else {}
+    project_query = str(metadata.get("project_query") or project.name)
+    web_results = metadata.get("web_results", []) if isinstance(metadata.get("web_results"), list) else []
+    official_site = select_best_official_site(project_query, web_results)
+    if official_site:
+        return official_site
+    if project.website and is_primary_project_site(project_query, project.website):
+        return project.website
     for source_id in room.source_inputs:
         source = memory.sources.get(source_id)
-        if source and source.url:
+        if source and source.url and is_primary_project_site(project_query, source.url):
             return source.url
     return None
 
@@ -163,16 +174,25 @@ def _confidence(rows: list[dict[str, Any]]) -> float:
 
 
 def _select_github_target(website_data: dict[str, Any], metadata: dict[str, Any]) -> str | None:
+    project_stub = type(
+        "ProjectStub",
+        (),
+        {
+            "name": metadata.get("project_query", ""),
+            "website": "",
+            "metadata": metadata,
+        },
+    )()
     official_links = website_data.get("official_links") if isinstance(website_data.get("official_links"), dict) else {}
     github_links = official_links.get("github", []) if isinstance(official_links.get("github"), list) else []
     for link in github_links:
-        if isinstance(link, dict) and link.get("url"):
+        if isinstance(link, dict) and link.get("url") and is_project_github_url(project_stub, str(link["url"])):
             return str(link["url"])
     for repo in metadata.get("github_repos", []):
-        if isinstance(repo, dict) and repo.get("html_url"):
+        if isinstance(repo, dict) and repo.get("html_url") and is_project_github_url(project_stub, str(repo["html_url"])):
             return str(repo["html_url"])
     for result in metadata.get("web_results", []):
-        if isinstance(result, dict) and "github.com" in str(result.get("url", "")).lower():
+        if isinstance(result, dict) and is_project_github_url(project_stub, str(result.get("url", ""))):
             return str(result["url"])
     return None
 

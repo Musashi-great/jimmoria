@@ -363,7 +363,6 @@ class ResearchRuntime:
             summary=review["summary"],
             payload={"finding_id": review_finding.finding_id, "review": review},
         )
-        self._append_supervisor_review_to_report(room, review, company_settings=company_settings)
         self._emit(
             "final_review_done",
             room_id=room.room_id,
@@ -504,6 +503,9 @@ def default_policy(agent_specs: AgentSpecRegistry | None = None) -> PolicyEngine
     tool_registry = load_tool_registry()
     for agent_id in DEFAULT_AGENTS:
         policy.allow(agent_id, "source_cache_write")
+        policy.allow(agent_id, "url_safety_check")
+        policy.allow(agent_id, "source_relevance_filter")
+        policy.allow(agent_id, "tool_call_guardrail")
     if agent_specs is not None:
         for agent_id, spec in agent_specs.specs.items():
             allowed_tools = tool_registry.tools_for_agent_policy(

@@ -7,6 +7,7 @@ from crypto_research_agents.core.bus import CollaborationBus
 from crypto_research_agents.core.memory import SharedMemory
 from crypto_research_agents.core.message import MessageType
 from crypto_research_agents.core.room import ResearchRoom
+from crypto_research_agents.core.source_quality import is_project_social_url, select_best_official_site
 
 
 class SocialKOLAgent(BaseAgent):
@@ -30,7 +31,7 @@ class SocialKOLAgent(BaseAgent):
                 self.agent_id,
                 "crawl_website",
                 room_id=room.room_id,
-                url=project.website,
+                url=_select_social_source_url(project),
                 project_name=project.name,
             )
             web_result = self.tool_gateway.call(
@@ -42,7 +43,7 @@ class SocialKOLAgent(BaseAgent):
             )
             website_data = website_result.get("data") if isinstance(website_result.get("data"), dict) else {}
             web_data = web_result.get("data") if isinstance(web_result.get("data"), dict) else {}
-            social_urls = _social_urls(project.metadata, website_data, web_data.get("results", []))
+            social_urls = _social_urls(project, website_data, web_data.get("results", []))
             rows.append(
                 {
                     "project_id": project_id,
@@ -94,26 +95,33 @@ def _collect_candidate_ids(requests: list[Any]) -> list[str]:
     return sorted(set(candidate_ids))
 
 
-def _social_urls(metadata: dict[str, Any], website_data: dict[str, Any], web_results: list[Any]) -> list[str]:
+def _select_social_source_url(project: Any) -> str | None:
+    metadata = project.metadata if isinstance(project.metadata, dict) else {}
+    project_query = str(metadata.get("project_query") or project.name)
+    web_results = metadata.get("web_results", []) if isinstance(metadata.get("web_results"), list) else []
+    return select_best_official_site(project_query, web_results) or project.website
+
+
+def _social_urls(project: Any, website_data: dict[str, Any], web_results: list[Any]) -> list[str]:
     urls: list[str] = []
+    metadata = project.metadata if isinstance(project.metadata, dict) else {}
     official_links = website_data.get("official_links") if isinstance(website_data.get("official_links"), dict) else {}
     for bucket in ["x"]:
         for link in official_links.get(bucket, []):
             if isinstance(link, dict):
-                urls.extend(_maybe_social_url(link.get("url")))
+                urls.extend(_maybe_social_url(project, link.get("url"), trusted=True))
     for result in metadata.get("web_results", []):
         if isinstance(result, dict):
-            urls.extend(_maybe_social_url(result.get("url")))
+            urls.extend(_maybe_social_url(project, result.get("url")))
     for result in web_results:
         if isinstance(result, dict):
-            urls.extend(_maybe_social_url(result.get("url")))
+            urls.extend(_maybe_social_url(project, result.get("url")))
     return _dedupe(urls)[:10]
 
 
-def _maybe_social_url(value: object) -> list[str]:
+def _maybe_social_url(project: Any, value: object, *, trusted: bool = False) -> list[str]:
     url = str(value or "")
-    lowered = url.lower()
-    if any(host in lowered for host in ["x.com/", "twitter.com/"]):
+    if is_project_social_url(project, url, trusted_official_link=trusted):
         return [url]
     return []
 

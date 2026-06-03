@@ -69,4 +69,13 @@
     "소셜 반응을 직접 해석하지 않는다.",
     "GitHub가 없다고 무조건 나쁘다고 단정하지 않는다."
   ]
+,
+  "professional_output_contract": {
+    "goal": "Explain the actual product and protocol mechanics, not just whether a website or GitHub page exists.",
+    "quality_rules": [
+      "Use official website/docs as product evidence; treat GitHub as code/activity evidence only.",
+      "Reject GitHub navigation, docs.github.com, marketplace, security, login, and generic platform links.",
+      "Separate marketing claims from live app, docs, repo, release, and technical mechanism evidence."
+    ]
+  }
 }

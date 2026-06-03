@@ -92,9 +92,19 @@ def _evidence_text(metadata: dict[str, Any]) -> str:
 
 
 def _points_status(evidence_text: str, tool_data: dict[str, Any] | None = None) -> str:
-    if tool_data and tool_data.get("classification") == "hint_found":
+    hints = tool_data.get("hints", []) if isinstance(tool_data, dict) and isinstance(tool_data.get("hints"), list) else []
+    if tool_data and tool_data.get("classification") == "hint_found" and hints:
         return "hint_found"
-    if any(keyword in evidence_text for keyword in ["points", "airdrop", "quest", "rewards campaign"]):
+    project_specific_phrases = [
+        "points program",
+        "airdrop program",
+        "airdrop campaign",
+        "quest campaign",
+        "testnet rewards",
+        "rewards campaign",
+        "waitlist rewards",
+    ]
+    if any(keyword in evidence_text for keyword in project_specific_phrases):
         return "hint_found"
     return "unknown"
 
@@ -111,8 +121,8 @@ def _note(evidence_text: str, tool_result: dict[str, Any]) -> str:
     status = str(tool_result.get("status") or "unknown")
     if "block reward" in evidence_text or "proof-of-useful-work" in evidence_text:
         return "Evidence mentions mining/block rewards; treat as token mechanics research, not investment advice."
-    if "points" in evidence_text or "airdrop" in evidence_text:
-        return "Evidence mentions points/airdrop-style incentives; requires official confirmation."
+    if _points_status(evidence_text) == "hint_found":
+        return "Project-specific points/airdrop-style incentive language appeared in official or searched evidence; requires confirmation."
     if status == "success":
         return "Airdrop/points connector ran, but no public hint was found in the searched sources."
     return f"Airdrop/points connector status: {status}; treat incentive status as unknown."

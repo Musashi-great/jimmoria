@@ -74,4 +74,26 @@
     "raw LLM JSON, Obsidian note payload, tool payload를 최종 보고서 본문에 그대로 넣지 않는다.",
     "에이전트별 회의록이나 토론 로그를 완성 보고서 섹션으로 만들지 않는다."
   ]
+,
+  "professional_output_contract": {
+    "goal": "The final artifact must read like a project intelligence report, not an agent log or debate transcript.",
+    "required_sections": [
+      "executive_summary",
+      "project_identity",
+      "market_problem_and_narrative",
+      "product_and_protocol_mechanics",
+      "token_chain_value_capture",
+      "traction_social_funding_signals",
+      "analyst_thesis",
+      "risk_register",
+      "specialist_coverage",
+      "next_research_checklist",
+      "source_appendix"
+    ],
+    "quality_rules": [
+      "Prefer official site, docs, whitepaper, repo, and reputable third-party evidence over generic platform pages.",
+      "Do not include GitHub navigation, docs.github.com, marketplace, security, pricing, login, or unrelated X handles as project evidence.",
+      "Explain what the project is building before explaining how the agents worked."
+    ]
+  }
 }

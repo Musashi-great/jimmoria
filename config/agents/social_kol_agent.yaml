@@ -77,4 +77,13 @@
     "Do not make price predictions.",
     "Do not assume paid promotion without evidence."
   ]
+,
+  "professional_output_contract": {
+    "goal": "Separate official social identity from KOL mention history and public web noise.",
+    "quality_rules": [
+      "Only promote an X/Twitter handle as official when it is project-owned or linked by official sources.",
+      "Do not treat unrelated personal X accounts from search results as project accounts.",
+      "Telegram and Discord connectors are intentionally out of scope for the current public-web research stack."
+    ]
+  }
 }
