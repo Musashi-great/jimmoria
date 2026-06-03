@@ -25,7 +25,6 @@ from crypto_research_agents.core.supervisor_intake import (
     build_company_instruction_reply,
     build_company_status_reply,
     build_supervisor_reply,
-    build_supervisor_dispatch_reply,
 )
 from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
 from crypto_research_agents.core.model_gateway import ModelGateway
@@ -835,9 +834,6 @@ def chat_command(args: argparse.Namespace) -> None:
         pending_report_creation_line = ""
         runtime = ResearchRuntime(load_memory(args.memory))
         runtime.event_handler = console.make_event_handler()
-        reply = build_supervisor_dispatch_reply(intake_decision, agent_count)
-        console.print_supervisor_reply(reply)
-        append_supervisor_history(supervisor_history, line, reply)
         if intake_decision.intent_type == "source_ingestion":
             result = runtime.run_source_ingestion(
                 title=title,

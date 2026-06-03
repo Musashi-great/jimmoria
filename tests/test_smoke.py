@@ -538,6 +538,44 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("저장된 보고서를 찾지 못했습니다", text)
         self.assertIn("Research Room", text)
 
+    def test_chat_confirmed_report_skips_duplicate_dispatch_reply(self) -> None:
+        output = StringIO()
+        fake_result = types.SimpleNamespace(
+            room=types.SimpleNamespace(
+                room_id="room_confirmed",
+                status="completed",
+                output_paths={},
+                project_card={},
+            ),
+            memory=types.SimpleNamespace(get_room_findings=lambda room_id: []),
+            bus=types.SimpleNamespace(messages=[]),
+        )
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            args = argparse.Namespace(
+                memory=str(root / "memory.json"),
+                vault=str(root / "vault"),
+                reports=str(root / "reports"),
+                skip_model_setup=True,
+            )
+            with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(root / "model_settings.json")}, clear=True):
+                with patch("sys.stdin.isatty", return_value=True):
+                    with patch("builtins.input", side_effect=["3jane 관련 투자 보고서 만들어봐", "y", "/quit"]):
+                        with patch(
+                            "crypto_research_agents.cli.ResearchRuntime.run_article_research",
+                            return_value=fake_result,
+                        ) as run_article:
+                            with redirect_stdout(output):
+                                chat_command(args)
+
+            self.assertTrue(run_article.called)
+
+        text = output.getvalue()
+        self.assertIn("Supervisor check", text)
+        self.assertNotIn("이건 리서치 요청으로 판단했습니다", text)
+        self.assertNotIn("작업을 배정하겠습니다", text)
+        self.assertNotIn("제가 먼저 목표와 우선순위를", text)
+
     def test_runtime_records_supervisor_intake_decision(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
