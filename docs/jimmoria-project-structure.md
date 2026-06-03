@@ -334,45 +334,36 @@ Research Room 결과 출력 정책:
 완료 보고서의 1차 목표는 에이전트 로그를 보여주는 것이 아니라, 사용자가 프로젝트나 내러티브를 이해하도록 돕는 것이다. 그래서 `research_complete` 보고서는 다음 순서로 작성한다.
 
 ```text
-1. 핵심 결론
-2. 프로젝트가 무엇을 하려는지
-3. 제품 / 기술 구조
-4. 토큰 / 체인 / 온체인 상태
-5. 소셜 / KOL / 커뮤니티 신호
-6. 펀딩 / 인센티브 / 에어드랍 단서
-7. 리서치 thesis
-8. 강점
-9. 약점 / 리스크
-10. 앞으로 확인해야 할 것
-11. 검증 상태 / 리서치 범위
-12. Source Log
-13. Research Quality Gate
+1. 결론 먼저
+2. 이 프로젝트가 하는 일
+3. 왜 지금 언급되는가
+4. 제품과 기술 확인
+5. 토큰 / 체인 / 가치 포착
+6. 팀 / 펀딩 / KOL
+7. 리스크
+8. 다음 확인할 것
+9. 근거 링크
 ```
 
 즉 ReportAgent는 "누가 무엇을 했는지"보다 "이 프로젝트를 어떻게 이해해야 하는지"를 앞세운다. 에이전트별 실행 로그, council 토론, tool payload, raw LLM output은 최종 보고서 본문에 넣지 않고 `data/runs/<room_id>/messages.json`, `events.json`, `tool_audit_log.json`, `llm_call_log.json`에 감사 trail로 남긴다.
 
-### Current Project Intelligence Report Shape
+### Current Reader-Friendly Report Shape
 
-`research_complete` report output is now written as a project intelligence memo, not an internal agent activity log. The client-facing report uses this shape:
+`research_complete` report output is now written as a reader-friendly project dossier, not an internal agent activity log. The client-facing report uses this shape:
 
 ```text
-1. Executive Summary / 핵심 요약
-2. Primary Market Signal Layer / X-KOL First Source
-3. Project Identity / 프로젝트 정체성
-4. Market Problem & Narrative / 시장 문제와 내러티브
-5. Product & Protocol Mechanics / 제품과 프로토콜 구조
-6. Token, Chain & Value Capture / 토큰, 체인, 가치 포착
-7. Traction, Social & Funding Signals / 트랙션, 소셜, 펀딩
-8. Analyst Thesis / 리서치 판단
-9. Risk Register / 리스크
-10. Specialist Coverage / 에이전트별 커버리지
-11. Next Research Checklist / 다음 조사 체크리스트
-12. Verification Status / 검증 범위
-13. Source Appendix / 출처
-14. Research Quality Metadata
+1. 결론 먼저
+2. 이 프로젝트가 하는 일
+3. 왜 지금 언급되는가
+4. 제품과 기술 확인
+5. 토큰 / 체인 / 가치 포착
+6. 팀 / 펀딩 / KOL
+7. 리스크
+8. 다음 확인할 것
+9. 근거 링크
 ```
 
-Internal Supervisor final review, agent council notes, tool payloads, raw LLM JSON, and execution logs stay in `data/runs/<room_id>/` instead of being appended to the final report body.
+Internal Supervisor final review, agent council notes, tool payloads, raw LLM JSON, execution logs, detailed specialist coverage, and AntSeed peer review stay in `data/runs/<room_id>/` and `data/evidence_packets/<project>-<room_id>.md` instead of being appended to the final report body.
 
 ### Twitter/KOL-First Research Flow
 
@@ -483,8 +474,7 @@ The report order is:
 8. On-chain / market background
 9. Risk separation
 10. TOP / WATCH / OPERATOR / EXCLUDE stance
-11. Evidence Packet
-12. Sources
+11. Sources
 ```
 
 Key rules:
@@ -498,6 +488,7 @@ Key rules:
 - Token value-capture must separate live mechanics from roadmap claims.
 - Contract, LP, holder, liquidity, and market data are background unless they create a fatal risk.
 - No hype, buy/sell, target, or guaranteed-return language.
+- Evidence Packet and AntSeed-style peer review are saved separately, while the client-facing report stays readable.
 
 Every completed room now writes two client-useful artifacts:
 

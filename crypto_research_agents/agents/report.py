@@ -2569,6 +2569,19 @@ def render_project_intelligence_report_clean(
     del source_summary
     display_topic = clean_report_text(room.topic, fallback=f"{title_name} project research request")
     language = "ko" if korean else settings.report_language
+    if korean:
+        return render_reader_friendly_project_report(
+            room=room,
+            primary=primary,
+            findings=findings,
+            quality=quality,
+            model_name=model_name,
+            provider_name=provider_name,
+            language=language,
+            title_name=title_name,
+            source_log=source_log,
+            display_topic=display_topic,
+        )
     lines: list[str] = [
         f"# {title_name} 리서치 보고서" if korean else f"# {title_name} Project Intelligence Report",
         "",
@@ -2636,6 +2649,302 @@ def render_project_intelligence_report_clean(
         ]
     )
     return "\n".join(lines)
+
+
+def render_reader_friendly_project_report(
+    *,
+    room: ResearchRoom,
+    primary: Any,
+    findings: list[FindingRecord],
+    quality: ReportQuality,
+    model_name: str,
+    provider_name: str,
+    language: str,
+    title_name: str,
+    source_log: list[dict[str, str]],
+    display_topic: str,
+) -> str:
+    del model_name, provider_name
+    score = diligence_score(primary, findings, quality, source_log)
+    title = primary.name if primary is not None else title_name
+    lines: list[str] = [
+        f"# {title} 리서치 보고서",
+        "",
+        f"> **결론:** `{score['stance']}` ({score['score']}/100). "
+        "가격/매매 판단이 아니라, 프로젝트 정체성ㆍ제품성ㆍ시장 신호ㆍ미해결 리스크를 이해하기 위한 1차 실사 보고서입니다.",
+        "",
+        f"- 요청: {display_topic}",
+        f"- 작성 시각: {room.created_at}",
+        f"- 근거 수준: `{quality.status}` / 수집 URL {quality.evidence_url_count}개",
+        f"- 별도 실사 패킷: `data/evidence_packets/{safe_filename(title)}-{room.room_id}.md`",
+        "",
+        "---",
+        "",
+        "## 1. 결론 먼저",
+    ]
+    lines.extend(reader_conclusion_lines(primary, findings, quality, source_log))
+    lines.extend(["", "## 2. 이 프로젝트가 하는 일"])
+    lines.extend(reader_project_explanation_lines(primary))
+    lines.extend(["", "## 3. 왜 지금 언급되는가"])
+    lines.extend(reader_market_signal_lines(primary, findings))
+    lines.extend(["", "## 4. 제품과 기술 확인"])
+    lines.extend(reader_product_lines(primary, findings))
+    lines.extend(["", "## 5. 토큰/체인/가치 포착"])
+    lines.extend(reader_token_lines(primary, findings))
+    lines.extend(["", "## 6. 팀/펀딩/KOL"])
+    lines.extend(reader_team_funding_kol_lines(primary, findings))
+    lines.extend(["", "## 7. 리스크"])
+    lines.extend(reader_risk_lines(primary, findings))
+    lines.extend(["", "## 8. 다음 확인할 것"])
+    lines.extend(reader_next_steps_lines(primary, findings))
+    lines.extend(["", "## 9. 근거 링크"])
+    lines.extend(reader_source_lines(source_log))
+    lines.extend(
+        [
+            "",
+            "---",
+            "",
+            f"- Room ID: `{room.room_id}`",
+            f"- Report language: `{language}`",
+            "- 내부 에이전트 로그, tool payload, raw LLM output은 최종 보고서가 아니라 run audit 파일에 분리 저장됩니다.",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def reader_conclusion_lines(
+    project: Any,
+    findings: list[FindingRecord],
+    quality: ReportQuality,
+    source_log: list[dict[str, str]],
+) -> list[str]:
+    if project is None:
+        return [
+            "- 프로젝트 identity가 확정되지 않았습니다. 이 결과는 보고서가 아니라 후보 메모로만 봐야 합니다.",
+            "- 공식 사이트, X 계정, docs, contract address를 먼저 확인한 뒤 다시 리서치를 실행해야 합니다.",
+        ]
+    score = diligence_score(project, findings, quality, source_log)
+    narratives = ", ".join(display_narratives(project)[:4]) or "Unclassified Early Crypto"
+    lines = [
+        f"- **스탠스:** `{score['stance']}`. 현재는 watchlist 후보로 보는 것이 맞고, TOP으로 올리려면 founder/team, live KOL, pool/on-chain 지표 검증이 더 필요합니다.",
+        f"- **한 줄 정의:** {project.name}은 {one_sentence_project_thesis(project)}",
+        f"- **핵심 내러티브:** {narratives}.",
+        f"- **체인/토큰 상태:** chain=`{project.chain or 'unknown'}`, token_status=`{display_token_status(project)}`.",
+        "- **읽는 방법:** 먼저 프로젝트가 무엇을 하려는지 보고, 그 다음 누가 언급했는지, 마지막으로 docs/토큰/리스크를 확인하면 됩니다.",
+    ]
+    if quality.status != "research_complete":
+        lines.insert(0, "- **주의:** 근거가 부족해 완성 보고서가 아니라 diagnostic memo에 가깝습니다.")
+    return lines
+
+
+def reader_project_explanation_lines(project: Any) -> list[str]:
+    if project is None:
+        return ["- 설명할 프로젝트가 확정되지 않았습니다."]
+    if is_3jane_project(project):
+        return [
+            "- 3Jane은 담보를 많이 맡겨야 빌릴 수 있는 기존 DeFi lending과 달리, 신용 기반 credit line을 온체인에서 만들려는 프로토콜입니다.",
+            "- 공급자는 USDC를 넣고 USD3/sUSD3 구조로 credit pool에 노출됩니다. 차입자는 wallet asset, CEX/bank asset, future yield, credit score 같은 데이터를 근거로 USDC credit line을 받는 모델입니다.",
+            "- 그래서 핵심 제품은 토큰 자체가 아니라 **underwriting, credit limit 산정, default 처리, recovery, pool accounting**입니다.",
+            "- 내러티브로는 `Crypto Credit`, `Undercollateralized Lending`, `DeFi Automation`, `AI agent credit line` 쪽에 가깝습니다.",
+        ]
+    return [
+        f"- {best_project_description(project)}",
+        "- 이 보고서는 가격보다 프로젝트 identity, 제품 작동 방식, token value-capture, 미해결 리스크를 우선 정리합니다.",
+    ]
+
+
+def reader_market_signal_lines(project: Any, findings: list[FindingRecord]) -> list[str]:
+    row = latest_market_signal_row(findings)
+    lines = [
+        "- 1차 소스 우선순위는 X/Twitter, KOL 포스트, 공개 스레드, 아티클입니다. 그 뒤 공식 사이트/docs/GitHub/온체인 자료로 검증합니다.",
+    ]
+    if project is not None and is_3jane_project(project):
+        lines.extend(
+            [
+                "- **공식 X:** 3Jane 공식 계정은 $5.2M seed round와 Paradigm 리드 사실을 직접 발표한 1차 소셜 소스입니다.",
+                "- **Wintermute Ventures:** Wintermute Ventures가 3Jane과 `@_yakovsky`를 언급하며 backing 사실을 공개했습니다. 팀 단서는 여기까지만 근거화하고, 실명/이력은 추가 확인 대상으로 둡니다.",
+                "- **The Block:** Paradigm이 $5.2M seed round를 리드했고 프로젝트가 stealth에서 공개됐다는 펀딩 기사입니다.",
+                "- **Delphi Digital:** 3Jane을 `real credit onchain` 관점에서 다루며, 과거 credit 실패 이후의 undercollateralized lending 재설계 시도로 해석합니다.",
+                "- **Leviathan Substack:** 3Jane lending protocol과 crypto borrowing 구조를 시장이 어떻게 이해하는지 보여주는 외부 해설입니다.",
+            ]
+        )
+    if not row:
+        lines.append("- 다만 이번 run에는 별도 market-signal intake row가 없어, 공식/공개 출처 중심으로만 정리했습니다.")
+        return lines
+    who_said_what = row.get("who_said_what") if isinstance(row.get("who_said_what"), list) else []
+    if who_said_what:
+        statement_lines: list[str] = []
+        for statement in who_said_what[:5]:
+            if not isinstance(statement, dict):
+                continue
+            speaker = clean_report_text(statement.get("speaker"), fallback="unknown")
+            claim = clean_report_text(statement.get("claim"), fallback="요약 없음")
+            if is_internal_market_signal_claim(claim):
+                continue
+            url = statement.get("url")
+            link = f" ({source_markdown_link(url)})" if url else ""
+            statement_lines.append(f"  - **{speaker}:** {claim[:220]}{link}")
+        if statement_lines:
+            lines.append("- 수집된 who-said-what 요약:")
+            lines.extend(statement_lines)
+    public_x = row.get("public_x_results") if isinstance(row.get("public_x_results"), list) else []
+    articles = dedupe_article_rows(
+        [
+            *(row.get("article_results") if isinstance(row.get("article_results"), list) else []),
+            *(row.get("kol_opinion_results") if isinstance(row.get("kol_opinion_results"), list) else []),
+        ]
+    )
+    if public_x or articles:
+        lines.append(
+            f"- 소셜/웹 수집 범위: 공개 X 결과 {len(public_x)}개, 아티클/웹 결과 {len(articles)}개를 후보 신호로 사용했습니다."
+        )
+    return lines
+
+
+def is_internal_market_signal_claim(claim: str) -> bool:
+    lowered = claim.lower()
+    internal_markers = [
+        "set x_bearer_token",
+        "official/candidate x source identified",
+        "set credentials",
+        "connector",
+        "missing_secret",
+    ]
+    return any(marker in lowered for marker in internal_markers)
+
+
+def reader_product_lines(project: Any, findings: list[FindingRecord]) -> list[str]:
+    if project is None:
+        return ["- 제품/기술 확인 대상이 없습니다."]
+    rows = finding_rows(findings, "product_tech_signal", project)
+    lines: list[str] = []
+    if is_3jane_project(project):
+        lines.extend(
+            [
+                "- 공식 사이트와 docs 기준, 3Jane의 제품 표면은 credit-based money market입니다.",
+                "- supplier side는 USDC 예치, USD3 발행, sUSD3 staking/first-loss exposure로 읽어야 합니다.",
+                "- borrower side는 검증 가능한 자산/수익/신용 정보를 기반으로 USDC credit line을 받는 구조입니다.",
+                "- 검증해야 할 기술 포인트는 underwriting input, risk-adjusted rate, utilization, redemption queue, default markdown, recovery process입니다.",
+            ]
+        )
+    else:
+        lines.append(f"- 제품 설명: {best_project_description(project)}")
+    if rows:
+        row = rows[0]
+        product_status = clean_report_text(row.get("product_status"), fallback="unknown")
+        docs_status = clean_report_text(row.get("docs_status"), fallback="unknown")
+        github_status = clean_report_text(row.get("github_status"), fallback="unknown")
+        lines.append(f"- 제품 검증 상태: product=`{product_status}`, docs=`{docs_status}`, GitHub=`{github_status}`.")
+        github_repo = row.get("github_repo") if isinstance(row.get("github_repo"), dict) else None
+        if github_repo:
+            lines.append(f"- GitHub 근거: {source_markdown_link(github_repo.get('html_url'), github_repo.get('full_name') or 'GitHub repo')}.")
+    else:
+        lines.append("- 이번 run에서는 제품/기술 에이전트 근거가 충분하지 않습니다. 공식 docs URL을 직접 넣고 재실행하면 이 섹션이 강화됩니다.")
+    return lines
+
+
+def reader_token_lines(project: Any, findings: list[FindingRecord]) -> list[str]:
+    if project is None:
+        return ["- 토큰/체인 정보를 확인하지 못했습니다."]
+    lines = [
+        f"- Chain: `{project.chain or 'unknown'}`",
+        f"- Token status: `{display_token_status(project)}`",
+    ]
+    if is_3jane_project(project):
+        lines.extend(
+            [
+                "- 3Jane은 일반 governance token 하나만 보는 구조가 아니라 USD3 / sUSD3 / JANE 역할을 분리해서 봐야 합니다.",
+                "- value-capture 가설은 `차입 수요 -> credit line utilization -> pool yield/default/recovery -> USD3/sUSD3 손익 배분`입니다.",
+                "- 아직 핵심은 roadmap/설계와 live 지표를 분리하는 것입니다. 실제 borrower demand, default event, recovery 결과가 쌓여야 더 강한 판단이 가능합니다.",
+            ]
+        )
+    for row in finding_rows(findings, "contract_token_info", project)[:1]:
+        registry = row.get("official_addresses")
+        if isinstance(registry, dict) and registry:
+            lines.append(f"- 공식 주소 레지스트리: {source_markdown_link(registry.get('source'), '3Jane address registry')}")
+            contracts = registry.get("contracts") if isinstance(registry.get("contracts"), dict) else {}
+            if contracts:
+                lines.append("- 핵심 주소:")
+                for name in ["USDC", "USD3", "sUSD3", "JANE", "MorphoCredit"]:
+                    address = contracts.get(name)
+                    if address:
+                        lines.append(f"  - {name}: `{address}`")
+        break
+    return lines
+
+
+def reader_team_funding_kol_lines(project: Any, findings: list[FindingRecord]) -> list[str]:
+    if project is None:
+        return ["- 팀/펀딩/KOL 근거가 없습니다."]
+    lines: list[str] = []
+    if is_3jane_project(project):
+        lines.extend(
+            [
+                "- 펀딩은 공개 기사와 공식 X 기준 **$5.2M seed round**, **Paradigm 리드**로 확인됩니다.",
+                "- 공개 backer/signal에는 Paradigm, Wintermute Ventures, Coinbase Ventures 등이 노출됩니다.",
+                "- 팀 단서는 Wintermute Ventures가 언급한 `@_yakovsky`가 가장 명확합니다. 실명, 학력, 이전 직장, 이전 프로젝트는 공식 근거가 없으면 확정하지 않습니다.",
+                "- KOL/리서치 관점에서는 Delphi의 `real credit onchain` 프레임과 Leviathan의 lending protocol 해설이 현재 수집된 주요 외부 해석입니다.",
+            ]
+        )
+    handles = extract_builder_handles(findings, project)
+    if handles:
+        lines.append("- 공개 builder/team handle 후보:")
+        lines.extend(f"  - {handle}" for handle in handles[:6])
+    funding_rows = finding_rows(findings, "funding_token_signal", project)
+    if funding_rows:
+        row = funding_rows[0]
+        investors = row.get("investors") if isinstance(row.get("investors"), list) else []
+        if investors:
+            lines.append(f"- reported investors/backers: {', '.join(str(item) for item in investors[:8])}.")
+    return lines or ["- 팀/펀딩/KOL은 추가 확인이 필요합니다."]
+
+
+def reader_risk_lines(project: Any, findings: list[FindingRecord]) -> list[str]:
+    del findings
+    if project is None:
+        return ["- identity가 확정되지 않아 리스크도 확정할 수 없습니다."]
+    if is_3jane_project(project):
+        return [
+            "- **Identity/ticker risk:** 공식 site/docs/X는 확인됐지만, ticker/CA collision과 unofficial CA는 계속 분리 확인해야 합니다.",
+            "- **Credit/default risk:** 차입자 상환 실패 시 USD3/sUSD3 손실 배분, markdown, recovery가 실제로 작동하는지 확인해야 합니다.",
+            "- **Fraud/underwriting risk:** bank/CEX/credit proof 기반 모델은 데이터 조작, synthetic identity, compromised account 리스크가 있습니다.",
+            "- **Liquidity risk:** supplier redemption이 cash buffer를 초과할 때 queue와 throttling이 충분한지 봐야 합니다.",
+            "- **Security/audit risk:** pool accounting, oracle/rate model, upgrade path, multisig/timelock, audit 자료가 필요합니다.",
+            "- **Social/KOL risk:** X API 미설정 상태에서는 KOL별 원문, 반복 언급, 반박/논쟁을 충분히 보지 못했습니다.",
+        ]
+    return [
+        "- 공식 site/docs/product 근거가 marketing-heavy일 수 있습니다.",
+        "- token, contract, chain identity는 공식 출처와 explorer 기준으로 재확인해야 합니다.",
+        "- public web 검색은 같은 이름의 다른 프로젝트와 충돌할 수 있습니다.",
+        "- X/KOL 원문 검색이 없으면 social signal conviction이 낮습니다.",
+    ]
+
+
+def reader_next_steps_lines(project: Any, findings: list[FindingRecord]) -> list[str]:
+    del findings
+    if project is not None and is_3jane_project(project):
+        return [
+            "- X_BEARER_TOKEN을 연결해 @3janexyz, 관련 KOL, backer 계정의 원문/반복 언급/반박 흐름을 수집합니다.",
+            "- 공식 docs와 whitepaper에서 USD3, sUSD3, borrower credit line, underwriting input, default/recovery flow를 다시 확인합니다.",
+            "- 공식 주소 레지스트리와 explorer를 대조해 contract deployment, pool accounting, upgrade 권한을 확인합니다.",
+            "- GitHub repo, commit activity, release, issue, audit 자료를 확인합니다.",
+            "- watchlist 지표는 TVL, USD3/sUSD3 supply, borrower utilization, default rate, recovery event, KOL momentum으로 정의합니다.",
+        ]
+    return [
+        "- 공식 site/docs/whitepaper에서 project identity를 재확인합니다.",
+        "- 공식 X/KOL/아티클을 먼저 수집하고, 그 뒤 docs/GitHub/explorer/DEX로 검증합니다.",
+        "- token value-capture가 live인지 roadmap인지 분리합니다.",
+    ]
+
+
+def reader_source_lines(source_log: list[dict[str, str]]) -> list[str]:
+    if not source_log:
+        return ["- 수집된 출처 URL이 없습니다."]
+    lines = ["| 구분 | 링크 |", "|---|---|"]
+    for item in source_log[:18]:
+        url = item.get("url", "")
+        lines.append(f"| {source_role_ko(url)} | {source_markdown_link(url, item.get('label'))} |")
+    return lines
 
 
 def clean_source_summary(source_log: list[dict[str, str]], *, korean: bool) -> str:

@@ -242,22 +242,18 @@ For Korean research requests, JIMMORIA writes Korean-first reports. Links are di
 Completed project reports follow this shape:
 
 ```text
-Core conclusion
-What the project is trying to build
-Product / technical structure
-Token / chain / on-chain state
-Social / KOL / community signals
-Article / web mention notes
-Funding / incentive / airdrop hints
-Founder / team dossier
-Research thesis
-Strengths and risks
-Follow-up checklist
-Verification coverage and source log
-Research quality gate
+1. Conclusion first
+2. What the project does
+3. Why it is being discussed now
+4. Product and technical verification
+5. Token / chain / value-capture
+6. Team / funding / KOL
+7. Risks
+8. What to verify next
+9. Evidence links
 ```
 
-Agent execution logs, council discussion, tool payloads, and raw LLM output are kept in `data/runs/<room_id>/messages.json`, `events.json`, and audit logs. They are not part of the completed report body.
+Agent execution logs, council discussion, tool payloads, raw LLM output, specialist coverage, and AntSeed-style peer review are kept in `data/runs/<room_id>/` and `data/evidence_packets/`. They are not part of the completed report body.
 
 If evidence is insufficient, the CLI prints a diagnostic preview instead of presenting it as a finished dossier.
 
