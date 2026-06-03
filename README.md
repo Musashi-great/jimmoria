@@ -59,6 +59,8 @@ JIMMORIA는 토큰이나 API key를 저장하지 않습니다. 저장하는 것�
 
 이미 Codex에 로그인되어 있으면 JIMMORIA가 자동으로 `codex_sdk` 또는 `codex_cli` provider를 감지하고 다음 실행부터 모델 설정 화면을 건너뜁니다.
 
+SDK provider는 `openai/codex` Python SDK 구조를 따른다. JIMMORIA는 에이전트 LLM 호출마다 ephemeral thread를 만들고, 기본값으로 `Sandbox.read_only`, `ApprovalMode.deny_all`, JIMMORIA 프로젝트 루트 `cwd`를 사용한다. 리서치 판단용 LLM 호출이므로 저장소 수정이나 추가 승인 요청은 기본적으로 막아둔다.
+
 ## How LLMs Work
 
 JIMMORIA는 에이전트가 각자 모델을 직접 고르지 않습니다. 모든 호출은 `ModelGateway`를 통과하고, 작업 종류에 따라 fast/reasoning/writing route로 나뉩니다.

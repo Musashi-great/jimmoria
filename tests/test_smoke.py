@@ -1402,27 +1402,43 @@ Usage: codex exec [OPTIONS] [PROMPT]
         calls: dict[str, object] = {}
 
         class FakeResult:
+            id = "turn_test"
+            status = "completed"
+            duration_ms = 123
             final_response = "sdk ok"
+            usage = None
 
         class FakeThread:
-            def run(self, prompt: str) -> FakeResult:
+            def run(self, prompt: str, **kwargs: object) -> FakeResult:
                 calls["prompt"] = prompt
+                calls["run_kwargs"] = kwargs
                 return FakeResult()
 
         class FakeCodex:
+            def __init__(self, config: object | None = None) -> None:
+                calls["config"] = config
+
             def __enter__(self) -> "FakeCodex":
                 return self
 
             def __exit__(self, *_args: object) -> None:
                 return None
 
-            def thread_start(self, *, model: str, sandbox: object) -> FakeThread:
-                calls["model"] = model
-                calls["sandbox"] = sandbox
+            def thread_start(self, **kwargs: object) -> FakeThread:
+                calls["thread_start"] = kwargs
                 return FakeThread()
 
+        class FakeCodexConfig:
+            def __init__(self, **kwargs: object) -> None:
+                self.kwargs = kwargs
+
         fake_module = types.SimpleNamespace(
+            ApprovalMode=types.SimpleNamespace(
+                deny_all="deny_all",
+                auto_review="auto_review",
+            ),
             Codex=FakeCodex,
+            CodexConfig=FakeCodexConfig,
             Sandbox=types.SimpleNamespace(
                 read_only="read_only",
                 workspace_write="workspace_write",
@@ -1444,9 +1460,16 @@ Usage: codex exec [OPTIONS] [PROMPT]
                 response = CodexSdkProvider().complete(request)
 
         self.assertEqual(response.text, "sdk ok")
-        self.assertEqual(calls["model"], "gpt-5.4-mini")
-        self.assertEqual(calls["sandbox"], "workspace_write")
+        thread_start = calls["thread_start"]
+        assert isinstance(thread_start, dict)
+        self.assertEqual(thread_start["model"], "gpt-5.4-mini")
+        self.assertEqual(thread_start["sandbox"], "workspace_write")
+        self.assertEqual(thread_start["approval_mode"], "deny_all")
+        self.assertTrue(thread_start["ephemeral"])
+        self.assertEqual(thread_start["developer_instructions"], "Talk as supervisor.")
         self.assertIn("안녕", str(calls["prompt"]))
+        self.assertEqual(response.usage["approval_mode"], "deny_all")
+        self.assertEqual(response.usage["duration_ms"], 123)
 
     def test_codex_model_env_has_priority(self) -> None:
         with patch.dict(

@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+from crypto_research_agents.storage.paths import project_root
+
 
 @dataclass(slots=True)
 class LLMRequest:
@@ -125,25 +127,46 @@ class CodexSdkProvider:
 
     def __init__(self) -> None:
         self.sandbox_name = os.getenv("CODEX_SDK_SANDBOX", "read_only")
+        self.approval_mode_name = os.getenv("CODEX_SDK_APPROVAL_MODE", "deny_all")
+        self.cwd = os.getenv("CODEX_SDK_CWD") or str(project_root())
 
     def complete(self, request: LLMRequest) -> LLMResponse:
         try:
-            from openai_codex import Codex, Sandbox  # type: ignore
+            from openai_codex import ApprovalMode, Codex, CodexConfig, Sandbox  # type: ignore
         except ImportError as exc:
             raise RuntimeError("Install the Codex Python SDK with `pip install openai-codex`.") from exc
 
         sandbox = _codex_sdk_sandbox(Sandbox, self.sandbox_name)
+        approval_mode = _codex_sdk_approval_mode(ApprovalMode, self.approval_mode_name)
         prompt = _codex_sdk_prompt(request)
-        with Codex() as codex:
-            thread = codex.thread_start(model=request.model, sandbox=sandbox)
-            result = thread.run(prompt)
-            text = str(getattr(result, "final_response", "") or result)
+        config = CodexConfig(
+            cwd=self.cwd,
+            client_name="jimmoria",
+            client_title="JIMMORIA",
+        )
+        with Codex(config) as codex:
+            thread = codex.thread_start(
+                approval_mode=approval_mode,
+                cwd=self.cwd,
+                developer_instructions=request.system_prompt,
+                ephemeral=True,
+                model=request.model,
+                sandbox=sandbox,
+                service_name=f"jimmoria:{request.agent_id}:{request.task_type}",
+            )
+            result = thread.run(prompt, approval_mode=approval_mode, cwd=self.cwd, sandbox=sandbox)
+            text = str(getattr(result, "final_response", "") or "")
 
         return LLMResponse(
             text=text.strip(),
             model=request.model,
             provider=self.provider_name,
-            usage={"mode": "codex_sdk", "sandbox": self.sandbox_name},
+            usage=_codex_sdk_usage(
+                result,
+                sandbox=self.sandbox_name,
+                approval_mode=self.approval_mode_name,
+                cwd=self.cwd,
+            ),
             raw=result,
         )
 
@@ -260,6 +283,33 @@ def _codex_sdk_sandbox(sandbox_module: Any, sandbox_name: str) -> Any:
     if normalized == "full_access":
         return sandbox_module.full_access
     return sandbox_module.read_only
+
+
+def _codex_sdk_approval_mode(approval_module: Any, approval_mode: str) -> Any:
+    normalized = approval_mode.lower().replace("-", "_")
+    if normalized in {"auto", "auto_review", "on_request"}:
+        return approval_module.auto_review
+    return approval_module.deny_all
+
+
+def _codex_sdk_usage(result: Any, *, sandbox: str, approval_mode: str, cwd: str) -> dict[str, Any]:
+    usage: dict[str, Any] = {
+        "mode": "codex_sdk",
+        "sandbox": sandbox,
+        "approval_mode": approval_mode,
+        "cwd": cwd,
+    }
+    for attr_name in ["id", "status", "duration_ms"]:
+        value = getattr(result, attr_name, None)
+        if value is not None:
+            usage[attr_name] = getattr(value, "value", value)
+    token_usage = getattr(result, "usage", None)
+    if token_usage is not None:
+        if hasattr(token_usage, "model_dump"):
+            usage["token_usage"] = token_usage.model_dump()
+        else:
+            usage["token_usage"] = token_usage
+    return usage
 
 
 def _is_real_model_name(model: str) -> bool:

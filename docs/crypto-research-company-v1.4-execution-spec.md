@@ -416,8 +416,11 @@ CodexSdkProvider
 - LLM_PROVIDER=codex_sdk
 - 공식 openai-codex Python SDK 사용
 - 로컬 Codex app-server를 JSON-RPC로 제어
-- Codex thread_start(model=..., sandbox=...) 후 thread.run(prompt)
+- CodexConfig(cwd=JIMMORIA project root)로 app-server 실행
+- Codex thread_start(model=..., sandbox=..., approval_mode=..., developer_instructions=..., ephemeral=True) 후 thread.run(prompt)
 - 기본 sandbox는 read_only
+- 기본 approval_mode는 deny_all
+- TurnResult.final_response, duration_ms, usage를 LLMResponse에 기록
 
 CodexCliProvider
 - LLM_PROVIDER=codex_cli
@@ -435,6 +438,7 @@ OfflineLLMProvider
 ```powershell
 $env:LLM_PROVIDER="codex_sdk"
 $env:CODEX_SDK_SANDBOX="read_only"
+$env:CODEX_SDK_APPROVAL_MODE="deny_all"
 $env:CODEX_MODEL_REASONING="gpt-5.5"
 $env:CODEX_MODEL_WRITING="gpt-5.5"
 $env:CODEX_MODEL_FAST="gpt-5.4-mini"

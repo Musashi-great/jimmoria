@@ -12,6 +12,8 @@
   "env": {
     "provider": "LLM_PROVIDER",
     "codex_sdk_sandbox": "CODEX_SDK_SANDBOX",
+    "codex_sdk_approval_mode": "CODEX_SDK_APPROVAL_MODE",
+    "codex_sdk_cwd": "CODEX_SDK_CWD",
     "codex_cli_command": "CODEX_CLI_COMMAND",
     "codex_cli_timeout": "CODEX_CLI_TIMEOUT",
     "fast_chat_model": "CODEX_MODEL_FAST_CHAT",
@@ -61,6 +63,7 @@
   "notes": [
     "Supported model ids are fixed to the official Codex model list above.",
     "JIMMORIA does not expose OpenAI API-key or OAuth bearer-token setup as model providers.",
-    "Use codex_sdk when openai-codex is installed; use codex_cli when relying on a local Codex login."
+    "Use codex_sdk when openai-codex is installed; use codex_cli when relying on a local Codex login.",
+    "Codex SDK calls default to Sandbox.read_only, ApprovalMode.deny_all, ephemeral threads, and the JIMMORIA project root as cwd."
   ]
 }

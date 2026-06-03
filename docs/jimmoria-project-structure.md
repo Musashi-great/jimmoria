@@ -541,7 +541,18 @@ gpt-5.3-codex-spark
 | `codex_cli` | `LLM_PROVIDER=codex_cli` | 로컬 Codex CLI 로그인 세션으로 `codex exec` 호출 |
 | `offline_fallback` | 설정 없음 또는 `LLM_PROVIDER=offline` | deterministic local fallback, 테스트와 진단용 안전장치 |
 
-`codex_sdk` provider는 `openai_codex.Codex`와 `Sandbox`를 사용한다. JIMMORIA는 provider 안에서 thread를 만들고, 선택된 Codex 모델과 sandbox preset을 넘긴 뒤, 에이전트별 prompt를 `thread.run()`에 전달한다. 기본 sandbox는 `read_only`이며 `CODEX_SDK_SANDBOX=workspace_write` 또는 `full_access`로 바꿀 수 있다. 리서치 에이전트 LLM 판단은 저장소를 수정하는 작업이 아니므로 기본값은 읽기 전용이다.
+`codex_sdk` provider는 `openai_codex.Codex`, `CodexConfig`, `Sandbox`, `ApprovalMode`를 사용한다. JIMMORIA는 provider 안에서 `CodexConfig(cwd=JIMMORIA_PROJECT_ROOT)`를 만들고, 에이전트 LLM 호출마다 ephemeral thread를 연다. `thread_start()`에는 선택된 Codex 모델, `developer_instructions`, `service_name`, sandbox preset, approval mode, cwd가 들어가고, 실제 에이전트 prompt는 `thread.run()`에 전달된다.
+
+기본 SDK runtime boundary는 다음이다.
+
+```text
+CODEX_SDK_SANDBOX=read_only
+CODEX_SDK_APPROVAL_MODE=deny_all
+CODEX_SDK_CWD=<JIMMORIA project root>
+ephemeral=True
+```
+
+`CODEX_SDK_SANDBOX=workspace_write` 또는 `full_access`, `CODEX_SDK_APPROVAL_MODE=auto_review`로 바꿀 수는 있다. 다만 리서치 에이전트 LLM 판단은 저장소를 수정하는 작업이 아니므로 기본값은 읽기 전용 + 승인 거절이다. `TurnResult.final_response`, `duration_ms`, `usage`는 `LLMResponse.usage`와 `llm_call_log.json`에 저장될 수 있게 직렬화한다.
 
 `codex_cli` provider는 `codex exec --help`를 읽고 현재 설치된 Codex CLI가 지원하는 옵션만 붙인다. 예를 들어 어떤 버전은 `--ask-for-approval`을 지원하지 않으므로, JIMMORIA는 이 옵션을 하드코딩하지 않는다. 현재 provider는 지원 여부를 확인한 뒤 `--ephemeral`, `--skip-git-repo-check`, `--sandbox`, `--output-last-message`, `--model` 같은 옵션을 선택적으로 사용한다. 또한 한국어 리서치 요청이 Windows 코드페이지를 타며 깨지지 않도록 `codex exec -` stdin에는 프롬프트를 UTF-8 bytes로 직접 전달한다. 이 방식은 Codex CLI 버전 차이와 터미널 인코딩 차이 때문에 리서치 런이 중간에 죽는 일을 줄이기 위한 호환성 장치다.
 
