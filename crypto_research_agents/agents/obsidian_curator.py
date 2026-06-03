@@ -33,21 +33,32 @@ class ObsidianCuratorAgent(BaseAgent):
 
         room.output_paths["obsidian_vault"] = str(vault_dir)
         summary = f"Obsidian sync wrote {len(written)} notes."
+        llm_analysis = self.llm_analysis_pass(
+            room=room,
+            objective="Review the Obsidian sync result and identify follow-up knowledge curation work.",
+            evidence={
+                "written_paths": written,
+                "source_count": len(room.source_inputs),
+                "project_count": len(current_room_projects(room, memory)),
+                "has_report": bool(room.report_draft),
+            },
+            fallback_summary=summary,
+        )
         finding = self.write_finding(
             room=room,
             memory=memory,
             finding_type="obsidian_sync",
             summary=summary,
-            data={"paths": written},
+            data={"paths": written, "llm_analysis": llm_analysis},
             confidence=0.75,
         )
         bus.update(
             room_id=room.room_id,
             from_agent=self.agent_id,
             summary="Obsidian vault updated.",
-            payload={"finding_id": finding.finding_id, "paths": written},
+            payload={"finding_id": finding.finding_id, "paths": written, "llm_analysis": llm_analysis},
         )
-        return AgentResult(self.agent_id, summary, {"finding_id": finding.finding_id, "paths": written}, confidence=0.75)
+        return AgentResult(self.agent_id, summary, {"finding_id": finding.finding_id, "paths": written, "llm_analysis": llm_analysis}, confidence=0.75)
 
 
 def current_room_projects(room: ResearchRoom, memory: SharedMemory) -> list[Any]:

@@ -25,6 +25,19 @@ class SupervisorAgent(BaseAgent):
             if supervisor_mode == "company_ceo"
             else "Research room initialized with controlled P2P collaboration."
         )
+        llm_analysis = self.llm_analysis_pass(
+            room=room,
+            objective="Create an evidence-bound room plan for the specialist agents.",
+            evidence={
+                "topic": room.topic,
+                "goals": goals,
+                "agents": room.agents,
+                "company_settings": company_settings,
+                "intake_decision": intake_decision,
+                "model_decision": asdict(decision),
+            },
+            fallback_summary=summary,
+        )
         finding = self.write_finding(
             room=room,
             memory=memory,
@@ -37,6 +50,7 @@ class SupervisorAgent(BaseAgent):
                 "model_decision": asdict(decision),
                 "company_settings": company_settings,
                 "intake_decision": intake_decision,
+                "llm_analysis": llm_analysis,
             },
             confidence=0.9,
         )
@@ -44,6 +58,11 @@ class SupervisorAgent(BaseAgent):
             room_id=room.room_id,
             from_agent=self.agent_id,
             summary="Research room created after supervisor intake, output routing, and goals set.",
-            payload={"finding_id": finding.finding_id, "goals": goals, "intake_decision": intake_decision},
+            payload={
+                "finding_id": finding.finding_id,
+                "goals": goals,
+                "intake_decision": intake_decision,
+                "llm_analysis": llm_analysis,
+            },
         )
         return AgentResult(self.agent_id, summary, {"finding_id": finding.finding_id}, confidence=0.9)

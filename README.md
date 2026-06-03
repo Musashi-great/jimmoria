@@ -45,6 +45,24 @@ JIMMORIA는 토큰을 저장하지 않습니다. 저장하는 것은 `data/model
 
 이미 Codex CLI에 로그인되어 있으면 JIMMORIA가 자동으로 `codex_cli` provider를 감지하고 다음 실행부터 모델 설정 화면을 건너뜁니다.
 
+## How LLMs Work
+
+JIMMORIA는 에이전트가 각자 모델을 직접 고르지 않습니다. 모든 호출은 `ModelGateway`를 통과하고, 작업 종류에 따라 fast/reasoning/writing route로 나뉩니다.
+
+```text
+Supervisor chat          fast chat route
+Source ingestion         fast/default route
+Supervisor planning      reasoning route
+Narrative/discovery      reasoning route
+Social/on-chain/product  reasoning route
+Funding/token review     reasoning route
+Report synthesis         writing route
+```
+
+CrewAI의 agent/task 분리, ChatDev의 phase/workflow와 replay, LangGraph Supervisor의 routing/handoff 패턴을 JIMMORIA 구조에 맞게 흡수했습니다. 그래서 각 전문 에이전트는 먼저 ToolGateway와 SharedMemory로 근거를 모으고, 그 다음 `llm_analysis_pass`로 요약, 근거 부족, 리스크, 다음 액션을 판단합니다.
+
+이 LLM pass는 근거를 만들어내는 역할이 아닙니다. 외부 connector가 비어 있으면 “미설정/근거 부족”이라고 표시하고, 실패해도 Research Room 전체가 죽지 않게 fallback summary를 남깁니다. finding confidence는 tool/memory evidence 기준으로 유지하고, 모델의 자신감은 `llm_analysis.confidence`에 따로 저장합니다. 호출 기록은 `data/runs/<room_id>/llm_call_log.json`에 저장됩니다.
+
 ## Chat Commands
 
 ```text
@@ -127,6 +145,8 @@ Default CLI paths resolve to the JIMMORIA project root. Running `jimmoria` from 
 - Research Room orchestration
 - Supervisor + controlled P2P Agent Bus
 - AgentSpec/persona YAML 로딩
+- ProcessSpec 기반 Research Room task manifest
+- Agent-level LLM analysis pass
 - Codex CLI login, OpenAI API key, offline fallback provider
 - Web Search/URL/Website/Docs/GitHub/DEX Screener/CoinGecko 기본 connector
 - Source content hash, canonical URL, source snapshot, dedupe

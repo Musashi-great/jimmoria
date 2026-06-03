@@ -47,7 +47,15 @@ class ModelGateway:
                 max_tokens=6000,
                 temperature=0.2,
             )
-        if task_type in {"narrative_reasoning", "supervision"}:
+        if task_type in {
+            "narrative_reasoning",
+            "supervision",
+            "candidate_discovery",
+            "social_summary",
+            "contract_info",
+            "product_docs",
+            "funding_token",
+        }:
             return ModelDecision(
                 selected_model=_model_env("REASONING")
                 or _model_env("STRONG")

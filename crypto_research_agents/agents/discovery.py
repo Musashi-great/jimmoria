@@ -37,6 +37,18 @@ class DiscoveryAgent(BaseAgent):
             if used_live_data
             else f"Discovered {len(candidates)} MVP candidate placeholders from narrative signals."
         )
+        llm_analysis = self.llm_analysis_pass(
+            room=room,
+            objective="Review candidate discovery evidence and identify whether the leads are source-backed or placeholders.",
+            evidence={
+                "narratives": narratives,
+                "project_query": project_query,
+                "used_live_data": used_live_data,
+                "live_discovery": live_data,
+                "candidates": [candidate.to_dict() for candidate in candidates],
+            },
+            fallback_summary=summary,
+        )
         finding = self.write_finding(
             room=room,
             memory=memory,
@@ -46,6 +58,7 @@ class DiscoveryAgent(BaseAgent):
                 "project_query": project_query,
                 "live_discovery": live_data,
                 "candidates": [candidate.to_dict() for candidate in candidates],
+                "llm_analysis": llm_analysis,
             },
             sources=room.source_inputs,
             confidence=0.72 if used_live_data else 0.55,

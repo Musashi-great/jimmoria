@@ -693,7 +693,29 @@ class SmokeTest(unittest.TestCase):
             self.assertIn("finding_saved", event_types)
             self.assertIn("source_saved", event_types)
             self.assertIn("report_written", event_types)
-            self.assertGreaterEqual(len(runtime.model_gateway.call_log), 3)
+            self.assertGreaterEqual(len(runtime.model_gateway.call_log), 10)
+            llm_log = json.loads((root / "runs" / result.room.room_id / "llm_call_log.json").read_text(encoding="utf-8"))
+            llm_agents = {entry["agent_id"] for entry in llm_log}
+            self.assertTrue(
+                {
+                    "supervisor_agent",
+                    "ingestion_agent",
+                    "narrative_agent",
+                    "discovery_agent",
+                    "social_kol_agent",
+                    "contract_onchain_agent",
+                    "product_tech_agent",
+                    "funding_token_agent",
+                    "report_agent",
+                    "obsidian_curator_agent",
+                }.issubset(llm_agents)
+            )
+            reasoning_tasks = {
+                entry["task_type"]: entry["selected_model"]
+                for entry in llm_log
+                if entry["task_type"] in {"candidate_discovery", "social_summary", "contract_info", "product_docs", "funding_token"}
+            }
+            self.assertEqual(set(reasoning_tasks.values()), {"strong_reasoning_model"})
             self.assertGreaterEqual(len(result.bus.messages), 8)
             self.assertGreaterEqual(len(result.memory.get_room_findings(result.room.room_id)), 8)
 

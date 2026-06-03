@@ -62,23 +62,29 @@ class SocialKOLAgent(BaseAgent):
             if rows
             else "Social/KOL check found no candidate projects to inspect."
         )
+        llm_analysis = self.llm_analysis_pass(
+            room=room,
+            objective="Interpret social/KOL evidence, separate official links from live mention history, and list missing connector gaps.",
+            evidence={"rows": rows},
+            fallback_summary=summary,
+        )
         finding = self.write_finding(
             room=room,
             memory=memory,
             finding_type="social_kol_signal",
             summary=summary,
-            data={"rows": rows},
+            data={"rows": rows, "llm_analysis": llm_analysis},
             confidence=0.35,
         )
         for request in requests:
             bus.response(
                 request=request,
                 from_agent=self.agent_id,
-                result={"rows": rows, "finding_id": finding.finding_id},
-                confidence=0.35,
-                notes=["Live social connector is not configured."],
+                result={"rows": rows, "finding_id": finding.finding_id, "llm_analysis": llm_analysis},
+                confidence=finding.confidence,
+                notes=["Live social connector is not configured.", str(llm_analysis.get("summary", summary))],
             )
-        return AgentResult(self.agent_id, summary, {"finding_id": finding.finding_id, "rows": rows}, confidence=0.35)
+        return AgentResult(self.agent_id, summary, {"finding_id": finding.finding_id, "rows": rows, "llm_analysis": llm_analysis}, confidence=finding.confidence)
 
 
 def _collect_candidate_ids(requests: list[Any]) -> list[str]:

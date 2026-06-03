@@ -44,23 +44,29 @@ class FundingTokenAgent(BaseAgent):
             if rows
             else "Funding/token check found no candidate projects to inspect."
         )
+        llm_analysis = self.llm_analysis_pass(
+            room=room,
+            objective="Interpret funding, points, airdrop, and token opportunity evidence without turning it into investment advice.",
+            evidence={"rows": rows},
+            fallback_summary=summary,
+        )
         finding = self.write_finding(
             room=room,
             memory=memory,
             finding_type="funding_token_signal",
             summary=summary,
-            data={"rows": rows},
+            data={"rows": rows, "llm_analysis": llm_analysis},
             confidence=0.52 if signal_rows else 0.35,
         )
         for request in requests:
             bus.response(
                 request=request,
                 from_agent=self.agent_id,
-                result={"rows": rows, "finding_id": finding.finding_id},
+                result={"rows": rows, "finding_id": finding.finding_id, "llm_analysis": llm_analysis},
                 confidence=finding.confidence,
-                notes=[summary],
+                notes=[summary, str(llm_analysis.get("summary", summary))],
             )
-        return AgentResult(self.agent_id, summary, {"finding_id": finding.finding_id, "rows": rows}, confidence=finding.confidence)
+        return AgentResult(self.agent_id, summary, {"finding_id": finding.finding_id, "rows": rows, "llm_analysis": llm_analysis}, confidence=finding.confidence)
 
 
 def _collect_candidate_ids(requests: list[Any]) -> list[str]:

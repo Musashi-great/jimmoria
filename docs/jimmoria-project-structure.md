@@ -372,9 +372,45 @@ discovery_agent -> funding_token_agent
 | `source_ingestion` | fast/default model |
 | `narrative_reasoning` | reasoning model |
 | `supervision` | reasoning model |
+| `candidate_discovery` | reasoning model |
+| `social_summary` | reasoning model |
+| `contract_info` | reasoning model |
+| `product_docs` | reasoning model |
+| `funding_token` | reasoning model |
 | `report_writing` | writing model |
 | `final_synthesis` | writing model |
 | `embedding_search` | embedding model |
+
+현재 LLM 동작은 CrewAI의 agent/task 분리, ChatDev의 phase/workflow와 replay, LangGraph Supervisor의 routing/handoff/message-history 패턴을 JIMMORIA 구조에 맞게 흡수한 형태다. 외부 프레임워크를 그대로 끼우지 않고, 기존 `AgentSpec`, `ProcessSpec`, `CollaborationBus`, `SharedMemory`, `ToolGateway` 위에 에이전트별 LLM 판단 패스를 얹었다.
+
+핵심 구현은 `agents/base.py`의 `BaseAgent.llm_analysis_pass()`다. 각 전문 에이전트는 먼저 tool과 memory에서 근거를 모은 뒤, 이 LLM pass로 다음 JSON을 받는다.
+
+```text
+summary
+confidence
+evidence_gaps
+risks
+next_actions
+```
+
+이 pass는 근거 생성기가 아니라 근거 해석기다. 외부 connector가 비어 있거나 evidence URL이 없으면 그 상태를 그대로 요약해야 하며, token/contract/KOL/funding 데이터를 상상해서 채우면 안 된다. provider 실패도 Research Room 전체를 중단하지 않는다. 실패 시 `status: llm_failed`와 fallback summary를 finding에 남기고 다음 에이전트로 넘어간다. finding의 기본 confidence는 tool/memory evidence 기반으로 유지하고, LLM이 반환한 confidence는 `llm_analysis.confidence`에 별도로 보관한다.
+
+현재 agent-level LLM pass가 붙은 에이전트는 다음과 같다.
+
+| Agent | LLM Task Type | 역할 |
+|---|---|---|
+| `supervisor_agent` | `supervision` | room 목표, 우선순위, intake/context 검토 |
+| `ingestion_agent` | `source_ingestion` | 소스 요약, entity, keyword 추출 |
+| `narrative_agent` | `narrative_reasoning` | narrative taxonomy와 해석 |
+| `discovery_agent` | `candidate_discovery` | live 후보와 placeholder 후보 구분 |
+| `social_kol_agent` | `social_summary` | 소셜/KOL 근거와 connector gap 판단 |
+| `contract_onchain_agent` | `contract_info` | chain/token/contract evidence gap 판단 |
+| `product_tech_agent` | `product_docs` | website/docs/GitHub readiness 판단 |
+| `funding_token_agent` | `funding_token` | funding/points/airdrop/token clue 판단 |
+| `report_agent` | `final_synthesis` | 최종 TL;DR과 report synthesis |
+| `obsidian_curator_agent` | `obsidian_sync` | vault sync 결과 요약 |
+
+각 호출은 `ModelGateway.call_log`에 쌓이고 실행 후 `data/runs/<room_id>/llm_call_log.json`에 저장된다. 따라서 나중에 UI에서 “어떤 에이전트가 어떤 route/model로 판단했는지”를 replay할 수 있다.
 
 실제 provider는 `core/llm_provider.py`에서 결정된다.
 
@@ -702,6 +738,7 @@ project_research.yaml
 - Codex OAuth/Codex CLI/OpenAI/offline provider selection
 - Codex CLI exec flag compatibility
 - Codex CLI UTF-8 stdin handling for Korean prompts
+- agent-level LLM analysis pass and route selection
 - model setup flow
 - startup model setup skip
 - doctor capability status
@@ -778,7 +815,7 @@ python -m unittest discover -s tests -v
 
 ## 21. 한 줄 요약
 
-JIMMORIA는 현재 "채팅형 CLI + ProcessSpec 기반 Research Room + controlled P2P Agent Bus + Shared Memory + Model Gateway + Tool Gateway + 기본 Web Search/URL/Website/Docs/GitHub/DEX/CoinGecko connectors + Markdown/Obsidian output"까지 구현된 크립토 리서치 회사 MVP다. 다음 핵심 작업은 Project Research Loop, Identity/Evidence/Collision 검증 엔진, 그리고 Social/Contract/Funding 에이전트의 source-backed finding 업그레이드다.
+JIMMORIA는 현재 "채팅형 CLI + ProcessSpec 기반 Research Room + controlled P2P Agent Bus + Shared Memory + Model Gateway + agent-level LLM analysis pass + Tool Gateway + 기본 Web Search/URL/Website/Docs/GitHub/DEX/CoinGecko connectors + Markdown/Obsidian output"까지 구현된 크립토 리서치 회사 MVP다. 다음 핵심 작업은 Project Research Loop, Identity/Evidence/Collision 검증 엔진, 그리고 Social/Contract/Funding 에이전트의 source-backed finding 업그레이드다.
 ## 22. Current Runtime Update Notes
 
 최근 변경 기준으로 JIMMORIA는 live/source-backed 후보와 MVP placeholder 후보를 구분한다.
