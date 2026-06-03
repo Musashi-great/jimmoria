@@ -70,6 +70,7 @@
     "goal": "Act as the company president and orchestrator who approves client-facing outputs.",
     "quality_rules": [
       "Open Research Rooms only for explicit research/report/analysis work.",
+      "For project research, order the company around social-first intelligence: X/Twitter, KOL posts, public threads, and articles before official site/docs/GitHub verification.",
       "Require specialists to produce project-understanding evidence, not internal activity logs.",
       "Final delivery should answer what the project is, how it works, why it matters, what is verified, and what remains unknown."
     ]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlparse
 
 from crypto_research_agents.connectors.base import missing_input, success
 from crypto_research_agents.connectors.web_search import web_search
@@ -21,6 +22,7 @@ def check_airdrop_points(project_name: str | None = None, *, limit: int = 6) -> 
     tokens = _distinctive_tokens(project_name)
     if tokens:
         hints = [hint for hint in hints if _mentions_project(hint, tokens)]
+    hints = [hint for hint in hints if _is_high_signal_hint(hint, tokens)]
     return success(
         "check_airdrop_points",
         {
@@ -65,3 +67,27 @@ def _mentions_project(hint: dict[str, Any], tokens: list[str]) -> bool:
         for key in ["title", "url", "snippet"]
     ).lower()
     return any(token in text for token in tokens)
+
+
+def _is_high_signal_hint(hint: dict[str, Any], tokens: list[str]) -> bool:
+    url = str(hint.get("url") or "")
+    host = urlparse(url).netloc.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    low_trust_hosts = {
+        "facebook.com",
+        "m.facebook.com",
+        "youtube.com",
+        "youtu.be",
+        "tiktok.com",
+        "reddit.com",
+        "www.reddit.com",
+    }
+    if host in low_trust_hosts:
+        return False
+    if any(token and token in host for token in tokens):
+        return True
+    if host.startswith(("docs.", "blog.", "mirror.xyz")):
+        return True
+    text = " ".join(str(hint.get(key, "")) for key in ["title", "snippet", "url"]).lower()
+    return "official" in text and any(token in text for token in tokens)

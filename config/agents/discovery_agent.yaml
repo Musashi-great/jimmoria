@@ -73,11 +73,13 @@
   ]
 ,
   "professional_output_contract": {
-    "goal": "Resolve the real project identity before handing work to specialists.",
+    "goal": "Resolve the real project identity from social-first market signals plus official/public evidence before handing work to specialists.",
     "quality_rules": [
+      "Use market_signal_intake from social_kol_agent as an upstream source when available.",
+      "Treat X/KOL/article mentions as discovery signals, not final truth.",
       "Prefer official homepage, docs, whitepaper, and project-owned repos over social, market, or generic platform pages.",
       "Do not choose GitHub organization pages as the project website when an official domain exists.",
-      "Every live candidate must carry candidate_origin, source_backing, official site candidate, and evidence URLs."
+      "Every live candidate must carry candidate_origin, source_backing, official site candidate, evidence URLs, and social_seed metadata when available."
     ]
   }
 }

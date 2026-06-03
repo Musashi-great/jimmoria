@@ -79,6 +79,7 @@
     "goal": "The final artifact must read like a project intelligence report, not an agent log or debate transcript.",
     "required_sections": [
       "executive_summary",
+      "primary_market_signal_layer",
       "project_identity",
       "market_problem_and_narrative",
       "product_and_protocol_mechanics",
@@ -91,6 +92,7 @@
       "source_appendix"
     ],
     "quality_rules": [
+      "Surface X/Twitter, KOL posts, public threads, and article signals early in the report before official-source verification sections.",
       "Prefer official site, docs, whitepaper, repo, and reputable third-party evidence over generic platform pages.",
       "Do not include GitHub navigation, docs.github.com, marketplace, security, pricing, login, or unrelated X handles as project evidence.",
       "Explain what the project is building before explaining how the agents worked."

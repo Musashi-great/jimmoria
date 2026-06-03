@@ -37,9 +37,9 @@ from crypto_research_agents.tools.registry import load_tool_registry
 DEFAULT_AGENTS = [
     "supervisor_agent",
     "ingestion_agent",
+    "social_kol_agent",
     "narrative_agent",
     "discovery_agent",
-    "social_kol_agent",
     "contract_onchain_agent",
     "product_tech_agent",
     "funding_token_agent",
@@ -49,9 +49,9 @@ DEFAULT_AGENTS = [
 
 COUNCIL_AGENTS = [
     "ingestion_agent",
+    "social_kol_agent",
     "narrative_agent",
     "discovery_agent",
-    "social_kol_agent",
     "contract_onchain_agent",
     "product_tech_agent",
     "funding_token_agent",
@@ -139,6 +139,7 @@ class ResearchRuntime:
             )
             room.set_status(RuntimeState.RUNNING)
             self._run_agent("ingestion_agent", room, title=title, content=content, url=url, source_type="article")
+            self._run_agent("social_kol_agent", room, seed_mode=True)
             self._run_agent("narrative_agent", room)
             self._run_agent("discovery_agent", room)
             room.set_status(RuntimeState.WAITING_FOR_TOOL)

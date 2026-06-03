@@ -131,11 +131,11 @@ def _select_project_url(project: Any, room: ResearchRoom, memory: SharedMemory) 
     metadata = project.metadata if isinstance(project.metadata, dict) else {}
     project_query = str(metadata.get("project_query") or project.name)
     web_results = metadata.get("web_results", []) if isinstance(metadata.get("web_results"), list) else []
+    if project.website and is_primary_project_site(project_query, project.website):
+        return project.website
     official_site = select_best_official_site(project_query, web_results)
     if official_site:
         return official_site
-    if project.website and is_primary_project_site(project_query, project.website):
-        return project.website
     for source_id in room.source_inputs:
         source = memory.sources.get(source_id)
         if source and source.url and is_primary_project_site(project_query, source.url):

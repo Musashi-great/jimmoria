@@ -23,7 +23,7 @@
       "name": "parallel_evidence_checks",
       "status": "planned",
       "mode": "bounded_parallel_agent_group",
-      "description": "After Discovery, run Social, Contract, Product, and Funding evidence checks at the same time.",
+      "description": "After social-first discovery, re-run candidate-specific Social together with Contract, Product, and Funding evidence checks at the same time.",
       "max_parallel": 4,
       "parallel_groups": [
         {
@@ -44,7 +44,7 @@
       "name": "parallel_24h_monitoring",
       "status": "planned",
       "mode": "background_monitor_workers",
-      "description": "Run X, GitHub, Docs, DEX, RSS, RootData, and other public web monitor workers concurrently into a signal queue.",
+      "description": "Run X/KOL, article, GitHub, Docs, DEX, RSS, RootData, and other public web monitor workers concurrently into a signal queue.",
       "max_parallel": 6,
       "parallel_groups": [
         {

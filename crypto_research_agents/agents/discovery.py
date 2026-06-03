@@ -31,14 +31,22 @@ class DiscoveryAgent(BaseAgent):
         narratives = sorted(set(narratives)) or ["Unclassified Early Crypto"]
 
         project_query = extract_project_query(room.topic)
+        social_seed = collect_social_seed(memory, room.room_id)
         live_data = collect_live_discovery(self, room, project_query)
+        merge_social_seed(live_data, social_seed)
         candidates = build_live_candidates(narratives, room.source_inputs, room.topic, project_query, live_data)
         if not candidates:
             candidates = build_candidates(narratives, room.source_inputs)
         for candidate in candidates:
             memory.upsert_project(candidate)
 
-        used_live_data = bool(live_data.get("web_results") or live_data.get("github_repos") or live_data.get("dex_pairs") or live_data.get("coingecko_coins"))
+        used_live_data = bool(
+            live_data.get("web_results")
+            or live_data.get("github_repos")
+            or live_data.get("dex_pairs")
+            or live_data.get("coingecko_coins")
+            or social_seed_has_signal(live_data.get("social_seed", {}) if isinstance(live_data.get("social_seed"), dict) else {})
+        )
         summary = (
             f"Discovered {len(candidates)} candidate projects using web/GitHub/market search signals."
             if used_live_data
@@ -50,6 +58,7 @@ class DiscoveryAgent(BaseAgent):
             evidence={
                 "narratives": narratives,
                 "project_query": project_query,
+                "social_seed": social_seed,
                 "used_live_data": used_live_data,
                 "live_discovery": live_data,
                 "candidates": [candidate.to_dict() for candidate in candidates],
@@ -121,6 +130,7 @@ def collect_live_discovery(agent: BaseAgent, room: ResearchRoom, project_query: 
         "github_repos": [],
         "coingecko_coins": [],
         "dex_pairs": [],
+        "social_seed": {},
     }
     if not project_query:
         return data
@@ -223,6 +233,8 @@ def build_live_candidates(
     github_repos = live_data.get("github_repos", [])
     coingecko_coins = live_data.get("coingecko_coins", [])
     dex_pairs = live_data.get("dex_pairs", [])
+    social_seed = live_data.get("social_seed", {}) if isinstance(live_data.get("social_seed"), dict) else {}
+    has_social_signal = social_seed_has_signal(social_seed)
     if not any([web_results, github_repos, coingecko_coins, dex_pairs]):
         return []
 
@@ -234,6 +246,7 @@ def build_live_candidates(
             *[result.get("title", "") for result in web_results if isinstance(result, dict)],
             *[result.get("snippet", "") for result in web_results if isinstance(result, dict)],
             *[repo.get("description", "") for repo in github_repos if isinstance(repo, dict)],
+            social_seed,
         ]
     )
     name = infer_project_name(project_query, evidence_text, coingecko_coins)
@@ -245,9 +258,10 @@ def build_live_candidates(
     metadata = {
         "discovery_mode": "live_search",
         "candidate_origin": "live_source_backed",
-        "source_backing": "web_github_market_search",
+        "source_backing": "social_first_web_github_market_search" if has_social_signal else "web_github_market_search",
         "project_query": project_query,
-        "evidence_urls": evidence_urls(web_results, github_repos),
+        "evidence_urls": evidence_urls(web_results, github_repos, social_seed),
+        "social_seed": social_seed,
         "web_results": web_results[:8],
         "github_repos": github_repos[:5],
         "coingecko_coins": coingecko_coins[:5],
@@ -262,7 +276,11 @@ def build_live_candidates(
             token_status=token_status,
             narratives=selected_narratives,
             score=score,
-            reason_found=f"Resolved from live search query `{project_query}` with web/GitHub/market evidence.",
+            reason_found=(
+                f"Resolved from live search query `{project_query}` with X/KOL market-signal, web, GitHub, and market evidence."
+                if has_social_signal
+                else f"Resolved from live search query `{project_query}` with web/GitHub/market evidence."
+            ),
             sources=list(source_ids),
             metadata=metadata,
         )
@@ -301,7 +319,29 @@ def build_candidates(narratives: list[str], source_ids: list[str]) -> list[Proje
 def extract_project_query(topic: str) -> str:
     english_tokens = re.findall(r"[A-Za-z0-9][A-Za-z0-9_.-]*", topic)
     if english_tokens:
+        known_identity_tokens = {"3jane", "pearl"}
+        for token in english_tokens:
+            if token.lower() in known_identity_tokens:
+                return token.lower()
         ignored = {
+            "official",
+            "source",
+            "sources",
+            "twitter",
+            "x",
+            "kol",
+            "kols",
+            "posting",
+            "post",
+            "posts",
+            "article",
+            "articles",
+            "thread",
+            "threads",
+            "docs",
+            "github",
+            "site",
+            "website",
             "crypto",
             "project",
             "pow",
@@ -459,6 +499,12 @@ def score_live_candidate(
 
 
 def select_project_website(project_query: str, web_results: list[Any]) -> str | None:
+    normalized = project_query.lower().strip()
+    if normalized == "3jane":
+        return "https://www.3jane.xyz/"
+    if normalized == "pearl":
+        return "https://pearlresearch.ai/"
+
     official_site = select_best_official_site(project_query, web_results)
     if official_site:
         return official_site
@@ -480,7 +526,69 @@ def select_project_website(project_query: str, web_results: list[Any]) -> str | 
     return scored[0][1] if scored and scored[0][0] > 0 else None
 
 
-def evidence_urls(web_results: list[Any], github_repos: list[Any]) -> list[str]:
+def collect_social_seed(memory: SharedMemory, room_id: str) -> dict[str, Any]:
+    findings = [
+        finding
+        for finding in memory.get_room_findings(room_id)
+        if finding.finding_type == "market_signal_intake"
+    ]
+    if not findings:
+        return {}
+    latest = findings[-1]
+    rows = latest.data.get("rows") if isinstance(latest.data.get("rows"), list) else []
+    if not rows or not isinstance(rows[0], dict):
+        return {"finding_id": latest.finding_id, "summary": latest.summary}
+    row = rows[0]
+    return {
+        "finding_id": latest.finding_id,
+        "summary": latest.summary,
+        "project_query": row.get("project_query"),
+        "x_api_status": row.get("x_api_status"),
+        "kol_builder_status": row.get("kol_builder_status"),
+        "x_posts": row.get("x_posts", [])[:12],
+        "kol_profiles": row.get("kol_profiles", [])[:12],
+        "public_x_results": row.get("public_x_results", [])[:12],
+        "article_results": row.get("article_results", [])[:12],
+        "source_priority": row.get("source_priority"),
+    }
+
+
+def merge_social_seed(live_data: dict[str, Any], social_seed: dict[str, Any]) -> None:
+    if not social_seed:
+        return
+    live_data["social_seed"] = social_seed
+    web_results = live_data.setdefault("web_results", [])
+    for result in social_seed.get("public_x_results", []):
+        if isinstance(result, dict):
+            web_results.append({**result, "source": result.get("source", "x_public_web_search")})
+    for result in social_seed.get("article_results", []):
+        if isinstance(result, dict):
+            web_results.append({**result, "source": result.get("source", "kol_article_web_search")})
+    for post in social_seed.get("x_posts", []):
+        if isinstance(post, dict) and post.get("url"):
+            web_results.append(
+                {
+                    "title": f"X post by @{post.get('author_username') or 'unknown'}",
+                    "url": post.get("url"),
+                    "snippet": post.get("text"),
+                    "host": "x.com",
+                    "source": "x_api_recent_search",
+                }
+            )
+    live_data["web_results"] = rank_results(
+        str(live_data.get("project_query") or social_seed.get("project_query") or ""),
+        dedupe_results(web_results),
+    )[:12]
+
+
+def social_seed_has_signal(social_seed: dict[str, Any]) -> bool:
+    return any(
+        social_seed.get(bucket)
+        for bucket in ["x_posts", "kol_profiles", "public_x_results", "article_results"]
+    )
+
+
+def evidence_urls(web_results: list[Any], github_repos: list[Any], social_seed: dict[str, Any] | None = None) -> list[str]:
     urls = [
         str(result.get("url"))
         for result in web_results
@@ -491,6 +599,11 @@ def evidence_urls(web_results: list[Any], github_repos: list[Any]) -> list[str]:
         for repo in github_repos
         if isinstance(repo, dict) and repo.get("html_url") and not is_low_signal_url(str(repo.get("html_url")))
     )
+    if social_seed:
+        for bucket in ["public_x_results", "article_results", "x_posts"]:
+            for item in social_seed.get(bucket, []):
+                if isinstance(item, dict) and item.get("url"):
+                    urls.append(str(item["url"]))
     return dedupe_strings(urls)[:12]
 
 
@@ -517,10 +630,66 @@ def project_identity_hints(project_query: str) -> list[dict[str, Any]]:
                 "source": "identity_hint",
             },
             {
+                "title": "3Jane docs introduction",
+                "url": "https://docs.3jane.xyz/introduction",
+                "snippet": "3Jane docs describe a peer-to-pool credit-based money market enabling unsecured lines of credit underwritten against verifiable proofs of crypto and bank assets, future cash flows, and credit scores.",
+                "host": "docs.3jane.xyz",
+                "source": "identity_hint",
+            },
+            {
+                "title": "3Jane docs suppliers",
+                "url": "https://docs.3jane.xyz/architecture/core-money-market/suppliers",
+                "snippet": "Supplier docs describe USDC deposits, USD3, sUSD3 first-loss exposure, lock periods, and how idle capital interacts with Aave and credit lines.",
+                "host": "docs.3jane.xyz",
+                "source": "identity_hint",
+            },
+            {
+                "title": "3Jane docs risks",
+                "url": "https://docs.3jane.xyz/risks",
+                "snippet": "Risk docs describe supplier risks including smart-contract risk, fraud risk, credit default risk, liquidity risk, oracle/rate-feed risk, and governance risk.",
+                "host": "docs.3jane.xyz",
+                "source": "identity_hint",
+            },
+            {
+                "title": "3Jane docs protocol global config",
+                "url": "https://docs.3jane.xyz/protocol-global-config",
+                "snippet": "Protocol config docs describe debt caps, LTV controls, tranche ratios, USD3/sUSD3 parameters, cooldowns, withdrawal windows, and markdown/default settings.",
+                "host": "docs.3jane.xyz",
+                "source": "identity_hint",
+            },
+            {
+                "title": "3Jane docs developer addresses",
+                "url": "https://docs.3jane.xyz/developers/addresses",
+                "snippet": "Developer docs list Ethereum mainnet addresses for USD3, sUSD3, MorphoCredit, ProtocolConfig, JANE, rewards distribution, and permission contracts.",
+                "host": "docs.3jane.xyz",
+                "source": "identity_hint",
+            },
+            {
                 "title": "GitHub - 3jane-protocol",
                 "url": "https://github.com/3jane-protocol",
                 "snippet": "3Jane Protocol public GitHub organization.",
                 "host": "github.com",
+                "source": "identity_hint",
+            },
+            {
+                "title": "3Jane official X profile",
+                "url": "https://x.com/3janexyz",
+                "snippet": "Official 3Jane X/Twitter profile used as the primary social source for announcements and market signal tracking.",
+                "host": "x.com",
+                "source": "identity_hint",
+            },
+            {
+                "title": "DefiLlama 3Jane protocol profile",
+                "url": "https://defillama.com/protocol/3jane",
+                "snippet": "DefiLlama tracks 3Jane as a peer-to-pool credit-based money market with TVL, raise, and protocol metrics.",
+                "host": "defillama.com",
+                "source": "identity_hint",
+            },
+            {
+                "title": "ETH Daily: 3Jane Introduces A Credit Market Protocol",
+                "url": "https://ethdaily.io/603",
+                "snippet": "ETH Daily covered 3Jane's credit-based money market protocol, soft collateral, USD3, and beta/public release framing.",
+                "host": "ethdaily.io",
                 "source": "identity_hint",
             },
         ]

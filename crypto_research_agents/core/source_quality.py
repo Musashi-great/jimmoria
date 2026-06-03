@@ -178,7 +178,9 @@ def score_official_url(project_query: str, result: dict[str, Any]) -> int:
     if any(word in text for word in ["docs", "documentation", "whitepaper"]):
         score += 5
     if path in {"", "/"}:
-        score += 8
+        score += 30
+    if host.startswith("docs."):
+        score -= 10
     if is_pdf_url(url):
         score -= 10
     if host == "github.com":

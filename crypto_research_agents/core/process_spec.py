@@ -62,7 +62,11 @@ class ProcessSpec:
 
     @property
     def agent_ids(self) -> list[str]:
-        return [task.agent_id for task in self.tasks]
+        agent_ids: list[str] = []
+        for task in self.tasks:
+            if task.agent_id not in agent_ids:
+                agent_ids.append(task.agent_id)
+        return agent_ids
 
     def task_for_agent(self, agent_id: str) -> TaskSpec | None:
         for task in self.tasks:

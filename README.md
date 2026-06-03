@@ -6,10 +6,12 @@ It is not a trading bot. It does not place orders, sign wallets, predict prices,
 
 ## Current Direction
 
-The default research stack is public-web first.
+The default research stack is social-signal first and public-web verified.
 
 JIMMORIA now focuses on sources that can be reached through web-accessible, read-only research tools:
 
+- X/Twitter recent search and KOL timeline checks, when an X bearer token is configured
+- Public web fallback searches for X/Twitter posts, KOL opinions, threads, and articles
 - Web search
 - URL fetch and HTML parsing
 - Official website crawling
@@ -19,7 +21,6 @@ JIMMORIA now focuses on sources that can be reached through web-accessible, read
 - DefiLlama protocol and TVL context
 - Snapshot governance proposals
 - Token metadata and specific DEX pair lookup through public metadata APIs
-- X/Twitter public search and KOL timeline checks, when an X bearer token is configured
 - RootData, when an API key is configured
 - Explorer/RPC read-only checks, when API/RPC secrets are configured
 - DEX Screener and CoinGecko public metadata
@@ -88,7 +89,10 @@ User request
 -> Supervisor intake and confirmation
 -> Research Room opens only for explicit report/dossier creation
 -> Supervisor creates a plan and delegates tasks
--> Specialist agents collect evidence
+-> Ingestion stores the request/source
+-> Social/KOL agent collects X, KOL, public thread, and article market signals first
+-> Narrative and Discovery resolve project identity from those signals
+-> Product/docs/GitHub, token/chain, funding, and candidate-specific social checks verify the project
 -> Agent Council summarizes agreement and risks
 -> ReportAgent drafts the report
 -> Supervisor performs final review
@@ -102,9 +106,9 @@ For ordinary conversation, configuration requests, source-only notes, or loose "
 ```text
 supervisor_agent          Plans, routes, confirms, and final-reviews work
 ingestion_agent           Stores sources and extracts metadata
+social_kol_agent          First collects X/KOL/thread/article signals, then checks official social identity
 narrative_agent           Maps market narratives and thesis categories
-discovery_agent           Finds early project candidates from public evidence
-social_kol_agent          Checks public web, X, KOL, and official social links
+discovery_agent           Resolves candidates from social-first and public evidence
 contract_onchain_agent    Verifies chain, token, contract, DEX/explorer identity
 product_tech_agent        Checks website, docs, GitHub, and product readiness
 funding_token_agent       Reviews investors, points, airdrop, and token hints
@@ -168,7 +172,7 @@ Planned:
 
 ```text
 Phase 2: parallel_evidence_checks
-After Discovery, run Social / Contract / Product / Funding evidence checks together.
+After social-first Discovery, run candidate Social / Contract / Product / Funding evidence checks together.
 
 Phase 3: parallel_24h_monitoring
 Run public web, X, GitHub, Docs, DEX, RSS, RootData monitor workers in parallel.

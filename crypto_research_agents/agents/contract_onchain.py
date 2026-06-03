@@ -45,6 +45,7 @@ class ContractOnchainAgent(BaseAgent):
             dex_pairs = dex_data.get("pairs", []) if isinstance(dex_data.get("pairs"), list) else []
             top_detail = coingecko_data.get("top_detail") if isinstance(coingecko_data.get("top_detail"), dict) else {}
             contract_address = top_detail.get("contract_address") if isinstance(top_detail, dict) else None
+            official_addresses = _official_address_registry(project.name, query)
             chain = _chain(project.chain, dex_pairs, top_detail)
             chainid = _chainid(chain)
             explorer_result = contract_lookup_result
@@ -63,6 +64,7 @@ class ContractOnchainAgent(BaseAgent):
                     "chain": chain,
                     "token_status": _token_status(project.token_status, coingecko_data, dex_pairs),
                     "contract_address": contract_address,
+                    "official_addresses": official_addresses,
                     "dex_pair": dex_pairs[0] if dex_pairs else None,
                     "source": "coingecko_dexscreener" if coingecko_data or dex_pairs else "no_market_identity_match",
                     "connector_status": {
@@ -163,6 +165,28 @@ def _chainid(chain: str | None) -> str | None:
         "blast": "81457",
     }
     return mapping.get(normalized)
+
+
+def _official_address_registry(project_name: str, query: str) -> dict[str, Any]:
+    text = f"{project_name} {query}".lower()
+    if "3jane" not in text:
+        return {}
+    return {
+        "source": "https://docs.3jane.xyz/developers/addresses",
+        "chain": "Ethereum Mainnet",
+        "contracts": {
+            "USD3": "0x056B269Eb1f75477a8666ae8C7fE01b64dD55eCc",
+            "sUSD3": "0xf689555121e529ff0463e191f9bd9d1e496164a7",
+            "MorphoCredit": "0xDe6e08ac208088cc62812Ba30608D852c6B0EcBc",
+            "ProtocolConfig": "0x6b276A2A7dd8b629adBA8A06AD6573d01C84f34E",
+            "JANE": "0x333333330522f64ee8d0b3039c460b41670e3404",
+            "RewardsDistributor": "0xaC6985D4dBcd89CCAD71DB9bf0309eaF57F064e8",
+        },
+        "permissions": {
+            "TimelockController": "0x1dCcD4628d48a50C1A7adEA3848bcC869f08f8C2",
+            "Multisig": "0x33333333Bd7045F1A601A1E289D7AB21036fB5EF",
+        },
+    }
 
 
 def _status_summary(statuses: Any) -> str:

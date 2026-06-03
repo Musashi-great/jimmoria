@@ -275,9 +275,9 @@
     },
     "web_search": {
       "priority": "required",
-      "owner_agent": "discovery_agent",
+      "owner_agent": "discovery_agent,social_kol_agent",
       "implementation_status": "implemented",
-      "purpose": "Search the public web for project discovery evidence before agents verify official links and technical sources.",
+      "purpose": "Search the public web for social-first X/KOL/article fallback evidence and project discovery evidence before agents verify official links and technical sources.",
       "provider_options": ["DDGS public web search"],
       "required_secrets": [],
       "source_docs": ["https://pypi.org/project/ddgs/"]
@@ -304,7 +304,7 @@
       "priority": "required",
       "owner_agent": "social_kol_agent",
       "implementation_status": "implemented",
-      "purpose": "Search recent X posts for project, KOL, narrative, URL, and ticker mentions.",
+      "purpose": "Primary market-signal source: search recent X posts for project, KOL, narrative, URL, and ticker mentions before official-source verification.",
       "provider_options": ["X API v2 recent search"],
       "required_secrets": ["X_BEARER_TOKEN"],
       "source_docs": ["https://docs.x.com/x-api/posts/search/introduction"]
@@ -340,7 +340,7 @@
       "priority": "required",
       "owner_agent": "social_kol_agent",
       "implementation_status": "implemented",
-      "purpose": "Build and update KOL handle sets by narrative, ecosystem, and credibility tier.",
+      "purpose": "Build and update KOL handle sets by project, narrative, ecosystem, and credibility tier for the first market-signal layer.",
       "provider_options": ["local KOL DB", "X API user/profile endpoints", "RootData leading figures"],
       "required_secrets": ["X_BEARER_TOKEN"],
       "source_docs": ["https://www.rootdata.com/Api/Doc"]

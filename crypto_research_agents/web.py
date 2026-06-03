@@ -21,9 +21,9 @@ from crypto_research_agents.storage.run_store import list_run_summaries
 AGENT_WORK = {
     "supervisor_agent": "Plan, delegate, route, and final-review the company output.",
     "ingestion_agent": "Store source material and extract entities, keywords, and metadata.",
-    "narrative_agent": "Map the project into market narratives and thesis categories.",
-    "discovery_agent": "Resolve named projects and discover early candidate leads.",
-    "social_kol_agent": "Check KOL handles, social mentions, and community signals.",
+    "social_kol_agent": "Collect X/KOL/article market signals first, then verify candidate social identity.",
+    "narrative_agent": "Map the project and social signals into market narratives and thesis categories.",
+    "discovery_agent": "Resolve named projects from social-first, web, GitHub, and market evidence.",
     "contract_onchain_agent": "Verify chain, token, contract, DEX, and explorer evidence.",
     "product_tech_agent": "Inspect website, docs, GitHub, and product readiness.",
     "funding_token_agent": "Review investors, points, airdrops, and token opportunity hints.",
@@ -50,7 +50,7 @@ WORKFLOW_NODES = [
     {
         "id": "agents",
         "label": "Specialist Agents",
-        "description": "Ingestion, narrative, discovery, social, on-chain, product, funding, report, and vault work.",
+        "description": "Ingestion, social-first market signal intake, narrative, discovery, on-chain, product, funding, report, and vault work.",
     },
     {
         "id": "agent_council",

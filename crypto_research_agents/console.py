@@ -31,9 +31,9 @@ except ImportError:  # pragma: no cover - fallback for non-installed editable ch
 AGENT_ACTIVITY = {
     "supervisor_agent": "Planning direction",
     "ingestion_agent": "Extracting source metadata",
+    "social_kol_agent": "Collecting X/KOL market signals",
     "narrative_agent": "Mapping narratives",
     "discovery_agent": "Resolving candidates",
-    "social_kol_agent": "Checking social signal",
     "contract_onchain_agent": "Checking token identity",
     "product_tech_agent": "Checking docs/GitHub",
     "funding_token_agent": "Checking funding/token hints",

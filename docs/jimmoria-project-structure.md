@@ -357,21 +357,49 @@ Research Room 결과 출력 정책:
 
 ```text
 1. Executive Summary / 핵심 요약
-2. Project Identity / 프로젝트 정체성
-3. Market Problem & Narrative / 시장 문제와 내러티브
-4. Product & Protocol Mechanics / 제품과 프로토콜 구조
-5. Token, Chain & Value Capture / 토큰, 체인, 가치 포착
-6. Traction, Social & Funding Signals / 트랙션, 소셜, 펀딩
-7. Analyst Thesis / 리서치 판단
-8. Risk Register / 리스크
-9. Specialist Coverage / 에이전트별 커버리지
-10. Next Research Checklist / 다음 조사 체크리스트
-11. Verification Status / 검증 범위
-12. Source Appendix / 출처
-13. Research Quality Metadata
+2. Primary Market Signal Layer / X-KOL First Source
+3. Project Identity / 프로젝트 정체성
+4. Market Problem & Narrative / 시장 문제와 내러티브
+5. Product & Protocol Mechanics / 제품과 프로토콜 구조
+6. Token, Chain & Value Capture / 토큰, 체인, 가치 포착
+7. Traction, Social & Funding Signals / 트랙션, 소셜, 펀딩
+8. Analyst Thesis / 리서치 판단
+9. Risk Register / 리스크
+10. Specialist Coverage / 에이전트별 커버리지
+11. Next Research Checklist / 다음 조사 체크리스트
+12. Verification Status / 검증 범위
+13. Source Appendix / 출처
+14. Research Quality Metadata
 ```
 
 Internal Supervisor final review, agent council notes, tool payloads, raw LLM JSON, and execution logs stay in `data/runs/<room_id>/` instead of being appended to the final report body.
+
+### Twitter/KOL-First Research Flow
+
+Project research now treats X/Twitter, KOL posts, public threads, and related articles as the first market-signal layer. The official site, docs, GitHub, token metadata, and chain/on-chain checks are the verification layer.
+
+The Phase 1 sequential room now behaves like this:
+
+```text
+Supervisor plan
+-> Ingestion
+-> Social/KOL market_signal_intake
+   - X recent search when X_BEARER_TOKEN exists
+   - public web fallback such as site:x.com project searches
+   - KOL/profile candidates
+   - related article/public web mentions
+-> Narrative map
+-> Discovery uses the social seed plus web/GitHub/market evidence
+-> Candidate-specific Social/KOL verification
+-> Contract/On-chain verification
+-> Product/Site/Docs/GitHub verification
+-> Funding/Token opportunity check
+-> Agent Council
+-> Report
+-> Obsidian sync
+```
+
+This means Social/KOL is no longer only a later validation desk. It first acts as the market radar that asks: who is talking about this, what posts or articles exist, and which handles or narratives are appearing? After that, Product/Tech and Contract/On-chain answer whether the project is real, documented, shipped, and technically identifiable.
 
 ### Hermes-Inspired Tool Guardrails
 
@@ -392,7 +420,7 @@ The agent specs now include a `professional_output_contract` for Supervisor, Dis
 - Supervisor acts as company president and final client-delivery gate.
 - Discovery resolves official identity first and avoids choosing GitHub org pages as the project website when an official domain exists.
 - Product/Tech separates official product/docs evidence from GitHub code/activity evidence.
-- Social/KOL separates official project handles from unrelated personal accounts found by search.
+- Social/KOL runs market-signal intake before Discovery, then separates official project handles from unrelated personal accounts found by search.
 - Funding/Token only marks points or airdrop as `hint_found` when project-specific evidence exists.
 - Report writes a project intelligence report first and keeps logs/audit trails out of the client-facing body.
 
@@ -445,7 +473,7 @@ Important test coverage:
 1. Keep Phase 1 stable with web-only public research stack.
 2. Improve official-source extraction and identity validation.
 3. Add stronger project identity collision checks.
-4. Improve X/KOL handling without relying on private chat channels.
+4. Improve X/KOL handling without relying on private chat channels; add better KOL ranking, repeated-mention detection, and article/thread clustering.
 5. Implement Phase 2 parallel evidence checks.
 6. Implement Phase 3 public web/RSS/GitHub/docs/DEX monitor workers.
 7. Expand web dashboard replay and multi-room board.
