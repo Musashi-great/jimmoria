@@ -34,7 +34,14 @@ def build_supervisor_reply(
     report_language = settings.report_language
     terms_policy = "allowed" if settings.allow_english_terms else "restricted"
 
-    if _looks_like_small_talk(line.strip(), lowered):
+    if decision.action == "ask_report_confirmation":
+        lines = [
+            "조사 방향은 이해했습니다.",
+            "다만 지금부터는 보고서/dossier 작성처럼 산출물을 명확히 요청할 때만 Research Room을 엽니다.",
+            "보고서를 원하면 'pearl 프로젝트 리서치 보고서 작성해봐'처럼 다시 지시해 주세요.",
+            "소스만 저장하려면 /add <text-or-url> 명령을 쓰면 됩니다.",
+        ]
+    elif _looks_like_small_talk(line.strip(), lowered):
         lines = [
             "안녕하세요. JIMMORIA Supervisor입니다.",
             "리서치 지시, 회사 설정 변경, 상태 확인 중 무엇을 원하는지 말해주면 제가 먼저 분류해서 처리하겠습니다.",
@@ -157,12 +164,12 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
     if _looks_like_source_only_request(stripped, lowered):
         return SupervisorIntakeDecision(
             intent_type="source_ingestion",
-            action="run_source_ingestion",
-            output_mode="source_note",
-            needs_research_room=True,
+            action="ask_report_confirmation",
+            output_mode="supervisor_reply",
+            needs_research_room=False,
             confidence=0.78,
-            rationale="The client wants material stored or remembered without a full dossier.",
-            next_step="Open a small source-ingestion room with ingestion and Obsidian curation.",
+            rationale="The client wants material stored or remembered, but chat input should not open a room unless a report is requested.",
+            next_step="Explain that /add handles source ingestion and keep the Research Room closed.",
             supervisor_authority=authority,
         )
 
@@ -180,19 +187,20 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
 
     if stripped.startswith(("http://", "https://")):
         return SupervisorIntakeDecision(
-            intent_type="research_request",
-            action="open_research_room",
-            output_mode="research_dossier",
-            needs_research_room=True,
+            intent_type="source_ingestion",
+            action="ask_report_confirmation",
+            output_mode="supervisor_reply",
+            needs_research_room=False,
             confidence=0.76,
-            rationale="A standalone URL is treated as source material for research.",
-            next_step="Fetch the URL and dispatch the research agents.",
+            rationale="A standalone URL is source material, but chat input should not open a room unless a report is requested.",
+            next_step="Ask whether the client wants a report, or use /add for source-only storage.",
             supervisor_authority=authority,
         )
 
     has_config = _has_any(stripped, lowered, COMPANY_CONFIG_TERMS) or _is_meta_instruction(stripped)
     has_research = _has_any(stripped, lowered, RESEARCH_TERMS)
     has_explicit_research_action = _has_any(stripped, lowered, EXPLICIT_RESEARCH_ACTIONS)
+    has_report_creation = _looks_like_report_creation_request(stripped, lowered)
 
     if _looks_like_supervisor_chat(stripped, lowered) and not has_explicit_research_action:
         return SupervisorIntakeDecision(
@@ -203,6 +211,18 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
             confidence=0.8,
             rationale="The input is phrased as a conversation with the Supervisor rather than a task dispatch.",
             next_step="Answer as the company president and keep the room closed.",
+            supervisor_authority=authority,
+        )
+
+    if has_report_creation:
+        return SupervisorIntakeDecision(
+            intent_type="research_request",
+            action="open_research_room",
+            output_mode="research_dossier",
+            needs_research_room=True,
+            confidence=0.84,
+            rationale="The client explicitly asked JIMMORIA to create a report or dossier.",
+            next_step="Open a full Research Room and assign specialist agents.",
             supervisor_authority=authority,
         )
 
@@ -233,12 +253,12 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
     if has_research or has_explicit_research_action:
         return SupervisorIntakeDecision(
             intent_type="research_request",
-            action="open_research_room",
-            output_mode="research_dossier",
-            needs_research_room=True,
-            confidence=0.84,
-            rationale="The client explicitly asked for research, analysis, investigation, or a report.",
-            next_step="Open a full Research Room and assign specialist agents.",
+            action="ask_report_confirmation",
+            output_mode="supervisor_reply",
+            needs_research_room=False,
+            confidence=0.78,
+            rationale="The client asked for research-like work but did not explicitly request a report or dossier.",
+            next_step="Keep the room closed and ask for a report-writing instruction before dispatching agents.",
             supervisor_authority=authority,
         )
 
@@ -528,16 +548,35 @@ def _looks_like_report_retrieval_request(original: str, lowered: str) -> bool:
         return False
     normal_report_words = ["보고서", "리포트", "레포트", "report"]
     if _has_any(original, lowered, normal_report_words):
-        if _has_any(original, lowered, REPORT_CREATE_TERMS):
-            return not _has_any(original, lowered, REPORT_NEW_RESEARCH_TERMS)
         if _has_any(original, lowered, REPORT_RETRIEVAL_TERMS):
             return True
     report_words = ["보고서", "리포트", "레포트", "report"]
     if not _has_any(original, lowered, report_words):
         return False
-    if _has_any(original, lowered, REPORT_CREATE_TERMS):
-        return not _has_any(original, lowered, REPORT_NEW_RESEARCH_TERMS)
     return _has_any(original, lowered, REPORT_RETRIEVAL_TERMS)
+
+
+def _looks_like_report_creation_request(original: str, lowered: str) -> bool:
+    if _has_any(original, lowered, COMPANY_CONFIG_TERMS) and _is_meta_instruction(original):
+        return False
+    report_setting_words = ["보고서는", "리포트는", "레포트는"]
+    language_or_setting_words = ["한글", "한국어", "영어단어", "영어 단어", "세팅", "설정", "language"]
+    if _has_any(original, lowered, report_setting_words) and _has_any(original, lowered, language_or_setting_words):
+        return False
+    report_words = [
+        "보고서",
+        "리포트",
+        "레포트",
+        "도시에",
+        "도시에이",
+        "dossier",
+        "report",
+    ]
+    if not _has_any(original, lowered, report_words):
+        return False
+    if _has_any(original, lowered, REPORT_RETRIEVAL_TERMS) and not _has_any(original, lowered, REPORT_CREATE_TERMS):
+        return False
+    return _has_any(original, lowered, REPORT_CREATE_TERMS)
 
 
 def _looks_like_supervisor_chat(original: str, lowered: str) -> bool:

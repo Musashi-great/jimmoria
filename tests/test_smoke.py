@@ -235,7 +235,7 @@ class SmokeTest(unittest.TestCase):
 
     def test_chat_intake_classifies_saved_report_request(self) -> None:
         self.assertEqual(classify_chat_input("3jane 보고서 만든거 보내봐 전체"), "report_retrieval")
-        self.assertEqual(classify_chat_input("3jane 보고서 만들어봐"), "report_retrieval")
+        self.assertEqual(classify_chat_input("3jane 보고서 만들어봐"), "research_request")
         self.assertEqual(classify_chat_input("3jane 보고서 들고와봐"), "report_retrieval")
         self.assertEqual(classify_chat_input("show 3jane full report"), "report_retrieval")
         self.assertEqual(classify_chat_input("3jane 보고서 가지고 와봐"), "report_retrieval")
@@ -276,11 +276,15 @@ class SmokeTest(unittest.TestCase):
         settings = CompanySettings(supervisor_mode="company_ceo")
 
         research = decide_supervisor_intake("pearl 프로젝트를 분석해봐", settings)
+        report = decide_supervisor_intake("pearl 프로젝트 리서치 보고서 작성해봐", settings)
         config = decide_supervisor_intake("로그 출력 스타일을 바꿔봐", settings)
         status = decide_supervisor_intake("현재 회사 상태 보여줘", settings)
 
-        self.assertTrue(research.needs_research_room)
-        self.assertEqual(research.output_mode, "research_dossier")
+        self.assertFalse(research.needs_research_room)
+        self.assertEqual(research.output_mode, "supervisor_reply")
+        self.assertEqual(research.action, "ask_report_confirmation")
+        self.assertTrue(report.needs_research_room)
+        self.assertEqual(report.output_mode, "research_dossier")
         self.assertFalse(config.needs_research_room)
         self.assertEqual(config.output_mode, "settings_update")
         self.assertFalse(status.needs_research_room)
@@ -434,7 +438,7 @@ class SmokeTest(unittest.TestCase):
             )
             with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(root / "model_settings.json")}, clear=True):
                 with patch("sys.stdin.isatty", return_value=True):
-                    with patch("builtins.input", side_effect=["3jane 보고서 만들어봐", "/quit"]):
+                    with patch("builtins.input", side_effect=["3jane 보고서 만든거 보내봐 전체", "/quit"]):
                         with redirect_stdout(output):
                             chat_command(args)
 
@@ -458,7 +462,7 @@ class SmokeTest(unittest.TestCase):
             )
             with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(root / "model_settings.json")}, clear=True):
                 with patch("sys.stdin.isatty", return_value=True):
-                    with patch("builtins.input", side_effect=["pearl 프로젝트에 대해서 리서치 진행해봐", "n", "/quit"]):
+                    with patch("builtins.input", side_effect=["pearl 프로젝트 리서치 보고서 작성해봐", "n", "/quit"]):
                         with redirect_stdout(output):
                             chat_command(args)
 
@@ -470,10 +474,33 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("Research Room은 열지 않겠습니다", text)
         self.assertNotIn("Room > OPEN", text)
 
+    def test_chat_research_without_report_request_keeps_room_closed(self) -> None:
+        output = StringIO()
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            args = argparse.Namespace(
+                memory=str(root / "memory.json"),
+                vault=str(root / "vault"),
+                reports=str(root / "reports"),
+                skip_model_setup=True,
+            )
+            with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(root / "model_settings.json")}, clear=True):
+                with patch("sys.stdin.isatty", return_value=True):
+                    with patch("builtins.input", side_effect=["pearl 프로젝트에 대해서 리서치 진행해봐", "/quit"]):
+                        with redirect_stdout(output):
+                            chat_command(args)
+
+            self.assertFalse((root / "reports").exists())
+            self.assertFalse((root / "runs").exists())
+
+        text = output.getvalue()
+        self.assertIn("보고서를 원하면", text)
+        self.assertNotIn("Room > OPEN", text)
+
     def test_runtime_records_supervisor_intake_decision(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
-            decision = decide_supervisor_intake("pearl 프로젝트를 분석해봐").to_dict()
+            decision = decide_supervisor_intake("pearl 프로젝트 리서치 보고서 작성해봐").to_dict()
             runtime = ResearchRuntime()
             result = runtime.run_article_research(
                 title="Pearl",

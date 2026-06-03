@@ -2,7 +2,7 @@
 
 이 문서는 JIMMORIA의 현재 구조, 에이전트 역할, 실행 흐름, 도구 정책, 저장 위치, 병렬화 로드맵을 설명한다.
 
-JIMMORIA는 크립토 가격 매매 도구가 아니라 리서치 전용 멀티에이전트 회사다. 사용자는 CLI 또는 로컬 웹 대시보드에서 Supervisor와 대화하고, Supervisor는 필요할 때만 Research Room을 열어 하위 에이전트에게 작업을 배정한다.
+JIMMORIA는 크립토 가격 매매 도구가 아니라 리서치 전용 멀티에이전트 회사다. 사용자는 CLI 또는 로컬 웹 대시보드에서 Supervisor와 대화하고, Supervisor는 보고서나 dossier 작성이 명확히 요청될 때만 Research Room을 열어 하위 에이전트에게 작업을 배정한다.
 
 ## 1. 현재 방향
 
@@ -155,14 +155,14 @@ Supervisor는 단순 라우터가 아니라 회사의 boss/orchestrator다.
 
 - 사용자 발화를 먼저 읽고 대화/설정/리서치/보고서 조회 요청을 구분
 - Research Room이 필요한지 판단
-- 리서치 요청이면 사용자에게 확인 후 room open
+- 보고서/dossier 작성 요청이면 사용자에게 확인 후 room open
 - 목표, 우선순위, task plan 생성
 - 하위 agent에게 작업 배정
 - Agent Council 결과를 받아 최종 검토
 - 보고서가 충분한지, evidence가 부족한지 판단
 - 사용자에게 최종 응답 전달
 
-일상 대화나 설정 변경 요청은 report를 만들지 않고 Supervisor가 직접 응답한다.
+일상 대화, 설정 변경, 단순 "조사해봐/알아봐" 요청은 report를 만들지 않고 Supervisor가 직접 응답한다. Research Room은 "보고서 작성해봐", "dossier 만들어봐", "리서치 보고서 생성해줘"처럼 최종 산출물 작성이 명확한 경우에만 열린다.
 
 ## 7. Agent Roster
 
@@ -359,4 +359,3 @@ Important test coverage:
 ## 16. One-Line Summary
 
 JIMMORIA is currently a Codex-first, public-web-first multi-agent crypto research company with Supervisor orchestration, controlled P2P collaboration, shared memory, read-only ToolGateway, Markdown/Obsidian outputs, and a Phase 1 sequential runtime preparing for staged parallelization.
-

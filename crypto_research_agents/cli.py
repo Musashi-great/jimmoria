@@ -24,6 +24,7 @@ from crypto_research_agents.core.supervisor_intake import decide_supervisor_inta
 from crypto_research_agents.core.supervisor_intake import (
     build_company_instruction_reply,
     build_company_status_reply,
+    build_supervisor_reply,
     build_supervisor_dispatch_reply,
 )
 from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
@@ -796,6 +797,12 @@ def chat_command(args: argparse.Namespace) -> None:
             append_supervisor_history(supervisor_history, line, reply)
             continue
 
+        if not intake_decision.needs_research_room:
+            reply = build_supervisor_reply(line, settings, intake_decision)
+            console.print_supervisor_reply(reply)
+            append_supervisor_history(supervisor_history, line, reply)
+            continue
+
         title, content, url = chat_input_to_source(line)
         agent_count = 3 if intake_decision.intent_type == "source_ingestion" else len(DEFAULT_AGENTS)
         if not console.confirm_dispatch(
@@ -1111,11 +1118,11 @@ def apply_company_instruction(line: str, settings: CompanySettings) -> list[str]
 
     if any(term in line for term in ["설정 변경", "자체 반영", "아닐경우", "그러지말고", "출력하는게 달라", "입력하는거에 따라서"]):
         settings.auto_apply_company_instructions = True
-        _add_unique(settings.operating_principles, "Only open a Research Room for explicit research, analysis, or report requests.")
+        _add_unique(settings.operating_principles, "Only open a Research Room for explicit report or dossier creation requests.")
         _add_unique(settings.operating_principles, "Apply company configuration instructions directly instead of creating reports.")
         settings.intake_policy["company_config"] = "apply settings directly without report generation"
         settings.intake_policy["company_status"] = "show status/settings panel without report generation"
-        settings.intake_policy["research_request"] = "open Research Room only for explicit research, analysis, or report requests"
+        settings.intake_policy["research_request"] = "open Research Room only for explicit report or dossier creation requests"
         applied.append("Chat routing: settings instructions are applied directly")
 
     if not applied:

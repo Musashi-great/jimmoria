@@ -83,7 +83,7 @@ Typical flow:
 ```text
 User request
 -> Supervisor intake and confirmation
--> Research Room opens only when research is needed
+-> Research Room opens only for explicit report/dossier creation
 -> Supervisor creates a plan and delegates tasks
 -> Specialist agents collect evidence
 -> Agent Council summarizes agreement and risks
@@ -92,7 +92,7 @@ User request
 -> CLI/web output, report file, and Obsidian notes are saved
 ```
 
-For ordinary conversation or configuration requests, the Supervisor should answer directly and avoid creating a report.
+For ordinary conversation, configuration requests, source-only notes, or loose "research this" messages, the Supervisor answers directly and keeps the room closed. Ask for a report or dossier when you want the full multi-agent room.
 
 ## Core Agents
 
@@ -237,4 +237,3 @@ vault/                      Obsidian-style notes, ignored by git
 ```powershell
 python -m unittest discover -s tests -v
 ```
-
