@@ -24,8 +24,24 @@
     "source_ingestion": "fast_model",
     "narrative_reasoning": "reasoning_model",
     "supervision": "reasoning_model",
+    "candidate_discovery": "reasoning_model",
+    "social_summary": "reasoning_model",
+    "contract_info": "reasoning_model",
+    "product_docs": "reasoning_model",
+    "funding_token": "reasoning_model",
+    "obsidian_sync": "reasoning_model",
     "report_writing": "writing_model",
     "final_synthesis": "writing_model",
     "embedding_search": "embedding_model"
+  },
+  "provider_defaults": {
+    "codex_cli": {
+      "reasoning_model": "pro",
+      "writing_model": "pro"
+    },
+    "other": {
+      "reasoning_model": "strong_reasoning_model",
+      "writing_model": "strong_writing_model"
+    }
   }
 }

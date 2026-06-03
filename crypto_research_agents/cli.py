@@ -28,6 +28,7 @@ from crypto_research_agents.core.supervisor_intake import (
     build_supervisor_dispatch_reply,
 )
 from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
+from crypto_research_agents.core.model_gateway import ModelGateway
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 from crypto_research_agents.core.playbook import ResearchPlaybookRegistry
 from crypto_research_agents.core.profile import WorkerProfileRegistry
@@ -1290,7 +1291,7 @@ def doctor_command(args: argparse.Namespace | None = None) -> None:
             "Report writer",
             "Obsidian vault writer",
         },
-        "Models": {"LLM provider", "Codex OAuth token", "OpenAI API key"},
+        "Models": {"LLM provider", "Agent LLM routing", "Codex OAuth token", "OpenAI API key"},
         "Operations": {
             "Tool registry",
             "Scheduled jobs",
@@ -1542,33 +1543,27 @@ def clear_openai_session_env() -> None:
 
 
 def print_current_model_config() -> None:
-    provider = os.getenv("LLM_PROVIDER") or "offline_fallback"
+    gateway = ModelGateway()
+    provider = os.getenv("LLM_PROVIDER") or getattr(gateway.provider, "provider_name", "offline_fallback")
+    fast_decision = gateway.select(agent_id="supervisor_agent", task_type="supervisor_chat")
+    reasoning_decision = gateway.select(agent_id="discovery_agent", task_type="candidate_discovery")
+    writing_decision = gateway.select(agent_id="report_agent", task_type="final_synthesis")
     if provider == "codex_cli":
-        fast = os.getenv("CODEX_CLI_MODEL_FAST") or "<Codex default>"
-        reasoning = os.getenv("CODEX_CLI_MODEL_REASONING") or os.getenv("CODEX_CLI_MODEL_STRONG") or "<Codex default>"
-        writing = os.getenv("CODEX_CLI_MODEL_WRITING") or os.getenv("CODEX_CLI_MODEL_STRONG") or "<Codex default>"
         token_source = codex_login_status()
     elif provider == "codex_oauth":
-        fast = os.getenv("CODEX_OAUTH_MODEL_FAST") or "<default>"
-        reasoning = os.getenv("CODEX_OAUTH_MODEL_REASONING") or os.getenv("CODEX_OAUTH_MODEL_STRONG") or "<default>"
-        writing = os.getenv("CODEX_OAUTH_MODEL_WRITING") or os.getenv("CODEX_OAUTH_MODEL_STRONG") or "<default>"
         token_source = configured_codex_token_source()
     elif provider == "openai":
-        fast = os.getenv("OPENAI_MODEL_FAST") or "<default>"
-        reasoning = os.getenv("OPENAI_MODEL_REASONING") or os.getenv("OPENAI_MODEL_STRONG") or "<default>"
-        writing = os.getenv("OPENAI_MODEL_WRITING") or os.getenv("OPENAI_MODEL_STRONG") or "<default>"
         token_source = "OPENAI_API_KEY set" if os.getenv("OPENAI_API_KEY") else "OPENAI_API_KEY not set"
     else:
-        fast = reasoning = writing = "offline_fallback"
         token_source = "not required"
 
     print_screen(
         "Model Config",
         [
             f"Provider: {provider}",
-            f"Fast model: {fast}",
-            f"Reasoning model: {reasoning}",
-            f"Writing model: {writing}",
+            f"Fast model: {fast_decision.selected_model}",
+            f"Reasoning model: {reasoning_decision.selected_model}",
+            f"Writing model: {writing_decision.selected_model}",
             f"Credential: {token_source}",
         ]
     )

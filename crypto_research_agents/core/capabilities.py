@@ -7,6 +7,7 @@ from typing import Any
 
 from .agent_spec import AgentSpecRegistry
 from .llm_provider import provider_from_env
+from .model_gateway import ModelGateway
 from .tool_gateway import ToolGateway
 from .profile import WorkerProfileRegistry
 from .scheduler import CronRegistry
@@ -74,6 +75,7 @@ def collect_capabilities(
             "configured" if provider.provider_name != "offline_fallback" else "fallback",
             provider.provider_name,
         ),
+        _agent_llm_routing_status(provider),
         CapabilityStatus(
             "Codex OAuth token",
             "configured" if _codex_token_configured() else "missing",
@@ -150,6 +152,22 @@ def _codex_token_configured() -> bool:
         os.getenv("CODEX_OAUTH_TOKEN")
         or os.getenv("CODEX_OAUTH_TOKEN_FILE")
         or os.getenv("CODEX_OAUTH_TOKEN_COMMAND")
+    )
+
+
+def _agent_llm_routing_status(provider: Any) -> CapabilityStatus:
+    gateway = ModelGateway(provider=provider)
+    reasoning = gateway.select(agent_id="discovery_agent", task_type="candidate_discovery").selected_model
+    writing = gateway.select(agent_id="report_agent", task_type="final_synthesis").selected_model
+    source = gateway.select(agent_id="ingestion_agent", task_type="source_ingestion").selected_model
+    status = "configured" if provider.provider_name != "offline_fallback" else "fallback"
+    return CapabilityStatus(
+        "Agent LLM routing",
+        status,
+        (
+            "10 core agents call ModelGateway; "
+            f"source={source}, reasoning={reasoning}, writing={writing}"
+        ),
     )
 
 

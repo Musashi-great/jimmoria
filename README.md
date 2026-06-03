@@ -56,12 +56,35 @@ Supervisor planning      reasoning route
 Narrative/discovery      reasoning route
 Social/on-chain/product  reasoning route
 Funding/token review     reasoning route
+Obsidian curation        reasoning route
 Report synthesis         writing route
 ```
 
 CrewAI의 agent/task 분리, ChatDev의 phase/workflow와 replay, LangGraph Supervisor의 routing/handoff 패턴을 JIMMORIA 구조에 맞게 흡수했습니다. 그래서 각 전문 에이전트는 먼저 ToolGateway와 SharedMemory로 근거를 모으고, 그 다음 `llm_analysis_pass`로 요약, 근거 부족, 리스크, 다음 액션을 판단합니다.
 
 이 LLM pass는 근거를 만들어내는 역할이 아닙니다. 외부 connector가 비어 있으면 “미설정/근거 부족”이라고 표시하고, 실패해도 Research Room 전체가 죽지 않게 fallback summary를 남깁니다. finding confidence는 tool/memory evidence 기준으로 유지하고, 모델의 자신감은 `llm_analysis.confidence`에 따로 저장합니다. 호출 기록은 `data/runs/<room_id>/llm_call_log.json`에 저장됩니다.
+
+Codex CLI provider를 쓰고 모델명을 따로 입력하지 않으면 reasoning/writing route의 기본값은 `pro`입니다. OpenAI/OAuth provider는 환경변수로 모델을 지정하지 않으면 각 provider의 fallback route를 사용합니다.
+
+## Tool Status
+
+현재 `jimmoria doctor` 기준으로 실제 등록된 read-only connector는 다음입니다.
+
+```text
+configured: web_search, fetch_url, parse_html, crawl_website, crawl_docs,
+            github_search_repos, read_github_repo,
+            coingecko_coin_metadata, dexscreener_search_pairs,
+            archive_source_snapshot
+
+placeholder/missing secret: X/Twitter, Telegram, Discord, RootData,
+                            Explorer/RPC, Dune, The Graph,
+                            funding/airdrop checker
+
+blocked by design: wallet_sign, swap, transfer, approve,
+                   private_key_read, seed_phrase_read
+```
+
+즉 브라우저/웹 검색 계열은 동작하지만, KOL timeline이나 Telegram/RootData/Explorer 같은 live research connector는 API 키와 connector 구현이 붙어야 합니다.
 
 ## Chat Commands
 

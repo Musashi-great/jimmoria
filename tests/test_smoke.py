@@ -713,7 +713,7 @@ class SmokeTest(unittest.TestCase):
             reasoning_tasks = {
                 entry["task_type"]: entry["selected_model"]
                 for entry in llm_log
-                if entry["task_type"] in {"candidate_discovery", "social_summary", "contract_info", "product_docs", "funding_token"}
+                if entry["task_type"] in {"candidate_discovery", "social_summary", "contract_info", "product_docs", "funding_token", "obsidian_sync"}
             }
             self.assertEqual(set(reasoning_tasks.values()), {"strong_reasoning_model"})
             self.assertGreaterEqual(len(result.bus.messages), 8)
@@ -1382,11 +1382,35 @@ Usage: codex exec [OPTIONS] [PROMPT]
 
         self.assertEqual(gateway.default_model, "codex-cli-fast")
 
+    def test_codex_cli_defaults_reasoning_and_writing_to_pro(self) -> None:
+        class FakeCodexCliProvider:
+            provider_name = "codex_cli"
+
+            def complete(self, request: LLMRequest) -> LLMResponse:
+                return LLMResponse(
+                    text="{}" if request.response_format == "json" else "ok",
+                    model=request.model,
+                    provider=self.provider_name,
+                    usage={},
+                )
+
+        with patch.dict("os.environ", {}, clear=True):
+            gateway = ModelGateway(provider=FakeCodexCliProvider())
+
+        reasoning = gateway.select(agent_id="discovery_agent", task_type="candidate_discovery")
+        obsidian = gateway.select(agent_id="obsidian_curator_agent", task_type="obsidian_sync")
+        writing = gateway.select(agent_id="report_agent", task_type="final_synthesis")
+
+        self.assertEqual(reasoning.selected_model, "pro")
+        self.assertEqual(obsidian.selected_model, "pro")
+        self.assertEqual(writing.selected_model, "pro")
+
     def test_doctor_marks_live_connectors_as_placeholders(self) -> None:
         statuses = {item.name: item.status for item in collect_capabilities()}
 
         self.assertEqual(statuses["Runtime scaffold"], "configured")
         self.assertEqual(statuses["Agent specs/personas"], "configured")
+        self.assertEqual(statuses["Agent LLM routing"], "fallback")
         self.assertEqual(statuses["X/Twitter search"], "placeholder")
         self.assertEqual(statuses["RootData project directory"], "placeholder")
         self.assertEqual(statuses["Explorer contract lookup"], "placeholder")
@@ -1413,6 +1437,19 @@ Usage: codex exec [OPTIONS] [PROMPT]
         router = json.loads(Path("config/models/model_router.yaml").read_text(encoding="utf-8"))
 
         self.assertEqual(router["routes"]["supervisor_chat"], "fast_model")
+        for task_type in [
+            "supervision",
+            "narrative_reasoning",
+            "candidate_discovery",
+            "social_summary",
+            "contract_info",
+            "product_docs",
+            "funding_token",
+            "obsidian_sync",
+        ]:
+            self.assertEqual(router["routes"][task_type], "reasoning_model")
+        self.assertEqual(router["provider_defaults"]["codex_cli"]["reasoning_model"], "pro")
+        self.assertEqual(router["provider_defaults"]["codex_cli"]["writing_model"], "pro")
 
     def test_doctor_command_outputs_current_limitations(self) -> None:
         with TemporaryDirectory() as tmp:

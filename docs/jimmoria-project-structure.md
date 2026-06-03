@@ -377,6 +377,7 @@ discovery_agent -> funding_token_agent
 | `contract_info` | reasoning model |
 | `product_docs` | reasoning model |
 | `funding_token` | reasoning model |
+| `obsidian_sync` | reasoning model |
 | `report_writing` | writing model |
 | `final_synthesis` | writing model |
 | `embedding_search` | embedding model |
@@ -411,6 +412,8 @@ next_actions
 | `obsidian_curator_agent` | `obsidian_sync` | vault sync 결과 요약 |
 
 각 호출은 `ModelGateway.call_log`에 쌓이고 실행 후 `data/runs/<room_id>/llm_call_log.json`에 저장된다. 따라서 나중에 UI에서 “어떤 에이전트가 어떤 route/model로 판단했는지”를 replay할 수 있다.
+
+Codex CLI provider에서는 모델명을 따로 지정하지 않아도 reasoning/writing route의 기본값이 `pro`다. 즉 `discovery_agent`, `social_kol_agent`, `contract_onchain_agent`, `product_tech_agent`, `funding_token_agent`, `obsidian_curator_agent`, `report_agent`는 Codex CLI 환경에서 기본적으로 `pro` route를 탄다. `supervisor_chat`과 `source_ingestion`은 빠른 대화/추출용 route를 유지한다. OpenAI/OAuth provider에서는 환경변수로 명시한 모델이 우선하고, 없으면 기존 fallback placeholder route를 사용한다.
 
 실제 provider는 `core/llm_provider.py`에서 결정된다.
 
@@ -468,6 +471,16 @@ coingecko_coin_metadata
 이 로그는 `data/runs/<room_id>/tool_audit_log.json`에 저장된다.
 
 필요한 tool 목록과 우선순위는 `config/tools/tool_registry.yaml`에 정리되어 있다. 구현된 connector는 `implementation_status: implemented`로 표시된다.
+
+현재 `jimmoria doctor` 기준 tool 상태는 세 가지로 봐야 한다.
+
+| 상태 | Tool | 의미 |
+|---|---|---|
+| configured | `web_search`, `fetch_url`, `parse_html`, `crawl_website`, `crawl_docs`, `github_search_repos`, `read_github_repo`, `coingecko_coin_metadata`, `dexscreener_search_pairs`, `archive_source_snapshot` | 지금 런타임에서 실제 connector가 등록되어 호출 가능 |
+| placeholder / missing secret | `x_search_posts`, `x_get_user_timeline`, `x_build_kol_list`, `telegram_read_channel`, `discord_read_channel`, `rss_monitor_feed`, `rootdata_search_projects`, `explorer_lookup`, `get_contract_address`, `check_airdrop_points`, `dune_execute_query`, `thegraph_query_subgraph` | registry에는 있지만 API 키, connector 구현, 또는 외부 서비스 연결이 아직 필요 |
+| blocked | `wallet_sign`, `swap`, `transfer`, `approve`, `private_key_read`, `seed_phrase_read` | 리서치 전용 회사 경계 때문에 의도적으로 실행 금지 |
+
+따라서 Hermes 스타일 operating layer에서 가져온 toolset/worker/profile/playbook 구조는 존재하지만, 모든 외부 live research tool이 이미 작동한다는 뜻은 아니다. 현재 확실히 작동하는 것은 read-only public web/document/market metadata 계열이고, KOL timeline, Telegram/Discord, RootData, Explorer/RPC 같은 고급 live connector는 다음 구현 대상이다.
 
 중요한 live stack은 다음이다. 이 중 Web Search/URL/Website/Docs/GitHub/DEX Screener/CoinGecko 계열은 초안 connector가 구현되어 있고, X/RootData/Explorer/vector 계열은 아직 다음 단계다.
 
@@ -739,6 +752,7 @@ project_research.yaml
 - Codex CLI exec flag compatibility
 - Codex CLI UTF-8 stdin handling for Korean prompts
 - agent-level LLM analysis pass and route selection
+- `jimmoria doctor` Agent LLM routing status
 - model setup flow
 - startup model setup skip
 - doctor capability status

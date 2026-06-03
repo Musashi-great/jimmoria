@@ -23,17 +23,19 @@ class ModelGateway:
         default_model: str | None = None,
         provider: LLMProvider | None = None,
     ) -> None:
-        default_model = default_model or _model_env("FAST") or "mvp_shared_llm"
-        self.default_model = default_model
         self.provider = provider or provider_from_env()
+        provider_name = getattr(self.provider, "provider_name", "")
+        default_model = default_model or _model_env("FAST") or _tier_default(provider_name, "FAST")
+        self.default_model = default_model
         self.call_log: list[dict[str, Any]] = []
 
     def select(self, *, agent_id: str, task_type: str) -> ModelDecision:
+        provider_name = getattr(self.provider, "provider_name", "")
         if task_type == "supervisor_chat":
             return ModelDecision(
                 selected_model=_model_env("FAST")
                 or _model_env("STRONG")
-                or "fast_chat_model",
+                or _tier_default(provider_name, "FAST_CHAT"),
                 reason=f"{agent_id} requested front-door conversation",
                 max_tokens=1200,
                 temperature=0.45,
@@ -42,7 +44,7 @@ class ModelGateway:
             return ModelDecision(
                 selected_model=_model_env("WRITING")
                 or _model_env("STRONG")
-                or "strong_writing_model",
+                or _tier_default(provider_name, "WRITING"),
                 reason=f"{agent_id} requested synthesis/report work",
                 max_tokens=6000,
                 temperature=0.2,
@@ -55,11 +57,12 @@ class ModelGateway:
             "contract_info",
             "product_docs",
             "funding_token",
+            "obsidian_sync",
         }:
             return ModelDecision(
                 selected_model=_model_env("REASONING")
                 or _model_env("STRONG")
-                or "strong_reasoning_model",
+                or _tier_default(provider_name, "REASONING"),
                 reason=f"{agent_id} requested reasoning work",
                 max_tokens=5000,
                 temperature=0.2,
@@ -134,3 +137,17 @@ def _model_env(tier: str) -> str | None:
         or os.getenv(f"CODEX_OAUTH_MODEL_{tier}")
         or os.getenv(f"OPENAI_MODEL_{tier}")
     )
+
+
+def _tier_default(provider_name: str, tier: str) -> str:
+    if provider_name == "codex_cli" and tier in {"REASONING", "WRITING"}:
+        return "pro"
+    if tier == "FAST_CHAT":
+        return "fast_chat_model"
+    if tier == "FAST":
+        return "mvp_shared_llm"
+    if tier == "WRITING":
+        return "strong_writing_model"
+    if tier == "REASONING":
+        return "strong_reasoning_model"
+    return "mvp_shared_llm"
