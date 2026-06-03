@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 from urllib.parse import urlparse
 
@@ -20,6 +21,12 @@ def web_search(
 
     if not query or not str(query).strip():
         return missing_input("web_search", "query is required")
+    if os.getenv("JIMMORIA_SKIP_EXTERNAL_SEARCH", "").strip().lower() in {"1", "true", "yes", "on"}:
+        return success(
+            "web_search",
+            {"query": query, "results": []},
+            "web search skipped by JIMMORIA_SKIP_EXTERNAL_SEARCH",
+        )
 
     try:
         from ddgs import DDGS
@@ -32,7 +39,8 @@ def web_search(
 
     results: list[dict[str, Any]] = []
     try:
-        with DDGS() as ddgs:
+        timeout = float(os.getenv("JIMMORIA_WEB_SEARCH_TIMEOUT", "8"))
+        with DDGS(timeout=timeout) as ddgs:
             for item in ddgs.text(str(query), max_results=max(1, min(limit, 20))):
                 url = str(item.get("href") or item.get("url") or "").strip()
                 if not url:

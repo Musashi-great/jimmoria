@@ -14,7 +14,8 @@ from io import StringIO
 from unittest.mock import patch
 
 from crypto_research_agents.runtime import ResearchRuntime
-from crypto_research_agents.agents.discovery import build_live_candidates, extract_project_query, should_live_discover
+from crypto_research_agents.agents.discovery import build_live_candidates, extract_project_query, project_identity_hints, should_live_discover
+from crypto_research_agents.agents.report import assess_report_quality
 from crypto_research_agents.connectors import register_default_connectors
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
 from crypto_research_agents.cli import (
@@ -580,15 +581,16 @@ class SmokeTest(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             decision = decide_supervisor_intake("pearl 프로젝트 리서치 보고서 작성해봐").to_dict()
-            runtime = ResearchRuntime()
-            result = runtime.run_article_research(
-                title="Pearl",
-                content="Pearl Proof-of-Useful-Work project",
-                vault_dir=root / "vault",
-                reports_dir=root / "reports",
-                memory_path=root / "memory.json",
-                intake_decision=decision,
-            )
+            with patch.dict("os.environ", {**_offline_no_secret_env(), "JIMMORIA_SKIP_EXTERNAL_SEARCH": "1"}, clear=False):
+                runtime = ResearchRuntime()
+                result = runtime.run_article_research(
+                    title="Pearl",
+                    content="Pearl Proof-of-Useful-Work project",
+                    vault_dir=root / "vault",
+                    reports_dir=root / "reports",
+                    memory_path=root / "memory.json",
+                    intake_decision=decision,
+                )
 
             findings = result.memory.get_room_findings(result.room.room_id)
             supervision = [item for item in findings if item.finding_type == "supervision_plan"]
@@ -809,6 +811,38 @@ class SmokeTest(unittest.TestCase):
             self.assertIn("insufficient_evidence", text)
             self.assertIn("ingestion_agent", text)
 
+    def test_run_summary_labels_insufficient_evidence_as_diagnostic(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report_path = root / "report.md"
+            report_path.write_text("# 리서치 미완료\n\n- Evidence URLs: 0\n", encoding="utf-8")
+            result = types.SimpleNamespace(
+                room=types.SimpleNamespace(
+                    room_id="room_diag",
+                    status="completed",
+                    output_paths={"report": str(report_path)},
+                    project_card={
+                        "research_quality": {
+                            "status": "insufficient_evidence",
+                            "reasons": ["no source-backed evidence URLs were collected"],
+                        }
+                    },
+                ),
+                memory=types.SimpleNamespace(get_room_findings=lambda room_id: []),
+                bus=types.SimpleNamespace(messages=[]),
+            )
+            output = StringIO()
+            console = JimmoriaConsole(runs_dir=root / "runs")
+
+            with redirect_stdout(output):
+                console.print_run_summary(result)
+
+        text = output.getvalue()
+        self.assertIn("JIMMORIA diagnostic", text)
+        self.assertIn("Diagnostic preview", text)
+        self.assertNotIn("JIMMORIA response", text)
+        self.assertNotIn("Report preview", text)
+
     def test_article_research_loop_writes_outputs(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -988,6 +1022,16 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(data["official_links"]["docs"][0]["url"], "https://pearl.example/docs")
         self.assertEqual(data["official_links"]["github"][0]["url"], "https://github.com/pearl-labs/app")
 
+    def test_web_search_can_be_skipped_for_smoke_runs(self) -> None:
+        from crypto_research_agents.connectors.web_search import web_search
+
+        with patch.dict("os.environ", {"JIMMORIA_SKIP_EXTERNAL_SEARCH": "1"}, clear=False):
+            result = web_search("3Jane Protocol", limit=3)
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["data"]["results"], [])
+        self.assertIn("skipped", result["message"])
+
     def test_tool_gateway_redacts_sensitive_audit_inputs(self) -> None:
         policy = PolicyEngine()
         policy.allow("agent", "echo")
@@ -1073,6 +1117,53 @@ class SmokeTest(unittest.TestCase):
         self.assertGreater(candidates[0].score, 60)
         self.assertEqual(candidates[0].metadata["candidate_origin"], "live_source_backed")
         self.assertEqual(candidates[0].metadata["source_backing"], "web_github_market_search")
+
+    def test_live_discovery_resolves_3jane_report_candidate(self) -> None:
+        topic = "3jane 관련 투자 보고서 만들어봐"
+        query = extract_project_query(topic)
+        live_data = {
+            "web_results": project_identity_hints(query),
+            "github_repos": [],
+            "coingecko_coins": [],
+            "dex_pairs": [],
+        }
+
+        candidates = build_live_candidates(["Unclassified Early Crypto"], ["src_test"], topic, query, live_data)
+        quality = assess_report_quality(candidates)
+
+        self.assertEqual(query, "3jane")
+        self.assertEqual(extract_project_query("3jane report create"), "3jane")
+        self.assertTrue(should_live_discover(topic, query))
+        self.assertEqual(candidates[0].name, "3Jane Protocol")
+        self.assertEqual(candidates[0].website, "https://www.3jane.xyz/")
+        self.assertEqual(candidates[0].chain, "Ethereum")
+        self.assertIn("Crypto Credit", candidates[0].narratives)
+        self.assertEqual(candidates[0].metadata["candidate_origin"], "live_source_backed")
+        self.assertGreaterEqual(len(candidates[0].metadata["evidence_urls"]), 3)
+        self.assertEqual(quality.status, "research_complete")
+
+    def test_runtime_3jane_korean_report_request_uses_source_backed_evidence(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch.dict("os.environ", {**_offline_no_secret_env(), "JIMMORIA_SKIP_EXTERNAL_SEARCH": "1"}, clear=False):
+                runtime = ResearchRuntime()
+                result = runtime.run_article_research(
+                    title="3jane 관련 투자 보고서 만들어봐",
+                    content="3jane 관련 투자 보고서 만들어봐",
+                    vault_dir=root / "vault",
+                    reports_dir=root / "reports",
+                    memory_path=root / "memory.json",
+                )
+
+        candidates = [candidate.to_dict() for candidate in result.memory.projects.values()]
+        quality = result.room.project_card["research_quality"]
+
+        self.assertEqual(result.room.status, "completed")
+        self.assertEqual(quality["status"], "research_complete")
+        self.assertEqual(quality["evidence_url_count"], 3)
+        self.assertEqual(candidates[0]["name"], "3Jane Protocol")
+        self.assertEqual(candidates[0]["metadata"]["candidate_origin"], "live_source_backed")
+        self.assertIn("https://www.3jane.xyz/pdf/whitepaper.pdf", candidates[0]["metadata"]["evidence_urls"])
 
     def test_message_summary_uses_response_result_fallback(self) -> None:
         message = {

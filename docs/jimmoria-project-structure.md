@@ -158,6 +158,7 @@ Supervisor는 단순 라우터가 아니라 회사의 boss/orchestrator다.
 - 보고서/dossier 작성 요청이면 사용자에게 확인 후 room open
 - 사용자가 y/Enter로 승인한 뒤에는 중복 Supervisor 설명 박스를 출력하지 않고 바로 room/agent event stream으로 전환
 - 저장 보고서 조회가 실패한 뒤 사용자가 "만들어/작성해"라고 정정하면 직전 요청을 새 보고서 작성 요청으로 복구
+- `3jane`처럼 숫자로 시작하는 프로젝트명도 추출하고, 보고서 작성 요청이면 public web discovery를 우선 수행
 - 목표, 우선순위, task plan 생성
 - 하위 agent에게 작업 배정
 - Agent Council 결과를 받아 최종 검토
@@ -193,6 +194,11 @@ Supervisor는 단순 라우터가 아니라 회사의 boss/orchestrator다.
 - Telegram/Discord private connector는 기본 스택에서 제외
 - secret이 없는 connector는 조용히 실패하지 않고 `missing_secret` 또는 `missing_input`으로 기록
 - 모든 tool call은 audit log에 남김
+
+운영 플래그:
+
+- `JIMMORIA_SKIP_EXTERNAL_SEARCH=1`: smoke/test 실행에서 외부 네트워크 검색을 끈다. Pearl, 3Jane처럼 공식 identity hint가 있는 프로젝트는 official URL 기반 후보 생성은 계속 가능하다.
+- `JIMMORIA_WEB_SEARCH_TIMEOUT`: public web-search connector timeout을 조절해서 느린 검색 provider가 Research Room 전체를 멈추지 않게 한다.
 
 ### Works Without Secrets
 

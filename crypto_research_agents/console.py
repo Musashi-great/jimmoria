@@ -631,7 +631,9 @@ class JimmoriaConsole:
             f"Findings: {len(memory.get_room_findings(room.room_id))}",
         ]
         quality = room.project_card.get("research_quality") if isinstance(room.project_card, dict) else {}
+        quality_status = ""
         if isinstance(quality, dict) and quality.get("status"):
+            quality_status = str(quality.get("status"))
             lines.append(f"Research quality: {quality.get('status')}")
             if quality.get("reasons"):
                 lines.append(f"Quality reasons: {'; '.join(str(item) for item in quality.get('reasons', []))}")
@@ -640,9 +642,11 @@ class JimmoriaConsole:
         if vault_path:
             lines.append(f"Vault: {vault_path}")
         lines.append(f"Replay events: {self.runs_dir / room.room_id / 'events.json'}")
-        self.block("JIMMORIA response", lines)
+        summary_title = "JIMMORIA diagnostic" if quality_status == "insufficient_evidence" else "JIMMORIA response"
+        preview_title = "Diagnostic preview" if quality_status == "insufficient_evidence" else "Report preview"
+        self.block(summary_title, lines)
         if report_path:
-            self.print_report_preview(report_path)
+            self.print_report_preview(report_path, title=preview_title)
 
     def print_context(self) -> None:
         memory = load_memory(self.memory_path)
@@ -917,13 +921,13 @@ class JimmoriaConsole:
             compact = compact[:61].rstrip() + "..."
         return f"{prefix}: {compact}"
 
-    def print_report_preview(self, report_path: str | Path, *, max_lines: int = 12) -> None:
+    def print_report_preview(self, report_path: str | Path, *, max_lines: int = 12, title: str = "Report preview") -> None:
         path = Path(report_path)
         if not path.exists():
             return
         lines = path.read_text(encoding="utf-8").splitlines()
         preview = [line for line in lines if line.strip()][:max_lines]
-        self.block("Report preview", preview)
+        self.block(title, preview)
 
     def agent_label(self, agent_id: str) -> str:
         spec = self.registry.get(agent_id)

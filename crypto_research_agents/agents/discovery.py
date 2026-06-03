@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from typing import Any
 from urllib.parse import urlparse
@@ -121,6 +122,12 @@ def collect_live_discovery(agent: BaseAgent, room: ResearchRoom, project_query: 
         data["skipped_reason"] = "topic_does_not_look_like_single_project_lookup"
         return data
 
+    identity_results = project_identity_hints(project_query)
+    if external_search_disabled():
+        data["web_results"] = rank_results(project_query, dedupe_results(identity_results))[:12]
+        data["skipped_reason"] = "external_search_disabled"
+        return data
+
     web_queries = build_web_queries(project_query, room.topic)
     data["web_queries"] = web_queries
     for query in web_queries:
@@ -134,7 +141,7 @@ def collect_live_discovery(agent: BaseAgent, room: ResearchRoom, project_query: 
         if result.get("status") == "success":
             result_data = result.get("data") if isinstance(result.get("data"), dict) else {}
             data["web_results"].extend(result_data.get("results", []))
-    data["web_results"].extend(project_identity_hints(project_query))
+    data["web_results"].extend(identity_results)
 
     github_query = f"{project_query} blockchain crypto"
     github_result = agent.tool_gateway.call(
@@ -176,6 +183,10 @@ def collect_live_discovery(agent: BaseAgent, room: ResearchRoom, project_query: 
     return data
 
 
+def external_search_disabled() -> bool:
+    return os.getenv("JIMMORIA_SKIP_EXTERNAL_SEARCH", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def build_web_queries(project_query: str, topic: str) -> list[str]:
     queries = [
         f"{project_query} crypto project official",
@@ -188,6 +199,10 @@ def build_web_queries(project_query: str, topic: str) -> list[str]:
     if "pearl" in project_query.lower():
         queries.insert(0, "Pearl Research Labs PRL Proof of Useful Work")
         queries.insert(1, "site:pearlresearch.ai Pearl Research Labs")
+    if project_query.lower().strip() == "3jane":
+        queries.insert(0, "3Jane Protocol credit based money market")
+        queries.insert(1, "site:3jane.xyz 3Jane whitepaper")
+        queries.insert(2, "3Jane Protocol GitHub")
     return dedupe_strings(queries)[:4]
 
 
@@ -278,18 +293,63 @@ def build_candidates(narratives: list[str], source_ids: list[str]) -> list[Proje
 
 
 def extract_project_query(topic: str) -> str:
-    english_tokens = re.findall(r"[A-Za-z][A-Za-z0-9_.-]*", topic)
+    english_tokens = re.findall(r"[A-Za-z0-9][A-Za-z0-9_.-]*", topic)
     if english_tokens:
-        ignored = {"crypto", "project", "pow", "research", "report"}
-        kept = [token for token in english_tokens if token.lower() not in ignored]
+        ignored = {
+            "crypto",
+            "project",
+            "pow",
+            "research",
+            "report",
+            "dossier",
+            "token",
+            "coin",
+            "investment",
+            "create",
+            "write",
+            "generate",
+            "make",
+            "new",
+        }
+        kept = [
+            token
+            for token in english_tokens
+            if token.lower() not in ignored and any(char.isalpha() for char in token)
+        ]
         return " ".join(kept[:4] or english_tokens[:4]).strip()
     cleaned = re.sub(r"[/@#]", " ", topic)
-    cleaned = re.sub(r"\b(크립토|프로젝트|리서칭|조사|진행|보고서|대해서)\b", " ", cleaned)
+    for term in [
+        "크립토",
+        "프로젝트",
+        "리서칭",
+        "리서치",
+        "조사",
+        "분석",
+        "진행",
+        "보고서",
+        "리포트",
+        "레포트",
+        "도시에",
+        "대해서",
+        "대해",
+        "관련",
+        "투자",
+        "만들어봐",
+        "만들어",
+        "작성해봐",
+        "작성해",
+        "생성해봐",
+        "생성해",
+        "줘",
+    ]:
+        cleaned = cleaned.replace(term, " ")
     return " ".join(cleaned.split())[:80]
 
 
 def should_live_discover(topic: str, project_query: str) -> bool:
     lowered = topic.lower()
+    if project_identity_hints(project_query):
+        return True
     project_words = [
         "project",
         "protocol",
@@ -303,6 +363,11 @@ def should_live_discover(topic: str, project_query: str) -> bool:
         "코인",
         "리서칭",
         "조사",
+        "보고서",
+        "리포트",
+        "레포트",
+        "dossier",
+        "report",
     ]
     query_tokens = project_query.split()
     return len(query_tokens) <= 4 and any(word in lowered for word in project_words)
@@ -310,6 +375,8 @@ def should_live_discover(topic: str, project_query: str) -> bool:
 
 def infer_project_name(project_query: str, evidence_text: str, coingecko_coins: list[Any]) -> str:
     lowered = evidence_text.lower()
+    if "3jane" in lowered or project_query.lower().strip() == "3jane":
+        return "3Jane Protocol"
     if "pearl research labs" in lowered or "proof-of-useful-work" in lowered or "proof of useful work" in lowered:
         return "Pearl Network"
     for coin in coingecko_coins:
@@ -326,6 +393,9 @@ def merge_narratives(narratives: list[str], evidence_text: str) -> list[str]:
         "AI Compute": ["ai compute", "matrix multiplication", "matmul", "gpu"],
         "GPU Mining": ["gpu mining", "mining", "block reward"],
         "L1 Blockchain": [" l1 ", "layer 1", "blockchain"],
+        "Crypto Credit": ["credit protocol", "credit-based", "credit based", "credit score"],
+        "Undercollateralized Lending": ["undercollateralized", "unsecured lines of credit", "unsecured credit"],
+        "zkTLS / Web Proofs": ["zktls", "web proof", "web proofs", "vantagescore"],
     }
     for narrative, triggers in additions.items():
         if any(trigger in lowered for trigger in triggers) and narrative not in merged:
@@ -340,6 +410,8 @@ def infer_token_status(evidence_text: str, coingecko_coins: list[Any], dex_pairs
     lowered = evidence_text.lower()
     if " prl" in f" {lowered}" or "ticker prl" in lowered or "block reward" in lowered or "mining" in lowered:
         return "native_coin_reported"
+    if "usd3" in lowered:
+        return "usd3_yieldcoin_or_credit_asset_reported"
     if any(isinstance(coin, dict) and str(coin.get("symbol", "")).lower() == "prl" for coin in coingecko_coins):
         return "market_metadata_found"
     if dex_pairs:
@@ -353,6 +425,8 @@ def infer_chain(evidence_text: str, dex_pairs: list[Any]) -> str | None:
     lowered = evidence_text.lower()
     if "pearl network" in lowered or "l1 protocol" in lowered or "l1 blockchain" in lowered:
         return "Pearl L1"
+    if "3jane" in lowered and "ethereum" in lowered:
+        return "Ethereum"
     for pair in dex_pairs:
         if isinstance(pair, dict) and pair.get("chain"):
             return str(pair["chain"])
@@ -434,7 +508,32 @@ def is_low_signal_url(url: str) -> bool:
 
 
 def project_identity_hints(project_query: str) -> list[dict[str, Any]]:
-    if project_query.lower().strip() != "pearl":
+    normalized = project_query.lower().strip()
+    if normalized == "3jane":
+        return [
+            {
+                "title": "3Jane official website",
+                "url": "https://www.3jane.xyz/",
+                "snippet": "3Jane is a global credit protocol for crypto-native credit and undercollateralized lending.",
+                "host": "www.3jane.xyz",
+                "source": "identity_hint",
+            },
+            {
+                "title": "3Jane Protocol whitepaper",
+                "url": "https://www.3jane.xyz/pdf/whitepaper.pdf",
+                "snippet": "3Jane Protocol whitepaper describes a credit-based money market on Ethereum and unsecured credit lines.",
+                "host": "www.3jane.xyz",
+                "source": "identity_hint",
+            },
+            {
+                "title": "GitHub - 3jane-protocol",
+                "url": "https://github.com/3jane-protocol",
+                "snippet": "3Jane Protocol public GitHub organization.",
+                "host": "github.com",
+                "source": "identity_hint",
+            },
+        ]
+    if normalized != "pearl":
         return []
     return [
         {
