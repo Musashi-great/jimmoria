@@ -693,6 +693,10 @@ class SmokeTest(unittest.TestCase):
             self.assertIn("finding_saved", event_types)
             self.assertIn("source_saved", event_types)
             self.assertIn("report_written", event_types)
+            self.assertIn("deliberation_start", event_types)
+            self.assertIn("deliberation_done", event_types)
+            self.assertIn("final_review_start", event_types)
+            self.assertIn("final_review_done", event_types)
             audit = json.loads((root / "runs" / result.room.room_id / "tool_audit_log.json").read_text(encoding="utf-8"))
             supervisor_tools = [
                 item["tool_name"]
@@ -728,6 +732,15 @@ class SmokeTest(unittest.TestCase):
             self.assertEqual(set(reasoning_tasks.values()), {"strong_reasoning_model"})
             self.assertGreaterEqual(len(result.bus.messages), 8)
             self.assertGreaterEqual(len(result.memory.get_room_findings(result.room.room_id)), 8)
+            finding_types = {
+                finding.finding_type
+                for finding in result.memory.get_room_findings(result.room.room_id)
+            }
+            self.assertIn("agent_council_consensus", finding_types)
+            self.assertIn("final_supervisor_review", finding_types)
+            self.assertIn("agent_council", {message.from_agent for message in result.bus.messages})
+            self.assertEqual(result.room.project_card["agent_council"]["decision"], "write_diagnostic_memo")
+            self.assertEqual(result.room.project_card["supervisor_final_review"]["delivery_mode"], "diagnostic_memo")
 
             report = Path(result.room.output_paths["report"]).read_text(encoding="utf-8")
             self.assertEqual(result.room.project_card["research_quality_status"], "insufficient_evidence")
@@ -739,6 +752,8 @@ class SmokeTest(unittest.TestCase):
             self.assertIn("[MVP Placeholder]", report)
             self.assertIn("LLM provider: `offline_fallback`", report)
             self.assertIn("Live LLM: not configured", report)
+            self.assertIn("## 9. Supervisor Final Review", report)
+            self.assertIn("Delivery mode: `diagnostic_memo`", report)
 
             project_notes = list((root / "vault" / "10_Projects").glob("*.md"))
             self.assertTrue(project_notes)

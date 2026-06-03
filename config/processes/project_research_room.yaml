@@ -121,7 +121,9 @@
     "default_event_style": "stream",
     "dock": "JIMMORIA HQ runtime dock remains visible while a room runs",
     "board_command": "/board",
-    "supervisor_office": "Supervisor creates and assigns task records before specialist agents run"
+    "supervisor_office": "Supervisor creates and assigns task records before specialist agents run",
+    "agent_council": "Specialist findings are deliberated before report writing",
+    "final_review": "Supervisor reviews report quality and delivery mode before Obsidian sync"
   },
   "memory_policy": {
     "save_run": true,

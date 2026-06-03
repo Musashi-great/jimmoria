@@ -497,6 +497,68 @@ class JimmoriaConsole:
             self.print_output_event(event_type, event)
             return
 
+        if event_type == "deliberation_start":
+            participants = event.get("participants", [])
+            count = len(participants) if isinstance(participants, list) else 0
+            if self.use_stream_events():
+                self.print_event_line("Council", f"START specialist roundtable | agents {count}")
+                return
+            self.block(
+                "Agent council started",
+                [
+                    f"Participants: {count}",
+                    str(event.get("summary") or "Specialists compare findings."),
+                ],
+            )
+            return
+
+        if event_type == "deliberation_done":
+            decision = str(event.get("decision") or "")
+            summary = self.compact_text(str(event.get("summary") or ""), 84)
+            if self.use_stream_events():
+                self.print_event_line(
+                    "Council",
+                    f"DONE {decision} | {summary} | msg {event.get('messages')} / findings {event.get('findings')}",
+                )
+                return
+            self.block(
+                "Agent council consensus",
+                [
+                    f"Decision: {decision}",
+                    f"Summary: {event.get('summary')}",
+                    f"Messages: {event.get('messages')}",
+                    f"Findings: {event.get('findings')}",
+                ],
+            )
+            return
+
+        if event_type == "final_review_start":
+            summary = self.compact_text(str(event.get("summary") or ""), 84)
+            if self.use_stream_events():
+                self.print_event_line("Supervisor", f"REVIEW report | {summary}")
+                return
+            self.block("Supervisor final review started", [str(event.get("summary") or "")])
+            return
+
+        if event_type == "final_review_done":
+            delivery_mode = str(event.get("delivery_mode") or "")
+            summary = self.compact_text(str(event.get("summary") or ""), 84)
+            if self.use_stream_events():
+                self.print_event_line(
+                    "Supervisor",
+                    f"FINAL {delivery_mode} | {summary} | msg {event.get('messages')} / findings {event.get('findings')}",
+                )
+                return
+            self.block(
+                "Supervisor final review",
+                [
+                    f"Delivery mode: {delivery_mode}",
+                    f"Approved: {event.get('approved')}",
+                    f"Summary: {event.get('summary')}",
+                ],
+            )
+            return
+
         if event_type == "room_completed":
             quality_status = str(event.get("research_quality_status") or "")
             quality_suffix = f" | quality {quality_status}" if quality_status else ""

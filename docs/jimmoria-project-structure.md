@@ -167,10 +167,12 @@ flowchart LR
 8. contract_onchain_agent 실행
 9. product_tech_agent 실행
 10. funding_token_agent 실행
-11. report_agent 실행
-12. obsidian_curator_agent 실행
-13. room_completed 이벤트 기록
-14. memory.json, run snapshot, report, vault note 저장
+11. Agent Council deliberation 실행
+12. report_agent 실행
+13. Supervisor final review 실행
+14. obsidian_curator_agent 실행
+15. room_completed 이벤트 기록
+16. memory.json, run snapshot, report, vault note 저장
 ```
 
 상태는 `RuntimeState` 값으로 이동한다.
@@ -202,6 +204,8 @@ Board > 10 wait/0 done
 Agent > RUN supervisor_agent | Planning direction
 Agent > DONE supervisor_agent | Research room initialized | msg 1 / findings 1
 Tool > RUN discovery_agent -> web_search | pearl crypto project
+Council > DONE write_diagnostic_memo | Agent council reached a guarded consensus
+Supervisor > FINAL diagnostic_memo | Supervisor approved delivery as a diagnostic memo
 Output > Report written | reports/pearl-room_abc123.md
 ```
 
@@ -355,6 +359,51 @@ ResearchRuntime loads ProcessSpec
 ```
 
 따라서 이제 `tool_audit_log.json`에는 social/on-chain 같은 외부 connector 호출뿐 아니라, Supervisor가 어떤 업무를 만들고 누구에게 배정했는지도 남는다. 이것은 나중에 웹 visualizer에서 "사장이 일을 배정하고 직원들이 처리하는 회사 화면"을 만들 때 핵심 데이터가 된다.
+
+## 7C. Agent Council And Supervisor Final Review
+
+JIMMORIA의 full research room은 이제 다음 회사 운영 흐름을 따른다.
+
+```text
+Supervisor plans
+-> Supervisor delegates tasks to sub-agents
+-> Sub-agents execute specialist research
+-> Agent Council deliberates over findings
+-> ReportAgent writes the dossier or diagnostic memo
+-> Supervisor performs final review
+-> ObsidianCurator stores the reviewed output
+-> User receives the result
+```
+
+`Agent Council`은 새 LLM 에이전트가 아니라, 기존 전문 에이전트들이 남긴 finding을 `CollaborationBus` 위에서 모아 round-table 형태로 정리하는 runtime stage다. 참여자는 기본적으로 다음 7명이다.
+
+```text
+ingestion_agent
+narrative_agent
+discovery_agent
+social_kol_agent
+contract_onchain_agent
+product_tech_agent
+funding_token_agent
+```
+
+각 agent는 자신의 최신 finding을 council에 제출하고, runtime은 이를 `agent_council_consensus` finding으로 합친다. consensus는 다음 판단을 남긴다.
+
+```text
+write_candidate_dossier   충분한 source-backed evidence가 있어 보고서 작성
+write_diagnostic_memo     connector gap, placeholder, low confidence가 있어 진단 메모로 작성
+```
+
+그 다음 ReportAgent가 보고서를 작성하면 Supervisor가 `final_supervisor_review` finding을 남긴다. 이 최종 검토는 `room.project_card.supervisor_final_review`에도 저장되고, 보고서 파일 끝에 `Supervisor Final Review` 섹션으로 append된다.
+
+따라서 사용자에게 전달되는 산출물은 다음 상태를 구분한다.
+
+```text
+final_research_report   최종 보고서로 전달 가능
+diagnostic_memo         방은 실행됐지만 근거 부족이므로 진단 메모로 전달
+```
+
+이 구조 덕분에 "에이전트가 그냥 각자 일하고 끝"이 아니라, 전문 직원들이 모여 결론을 만들고 Supervisor가 마지막으로 납품 형태를 결정하는 회사형 workflow가 된다.
 
 ## 8. Collaboration Bus
 
@@ -881,7 +930,7 @@ python -m unittest discover -s tests -v
 
 ## 21. 한 줄 요약
 
-JIMMORIA는 현재 "채팅형 CLI + Supervisor Office delegation tools + ProcessSpec 기반 Research Room + controlled P2P Agent Bus + Shared Memory + Model Gateway + agent-level LLM analysis pass + Tool Gateway + 기본 Web Search/URL/Website/Docs/GitHub/DEX/CoinGecko connectors + Markdown/Obsidian output"까지 구현된 크립토 리서치 회사 MVP다. 다음 핵심 작업은 Project Research Loop, Identity/Evidence/Collision 검증 엔진, 그리고 Social/Contract/Funding 에이전트의 source-backed finding 업그레이드다.
+JIMMORIA는 현재 "채팅형 CLI + Supervisor Office delegation tools + ProcessSpec 기반 Research Room + controlled P2P Agent Bus + Agent Council consensus + Supervisor final review + Shared Memory + Model Gateway + agent-level LLM analysis pass + Tool Gateway + 기본 Web Search/URL/Website/Docs/GitHub/DEX/CoinGecko connectors + Markdown/Obsidian output"까지 구현된 크립토 리서치 회사 MVP다. 다음 핵심 작업은 Project Research Loop, Identity/Evidence/Collision 검증 엔진, 그리고 Social/Contract/Funding 에이전트의 source-backed finding 업그레이드다.
 ## 22. Current Runtime Update Notes
 
 최근 변경 기준으로 JIMMORIA는 live/source-backed 후보와 MVP placeholder 후보를 구분한다.

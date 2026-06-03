@@ -21,7 +21,7 @@ from crypto_research_agents.core.bus import CollaborationBus
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
 from crypto_research_agents.core.company_settings import company_settings_path_for, load_company_settings
 from crypto_research_agents.core.hooks import HookEngine
-from crypto_research_agents.core.memory import SharedMemory
+from crypto_research_agents.core.memory import FindingRecord, SharedMemory
 from crypto_research_agents.core.model_gateway import ModelGateway
 from crypto_research_agents.core.process_spec import load_process_spec
 from crypto_research_agents.core.room import ResearchRoom
@@ -44,6 +44,16 @@ DEFAULT_AGENTS = [
     "funding_token_agent",
     "report_agent",
     "obsidian_curator_agent",
+]
+
+COUNCIL_AGENTS = [
+    "ingestion_agent",
+    "narrative_agent",
+    "discovery_agent",
+    "social_kol_agent",
+    "contract_onchain_agent",
+    "product_tech_agent",
+    "funding_token_agent",
 ]
 
 
@@ -132,9 +142,13 @@ class ResearchRuntime:
             self._run_agent("contract_onchain_agent", room)
             self._run_agent("product_tech_agent", room)
             self._run_agent("funding_token_agent", room)
+            room.set_status(RuntimeState.DELIBERATING)
+            self._run_agent_council(room)
             room.set_status(RuntimeState.READY_FOR_REPORT)
             room.set_status(RuntimeState.WRITING_REPORT)
             self._run_agent("report_agent", room, reports_dir=reports_dir, company_settings=company_settings)
+            room.set_status(RuntimeState.SUPERVISOR_REVIEWING)
+            self._run_supervisor_final_review(room, company_settings=company_settings)
             room.set_status(RuntimeState.OBSIDIAN_SYNCING)
             self._run_agent("obsidian_curator_agent", room, vault_dir=vault_dir)
         except Exception as exc:
@@ -247,6 +261,147 @@ class ResearchRuntime:
         )
         self._emit_output_events(room, result)
 
+    def _run_agent_council(self, room: ResearchRoom) -> None:
+        participants = [agent_id for agent_id in COUNCIL_AGENTS if agent_id in room.agents]
+        self._emit(
+            "deliberation_start",
+            room_id=room.room_id,
+            participants=participants,
+            summary="Specialist agents compare findings and produce a consensus for the report agent.",
+        )
+        findings = self.memory.get_room_findings(room.room_id)
+        statements: list[dict[str, Any]] = []
+        for agent_id in participants:
+            agent_findings = [finding for finding in findings if finding.agent_id == agent_id]
+            if agent_findings:
+                latest = agent_findings[-1]
+                statement = {
+                    "agent_id": agent_id,
+                    "finding_id": latest.finding_id,
+                    "summary": latest.summary,
+                    "confidence": latest.confidence,
+                    "finding_type": latest.finding_type,
+                }
+            else:
+                statement = {
+                    "agent_id": agent_id,
+                    "finding_id": None,
+                    "summary": "No finding submitted before council.",
+                    "confidence": 0.0,
+                    "finding_type": "missing",
+                }
+            statements.append(statement)
+            self.bus.update(
+                room_id=room.room_id,
+                from_agent=agent_id,
+                to_agent="agent_council",
+                summary=statement["summary"],
+                payload=statement,
+            )
+
+        consensus = _build_council_consensus(room, statements)
+        council_finding = self.memory.add_finding(
+            FindingRecord(
+                room_id=room.room_id,
+                agent_id="agent_council",
+                finding_type="agent_council_consensus",
+                summary=consensus["summary"],
+                data=consensus,
+                confidence=consensus["confidence"],
+            )
+        )
+        room.add_finding(council_finding.finding_id)
+        room.project_card["agent_council"] = consensus
+        self.bus.handoff(
+            room_id=room.room_id,
+            from_agent="agent_council",
+            to_agent="report_agent",
+            summary=consensus["summary"],
+            payload={"finding_id": council_finding.finding_id, "consensus": consensus},
+        )
+        self._emit(
+            "deliberation_done",
+            room_id=room.room_id,
+            participants=participants,
+            finding_id=council_finding.finding_id,
+            summary=consensus["summary"],
+            decision=consensus["decision"],
+            messages=len(self.bus.messages),
+            findings=len(self.memory.get_room_findings(room.room_id)),
+        )
+
+    def _run_supervisor_final_review(self, room: ResearchRoom, *, company_settings: Any) -> None:
+        self._emit(
+            "final_review_start",
+            room_id=room.room_id,
+            agent_id="supervisor_agent",
+            summary="Supervisor reviews council consensus, quality gate, and report draft before delivery.",
+        )
+        review = _build_supervisor_final_review(room)
+        review_finding = self.memory.add_finding(
+            FindingRecord(
+                room_id=room.room_id,
+                agent_id="supervisor_agent",
+                finding_type="final_supervisor_review",
+                summary=review["summary"],
+                data=review,
+                confidence=review["confidence"],
+            )
+        )
+        room.add_finding(review_finding.finding_id)
+        room.project_card["supervisor_final_review"] = review
+        self.bus.update(
+            room_id=room.room_id,
+            from_agent="supervisor_agent",
+            to_agent="all",
+            summary=review["summary"],
+            payload={"finding_id": review_finding.finding_id, "review": review},
+        )
+        self._append_supervisor_review_to_report(room, review, company_settings=company_settings)
+        self._emit(
+            "final_review_done",
+            room_id=room.room_id,
+            agent_id="supervisor_agent",
+            finding_id=review_finding.finding_id,
+            summary=review["summary"],
+            delivery_mode=review["delivery_mode"],
+            approved=review["approved_for_delivery"],
+            messages=len(self.bus.messages),
+            findings=len(self.memory.get_room_findings(room.room_id)),
+        )
+
+    def _append_supervisor_review_to_report(self, room: ResearchRoom, review: dict[str, Any], *, company_settings: Any) -> None:
+        report_path = room.output_paths.get("report")
+        if not report_path:
+            return
+        path = Path(report_path)
+        if not path.exists():
+            return
+        report_language = getattr(company_settings, "report_language", "en")
+        korean = report_language == "ko"
+        if korean:
+            section = [
+                "",
+                "## 9. Supervisor Final Review",
+                f"- 전달 모드: `{review['delivery_mode']}`",
+                f"- 전달 승인: `{str(review['approved_for_delivery']).lower()}`",
+                f"- 최종 판단: {review['summary']}",
+            ]
+        else:
+            section = [
+                "",
+                "## 9. Supervisor Final Review",
+                f"- Delivery mode: `{review['delivery_mode']}`",
+                f"- Approved for delivery: `{str(review['approved_for_delivery']).lower()}`",
+                f"- Final judgment: {review['summary']}",
+            ]
+        if review.get("required_followups"):
+            section.append("- Required follow-ups:")
+            section.extend(f"  - {item}" for item in review["required_followups"])
+        updated = path.read_text(encoding="utf-8").rstrip() + "\n" + "\n".join(section) + "\n"
+        path.write_text(updated, encoding="utf-8")
+        room.report_draft = updated
+
     def _emit(self, event_type: str, **payload: Any) -> None:
         event = {"type": event_type, **payload}
         self.event_log.append(event)
@@ -356,3 +511,78 @@ def default_policy(agent_specs: AgentSpecRegistry | None = None) -> PolicyEngine
     for tool in ["check_airdrop_points", "crawl_funding_news"]:
         policy.allow("funding_token_agent", tool)
     return policy
+
+
+def _build_council_consensus(room: ResearchRoom, statements: list[dict[str, Any]]) -> dict[str, Any]:
+    missing = [item["agent_id"] for item in statements if not item.get("finding_id")]
+    low_confidence = [
+        item["agent_id"]
+        for item in statements
+        if float(item.get("confidence") or 0.0) < 0.35
+    ]
+    blockers: list[str] = []
+    for item in statements:
+        summary = str(item.get("summary") or "")
+        lowered = summary.lower()
+        if "unconfigured" in lowered or "placeholder" in lowered or "insufficient" in lowered:
+            blockers.append(f"{item['agent_id']}: {summary}")
+    if missing:
+        blockers.append("Missing council statements: " + ", ".join(missing))
+
+    decision = "write_diagnostic_memo" if blockers or low_confidence else "write_candidate_dossier"
+    if decision == "write_diagnostic_memo":
+        summary = (
+            "Agent council reached a guarded consensus: write a diagnostic memo and label evidence gaps before delivery."
+        )
+        confidence = 0.45
+    else:
+        summary = "Agent council reached consensus: enough evidence exists to draft a candidate dossier."
+        confidence = 0.75
+    return {
+        "room_id": room.room_id,
+        "topic": room.topic,
+        "decision": decision,
+        "summary": summary,
+        "participants": [item["agent_id"] for item in statements],
+        "statements": statements,
+        "blockers": blockers[:8],
+        "low_confidence_agents": low_confidence,
+        "confidence": confidence,
+    }
+
+
+def _build_supervisor_final_review(room: ResearchRoom) -> dict[str, Any]:
+    quality = room.project_card.get("research_quality") if isinstance(room.project_card, dict) else {}
+    if not isinstance(quality, dict):
+        quality = {}
+    council = room.project_card.get("agent_council") if isinstance(room.project_card, dict) else {}
+    if not isinstance(council, dict):
+        council = {}
+    quality_status = str(quality.get("status") or "")
+    council_decision = str(council.get("decision") or "")
+    insufficient = quality_status == "insufficient_evidence" or council_decision == "write_diagnostic_memo"
+    if insufficient:
+        delivery_mode = "diagnostic_memo"
+        summary = (
+            "Supervisor approved delivery as a diagnostic memo, not as a completed research report, because evidence remains insufficient."
+        )
+        required_followups = [
+            "Add source-backed social/KOL evidence.",
+            "Verify official website, GitHub, token, and contract identity.",
+            "Re-run quality gate after live connectors collect evidence URLs.",
+        ]
+        confidence = 0.55
+    else:
+        delivery_mode = "final_research_report"
+        summary = "Supervisor approved the report for client delivery after council consensus and quality review."
+        required_followups = []
+        confidence = 0.8
+    return {
+        "approved_for_delivery": True,
+        "delivery_mode": delivery_mode,
+        "summary": summary,
+        "quality_status": quality_status,
+        "council_decision": council_decision,
+        "required_followups": required_followups,
+        "confidence": confidence,
+    }

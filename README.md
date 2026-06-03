@@ -4,7 +4,7 @@ JIMMORIA는 크립토 리서치 전용 멀티에이전트 회사 CLI입니다.
 
 사용자는 터미널에서 채팅을 치고, Supervisor가 Research Room을 열어 여러 에이전트에게 일을 나눕니다. 에이전트들은 소스 정리, 내러티브 분석, 후보 프로젝트 발굴, KOL/소셜 체크, 온체인/제품/토큰 체크, 보고서 작성, Obsidian 노트 정리를 담당합니다.
 
-현재는 MVP입니다. 에이전트 협업 구조와 보고서 생성 흐름은 동작하고, Supervisor Office가 Research Room 업무를 만들고 하위 에이전트에게 배정합니다. Web Search/URL/Website/Docs/GitHub/DEX Screener/CoinGecko 기본 connector도 ToolGateway 뒤에 붙어 있습니다. X/Twitter, Telegram, Discord, RootData, Explorer/RPC, funding/airdrop 커넥터는 아직 placeholder 상태입니다.
+현재는 MVP입니다. 에이전트 협업 구조와 보고서 생성 흐름은 동작하고, Supervisor Office가 Research Room 업무를 만들고 하위 에이전트에게 배정합니다. 하위 에이전트가 수행을 마치면 Agent Council이 findings를 모아 consensus를 만들고, ReportAgent가 작성한 뒤 Supervisor가 최종 검토해서 전달 모드를 결정합니다. Web Search/URL/Website/Docs/GitHub/DEX Screener/CoinGecko 기본 connector도 ToolGateway 뒤에 붙어 있습니다. X/Twitter, Telegram, Discord, RootData, Explorer/RPC, funding/airdrop 커넥터는 아직 placeholder 상태입니다.
 
 ## Quick Start
 
@@ -61,6 +61,14 @@ Report synthesis         writing route
 ```
 
 CrewAI의 agent/task 분리, ChatDev의 phase/workflow와 replay, LangGraph Supervisor의 routing/handoff 패턴, Hermes Agent의 toolset/delegation 운영 방식을 JIMMORIA 구조에 맞게 흡수했습니다. Supervisor는 `supervisor_office` 툴로 task를 만들고 배정하며, 각 전문 에이전트는 먼저 ToolGateway와 SharedMemory로 근거를 모은 뒤 `llm_analysis_pass`로 요약, 근거 부족, 리스크, 다음 액션을 판단합니다.
+
+Full research room 흐름은 다음입니다.
+
+```text
+Supervisor plan -> task delegation -> specialist execution
+-> Agent Council consensus -> report writing
+-> Supervisor final review -> user delivery + Obsidian sync
+```
 
 이 LLM pass는 근거를 만들어내는 역할이 아닙니다. 외부 connector가 비어 있으면 “미설정/근거 부족”이라고 표시하고, 실패해도 Research Room 전체가 죽지 않게 fallback summary를 남깁니다. finding confidence는 tool/memory evidence 기준으로 유지하고, 모델의 자신감은 `llm_analysis.confidence`에 따로 저장합니다. 호출 기록은 `data/runs/<room_id>/llm_call_log.json`에 저장됩니다.
 
