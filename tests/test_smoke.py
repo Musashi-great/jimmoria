@@ -30,7 +30,7 @@ from crypto_research_agents.cli import (
 from crypto_research_agents.console import JimmoriaConsole, print_jimmoria_logo
 from crypto_research_agents.core.company_settings import CompanySettings
 from crypto_research_agents.core.concurrency import load_concurrency_policy
-from crypto_research_agents.core.llm_provider import CodexCliProvider, CodexSdkProvider, LLMRequest, LLMResponse, provider_from_env
+from crypto_research_agents.core.llm_provider import CodexCliProvider, CodexSdkProvider, LLMRequest, LLMResponse, parse_json_response, provider_from_env
 from crypto_research_agents.core.memory import SharedMemory, SourceRecord
 from crypto_research_agents.core.model_gateway import ModelGateway
 from crypto_research_agents.core.process_spec import ProcessSpecRegistry, load_process_spec
@@ -882,6 +882,51 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(data["official_links"]["docs"][0]["url"], "https://pearl.example/docs")
         self.assertEqual(data["official_links"]["github"][0]["url"], "https://github.com/pearl-labs/app")
 
+    def test_tool_gateway_redacts_sensitive_audit_inputs(self) -> None:
+        policy = PolicyEngine()
+        policy.allow("agent", "echo")
+        events: list[dict[str, object]] = []
+        gateway = ToolGateway(
+            policy,
+            event_callback=lambda event_type, **payload: events.append({"type": event_type, **payload}),
+        )
+        gateway.register(
+            "echo",
+            lambda **kwargs: {
+                "status": "success",
+                "tool": "echo",
+                "message": "ok",
+                "data": {
+                    "token": kwargs["api_key"],
+                    "token_supply": "123",
+                    "required_secret": "ETHERSCAN_API_KEY",
+                    "normal": kwargs["normal"],
+                    "content": "x" * 2500,
+                },
+            },
+        )
+
+        result = gateway.call(
+            "agent",
+            "echo",
+            room_id="room_test",
+            api_key="secret-value",
+            normal="visible",
+            nested={"bearer_token": "nested-secret"},
+            content="y" * 2500,
+        )
+
+        self.assertEqual(result["data"]["token"], "secret-value")
+        audit = gateway.audit_log[-1]
+        self.assertEqual(audit["input"]["api_key"], "<redacted>")
+        self.assertEqual(audit["input"]["nested"]["bearer_token"], "<redacted>")
+        self.assertIn("<truncated", audit["input"]["content"])
+        self.assertEqual(audit["result"]["data"]["token"], "<redacted>")
+        self.assertEqual(audit["result"]["data"]["token_supply"], "123")
+        self.assertEqual(audit["result"]["data"]["required_secret"], "ETHERSCAN_API_KEY")
+        self.assertIn("<truncated", audit["result"]["data"]["content"])
+        self.assertFalse(any("secret-value" in str(event) for event in events))
+
     def test_live_discovery_resolves_pearl_project_candidate(self) -> None:
         topic = "pearl 크립토 pow 프로젝트에 대해서 리서칭을 진행해봐"
         query = extract_project_query(topic)
@@ -1565,6 +1610,23 @@ Usage: codex exec [OPTIONS] [PROMPT]
             gateway = ModelGateway(provider=None)
 
         self.assertEqual(gateway.default_model, "gpt-5.5")
+
+    def test_parse_json_response_accepts_fenced_or_prefaced_json(self) -> None:
+        fenced = LLMResponse(
+            text='```json\n{"summary": "ok", "confidence": 0.8}\n```',
+            model="test",
+            provider="fake",
+            usage={},
+        )
+        prefaced = LLMResponse(
+            text='Here is the result:\n{"summary": "wrapped", "risks": ["none"]}\nDone.',
+            model="test",
+            provider="fake",
+            usage={},
+        )
+
+        self.assertEqual(parse_json_response(fenced)["summary"], "ok")
+        self.assertEqual(parse_json_response(prefaced)["summary"], "wrapped")
 
     def test_codex_defaults_use_official_models_by_route(self) -> None:
         class FakeCodexCliProvider:

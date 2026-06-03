@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from time import perf_counter
 from typing import Any
 
@@ -179,10 +179,10 @@ class ToolGateway:
             room_id=room_id,
             agent_id=agent_id,
             tool_name=tool_name,
-            input=input_data,
+            input=_sanitize_for_log(input_data),
             status=status,
             latency_ms=latency_ms,
-            result=result,
+            result=_sanitize_for_log(result),
         )
         self.audit_log.append(record.to_dict())
 
@@ -204,7 +204,7 @@ class ToolGateway:
             "agent_id": agent_id,
             "tool_name": tool_name,
             "room_id": room_id,
-            "input_preview": _preview(input_data),
+            "input_preview": _preview(_sanitize_for_log(input_data)),
         }
         if latency_ms is not None:
             payload["latency_ms"] = latency_ms
@@ -224,3 +224,70 @@ def _preview(value: Any, *, limit: int = 180) -> str:
     if len(text) <= limit:
         return text
     return text[: limit - 3].rstrip() + "..."
+
+
+SENSITIVE_KEY_NAMES = {
+    "api_key",
+    "apikey",
+    "authorization",
+    "auth_header",
+    "bearer",
+    "credential",
+    "credentials",
+    "password",
+    "private_key",
+    "secret",
+    "seed_phrase",
+    "token",
+    "access_token",
+    "refresh_token",
+    "id_token",
+    "client_secret",
+}
+SENSITIVE_KEY_SUFFIXES = (
+    "_api_key",
+    "_apikey",
+    "_token",
+    "_secret",
+    "_password",
+    "_private_key",
+    "_seed_phrase",
+)
+
+
+def _sanitize_for_log(value: Any, *, max_string_length: int = 2000) -> Any:
+    if isinstance(value, Mapping):
+        sanitized: dict[str, Any] = {}
+        for key, item in value.items():
+            key_text = str(key)
+            if _is_sensitive_key(key_text):
+                sanitized[key_text] = "<redacted>"
+            else:
+                sanitized[key_text] = _sanitize_for_log(item, max_string_length=max_string_length)
+        return sanitized
+    if isinstance(value, list):
+        return [_sanitize_for_log(item, max_string_length=max_string_length) for item in value[:100]]
+    if isinstance(value, tuple):
+        return tuple(_sanitize_for_log(item, max_string_length=max_string_length) for item in value[:100])
+    if isinstance(value, set):
+        return [_sanitize_for_log(item, max_string_length=max_string_length) for item in list(value)[:100]]
+    if isinstance(value, str):
+        return _truncate_string(value, max_string_length)
+    return value
+
+
+def _is_sensitive_key(key: str) -> bool:
+    normalized = key.lower().replace("-", "_")
+    if normalized in {"required_secret", "required_secrets"}:
+        return False
+    return (
+        normalized in SENSITIVE_KEY_NAMES
+        or normalized.startswith("authorization")
+        or any(normalized.endswith(suffix) for suffix in SENSITIVE_KEY_SUFFIXES)
+    )
+
+
+def _truncate_string(value: str, limit: int) -> str:
+    if len(value) <= limit:
+        return value
+    return value[: limit - 30].rstrip() + f"... <truncated {len(value) - limit + 30} chars>"

@@ -327,11 +327,60 @@ def _is_real_model_name(model: str) -> bool:
 
 
 def parse_json_response(response: LLMResponse) -> dict[str, Any]:
-    try:
-        value = json.loads(response.text)
-    except json.JSONDecodeError:
-        return {}
-    return value if isinstance(value, dict) else {}
+    for candidate in _json_response_candidates(response.text):
+        try:
+            value = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            return value
+    return {}
+
+
+def _json_response_candidates(text: str) -> list[str]:
+    stripped = text.strip()
+    candidates = [stripped]
+    if stripped.startswith("```"):
+        lines = stripped.splitlines()
+        if lines and lines[0].strip().startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip().startswith("```"):
+            lines = lines[:-1]
+        fenced = "\n".join(lines).strip()
+        if fenced:
+            candidates.append(fenced)
+    extracted = _extract_first_json_object(stripped)
+    if extracted:
+        candidates.append(extracted)
+    return candidates
+
+
+def _extract_first_json_object(text: str) -> str | None:
+    start = text.find("{")
+    if start < 0:
+        return None
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(start, len(text)):
+        char = text[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : index + 1]
+    return None
 
 
 def _fallback_summary(text: str, limit: int = 260) -> str:
