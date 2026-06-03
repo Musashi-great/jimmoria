@@ -155,6 +155,13 @@ def main(argv: list[str] | None = None) -> None:
     doctor_parser = subparsers.add_parser("doctor", help="Show configured and placeholder capabilities.")
     add_run_args(doctor_parser)
 
+    web_parser = subparsers.add_parser("web", help="Open the local Web Research HQ dashboard.")
+    web_parser.add_argument("--host", default="127.0.0.1")
+    web_parser.add_argument("--port", type=int, default=8787)
+    web_parser.add_argument("--no-browser", action="store_true", help="Do not open the browser automatically.")
+    add_run_args(web_parser)
+    web_parser.add_argument("--runs-dir", default=default_project_path("data/runs"), help="Run snapshot directory.")
+
     workflow_parser = subparsers.add_parser("workflow", help="Inspect and run YAML company workflows.")
     workflow_subparsers = workflow_parser.add_subparsers(dest="workflow_command")
 
@@ -224,6 +231,10 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.command == "doctor":
         doctor_command(args)
+        return
+
+    if args.command == "web":
+        web_command(args)
         return
 
     if args.command == "workflow":
@@ -334,6 +345,20 @@ def default_chat_args() -> argparse.Namespace:
         memory=default_project_path("data/memory.json"),
         skip_model_setup=False,
         verbose_board=False,
+    )
+
+
+def web_command(args: argparse.Namespace) -> None:
+    from crypto_research_agents.web import run_web_server
+
+    run_web_server(
+        host=args.host,
+        port=args.port,
+        runs_dir=args.runs_dir,
+        reports_dir=args.reports,
+        vault_dir=args.vault,
+        memory_path=args.memory,
+        open_browser=not args.no_browser,
     )
 
 

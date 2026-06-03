@@ -28,6 +28,7 @@ jimmoria/
     cli.py
     console.py
     runtime.py
+    web.py
     agents/
     connectors/
     core/
@@ -90,6 +91,7 @@ jimmoria research           텍스트, 파일, URL 기반 리서치 실행
 jimmoria article            research 별칭
 jimmoria add-source         소스만 저장하고 Obsidian Source Note 생성
 jimmoria doctor             현재 기능 연결 상태 확인
+jimmoria web                로컬 Web Research HQ 대시보드 실행
 jimmoria runs               이전 실행 목록
 jimmoria status <room_id>   특정 Research Room 상태
 jimmoria messages <room_id> 에이전트 협업 메시지
@@ -106,6 +108,7 @@ flowchart LR
     User[User CLI Chat] --> CLI[cli.py]
     CLI --> Console[console.py]
     CLI --> Runtime[ResearchRuntime]
+    User --> Web[web.py Web Research HQ]
 
     Runtime --> Room[ResearchRoom]
     Runtime --> Bus[CollaborationBus]
@@ -126,6 +129,9 @@ flowchart LR
     Runtime --> Runs[data/runs]
     Runtime --> Reports[reports]
     Runtime --> Vault[vault]
+    Web --> Runs
+    Web --> Reports
+    Web --> Vault
 ```
 
 중앙 개념은 다음과 같다.
@@ -134,6 +140,7 @@ flowchart LR
 |---|---|---|
 | CLI | `crypto_research_agents/cli.py` | 명령어 파싱, 채팅 루프, 모델 설정 패널 |
 | Console | `crypto_research_agents/console.py` | JIMMORIA 로고, 박스형 입력창, 도움말, 실시간 에이전트 상황판 출력 |
+| Web Dashboard | `crypto_research_agents/web.py` | run snapshot, event stream, agent board, report preview를 웹에서 시각화 |
 | Runtime | `crypto_research_agents/runtime.py` | Research Room 생성과 에이전트 실행 순서 관리 |
 | ProcessSpec | `core/process_spec.py` + `config/processes/` | Research Room의 goals, task order, expected output, artifact contract 정의 |
 | ResearchRoom | `core/room.py` | 하나의 리서치 작업 단위와 상태 |
@@ -1504,3 +1511,79 @@ report      whether report artifact exists
 ```
 
 이 기능은 아직 실제 background parallel runner가 아니다. 현재 의미는 "여러 Research Room을 운영자가 한눈에 관리하는 UI"다. 다음 단계에서는 Research Room worker queue를 붙여 `jimmoria` 대화창은 유지한 채 여러 room을 백그라운드에서 돌리고, `/focus <room_id>`로 특정 room stream을 구독하는 방향으로 확장한다.
+
+## 30. Web Research HQ
+
+CLI 로그만으로 전체 회사 구조와 Research Room 진행 기록을 확인하기 어렵기 때문에 `jimmoria web` 명령으로 로컬 웹 대시보드를 띄울 수 있게 했다.
+
+```powershell
+jimmoria web
+```
+
+기본 주소는 다음이다.
+
+```text
+http://127.0.0.1:8787
+```
+
+브라우저 자동 열기를 원하지 않으면 다음처럼 실행한다.
+
+```powershell
+jimmoria web --no-browser
+```
+
+웹 대시보드는 실행 엔진을 새로 만들지 않고, 기존 런타임이 저장하는 로컬 산출물을 읽어서 시각화한다.
+
+```text
+data/runs/<room_id>/room.json
+data/runs/<room_id>/events.json
+data/runs/<room_id>/messages.json
+data/runs/<room_id>/tool_audit_log.json
+data/runs/<room_id>/llm_call_log.json
+reports/*.md
+vault/
+```
+
+새로 추가된 핵심 파일은 다음이다.
+
+| 파일 | 역할 |
+|---|---|
+| `crypto_research_agents/web.py` | 로컬 HTTP 서버, HTML 대시보드, JSON API 제공 |
+| `crypto_research_agents/cli.py` | `jimmoria web` 명령 연결 |
+
+웹에서 보는 주요 화면은 다음과 같다.
+
+| 영역 | 설명 |
+|---|---|
+| JIMMORIA Hero | Web Research HQ 상태와 현재 선택된 Room 표시 |
+| Company Structure | User Brief -> Supervisor -> Research Room -> Specialist Agents -> Agent Council -> Final Review -> Report/Vault 흐름 |
+| Research Rooms | `data/runs`에 저장된 과거 Research Room 목록 |
+| Live Agent Board | 선택한 room의 `events.json`을 읽어 agent별 WAIT/RUN/DONE/FAIL 상태 표시 |
+| Artifacts | report, vault, events, messages, tool log, LLM log 경로 표시 |
+| Event Stream | 최근 event를 시간순으로 표시 |
+| Report Preview | 저장된 Markdown report 미리보기 |
+
+현재 제공하는 API는 다음과 같다.
+
+```text
+GET /                         대시보드 HTML
+GET /health                   서버 상태
+GET /api/overview             회사 구조, workflow, agents, capabilities
+GET /api/runs                 최근 Research Room 목록
+GET /api/runs/<room_id>       room.json/events/messages/tool/llm/report preview 통합 payload
+GET /api/report/<room_id>     선택 room의 report preview
+```
+
+이 웹 레이어는 read-only dashboard다. 사용자가 웹에서 명령을 내려 Research Room을 직접 실행하는 기능은 아직 붙이지 않았다. 현재 목적은 CLI에서 생성된 Research Room과 agent/event 구조를 보기 쉽게 확인하는 것이다.
+
+향후 웹 확장 순서는 다음이 자연스럽다.
+
+```text
+1. 웹 입력창에서 Supervisor와 대화
+2. Supervisor 확인 후 Research Room 실행
+3. 실행 중 events.json을 polling이 아니라 streaming으로 표시
+4. Agent Council 토론 내용을 별도 탭으로 표시
+5. Tool audit log와 LLM call log를 agent별로 필터링
+6. Report/Vault 산출물을 웹에서 바로 열람
+7. 나중에 visual graph/canvas로 agent network replay
+```

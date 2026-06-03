@@ -47,6 +47,7 @@ from crypto_research_agents.core.workflow_loader import WorkflowSpecRegistry, lo
 from crypto_research_agents.storage.artifact_store import ArtifactStore
 from crypto_research_agents.storage.session_store import search_sessions
 from crypto_research_agents.tools.registry import load_tool_registry
+from crypto_research_agents.web import build_overview_payload, build_run_payload, render_dashboard_html
 
 
 class SmokeTest(unittest.TestCase):
@@ -1641,6 +1642,77 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(capabilities["Worker profiles"].status, "configured")
         self.assertEqual(capabilities["Telegram delivery config"].status, "missing")
         self.assertIn("connector not registered", capabilities["X/Twitter search"].detail)
+
+    def test_web_dashboard_html_exposes_company_structure(self) -> None:
+        html = render_dashboard_html()
+
+        self.assertIn("JIMMORIA Web Research HQ", html)
+        self.assertIn("Company Structure", html)
+        self.assertIn("Agent Council", html)
+        self.assertIn("Supervisor Final Review", html)
+
+    def test_web_overview_payload_lists_agents_and_runtime_layers(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            overview = build_overview_payload(
+                memory_path=root / "memory.json",
+                runs_dir=root / "runs",
+                vault_dir=root / "vault",
+                reports_dir=root / "reports",
+            )
+
+        self.assertEqual(overview["app"], "JIMMORIA")
+        self.assertTrue(any(item["id"] == "supervisor_agent" for item in overview["agents"]))
+        self.assertTrue(any(item["id"] == "agent_council" for item in overview["workflow"]))
+        self.assertTrue(any(item["label"] == "ToolGateway" for item in overview["infrastructure"]))
+
+    def test_web_run_payload_reads_room_events_and_report_preview(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "runs" / "room_web"
+            run_dir.mkdir(parents=True)
+            report_path = root / "reports" / "web-room.md"
+            report_path.parent.mkdir()
+            report_path.write_text("# Web Report\n\nAgent output.", encoding="utf-8")
+            (run_dir / "room.json").write_text(
+                json.dumps(
+                    {
+                        "room_id": "room_web",
+                        "topic": "Web dashboard check",
+                        "agents": ["supervisor_agent", "report_agent"],
+                        "shared_findings": ["finding_1"],
+                        "output_paths": {"report": str(report_path), "obsidian_vault": str(root / "vault")},
+                        "status": "completed",
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (run_dir / "events.json").write_text(
+                json.dumps(
+                    [
+                        {"type": "agent_start", "agent_id": "supervisor_agent", "task_type": "supervision"},
+                        {
+                            "type": "agent_done",
+                            "agent_id": "supervisor_agent",
+                            "task_type": "supervision",
+                            "summary": "Supervisor planned the room.",
+                        },
+                    ],
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (run_dir / "messages.json").write_text("[]", encoding="utf-8")
+            (run_dir / "tool_audit_log.json").write_text("[]", encoding="utf-8")
+            (run_dir / "llm_call_log.json").write_text("[]", encoding="utf-8")
+
+            payload = build_run_payload("room_web", runs_dir=root / "runs")
+
+        self.assertEqual(payload["room"]["room_id"], "room_web")
+        self.assertEqual(payload["counters"]["events"], 2)
+        self.assertEqual(payload["agent_state"][0]["state"], "DONE")
+        self.assertIn("Web Report", payload["report_preview"])
 
     def test_safety_gate_blocks_investment_advice(self) -> None:
         result = review_report_quality("This is not advice but you should swap into it. https://example.com")

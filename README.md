@@ -21,6 +21,16 @@ python -m pip install -e ".[all]"
 jimmoria
 ```
 
+웹 대시보드:
+
+웹에서 회사 구조와 Research Room 실행 기록을 확인하려면 로컬 Web Research HQ를 띄웁니다.
+
+```powershell
+jimmoria web
+```
+
+기본 주소는 `http://127.0.0.1:8787`입니다. 이 대시보드는 `data/runs`, `reports`, `vault`를 읽어서 Supervisor, Research Room, Agent Board, Agent Council, final review, report preview, replay events를 한 화면에 보여줍니다. 브라우저를 자동으로 열고 싶지 않으면 `jimmoria web --no-browser`를 사용합니다.
+
 데모 실행:
 
 ```powershell
@@ -141,6 +151,7 @@ jimmoria/
     cli.py                 jimmoria 명령어 진입점
     console.py             터미널 화면, 히어로, 채팅 UI
     runtime.py             Research Room 실행 흐름
+    web.py                 local Web Research HQ dashboard
     agents/                실제 에이전트 구현
     connectors/            Supervisor Office, Web Search, URL, Docs, GitHub, DEX, CoinGecko connector
     core/                  Bus, Memory, Room, ModelGateway, ToolGateway
@@ -175,6 +186,7 @@ Default CLI paths resolve to the JIMMORIA project root. Running `jimmoria` from 
 ```text
 - CLI 채팅 인터페이스
 - 보라/핑크 테마의 Rich 기반 실행 로그
+- Local Web Research HQ dashboard (`jimmoria web`)
 - Research Room orchestration
 - Supervisor + controlled P2P Agent Bus
 - AgentSpec/persona YAML 로딩
