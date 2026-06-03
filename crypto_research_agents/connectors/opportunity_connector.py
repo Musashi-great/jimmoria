@@ -18,6 +18,9 @@ def check_airdrop_points(project_name: str | None = None, *, limit: int = 6) -> 
     results = data.get("results", []) if isinstance(data.get("results"), list) else []
     hints = [_hint_from_result(result) for result in results if isinstance(result, dict)]
     hints = [hint for hint in hints if hint["signals"]]
+    tokens = _distinctive_tokens(project_name)
+    if tokens:
+        hints = [hint for hint in hints if _mentions_project(hint, tokens)]
     return success(
         "check_airdrop_points",
         {
@@ -44,3 +47,21 @@ def _hint_from_result(result: dict[str, Any]) -> dict[str, Any]:
         "snippet": result.get("snippet"),
         "signals": signals,
     }
+
+
+def _distinctive_tokens(project_name: str) -> list[str]:
+    generic = {"protocol", "project", "network", "labs", "lab", "crypto", "chain", "finance"}
+    tokens = []
+    for token in project_name.lower().replace("-", " ").replace("_", " ").split():
+        cleaned = "".join(char for char in token if char.isalnum())
+        if len(cleaned) >= 4 and cleaned not in generic:
+            tokens.append(cleaned)
+    return tokens[:3]
+
+
+def _mentions_project(hint: dict[str, Any], tokens: list[str]) -> bool:
+    text = " ".join(
+        str(hint.get(key, ""))
+        for key in ["title", "url", "snippet"]
+    ).lower()
+    return any(token in text for token in tokens)

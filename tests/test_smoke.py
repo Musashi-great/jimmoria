@@ -1097,6 +1097,34 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(get_dex_pair()["status"], "missing_input")
         self.assertEqual(get_token_metadata()["status"], "missing_input")
 
+    def test_airdrop_checker_filters_generic_non_project_results(self) -> None:
+        from crypto_research_agents.connectors.opportunity_connector import check_airdrop_points
+
+        generic_results = {
+            "status": "success",
+            "data": {
+                "results": [
+                    {
+                        "title": "Crypto Airdrops List June 2026",
+                        "url": "https://airdrops.io/",
+                        "snippet": "Free token opportunities, testnets, rewards, and points campaigns.",
+                    },
+                    {
+                        "title": "3Jane official rewards update",
+                        "url": "https://docs.3jane.xyz/jane/liquidity-mining",
+                        "snippet": "3Jane documentation mentions liquidity mining and rewards.",
+                    },
+                ]
+            },
+        }
+        with patch("crypto_research_agents.connectors.opportunity_connector.web_search", return_value=generic_results):
+            result = check_airdrop_points("3Jane Protocol")
+
+        hints = result["data"]["hints"]
+        self.assertEqual(result["data"]["classification"], "hint_found")
+        self.assertEqual(len(hints), 1)
+        self.assertIn("3Jane", hints[0]["title"])
+
     def test_tool_gateway_redacts_sensitive_audit_inputs(self) -> None:
         policy = PolicyEngine()
         policy.allow("agent", "echo")
@@ -1231,14 +1259,26 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(candidates[0]["metadata"]["candidate_origin"], "live_source_backed")
         self.assertIn("https://www.3jane.xyz/pdf/whitepaper.pdf", candidates[0]["metadata"]["evidence_urls"])
         self.assertIn("# 3Jane Protocol 리서치 보고서 - 통합본", report)
+        self.assertNotIn("GPU Mining", report)
+        self.assertNotIn("native_coin_reported", report)
+        self.assertNotIn("Crypto Airdrops List", report)
+        self.assertNotIn("Connector status: {", report)
+        self.assertIn("usd3_yieldcoin_or_credit_asset_reported", report)
         self.assertIn("## 1. 핵심 결론", report)
         self.assertIn("## 2. 3Jane Protocol는 무엇을 하려는 프로젝트인가", report)
         self.assertIn("## 3. 제품 / 기술 구조", report)
         self.assertIn("## 4. 토큰 / 체인 / 온체인 상태", report)
         self.assertIn("## 7. 리서치 Thesis", report)
         self.assertIn("## 10. 앞으로 확인해야 할 것", report)
+        self.assertIn("## 11. 검증 상태 / 리서치 범위", report)
         self.assertIn("## 12. Source Log", report)
         self.assertIn("## 13. Research Quality Gate", report)
+        self.assertNotIn("## 11. 에이전트별 조사 결과", report)
+        self.assertNotIn("Agent Research Notes", report)
+        self.assertNotIn("LLM synthesis", report)
+        self.assertNotIn("LLM 종합", report)
+        self.assertNotIn('"title":', report)
+        self.assertNotIn("obsidian_note", report)
 
     def test_message_summary_uses_response_result_fallback(self) -> None:
         message = {
@@ -1292,6 +1332,9 @@ class SmokeTest(unittest.TestCase):
         assert report is not None
         self.assertIn("프로젝트를 이해", report.mission.primary_goal)
         self.assertTrue(any("프로젝트 설명" in item for item in report.must_follow))
+        self.assertTrue(any("도메인별 프로젝트 정보" in item for item in report.must_follow))
+        self.assertTrue(any("raw LLM JSON" in item for item in report.must_not))
+        self.assertTrue(any("회의록" in item for item in report.must_not))
 
         funding = registry.get("funding_token_agent")
         self.assertIsNotNone(funding)

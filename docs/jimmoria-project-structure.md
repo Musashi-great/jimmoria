@@ -344,12 +344,12 @@ Research Room 결과 출력 정책:
 8. 강점
 9. 약점 / 리스크
 10. 앞으로 확인해야 할 것
-11. 에이전트별 조사 결과
+11. 검증 상태 / 리서치 범위
 12. Source Log
 13. Research Quality Gate
 ```
 
-즉 ReportAgent는 "누가 무엇을 했는지"보다 "이 프로젝트를 어떻게 이해해야 하는지"를 앞세운다. 에이전트별 로그와 품질 게이트는 보고서 후반의 근거/감사 trail로 남긴다.
+즉 ReportAgent는 "누가 무엇을 했는지"보다 "이 프로젝트를 어떻게 이해해야 하는지"를 앞세운다. 에이전트별 실행 로그, council 토론, tool payload, raw LLM output은 최종 보고서 본문에 넣지 않고 `data/runs/<room_id>/messages.json`, `events.json`, `tool_audit_log.json`, `llm_call_log.json`에 감사 trail로 남긴다.
 
 ## 12. Web Dashboard
 

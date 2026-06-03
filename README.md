@@ -232,9 +232,11 @@ Funding / incentive / airdrop hints
 Research thesis
 Strengths and risks
 Follow-up checklist
-Agent notes and source log
+Verification coverage and source log
 Research quality gate
 ```
+
+Agent execution logs, council discussion, tool payloads, and raw LLM output are kept in `data/runs/<room_id>/messages.json`, `events.json`, and audit logs. They are not part of the completed report body.
 
 If evidence is insufficient, the CLI prints a diagnostic preview instead of presenting it as a finished dossier.
 

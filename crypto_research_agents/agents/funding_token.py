@@ -100,7 +100,7 @@ def _points_status(evidence_text: str, tool_data: dict[str, Any] | None = None) 
 
 
 def _token_opportunity(project_status: str, evidence_text: str) -> str:
-    if any(keyword in evidence_text for keyword in [" prl", "ticker", "block reward", "mining", "coin", "emissions"]):
+    if any(keyword in evidence_text for keyword in [" prl", "ticker prl", "block reward", "proof-of-useful-work", "emissions"]):
         return "native_or_mining_token_signal"
     if project_status not in {"unknown", ""}:
         return project_status
@@ -109,7 +109,7 @@ def _token_opportunity(project_status: str, evidence_text: str) -> str:
 
 def _note(evidence_text: str, tool_result: dict[str, Any]) -> str:
     status = str(tool_result.get("status") or "unknown")
-    if "mining" in evidence_text or "block reward" in evidence_text:
+    if "block reward" in evidence_text or "proof-of-useful-work" in evidence_text:
         return "Evidence mentions mining/block rewards; treat as token mechanics research, not investment advice."
     if "points" in evidence_text or "airdrop" in evidence_text:
         return "Evidence mentions points/airdrop-style incentives; requires official confirmation."

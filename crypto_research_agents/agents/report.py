@@ -108,8 +108,9 @@ class ReportAgent(BaseAgent):
             task_type="final_synthesis",
             system_prompt=self.system_prompt(
                 "You are the Report Agent for a crypto research company. "
-                "Write a concise research TL;DR. Do not invent live data. "
-                "Clearly mention when connector data is not configured."
+                "Write a private editorial synthesis for the final renderer. "
+                "Do not output JSON, agent logs, Obsidian notes, or debate transcripts. "
+                "Do not invent live data. Clearly mention when connector data is not configured."
             ),
             user_prompt=(
                 f"Topic: {room.topic}\n\n"
@@ -255,8 +256,6 @@ def render_project_dossier(
             if korean
             else "- Live LLM: not configured. Offline fallback generated deterministic summaries only."
         )
-    elif should_show_llm_summary(llm_summary):
-        lines.append(f"- {'LLM 종합' if korean else 'LLM synthesis'}: {llm_summary}")
     lines.extend(
         [
             origin_note,
@@ -362,7 +361,7 @@ def render_completed_project_report(
     korean = wants_korean_report(room, settings)
     primary = candidates[0] if candidates else None
     title_name = primary.name if primary else room.topic
-    narrative_text = ", ".join(primary.narratives) if primary else "unknown"
+    narrative_text = ", ".join(display_narratives(primary)) if primary else "unknown"
     source_log = collect_source_log(primary, sources) if primary else []
     source_summary = ", ".join(f"[{item['label']}]({item['url']})" for item in source_log[:12]) or "source log unavailable"
 
@@ -381,8 +380,6 @@ def render_completed_project_report(
         "## 1. 핵심 결론" if korean else "## 1. Core Conclusion",
     ]
     lines.extend(render_core_conclusion(primary, quality, korean=korean))
-    if provider_name != "offline_fallback" and should_show_llm_summary(llm_summary):
-        lines.extend(["", "### LLM 종합" if korean else "### LLM Synthesis", llm_summary])
 
     lines.extend(
         [
@@ -416,8 +413,8 @@ def render_completed_project_report(
     lines.extend(["", "## 10. 앞으로 확인해야 할 것" if korean else "## 10. Follow-up Checklist"])
     lines.extend(render_due_diligence_checklist(primary, findings, korean=korean))
 
-    lines.extend(["", "## 11. 에이전트별 조사 결과" if korean else "## 11. Agent Research Notes"])
-    lines.extend(render_agent_findings_brief(findings))
+    lines.extend(["", "## 11. 검증 상태 / 리서치 범위" if korean else "## 11. Verification Status / Research Coverage"])
+    lines.extend(render_research_coverage(primary, findings, source_log, korean=korean))
 
     lines.extend(["", "## 12. Source Log"])
     if source_log:
@@ -439,17 +436,6 @@ def render_completed_project_report(
             f"- Report language: `{'ko' if korean else settings.report_language}`",
         ]
     )
-    final_review = room.project_card.get("supervisor_final_review") if isinstance(room.project_card, dict) else {}
-    if isinstance(final_review, dict) and final_review:
-        lines.extend(
-            [
-                "",
-                "## 14. Supervisor Final Review",
-                f"- Delivery mode: `{final_review.get('delivery_mode')}`",
-                f"- Approved for delivery: `{final_review.get('approved_for_delivery')}`",
-                f"- Final judgment: {final_review.get('summary')}",
-            ]
-        )
     return "\n".join(lines)
 
 
@@ -462,19 +448,20 @@ def wants_korean_report(room: ResearchRoom, settings: CompanySettings) -> bool:
 def render_core_conclusion(project: Any, quality: ReportQuality, *, korean: bool) -> list[str]:
     if project is None:
         return ["- 후보 프로젝트가 resolve되지 않았다." if korean else "- No candidate project was resolved."]
-    narratives = ", ".join(project.narratives[:5]) or "unknown"
+    narratives = ", ".join(display_narratives(project)[:5]) or "unknown"
     evidence_count = len(project.metadata.get("evidence_urls", []))
+    token_status = display_token_status(project)
     if korean:
         return [
             f"{project.name}는 현재 JIMMORIA가 source-backed 후보로 식별한 프로젝트다.",
-            f"핵심 내러티브는 **{narratives}** 쪽이며, 체인은 **{project.chain or 'unknown'}**, 토큰 상태는 **{project.token_status}**로 기록됐다.",
+            f"핵심 내러티브는 **{narratives}** 쪽이며, 체인은 **{project.chain or 'unknown'}**, 토큰 상태는 **{token_status}**로 기록됐다.",
             f"이번 룸에서 수집된 evidence URL은 {evidence_count}개이고, 품질 게이트는 `{quality.status}`로 통과했다.",
             "",
             "이 보고서의 1차 목적은 매수/매도 판단이 아니라, 이 프로젝트가 무엇을 만들고 어떤 구조로 value capture를 시도하는지 파악하는 것이다.",
         ]
     return [
         f"{project.name} is the primary source-backed candidate identified by JIMMORIA.",
-        f"Core narratives: **{narratives}**. Chain: **{project.chain or 'unknown'}**. Token status: **{project.token_status}**.",
+        f"Core narratives: **{narratives}**. Chain: **{project.chain or 'unknown'}**. Token status: **{token_status}**.",
         f"The room collected {evidence_count} evidence URLs and passed the `{quality.status}` quality gate.",
         "",
         "The first goal of this report is project understanding, not buy/sell advice.",
@@ -493,7 +480,7 @@ def render_project_overview(project: Any, *, korean: bool) -> list[str]:
         f"- Why found: {project.reason_found}",
     ]
     if project.narratives:
-        lines.append(f"- Narrative map: {', '.join(project.narratives)}")
+        lines.append(f"- Narrative map: {', '.join(display_narratives(project))}")
     return lines
 
 
@@ -506,6 +493,35 @@ def best_project_description(project: Any) -> str:
         if isinstance(result, dict) and result.get("snippet"):
             return str(result["snippet"])
     return "공개 근거로 식별된 초기 crypto project candidate이며, 세부 제품 정의는 공식 문서와 source log를 통해 추가 확인해야 한다."
+
+
+def display_narratives(project: Any) -> list[str]:
+    if project is None:
+        return []
+    metadata_text = str(project.metadata).lower()
+    narratives = []
+    for narrative in project.narratives:
+        if narrative == "GPU Mining" and not any(
+            marker in metadata_text
+            for marker in ["gpu mining", "block reward", "proof-of-useful-work", "proof of useful work"]
+        ):
+            continue
+        narratives.append(narrative)
+    return narratives or ["Unclassified Early Crypto"]
+
+
+def display_token_status(project: Any) -> str:
+    if project is None:
+        return "unknown"
+    metadata_text = str(project.metadata).lower()
+    if "usd3" in metadata_text:
+        return "usd3_yieldcoin_or_credit_asset_reported"
+    if project.token_status == "native_coin_reported" and "liquidity mining" in metadata_text and not any(
+        marker in metadata_text
+        for marker in ["block reward", "proof-of-useful-work", "proof of useful work", "ticker prl"]
+    ):
+        return "unknown_or_incentive_mining_unverified"
+    return project.token_status
 
 
 def render_product_structure(project: Any, findings: list[FindingRecord], *, korean: bool) -> list[str]:
@@ -538,14 +554,14 @@ def render_token_chain_section(project: Any, findings: list[FindingRecord], *, k
         return ["- Token/chain evidence unavailable."]
     lines = [
         f"- Chain: {project.chain or 'unknown'}",
-        f"- Token status: {project.token_status}",
+        f"- Token status: {display_token_status(project)}",
     ]
     for row in finding_rows(findings, "contract_token_info", project)[:1]:
         lines.extend(
             [
                 f"- Contract address: {row.get('contract_address') or 'unknown'}",
                 f"- Market identity source: {row.get('source', 'unknown')}",
-                f"- Connector status: {row.get('connector_status', {})}",
+                f"- Connector coverage: {format_connector_status(row.get('connector_status', {}))}",
             ]
         )
         dex_pair = row.get("dex_pair") if isinstance(row.get("dex_pair"), dict) else None
@@ -580,23 +596,94 @@ def render_funding_section(project: Any, findings: list[FindingRecord], *, korea
     if not rows:
         return ["- 펀딩/포인트/에어드랍 정보는 아직 확인되지 않았다." if korean else "- Funding/points/airdrop details are not yet confirmed."]
     row = rows[0]
+    hints = filter_project_hints(row.get("airdrop_hints"), project)
+    points_status = str(row.get("points_status", "unknown"))
+    if points_status == "hint_found" and not hints:
+        points_status = "unknown"
+    token_opportunity = str(row.get("token_opportunity", "unknown"))
+    project_token_status = display_token_status(project)
+    if project_token_status not in {"", "unknown"} and token_opportunity in {"unknown", "native_or_mining_token_signal"}:
+        token_opportunity = project_token_status
+    note = str(row.get("note", "No additional funding/token note."))
+    if "mining/block rewards" in note and token_opportunity != "native_or_mining_token_signal":
+        note = "No project-specific airdrop/points evidence was confirmed; token/incentive status is based on official project evidence."
     lines = [
         f"- Funding status: {row.get('funding_status', 'unknown')}",
-        f"- Points status: {row.get('points_status', 'unknown')}",
-        f"- Token opportunity: {row.get('token_opportunity', 'unknown')}",
-        f"- Note: {row.get('note', 'No additional funding/token note.')}",
+        f"- Points status: {points_status}",
+        f"- Token opportunity: {token_opportunity}",
+        f"- Note: {note}",
     ]
-    hints = row.get("airdrop_hints") if isinstance(row.get("airdrop_hints"), list) else []
     if hints:
         lines.append("- Airdrop/points hints:")
-        lines.extend(f"  - {hint}" for hint in hints[:5])
+        lines.extend(f"  - {format_hint(hint)}" for hint in hints[:5])
     return lines
+
+
+def format_hint(hint: object) -> str:
+    if not isinstance(hint, dict):
+        return str(hint)
+    title = str(hint.get("title") or "untitled")
+    url = str(hint.get("url") or "").strip()
+    signals = hint.get("signals") if isinstance(hint.get("signals"), list) else []
+    signal_text = f" signals={', '.join(str(signal) for signal in signals[:5])}" if signals else ""
+    return f"{title} - {url}{signal_text}".strip()
+
+
+def format_connector_status(status: object) -> str:
+    if not isinstance(status, dict) or not status:
+        return "not recorded"
+    labels = {
+        "explorer": "Explorer",
+        "coingecko": "CoinGecko",
+        "dexscreener": "DEX Screener",
+        "crawl_website": "Website",
+        "crawl_docs": "Docs",
+        "read_github_repo": "GitHub repo",
+        "github_get_repo_activity": "GitHub activity",
+    }
+    return "; ".join(
+        f"{labels.get(str(key), str(key))}: {str(value).replace('_', ' ')}"
+        for key, value in status.items()
+    )
+
+
+def filter_project_hints(raw_hints: object, project: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw_hints, list):
+        return []
+    tokens = project_tokens(project)
+    if not tokens:
+        return [hint for hint in raw_hints if isinstance(hint, dict)]
+    filtered: list[dict[str, Any]] = []
+    for hint in raw_hints:
+        if not isinstance(hint, dict):
+            continue
+        text = " ".join(str(hint.get(key, "")) for key in ["title", "url", "snippet"]).lower()
+        if any(token in text for token in tokens):
+            filtered.append(hint)
+    return filtered
+
+
+def project_tokens(project: Any) -> list[str]:
+    if project is None:
+        return []
+    generic = {"protocol", "project", "network", "labs", "lab", "crypto", "chain", "finance"}
+    values = [str(getattr(project, "name", "")), str(getattr(project, "website", "") or "")]
+    metadata = getattr(project, "metadata", {}) if isinstance(getattr(project, "metadata", {}), dict) else {}
+    if metadata.get("project_query"):
+        values.append(str(metadata["project_query"]))
+    tokens: list[str] = []
+    for value in values:
+        for token in value.lower().replace("-", " ").replace("_", " ").replace(".", " ").split():
+            cleaned = "".join(char for char in token if char.isalnum())
+            if len(cleaned) >= 4 and cleaned not in generic and cleaned not in tokens:
+                tokens.append(cleaned)
+    return tokens[:4]
 
 
 def render_research_thesis(project: Any, *, korean: bool) -> list[str]:
     if project is None:
         return ["- No thesis available."]
-    narratives = ", ".join(project.narratives[:4]) or "early crypto"
+    narratives = ", ".join(display_narratives(project)[:4]) or "early crypto"
     if korean:
         return [
             f"{project.name}의 리서치 thesis는 단순히 '{project.name}가 있다'가 아니라, **{narratives}** 내러티브가 실제 제품/토큰/사용량으로 연결되는지 확인하는 것이다.",
@@ -631,10 +718,12 @@ def render_strengths(project: Any, findings: list[FindingRecord], *, korean: boo
         "공식/공개 source-backed 후보로 식별됐다." if korean else "Identified as a public source-backed candidate.",
         "문서 또는 웹사이트 근거가 존재한다." if korean else "Website/docs evidence exists.",
     ]
-    if project.narratives:
-        strengths.append(("명확한 narrative bucket이 있다: " if korean else "Clear narrative buckets: ") + ", ".join(project.narratives[:4]))
-    if project.token_status not in {"", "unknown"}:
-        strengths.append(("토큰/인센티브 관련 단서가 있다: " if korean else "Token/incentive hint exists: ") + project.token_status)
+    narratives = display_narratives(project)
+    if narratives:
+        strengths.append(("명확한 narrative bucket이 있다: " if korean else "Clear narrative buckets: ") + ", ".join(narratives[:4]))
+    token_status = display_token_status(project)
+    if token_status not in {"", "unknown"}:
+        strengths.append(("토큰/인센티브 관련 단서가 있다: " if korean else "Token/incentive hint exists: ") + token_status)
     return [f"- {item}" for item in strengths]
 
 
@@ -673,19 +762,64 @@ def render_due_diligence_checklist(project: Any, findings: list[FindingRecord], 
     return [f"- {item}" for item in items]
 
 
-def render_agent_findings_brief(findings: list[FindingRecord]) -> list[str]:
-    lines: list[str] = []
-    for finding in findings:
-        lines.extend(
-            [
-                f"### {finding.agent_id}",
-                f"- Type: `{finding.finding_type}`",
-                f"- Summary: {finding.summary}",
-                f"- Confidence: {finding.confidence:.2f}",
-                "",
-            ]
-        )
-    return lines or ["- No agent findings recorded."]
+def render_research_coverage(
+    project: Any,
+    findings: list[FindingRecord],
+    source_log: list[dict[str, str]],
+    *,
+    korean: bool,
+) -> list[str]:
+    if project is None:
+        return ["- 검증 대상 프로젝트가 resolve되지 않았다." if korean else "- No project was resolved for verification."]
+
+    source_count = len(source_log)
+    product_rows = finding_rows(findings, "product_tech_signal", project)
+    token_rows = finding_rows(findings, "contract_token_info", project)
+    social_rows = finding_rows(findings, "social_kol_signal", project)
+    funding_rows = finding_rows(findings, "funding_token_signal", project)
+
+    if korean:
+        return [
+            "- Source discovery: "
+            + coverage_status(source_count > 0, "확인됨", "제한적")
+            + f" - 공개 근거 URL {source_count}개를 Source Log에 정리했다.",
+            "- Product/docs: "
+            + coverage_status(bool(product_rows), "확인됨", "추가 확인 필요")
+            + " - 웹사이트, docs, GitHub 근거를 제품/기술 구조 섹션에 반영했다.",
+            "- Token/chain/on-chain: "
+            + coverage_status(bool(token_rows), "부분 확인", "추가 확인 필요")
+            + " - chain, token status, market identity는 공식 ticker/contract로 재확인해야 한다.",
+            "- Social/KOL/community: "
+            + coverage_status(bool(social_rows), "부분 확인", "제한적")
+            + " - 공개 social 링크와 커뮤니티 신호만 반영했고, 실시간 X/KOL 히스토리는 별도 API 설정 시 강화된다.",
+            "- Funding/incentives: "
+            + coverage_status(bool(funding_rows), "부분 확인", "미확인")
+            + " - 투자자, 포인트, 에어드랍 단서는 확인된 내용만 기록했다.",
+            "- 내부 에이전트 실행 로그와 토론 기록은 최종 보고서 본문이 아니라 `data/runs/<room_id>/messages.json` 및 `events.json`에 보관된다.",
+        ]
+
+    return [
+        "- Source discovery: "
+        + coverage_status(source_count > 0, "verified", "limited")
+        + f" - {source_count} public evidence URLs are listed in Source Log.",
+        "- Product/docs: "
+        + coverage_status(bool(product_rows), "verified", "needs follow-up")
+        + " - Website, docs, and GitHub evidence are reflected in the product section.",
+        "- Token/chain/on-chain: "
+        + coverage_status(bool(token_rows), "partially verified", "needs follow-up")
+        + " - Chain, token status, and market identity still need official ticker/contract confirmation.",
+        "- Social/KOL/community: "
+        + coverage_status(bool(social_rows), "partially verified", "limited")
+        + " - Public social links and community signals are included; live X/KOL history improves with API configuration.",
+        "- Funding/incentives: "
+        + coverage_status(bool(funding_rows), "partially verified", "unverified")
+        + " - Investor, points, and airdrop hints include only confirmed evidence.",
+        "- Internal agent execution logs and council records are stored in `data/runs/<room_id>/messages.json` and `events.json`, not in the final report body.",
+    ]
+
+
+def coverage_status(condition: bool, ok: str, missing: str) -> str:
+    return ok if condition else missing
 
 
 def finding_rows(findings: list[FindingRecord], finding_type: str, project: Any) -> list[dict[str, Any]]:
@@ -856,33 +990,25 @@ def render_automatic_tldr(candidates: list[Any], *, korean: bool = False) -> str
     if not candidates:
         return "Research Room에서 후보 프로젝트가 resolve되지 않았다." if korean else "No candidate project was resolved in this room."
     primary = candidates[0]
-    narratives = ", ".join(primary.narratives[:4]) or "unknown narrative"
+    narratives = ", ".join(display_narratives(primary)[:4]) or "unknown narrative"
     evidence_count = len(primary.metadata.get("evidence_urls", []))
     origin = candidate_origin(primary)
+    token_status = display_token_status(primary)
     if korean:
         return (
             f"{primary.name}가 primary candidate로 resolve되었다({origin}). "
             f"Core thesis: {narratives}. "
-            f"Token status: {primary.token_status}; chain: {primary.chain or 'unknown'}. "
+            f"Token status: {token_status}; chain: {primary.chain or 'unknown'}. "
             f"수집된 Evidence URL: {evidence_count}. "
             "Market/social/on-chain detail은 connector secret 또는 대상 입력이 부족한 영역에서 추가 검증이 필요하다."
         )
     return (
         f"{primary.name} resolved as the primary candidate ({origin}). "
         f"Core thesis: {narratives}. "
-        f"Token status: {primary.token_status}; chain: {primary.chain or 'unknown'}. "
+        f"Token status: {token_status}; chain: {primary.chain or 'unknown'}. "
         f"Evidence URLs collected: {evidence_count}. "
         "Market/social/on-chain details still need official-source verification where connector secrets or target inputs are missing."
     )
-
-
-def should_show_llm_summary(summary: str) -> bool:
-    cleaned = summary.strip()
-    if not cleaned:
-        return False
-    if cleaned.startswith("Topic:") and "Goals:" in cleaned:
-        return False
-    return True
 
 
 def candidate_origin(project: Any) -> str:

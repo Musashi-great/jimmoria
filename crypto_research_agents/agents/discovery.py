@@ -391,7 +391,7 @@ def merge_narratives(narratives: list[str], evidence_text: str) -> list[str]:
     additions = {
         "Proof-of-Useful-Work": ["proof-of-useful-work", "proof of useful work", "pouw"],
         "AI Compute": ["ai compute", "matrix multiplication", "matmul", "gpu"],
-        "GPU Mining": ["gpu mining", "mining", "block reward"],
+        "GPU Mining": ["gpu mining", "block reward", "proof-of-useful-work", "proof of useful work"],
         "L1 Blockchain": [" l1 ", "layer 1", "blockchain"],
         "Crypto Credit": ["credit protocol", "credit-based", "credit based", "credit score"],
         "Undercollateralized Lending": ["undercollateralized", "unsecured lines of credit", "unsecured credit"],
@@ -408,10 +408,10 @@ def merge_narratives(narratives: list[str], evidence_text: str) -> list[str]:
 
 def infer_token_status(evidence_text: str, coingecko_coins: list[Any], dex_pairs: list[Any]) -> str:
     lowered = evidence_text.lower()
-    if " prl" in f" {lowered}" or "ticker prl" in lowered or "block reward" in lowered or "mining" in lowered:
-        return "native_coin_reported"
     if "usd3" in lowered:
         return "usd3_yieldcoin_or_credit_asset_reported"
+    if " prl" in f" {lowered}" or "ticker prl" in lowered or "block reward" in lowered or "proof-of-useful-work" in lowered:
+        return "native_coin_reported"
     if any(isinstance(coin, dict) and str(coin.get("symbol", "")).lower() == "prl" for coin in coingecko_coins):
         return "market_metadata_found"
     if dex_pairs:

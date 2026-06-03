@@ -131,7 +131,7 @@ def _token_status(project_status: str, coingecko_data: dict[str, Any], dex_pairs
     coins = coingecko_data.get("coins", [])
     if any(isinstance(coin, dict) and str(coin.get("symbol", "")).lower() == "prl" for coin in coins):
         return "market_metadata_found"
-    if project_status == "native_coin_reported":
+    if project_status not in {"unknown", ""}:
         return project_status
     if dex_pairs:
         return "dex_pair_unverified_collision_risk"

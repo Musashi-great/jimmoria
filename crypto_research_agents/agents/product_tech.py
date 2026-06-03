@@ -60,6 +60,9 @@ class ProductTechAgent(BaseAgent):
                 project.metadata["github_read"] = github_data
             if github_activity_data:
                 project.metadata["github_activity"] = _compact_github_activity(github_activity_data)
+            token_hint = _token_status_from_product_data(website_data, docs_data)
+            if token_hint and project.token_status in {"", "unknown", "native_coin_reported"}:
+                project.token_status = token_hint
             rows.append(
                 {
                     "project_id": project_id,
@@ -205,3 +208,12 @@ def _compact_github_activity(data: dict[str, Any]) -> dict[str, Any]:
         "latest_issues": data.get("issues", [])[:5],
         "connector_status": data.get("connector_status", {}),
     }
+
+
+def _token_status_from_product_data(website_data: dict[str, Any], docs_data: dict[str, Any]) -> str | None:
+    text = f"{website_data} {docs_data}".lower()
+    if "usd3" in text:
+        return "usd3_yieldcoin_or_credit_asset_reported"
+    if any(marker in text for marker in ["ticker prl", "block reward", "proof-of-useful-work", "proof of useful work"]):
+        return "native_coin_reported"
+    return None
