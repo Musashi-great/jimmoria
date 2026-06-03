@@ -497,6 +497,27 @@ class JimmoriaConsole:
             self.print_output_event(event_type, event)
             return
 
+        if event_type == "orchestration_plan":
+            delegated_count = event.get("delegated_count", 0)
+            checkpoints = event.get("checkpoints")
+            checkpoint_count = len(checkpoints) if isinstance(checkpoints, list) else 0
+            summary = self.compact_text(str(event.get("summary") or "Supervisor set the orchestration plan."), 78)
+            if self.use_stream_events():
+                self.print_event_line(
+                    "Plan",
+                    f"ORCHESTRATE {delegated_count} tasks | checkpoints {checkpoint_count} | {summary}",
+                )
+                return
+            self.block(
+                "Supervisor orchestration plan",
+                [
+                    f"Delegated tasks: {delegated_count}",
+                    f"Checkpoints: {checkpoint_count}",
+                    summary,
+                ],
+            )
+            return
+
         if event_type == "deliberation_start":
             participants = event.get("participants", [])
             count = len(participants) if isinstance(participants, list) else 0
@@ -794,6 +815,8 @@ class JimmoriaConsole:
                 return f"{event.get('agent_id', '')}: {event.get('summary', 'done')}"
             if event_type in {"tool_start", "tool_done", "tool_failed", "tool_denied", "tool_unconfigured"}:
                 return f"{event.get('agent_id', '')} -> {event.get('tool_name', '')}: {event.get('summary') or event_type}"
+            if event_type == "orchestration_plan":
+                return f"supervisor: {event.get('summary', 'orchestration plan')}"
             if event_type == "report_written":
                 return f"report: {event.get('summary', 'written')}"
             if event_type == "room_completed":

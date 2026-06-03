@@ -16,18 +16,18 @@
   ],
   "tasks": [
     {
-      "task_id": "set_room_direction",
+      "task_id": "orchestrate_room",
       "agent_id": "supervisor_agent",
       "phase": "management",
-      "description": "Set research objective, priority, agent order, quality bar, and final output mode.",
-      "expected_output": "Supervision plan with intake decision and room goals.",
+      "description": "Set research objective, priority, agent order, quality bar, handoff checkpoints, Agent Council role, and final output mode.",
+      "expected_output": "Orchestration plan with intake decision, room goals, delegated tasks, and coordination checkpoints.",
       "output_channels": ["finding", "event"]
     },
     {
       "task_id": "ingest_source",
       "agent_id": "ingestion_agent",
       "phase": "source_memory",
-      "requires": ["set_room_direction"],
+      "requires": ["orchestrate_room"],
       "description": "Store source text/URL and extract entities, keywords, metadata, canonical links, and source note candidates.",
       "expected_output": "SourceRecord plus ingestion finding.",
       "output_channels": ["memory.sources", "finding", "obsidian.source"]

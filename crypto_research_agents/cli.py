@@ -1093,16 +1093,21 @@ def apply_company_instruction(line: str, settings: CompanySettings) -> list[str]
         settings.allow_english_terms = True
         applied.append("English technical terms allowed")
 
-    if any(term in line for term in ["슈퍼바이저", "사장", "대표", "CEO", "외주", "회사에다가", "광범위", "권한"]):
+    if any(term in line for term in ["슈퍼바이저", "수퍼바이저", "사장", "대표", "CEO", "외주", "회사에다가", "광범위", "권한", "오케스트레이터", "오케스트레이션", "조율"]):
         settings.supervisor_mode = "company_ceo"
         settings.client_relationship = "outsourcing_client"
         _add_unique(settings.operating_principles, "Supervisor acts as company CEO: classify intent before opening a Research Room.")
         _add_unique(settings.operating_principles, "Treat the user as an outsourcing client giving company-level work orders.")
         _add_unique(settings.operating_principles, "Every plain chat input passes through Supervisor intake before any agent room is opened.")
+        _add_unique(settings.operating_principles, "Supervisor acts as the orchestrator: plan, delegate, coordinate specialist agents, convene council, and final-review delivery.")
         _add_unique(settings.supervisor_authority, "route_all_plain_chat_inputs")
         _add_unique(settings.supervisor_authority, "choose_response_shape_per_request")
         _add_unique(settings.supervisor_authority, "block_unnecessary_report_generation")
+        _add_unique(settings.supervisor_authority, "orchestrate_specialist_workflow")
+        _add_unique(settings.supervisor_authority, "coordinate_agent_council")
+        _add_unique(settings.supervisor_authority, "perform_final_delivery_review")
         applied.append("Supervisor mode: company CEO / outsourcing intake")
+        applied.append("Supervisor role: orchestrator / specialist coordinator")
 
     if any(term in line for term in ["설정 변경", "자체 반영", "아닐경우", "그러지말고", "출력하는게 달라", "입력하는거에 따라서"]):
         settings.auto_apply_company_instructions = True

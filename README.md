@@ -267,7 +267,7 @@ JIMMORIA는 이제 모든 일반 입력을 바로 보고서로 만들지 않는�
 - 설정은 `data/company_settings.json`에 저장된다.
 - `/settings`로 현재 회사 설정을 확인할 수 있다.
 
-Supervisor는 단순 진행자가 아니라 회사 사장/총괄 PM처럼 동작한다. 사용자는 JIMMORIA에 외주를 주는 클라이언트이고, Supervisor가 먼저 의도를 분류한 뒤 Research Room을 열지, 설정을 바꿀지 결정한다.
+Supervisor는 단순 진행자가 아니라 회사 사장/총괄 PM이자 오케스트레이터처럼 동작한다. 사용자는 JIMMORIA에 외주를 주는 클라이언트이고, Supervisor가 먼저 의도를 분류한 뒤 Research Room을 열지, 설정을 바꿀지 결정한다. Research Room이 열리면 Supervisor가 목표를 쪼개고, 하위 에이전트에게 일을 하달하고, Agent Council을 조율하고, 마지막 전달 모드를 승인한다.
 
 Important new file:
 
@@ -292,7 +292,7 @@ JIMMORIA의 일반 채팅 상대는 Supervisor다. 사용자는 먼저 Superviso
 
 기존 산출물 요청은 더 보수적으로 처리한다. `3jane 보고서 들고와봐`, `3jane 보고서 보내봐`, `3jane 보고서 만들어봐`는 새 Research Room을 열지 않고 `data/runs/*/room.json`과 `reports/*.md`에서 저장된 보고서를 먼저 찾는다. `3jane 새로 리서치 보고서 만들어봐`처럼 새 조사 의도가 분명할 때만 에이전트 방을 연다.
 
-Research Room이 필요한 경우에만 Supervisor가 방을 열고 에이전트들에게 작업을 배정한다. 그렇지 않으면 Supervisor가 바로 답하거나 설정을 반영하고 끝낸다.
+Research Room이 필요한 경우에만 Supervisor가 방을 열고 에이전트들에게 작업을 배정한다. 그렇지 않으면 Supervisor가 바로 답하거나 설정을 반영하고 끝낸다. 방이 열리면 `orchestration_plan` 이벤트와 finding이 저장되어 plan -> delegate -> coordinate -> council -> final review 흐름을 나중에 CLI/Web UI에서 추적할 수 있다.
 
 Supervisor 대화는 `supervisor_chat` 모델 라우트를 사용한다. live LLM이 설정되어 있으면 일반 챗봇처럼 자연어로 답하고, 모델이 없으면 로컬 fallback이 짧게 응답한다.
 
@@ -304,6 +304,7 @@ Research Room runtime 로그는 기본적으로 큰 카드가 아니라 compact 
 
 ```text
 Room > OPEN room_abc123 | agents 10 | pearl 프로젝트 리서치
+Plan > ORCHESTRATE 10 tasks | checkpoints 5 | Supervisor set the orchestration plan
 Agent > RUN ingestion_agent | Extracting source metadata
 Tool > RUN discovery_agent -> web_search | pearl crypto project
 Output > Report written | reports/pearl-room_abc123.md

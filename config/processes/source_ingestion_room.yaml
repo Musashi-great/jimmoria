@@ -15,18 +15,18 @@
   ],
   "tasks": [
     {
-      "task_id": "set_ingestion_direction",
+      "task_id": "orchestrate_ingestion_room",
       "agent_id": "supervisor_agent",
       "phase": "management",
-      "description": "Confirm this is source-only work and prevent unnecessary research/report generation.",
-      "expected_output": "Supervision plan for source-only ingestion.",
+      "description": "Confirm this is source-only work, choose the minimal agent path, set handoff checkpoints, and prevent unnecessary research/report generation.",
+      "expected_output": "Orchestration plan for source-only ingestion.",
       "output_channels": ["finding", "event"]
     },
     {
       "task_id": "ingest_source",
       "agent_id": "ingestion_agent",
       "phase": "source_memory",
-      "requires": ["set_ingestion_direction"],
+      "requires": ["orchestrate_ingestion_room"],
       "description": "Store source text/URL and extract metadata, entities, keywords, canonical links, and source hash.",
       "expected_output": "SourceRecord plus ingestion finding.",
       "output_channels": ["memory.sources", "finding", "obsidian.source"]

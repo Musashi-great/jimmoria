@@ -9,12 +9,16 @@ v1.3은 기획/아키텍처 문서이고, v1.4는 개발 가능한 실행 스펙
 ```text
 MVP Loop 1: CLI Article Ingestion Loop
 1. CLI에서 URL/file/text 입력
-2. Supervisor가 Research Room 생성
-3. Ingestion Agent가 Source 저장, 엔티티/키워드 추출
-4. Narrative Agent가 핵심 내러티브 분류
-5. Discovery Agent가 유사 초기 프로젝트 후보 생성
-6. Report Agent가 Candidate Dossier 생성
-7. Obsidian Curator가 Source / Project / Report Note 저장
+2. Supervisor가 intake 후 Research Room 개설 여부 확인
+3. Supervisor가 오케스트레이터로 목표, 우선순위, specialist task, handoff, Agent Council, final review checkpoint를 계획
+4. Ingestion Agent가 Source 저장, 엔티티/키워드 추출
+5. Narrative Agent가 핵심 내러티브 분류
+6. Discovery Agent가 유사 초기 프로젝트 후보 생성
+7. 전문 에이전트들이 social/on-chain/product/funding 증거를 보강
+8. Agent Council이 findings를 비교하고 dossier 또는 diagnostic memo 방향을 합의
+9. Report Agent가 Candidate Dossier 또는 Diagnostic Memo 생성
+10. Supervisor가 최종 검토와 delivery mode를 승인
+11. Obsidian Curator가 Source / Project / Report Note 저장
 ```
 
 이후 확장 순서:

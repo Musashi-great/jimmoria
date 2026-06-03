@@ -16,6 +16,8 @@ def default_supervisor_authority() -> list[str]:
         "apply_company_settings_without_research_room",
         "open_research_room_for_explicit_research",
         "assign_specialist_agents",
+        "orchestrate_specialist_workflow",
+        "coordinate_agent_council",
         "set_report_direction",
         "final_quality_gate",
     ]

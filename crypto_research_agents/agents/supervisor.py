@@ -22,9 +22,9 @@ class SupervisorAgent(BaseAgent):
         process = kwargs.get("process") if isinstance(kwargs.get("process"), dict) else {}
         supervisor_mode = company_settings.get("supervisor_mode", "research_director")
         summary = (
-            "Research room initialized by CEO-style supervisor intake and output routing."
+            "Research room initialized by CEO-style supervisor orchestration."
             if supervisor_mode == "company_ceo"
-            else "Research room initialized with controlled P2P collaboration."
+            else "Research room initialized with controlled P2P orchestration."
         )
         delegation = self._delegate_room_tasks(
             room=room,
@@ -32,15 +32,23 @@ class SupervisorAgent(BaseAgent):
             process=process,
             supervisor_mode=supervisor_mode,
         )
+        orchestration_plan = _build_orchestration_plan(
+            room=room,
+            goals=goals,
+            process=process,
+            delegation=delegation,
+            supervisor_mode=supervisor_mode,
+        )
         llm_analysis = self.llm_analysis_pass(
             room=room,
-            objective="Create an evidence-bound room plan for the specialist agents.",
+            objective="Create an evidence-bound orchestration plan for the specialist agents.",
             evidence={
                 "topic": room.topic,
                 "goals": goals,
                 "agents": room.agents,
                 "process": process,
                 "delegation": delegation,
+                "orchestration_plan": orchestration_plan,
                 "company_settings": company_settings,
                 "intake_decision": intake_decision,
                 "model_decision": asdict(decision),
@@ -61,25 +69,31 @@ class SupervisorAgent(BaseAgent):
                 "intake_decision": intake_decision,
                 "llm_analysis": llm_analysis,
                 "delegation": delegation,
+                "orchestration_plan": orchestration_plan,
             },
             confidence=0.9,
         )
         bus.update(
             room_id=room.room_id,
             from_agent=self.agent_id,
-            summary="Research room created after supervisor intake, output routing, and goals set.",
+            summary="Supervisor created the orchestration plan, delegated specialist tasks, and set council/final-review checkpoints.",
             payload={
                 "finding_id": finding.finding_id,
                 "goals": goals,
                 "intake_decision": intake_decision,
                 "llm_analysis": llm_analysis,
                 "delegated_tasks": delegation.get("delegated_tasks", []),
+                "orchestration_plan": orchestration_plan,
             },
         )
         return AgentResult(
             self.agent_id,
-            f"{summary} Delegated {delegation.get('delegated_count', 0)} specialist tasks.",
-            {"finding_id": finding.finding_id, "delegated_count": delegation.get("delegated_count", 0)},
+            f"{summary} Delegated {delegation.get('delegated_count', 0)} specialist tasks and set coordination checkpoints.",
+            {
+                "finding_id": finding.finding_id,
+                "delegated_count": delegation.get("delegated_count", 0),
+                "orchestration_plan": orchestration_plan,
+            },
             confidence=0.9,
         )
 
@@ -245,3 +259,61 @@ def _priority_for_task(task: dict[str, Any]) -> str:
     if phase in {"knowledge_ops"}:
         return "low"
     return "normal"
+
+
+def _build_orchestration_plan(
+    *,
+    room: ResearchRoom,
+    goals: Any,
+    process: dict[str, Any],
+    delegation: dict[str, Any],
+    supervisor_mode: str,
+) -> dict[str, Any]:
+    delegated_tasks = delegation.get("delegated_tasks", [])
+    if not isinstance(delegated_tasks, list):
+        delegated_tasks = []
+    coordination_checkpoints = [
+        {
+            "checkpoint": "intake_and_scope",
+            "owner": "supervisor_agent",
+            "purpose": "Confirm the client request, output mode, quality bar, and whether a Research Room is needed.",
+        },
+        {
+            "checkpoint": "task_delegation",
+            "owner": "supervisor_agent",
+            "purpose": "Create specialist tasks, assign owners, and record handoffs through Supervisor Office tools.",
+        },
+        {
+            "checkpoint": "specialist_execution",
+            "owner": "specialist_agents",
+            "purpose": "Let each specialist gather evidence and report gaps inside its scope.",
+        },
+        {
+            "checkpoint": "agent_council",
+            "owner": "agent_council",
+            "purpose": "Compare specialist findings, surface conflicts, and choose dossier versus diagnostic memo.",
+        },
+        {
+            "checkpoint": "final_review",
+            "owner": "supervisor_agent",
+            "purpose": "Review quality gate, delivery mode, unresolved risks, and client-facing final output.",
+        },
+    ]
+    return {
+        "mode": "supervisor_orchestrator",
+        "supervisor_mode": supervisor_mode,
+        "room_id": room.room_id,
+        "topic": room.topic,
+        "goals": goals,
+        "process_id": process.get("process_id"),
+        "delegated_count": len(delegated_tasks),
+        "agent_order": [task.get("agent_id") for task in delegated_tasks if isinstance(task, dict)],
+        "coordination_checkpoints": coordination_checkpoints,
+        "supervisor_decision_rights": [
+            "decide whether to open a Research Room",
+            "set room goals and priority",
+            "delegate specialist tasks",
+            "coordinate Agent Council",
+            "approve final delivery mode",
+        ],
+    }

@@ -2,9 +2,9 @@
 
 이 문서는 JIMMORIA 프로젝트의 전체 구조, 런타임 개념, 에이전트 역할, 데이터 흐름, 저장 위치, 앞으로 붙일 외부 커넥터의 위치를 설명한다.
 
-JIMMORIA는 크립토 가격 매매 도구가 아니라, 리서치 전용 멀티에이전트 회사 CLI다. 사용자는 터미널에서 자연어로 리서치 요청을 입력하고, Supervisor가 Research Room을 열어 여러 전문 에이전트에게 일을 나눈다. 에이전트들은 소스 정리, 내러티브 분석, 초기 프로젝트 후보 발굴, KOL/소셜 체크, 온체인/제품/토큰 체크, 보고서 작성, Obsidian 노트 정리를 수행한다.
+JIMMORIA는 크립토 가격 매매 도구가 아니라, 리서치 전용 멀티에이전트 회사 CLI다. 사용자는 터미널에서 자연어로 리서치 요청을 입력하고, Supervisor가 회사의 오케스트레이터처럼 Research Room을 열지 여부를 판단한다. 방이 열리면 Supervisor가 목표, 우선순위, 전문 에이전트별 업무, handoff, Agent Council, 최종 검토 흐름을 조율한다. 에이전트들은 소스 정리, 내러티브 분석, 초기 프로젝트 후보 발굴, KOL/소셜 체크, 온체인/제품/토큰 체크, 보고서 작성, Obsidian 노트 정리를 수행한다.
 
-현재 버전은 MVP다. 멀티에이전트 협업 구조, Supervisor Office task delegation, 보고서 생성, 런 저장, Obsidian-style 노트 생성은 동작한다. Web Search, URL fetch, Website/Docs crawler, GitHub reader/search, DEX Screener search, CoinGecko search/metadata는 ToolGateway 뒤에 기본 connector로 등록된다. X/Twitter, Telegram, Discord, RootData, Explorer/RPC, funding/airdrop 같은 커넥터는 아직 placeholder 상태다.
+현재 버전은 MVP다. 멀티에이전트 협업 구조, Supervisor Office task delegation, `orchestration_plan` 기록, 보고서 생성, 런 저장, Obsidian-style 노트 생성은 동작한다. Web Search, URL fetch, Website/Docs crawler, GitHub reader/search, DEX Screener search, CoinGecko search/metadata는 ToolGateway 뒤에 기본 connector로 등록된다. X/Twitter, Telegram, Discord, RootData, Explorer/RPC, funding/airdrop 같은 커넥터는 아직 placeholder 상태다.
 
 ## 1. 프로젝트 목표
 
@@ -143,6 +143,7 @@ flowchart LR
 | Web Dashboard | `crypto_research_agents/web.py` | run snapshot, event stream, agent board, report preview를 웹에서 시각화 |
 | Runtime | `crypto_research_agents/runtime.py` | Research Room 생성과 에이전트 실행 순서 관리 |
 | ProcessSpec | `core/process_spec.py` + `config/processes/` | Research Room의 goals, task order, expected output, artifact contract 정의 |
+| Supervisor Orchestrator | `agents/supervisor.py` + `connectors/supervisor_tools.py` | plan -> delegate -> coordinate -> council -> final review 흐름을 만들고 기록 |
 | ResearchRoom | `core/room.py` | 하나의 리서치 작업 단위와 상태 |
 | CollaborationBus | `core/bus.py` | 에이전트 요청, 응답, 핸드오프, 업데이트 로그 |
 | SharedMemory | `core/memory.py` | 소스, 프로젝트 후보, finding, entity graph 저장 |
@@ -167,19 +168,20 @@ flowchart LR
 1. ResearchRoom 생성
 2. room_created 이벤트 기록
 3. supervisor_agent 실행
-4. ingestion_agent 실행
-5. narrative_agent 실행
-6. discovery_agent 실행
-7. social_kol_agent 실행
-8. contract_onchain_agent 실행
-9. product_tech_agent 실행
-10. funding_token_agent 실행
-11. Agent Council deliberation 실행
-12. report_agent 실행
-13. Supervisor final review 실행
-14. obsidian_curator_agent 실행
-15. room_completed 이벤트 기록
-16. memory.json, run snapshot, report, vault note 저장
+4. Supervisor가 orchestration_plan 생성 및 저장
+5. ingestion_agent 실행
+6. narrative_agent 실행
+7. discovery_agent 실행
+8. social_kol_agent 실행
+9. contract_onchain_agent 실행
+10. product_tech_agent 실행
+11. funding_token_agent 실행
+12. Agent Council deliberation 실행
+13. report_agent 실행
+14. Supervisor final review 실행
+15. obsidian_curator_agent 실행
+16. room_completed 이벤트 기록
+17. memory.json, run snapshot, report, vault note 저장
 ```
 
 상태는 `RuntimeState` 값으로 이동한다.
@@ -195,9 +197,9 @@ obsidian_syncing
 completed
 ```
 
-현재는 순차 실행에 가깝지만, 구조상 각 에이전트의 요청/응답은 `CollaborationBus`에 기록된다. 나중에 병렬 실행, 비동기 큐, UI replay를 붙일 때 이 bus와 event log가 기반이 된다.
+현재는 순차 실행에 가깝지만, 구조상 각 에이전트의 요청/응답은 `CollaborationBus`에 기록된다. Supervisor가 만든 `orchestration_plan`은 supervision finding과 `events.json`의 `orchestration_plan` 이벤트에 함께 저장된다. 나중에 병렬 실행, 비동기 큐, UI replay를 붙일 때 이 bus, orchestration plan, event log가 기반이 된다.
 
-CLI는 `room_created`, `agent_start`, `agent_done`, `agent_failed`, `room_completed` 이벤트를 받아 보라/핑크 테마의 로그를 출력한다. `room_created`와 `room_completed`에는 전체 `Live agent board`를 보여주고, 각 `agent_start`/`agent_done` 이벤트는 짧은 작업 카드로 출력해서 로그가 과도하게 반복되지 않게 한다. 사용자가 작업 지시를 넣으면 각 에이전트가 `WAIT`, `RUN`, `DONE`, `FAIL` 중 어떤 상태인지와 현재 무엇을 하는지 바로 볼 수 있다.
+CLI는 `room_created`, `orchestration_plan`, `agent_start`, `agent_done`, `agent_failed`, `room_completed` 이벤트를 받아 보라/핑크 테마의 로그를 출력한다. `orchestration_plan`은 `Plan > ORCHESTRATE ...` 한 줄로 올라가며 Supervisor가 몇 개 task를 만들고 몇 개 checkpoint를 두었는지 보여준다. 각 `agent_start`/`agent_done` 이벤트는 짧은 작업 카드로 출력해서 로그가 과도하게 반복되지 않게 한다. 사용자가 작업 지시를 넣으면 각 에이전트가 `WAIT`, `RUN`, `DONE`, `FAIL` 중 어떤 상태인지와 현재 무엇을 하는지 바로 볼 수 있다.
 
 채팅 입력 UX는 "고정 입력창 + 위쪽 로그"에 가깝게 유지한다. 사용자가 입력을 제출하면 ANSI 터미널에서는 제출된 입력 박스를 지우고, 입력 내용은 큰 `You` 패널이 아니라 `You > ...` 한 줄 로그로 위에 남긴다. 그 다음 `Supervisor > ...` 진행 로그가 나오고, Supervisor 답변 또는 Research Room 이벤트가 이어진다. 입력 박스는 `JIMMORIA HQ` dock처럼 동작하며, `Supervisor channel`, 현재 provider, 최신 room, agent 상태 요약을 함께 보여준다.
 
@@ -209,7 +211,8 @@ CLI/UI 개선 방향은 [jimmoria-cli-ui-reference-notes.md](jimmoria-cli-ui-ref
 Room > OPEN room_abc123 | agents 10 | pearl 프로젝트 리서치
 Board > 10 wait/0 done
 Agent > RUN supervisor_agent | Planning direction
-Agent > DONE supervisor_agent | Research room initialized | msg 1 / findings 1
+Plan > ORCHESTRATE 10 tasks | checkpoints 5 | Supervisor set the orchestration plan...
+Agent > DONE supervisor_agent | Supervisor delegated tasks and set coordination checkpoints | msg 1 / findings 1
 Tool > RUN discovery_agent -> web_search | pearl crypto project
 Council > DONE write_diagnostic_memo | Agent council reached a guarded consensus
 Supervisor > FINAL diagnostic_memo | Supervisor approved delivery as a diagnostic memo
@@ -224,7 +227,7 @@ CLI 시작 도움말에는 정적 에이전트 목록을 길게 보여주지 않
 
 | Agent ID | 구현 클래스 | 역할 | 현재 동작 |
 |---|---|---|---|
-| `supervisor_agent` | `SupervisorAgent` | 목표와 실행 방향 설정 | ProcessSpec을 읽고 Supervisor Office 툴로 task 생성/배정/handoff를 기록한 뒤 supervision finding 저장 |
+| `supervisor_agent` | `SupervisorAgent` | 회사 오케스트레이터 / 최종 조율자 | ProcessSpec을 읽고 Supervisor Office 툴로 task 생성/배정/handoff를 기록한 뒤 `orchestration_plan`과 supervision finding 저장 |
 | `ingestion_agent` | `IngestionAgent` | 소스 저장과 메타데이터 추출 | 입력 소스를 `SharedMemory.sources`에 저장하고 summary/entities/keywords 추출 |
 | `narrative_agent` | `NarrativeAgent` | 내러티브 분류 | AI wallet, Consumer Crypto, DeFi Automation 등 taxonomy 기반 narrative 분류 |
 | `discovery_agent` | `DiscoveryAgent` | 초기 프로젝트 후보 발굴 | 프로젝트명 기반 요청이면 `web_search`, GitHub, CoinGecko, DEX Screener로 후보를 resolve하고, 일반 내러티브 요청이면 fallback 후보를 생성 |
@@ -323,11 +326,33 @@ memory_policy
 
 이 process metadata는 나중에 웹 visualizer가 agent workflow를 replay할 때 phase/task label로 사용할 수 있다.
 
-## 7B. Supervisor Office Delegation Tools
+## 7B. Supervisor Orchestrator And Office Tools
 
-이번 업데이트부터 Supervisor는 단순히 "리서치 방을 열겠다"고 말하는 역할을 넘어서, Hermes Agent의 toolset/delegation 패턴을 JIMMORIA식으로 흡수한 `Supervisor Office`를 사용한다.
+Supervisor는 Research Room 안에서 회사의 오케스트레이터로 동작한다. 단순히 "리서치 방을 열겠다"고 말하는 역할을 넘어서, Hermes Agent의 toolset/delegation 패턴을 JIMMORIA식으로 흡수한 `Supervisor Office`를 사용해 계획을 세우고, 전문 에이전트에게 일을 하달하고, 중간 handoff와 Agent Council, 최종 검토 지점을 조율한다.
 
 핵심은 외부 브라우저, 쉘, 파일 시스템을 Supervisor에게 무제한으로 주는 것이 아니라, Research Room 안에서 안전하게 업무를 만들고 배정하고 기록하는 내부 운영 툴을 붙이는 것이다.
+
+Supervisor가 남기는 핵심 산출물은 `orchestration_plan`이다.
+
+```text
+mode                  supervisor_orchestrator
+delegated_count       생성/배정된 specialist task 수
+agent_order           실행될 전문 에이전트 순서
+coordination_checkpoints
+  intake_and_scope
+  task_delegation
+  specialist_execution
+  agent_council
+  final_review
+supervisor_decision_rights
+  room 개설 여부 결정
+  목표와 우선순위 설정
+  specialist task 배정
+  Agent Council 조율
+  최종 전달 모드 승인
+```
+
+이 plan은 `supervision_plan` finding, `CollaborationBus` update, `events.json`의 `orchestration_plan` 이벤트에 저장된다.
 
 구현 위치:
 
@@ -359,13 +384,14 @@ ResearchRuntime loads ProcessSpec
 -> Supervisor Office records room opening
 -> Supervisor creates every task from process.tasks[]
 -> Supervisor marks its own planning task done
+-> Supervisor emits orchestration_plan
 -> Supervisor assigns specialist tasks through ToolGateway
 -> CollaborationBus receives REQUEST messages for each specialist
 -> First handoff is recorded
 -> Specialist agents run in the existing controlled P2P order
 ```
 
-따라서 이제 `tool_audit_log.json`에는 social/on-chain 같은 외부 connector 호출뿐 아니라, Supervisor가 어떤 업무를 만들고 누구에게 배정했는지도 남는다. 이것은 나중에 웹 visualizer에서 "사장이 일을 배정하고 직원들이 처리하는 회사 화면"을 만들 때 핵심 데이터가 된다.
+따라서 이제 `tool_audit_log.json`에는 social/on-chain 같은 외부 connector 호출뿐 아니라, Supervisor가 어떤 업무를 만들고 누구에게 배정했는지도 남는다. `events.json`에는 별도의 `orchestration_plan` 이벤트가 남는다. 이것은 나중에 웹 visualizer에서 "사장이 계획을 세우고, 일을 배정하고, 직원들이 처리하고, 회의 후 최종 납품하는 회사 화면"을 만들 때 핵심 데이터가 된다.
 
 ## 7C. Agent Council And Supervisor Final Review
 
@@ -655,14 +681,14 @@ JIMMORIA는 실행 결과를 여러 형태로 저장한다.
 | `data/runs/<room_id>/messages.json` | CollaborationBus 메시지 저장 |
 | `data/runs/<room_id>/tool_audit_log.json` | ToolGateway 호출 기록 |
 | `data/runs/<room_id>/llm_call_log.json` | ModelGateway 호출 기록 |
-| `data/runs/<room_id>/events.json` | CLI/UI replay용 이벤트 로그 |
+| `data/runs/<room_id>/events.json` | CLI/UI replay용 이벤트 로그. `room_created`, `orchestration_plan`, agent/tool/council/final-review 이벤트 포함 |
 | `reports/*.md` | ReportAgent가 작성한 Markdown 보고서 |
 | `vault/10_Projects/*.md` | Obsidian project note |
 | `vault/20_Sources/*.md` | Obsidian source note |
 | `vault/30_Narratives/*.md` | Obsidian narrative note |
 | `vault/50_Reports/*.md` | Obsidian report note |
 
-특히 `events.json`은 나중에 시각화 UI를 만들 때 중요하다. 현재 CLI에서는 이벤트를 실시간으로 받아 에이전트 진행 상태를 출력하고, 나중에 웹 화면에서는 이 이벤트 스트림을 replay해서 "어떤 에이전트가 언제 시작했고 언제 끝났는지" 보여줄 수 있다.
+특히 `events.json`은 나중에 시각화 UI를 만들 때 중요하다. 현재 CLI에서는 이벤트를 실시간으로 받아 에이전트 진행 상태를 출력하고, 나중에 웹 화면에서는 이 이벤트 스트림을 replay해서 "Supervisor가 어떤 플랜을 세웠고, 어떤 에이전트가 언제 시작했고 언제 끝났는지" 보여줄 수 있다.
 
 ## 13. Obsidian Vault 구조
 
@@ -1145,7 +1171,7 @@ Runtime 연결:
 - `research_request`면 기존처럼 `ResearchRuntime.run_article_research()`를 실행한다.
 - `supervisor_chat` 응답은 `supervisor_chat` 모델 라우트를 사용한다. live LLM이 있으면 자연어 응답을 생성하고, offline fallback이면 로컬 대화 응답을 사용한다.
 - `ResearchRuntime`은 `company_settings.json`과 `intake_decision`을 SupervisorAgent와 ReportAgent에 전달한다.
-- SupervisorAgent는 `supervision_plan` finding에 `intake_decision`을 저장해 왜 해당 Research Room이 열렸는지 남긴다.
+- SupervisorAgent는 `supervision_plan` finding에 `intake_decision`과 `orchestration_plan`을 저장해 왜 해당 Research Room이 열렸고 어떤 조율 흐름으로 움직였는지 남긴다.
 - ReportAgent는 `report_language`를 보고 한국어/영문 report shell을 선택한다.
 
 ## 24. Runtime Event Stream
@@ -1160,7 +1186,8 @@ Research Room이 실행 중일 때도 하단 `JIMMORIA HQ` dock은 유지된다.
 Room > OPEN room_abc123 | agents 10 | pearl 프로젝트 리서치
 Board > 10 wait/0 done
 Agent > RUN supervisor_agent | Planning direction
-Agent > DONE supervisor_agent | Research room initialized | msg 1 / findings 1
+Plan > ORCHESTRATE 10 tasks | checkpoints 5 | Supervisor set the orchestration plan...
+Agent > DONE supervisor_agent | Supervisor delegated tasks and set coordination checkpoints | msg 1 / findings 1
 Tool > RUN discovery_agent -> web_search | pearl crypto project
 Output > Report written | reports/pearl-room_abc123.md
 Room > DONE room_abc123 | status completed | msg 14 / findings 10

@@ -249,6 +249,7 @@ class ResearchRuntime:
             raise
         finally:
             self.hooks.run("after_run", agent_id=agent_id, room_id=room.room_id)
+        self._emit_orchestration_plan_event(room, result)
         self._emit(
             "agent_done",
             room_id=room.room_id,
@@ -464,6 +465,20 @@ class ResearchRuntime:
                     path=path,
                     summary=f"Wrote note: {path}",
                 )
+
+    def _emit_orchestration_plan_event(self, room: ResearchRoom, result: Any) -> None:
+        data = result.data if isinstance(getattr(result, "data", None), dict) else {}
+        orchestration_plan = data.get("orchestration_plan")
+        if isinstance(orchestration_plan, dict):
+            self._emit(
+                "orchestration_plan",
+                room_id=room.room_id,
+                agent_id=result.agent_id,
+                mode=orchestration_plan.get("mode"),
+                delegated_count=orchestration_plan.get("delegated_count"),
+                checkpoints=orchestration_plan.get("coordination_checkpoints", []),
+                summary="Supervisor set the orchestration plan and coordination checkpoints.",
+            )
 
     def _save_run(self, room: ResearchRoom, memory_path: str | Path | None) -> None:
         if memory_path is None:

@@ -65,7 +65,7 @@ flowchart TD
 
 ## 2. 핵심 원칙
 
-1. Supervisor는 목표, 우선순위, Research Room 생성만 담당한다.
+1. Supervisor는 회사 오케스트레이터로서 목표, 우선순위, Research Room 생성, task 배정, Agent Council 조율, 최종 검토를 담당한다.
 2. 에이전트 간 협업은 Agent Collaboration Bus를 통해 기록된다.
 3. 모든 외부 데이터는 Source ID를 가진다.
 4. 에이전트는 자기 전문 분야를 넘어서 판단하지 않는다.

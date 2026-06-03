@@ -239,7 +239,25 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(settings.client_relationship, "outsourcing_client")
         self.assertIn("route_all_plain_chat_inputs", settings.supervisor_authority)
         self.assertIn("choose_response_shape_per_request", settings.supervisor_authority)
+        self.assertIn("orchestrate_specialist_workflow", settings.supervisor_authority)
+        self.assertIn("coordinate_agent_council", settings.supervisor_authority)
         self.assertIn("Supervisor mode: company CEO / outsourcing intake", applied)
+        self.assertIn("Supervisor role: orchestrator / specialist coordinator", applied)
+
+    def test_company_instruction_sets_supervisor_as_orchestrator(self) -> None:
+        settings = CompanySettings()
+
+        applied = apply_company_instruction(
+            "수퍼바이저가 오케스트레이터로 활동을 하고 조율하는거야",
+            settings,
+        )
+
+        self.assertEqual(settings.supervisor_mode, "company_ceo")
+        self.assertEqual(settings.client_relationship, "outsourcing_client")
+        self.assertIn("orchestrate_specialist_workflow", settings.supervisor_authority)
+        self.assertIn("coordinate_agent_council", settings.supervisor_authority)
+        self.assertTrue(any("orchestrator" in item for item in settings.operating_principles))
+        self.assertIn("Supervisor role: orchestrator / specialist coordinator", applied)
 
     def test_supervisor_intake_returns_output_modes(self) -> None:
         settings = CompanySettings(supervisor_mode="company_ceo")
@@ -703,6 +721,14 @@ class SmokeTest(unittest.TestCase):
             self.assertIn("deliberation_done", event_types)
             self.assertIn("final_review_start", event_types)
             self.assertIn("final_review_done", event_types)
+            self.assertIn("orchestration_plan", event_types)
+            plan_index = next(index for index, event in enumerate(events) if event["type"] == "orchestration_plan")
+            supervisor_done_index = next(
+                index
+                for index, event in enumerate(events)
+                if event["type"] == "agent_done" and event.get("agent_id") == "supervisor_agent"
+            )
+            self.assertLess(plan_index, supervisor_done_index)
             audit = json.loads((root / "runs" / result.room.room_id / "tool_audit_log.json").read_text(encoding="utf-8"))
             supervisor_tools = [
                 item["tool_name"]
@@ -713,6 +739,15 @@ class SmokeTest(unittest.TestCase):
             self.assertIn("create_task", supervisor_tools)
             self.assertIn("assign_task", supervisor_tools)
             self.assertIn("agent_handoff", supervisor_tools)
+            supervisor_findings = [
+                finding
+                for finding in result.memory.get_room_findings(result.room.room_id)
+                if finding.agent_id == "supervisor_agent" and finding.finding_type == "supervision_plan"
+            ]
+            self.assertTrue(supervisor_findings)
+            orchestration_plan = supervisor_findings[0].data["orchestration_plan"]
+            self.assertEqual(orchestration_plan["mode"], "supervisor_orchestrator")
+            self.assertIn("agent_council", [item["checkpoint"] for item in orchestration_plan["coordination_checkpoints"]])
             self.assertGreaterEqual(len(runtime.model_gateway.call_log), 10)
             llm_log = json.loads((root / "runs" / result.room.room_id / "llm_call_log.json").read_text(encoding="utf-8"))
             llm_agents = {entry["agent_id"] for entry in llm_log}
