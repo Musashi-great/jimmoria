@@ -141,12 +141,12 @@ def collect_capabilities(
         ("The Graph subgraph query", "thegraph_query_subgraph"),
     ]
     for label, tool_name in tool_specs:
-        configured = gateway.has_tool(tool_name)
+        availability = tool_registry.availability(tool_name, registered_connectors=gateway.registered_tools)
         capabilities.append(
             CapabilityStatus(
                 label,
-                "configured" if configured else "placeholder",
-                tool_name if configured else f"{tool_name} connector not registered in ToolGateway",
+                availability.status,
+                availability.detail,
             )
         )
     capabilities.append(_overall_status(capabilities))
@@ -223,7 +223,7 @@ def _overall_status(capabilities: list[CapabilityStatus]) -> CapabilityStatus:
     placeholders = [
         item.name
         for item in capabilities
-        if item.status == "placeholder"
+        if item.status in {"placeholder", "missing_secret", "missing_connector"}
         and item.name
         not in {
             "Overall",
@@ -233,7 +233,7 @@ def _overall_status(capabilities: list[CapabilityStatus]) -> CapabilityStatus:
         return CapabilityStatus(
             "Overall",
             "placeholder",
-            "Core runtime and low-cost connectors run, but some live research connectors are still placeholders.",
+            "Core runtime and low-cost connectors run; some live research connectors need API secrets or are still placeholders.",
         )
     return CapabilityStatus(
         "Overall",

@@ -25,17 +25,20 @@ class FundingTokenAgent(BaseAgent):
                 room_id=room.room_id,
                 project_name=project.name,
             )
+            tool_data = tool_result.get("data") if isinstance(tool_result.get("data"), dict) else {}
+            hints = tool_data.get("hints", []) if isinstance(tool_data.get("hints"), list) else []
             evidence_text = _evidence_text(project.metadata)
             rows.append(
                 {
                     "project_id": project_id,
                     "project_name": project.name,
                     "funding_status": "unknown",
-                    "points_status": _points_status(evidence_text),
+                    "points_status": _points_status(evidence_text, tool_data),
                     "token_opportunity": _token_opportunity(project.token_status, evidence_text),
                     "token_status": project.token_status,
                     "tool_status": tool_result.get("status"),
-                    "note": _note(evidence_text),
+                    "airdrop_hints": hints[:5],
+                    "note": _note(evidence_text, tool_result),
                 }
             )
         signal_rows = sum(1 for row in rows if row["points_status"] != "unknown" or row["token_opportunity"] != "unknown")
@@ -88,7 +91,9 @@ def _evidence_text(metadata: dict[str, Any]) -> str:
     return " ".join(parts).lower()
 
 
-def _points_status(evidence_text: str) -> str:
+def _points_status(evidence_text: str, tool_data: dict[str, Any] | None = None) -> str:
+    if tool_data and tool_data.get("classification") == "hint_found":
+        return "hint_found"
     if any(keyword in evidence_text for keyword in ["points", "airdrop", "quest", "rewards campaign"]):
         return "hint_found"
     return "unknown"
@@ -102,9 +107,12 @@ def _token_opportunity(project_status: str, evidence_text: str) -> str:
     return "unknown"
 
 
-def _note(evidence_text: str) -> str:
+def _note(evidence_text: str, tool_result: dict[str, Any]) -> str:
+    status = str(tool_result.get("status") or "unknown")
     if "mining" in evidence_text or "block reward" in evidence_text:
         return "Evidence mentions mining/block rewards; treat as token mechanics research, not investment advice."
     if "points" in evidence_text or "airdrop" in evidence_text:
         return "Evidence mentions points/airdrop-style incentives; requires official confirmation."
-    return "Funding/token connectors are not configured; only local evidence hints were inspected."
+    if status == "success":
+        return "Airdrop/points connector ran, but no public hint was found in the searched sources."
+    return f"Airdrop/points connector status: {status}; treat incentive status as unknown."

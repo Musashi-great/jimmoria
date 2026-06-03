@@ -19,7 +19,7 @@ class ContractOnchainAgent(BaseAgent):
         rows = []
         for project_id in _collect_candidate_ids(requests):
             project = memory.projects[project_id]
-            explorer_result = self.tool_gateway.call(
+            contract_lookup_result = self.tool_gateway.call(
                 self.agent_id,
                 "get_contract_address",
                 room_id=room.room_id,
@@ -44,15 +44,27 @@ class ContractOnchainAgent(BaseAgent):
             dex_data = dex_result.get("data") if isinstance(dex_result.get("data"), dict) else {}
             dex_pairs = dex_data.get("pairs", []) if isinstance(dex_data.get("pairs"), list) else []
             top_detail = coingecko_data.get("top_detail") if isinstance(coingecko_data.get("top_detail"), dict) else {}
+            contract_address = top_detail.get("contract_address") if isinstance(top_detail, dict) else None
+            chain = _chain(project.chain, dex_pairs, top_detail)
+            chainid = _chainid(chain)
+            explorer_result = contract_lookup_result
+            if contract_address and chainid:
+                explorer_result = self.tool_gateway.call(
+                    self.agent_id,
+                    "explorer_lookup",
+                    room_id=room.room_id,
+                    contract_address=contract_address,
+                    chainid=chainid,
+                )
             rows.append(
                 {
                     "project_id": project_id,
                     "project_name": project.name,
-                    "chain": _chain(project.chain, dex_pairs, top_detail),
+                    "chain": chain,
                     "token_status": _token_status(project.token_status, coingecko_data, dex_pairs),
-                    "contract_address": top_detail.get("contract_address") if isinstance(top_detail, dict) else None,
+                    "contract_address": contract_address,
                     "dex_pair": dex_pairs[0] if dex_pairs else None,
-                    "source": "coingecko_dexscreener" if coingecko_data or dex_pairs else "explorer_not_configured",
+                    "source": "coingecko_dexscreener" if coingecko_data or dex_pairs else "no_market_identity_match",
                     "connector_status": {
                         "explorer": explorer_result.get("status"),
                         "coingecko": coingecko_result.get("status"),
@@ -62,11 +74,13 @@ class ContractOnchainAgent(BaseAgent):
                         "coingecko": coingecko_data.get("coins", []),
                         "dex_pairs": dex_pairs,
                     },
+                    "explorer_data": explorer_result.get("data") if isinstance(explorer_result.get("data"), dict) else {},
                 }
             )
         live_rows = sum(1 for row in rows if row["source"] == "coingecko_dexscreener")
+        explorer_status = _status_summary(row["connector_status"].get("explorer") for row in rows)
         summary = (
-            f"Contract/token check used CoinGecko/DEX Screener evidence for {live_rows}/{len(rows)} candidates; explorer lookup remains unconfigured."
+            f"Contract/token check used CoinGecko/DEX Screener evidence for {live_rows}/{len(rows)} candidates; explorer status: {explorer_status}."
             if rows
             else "Contract/token check found no candidate projects to inspect."
         )
@@ -124,3 +138,38 @@ def _token_status(project_status: str, coingecko_data: dict[str, Any], dex_pairs
     if coins:
         return "market_metadata_unverified_collision_risk"
     return project_status
+
+
+def _chainid(chain: str | None) -> str | None:
+    if not chain:
+        return None
+    normalized = str(chain).lower().strip()
+    mapping = {
+        "ethereum": "1",
+        "eth": "1",
+        "base": "8453",
+        "arbitrum": "42161",
+        "arbitrum-one": "42161",
+        "optimism": "10",
+        "optimistic-ethereum": "10",
+        "polygon": "137",
+        "polygon-pos": "137",
+        "binance-smart-chain": "56",
+        "bsc": "56",
+        "avalanche": "43114",
+        "avalanche-2": "43114",
+        "linea": "59144",
+        "scroll": "534352",
+        "blast": "81457",
+    }
+    return mapping.get(normalized)
+
+
+def _status_summary(statuses: Any) -> str:
+    counts: dict[str, int] = {}
+    for status in statuses:
+        key = str(status or "unknown")
+        counts[key] = counts.get(key, 0) + 1
+    if not counts:
+        return "not_run"
+    return ", ".join(f"{key}={value}" for key, value in sorted(counts.items()))

@@ -33,6 +33,7 @@ toolsets:
       - x_get_user_timeline
       - x_build_kol_list
       - telegram_read_channel
+      - telegram_search_public_channels
       - discord_read_channel
   market_basic:
     description: Read-only market metadata for identity and context, not trading advice.
@@ -40,11 +41,18 @@ toolsets:
       - dexscreener_search_pairs
       - coingecko_coin_metadata
       - rootdata_search_projects
+      - rootdata_get_project
+      - rootdata_get_investors
+      - rootdata_get_hot_projects
   onchain_basic:
     description: Public on-chain read tools only.
     tools:
       - get_contract_address
       - explorer_lookup
+      - explorer_get_contract_source
+      - explorer_get_token_supply
+      - explorer_get_token_holders
+      - rpc_read_contract
       - get_token_metadata
       - get_dex_pair
   reporting:
@@ -177,29 +185,36 @@ tools:
     connector_name: x_search_posts
     category: social
     mode: read_only
-    implementation_status: external_connector_required
+    implementation_status: implemented
     required_secrets: [X_BEARER_TOKEN]
     description: Search public X posts for project and KOL mentions.
   x_get_user_timeline:
     connector_name: x_get_user_timeline
     category: social
     mode: read_only
-    implementation_status: external_connector_required
+    implementation_status: implemented
     required_secrets: [X_BEARER_TOKEN]
     description: Read a KOL timeline for repeated mentions.
   x_build_kol_list:
     connector_name: x_build_kol_list
     category: social
     mode: read_only
-    implementation_status: planned
+    implementation_status: implemented
+    required_secrets: [X_BEARER_TOKEN]
     description: Build reusable KOL handle lists by narrative.
   telegram_read_channel:
     connector_name: telegram_read_channel
     category: social
     mode: read_only
-    implementation_status: external_connector_required
+    implementation_status: implemented
     required_secrets: [TELEGRAM_BOT_TOKEN]
     description: Read approved Telegram channels.
+  telegram_search_public_channels:
+    connector_name: telegram_search_public_channels
+    category: social
+    mode: read_only
+    implementation_status: implemented
+    description: Explain Telegram public channel search limitations and route users toward web search or client API.
   discord_read_channel:
     connector_name: discord_read_channel
     category: social
@@ -211,23 +226,72 @@ tools:
     connector_name: rootdata_search_projects
     category: discovery
     mode: read_only
-    implementation_status: external_connector_required
+    implementation_status: implemented
     required_secrets: [ROOTDATA_API_KEY]
     description: Search RootData project directory.
+  rootdata_get_project:
+    connector_name: rootdata_get_project
+    category: discovery
+    mode: read_only
+    implementation_status: implemented
+    required_secrets: [ROOTDATA_API_KEY]
+    description: Fetch a RootData project profile by project_id or contract_address.
+  rootdata_get_investors:
+    connector_name: rootdata_get_investors
+    category: discovery
+    mode: read_only
+    implementation_status: implemented
+    required_secrets: [ROOTDATA_API_KEY]
+    description: Fetch RootData investor directory pages.
+  rootdata_get_hot_projects:
+    connector_name: rootdata_get_hot_projects
+    category: discovery
+    mode: read_only
+    implementation_status: implemented
+    required_secrets: [ROOTDATA_API_KEY]
+    description: Fetch RootData hot/trending project input when endpoint/query is available.
   get_contract_address:
     connector_name: get_contract_address
     category: onchain
     mode: read_only
-    implementation_status: external_connector_required
+    implementation_status: implemented
     required_secrets: [ETHERSCAN_API_KEY]
     description: Resolve public contract address data.
   explorer_lookup:
     connector_name: explorer_lookup
     category: onchain
     mode: read_only
-    implementation_status: external_connector_required
+    implementation_status: implemented
     required_secrets: [ETHERSCAN_API_KEY]
     description: Read public explorer metadata.
+  explorer_get_contract_source:
+    connector_name: explorer_get_contract_source
+    category: onchain
+    mode: read_only
+    implementation_status: implemented
+    required_secrets: [ETHERSCAN_API_KEY]
+    description: Read verified contract source metadata from Etherscan V2.
+  explorer_get_token_supply:
+    connector_name: explorer_get_token_supply
+    category: onchain
+    mode: read_only
+    implementation_status: implemented
+    required_secrets: [ETHERSCAN_API_KEY]
+    description: Read token supply from Etherscan V2.
+  explorer_get_token_holders:
+    connector_name: explorer_get_token_holders
+    category: onchain
+    mode: read_only
+    implementation_status: implemented
+    required_secrets: [ETHERSCAN_API_KEY]
+    description: Read top token holders from Etherscan V2 when plan supports the endpoint.
+  rpc_read_contract:
+    connector_name: rpc_read_contract
+    category: onchain
+    mode: read_only
+    implementation_status: implemented
+    required_secrets: [ETH_RPC_URL]
+    description: Execute read-only JSON-RPC eth_call against a configured RPC endpoint.
   get_token_metadata:
     connector_name: get_token_metadata
     category: onchain
@@ -240,6 +304,12 @@ tools:
     mode: read_only
     implementation_status: external_connector_required
     description: Read public DEX pair metadata.
+  check_airdrop_points:
+    connector_name: check_airdrop_points
+    category: opportunity
+    mode: read_only
+    implementation_status: implemented
+    description: Search public web results for points, airdrop, reward, quest, and testnet hints.
   source_cache_write:
     connector_name: source_cache_write
     category: artifact

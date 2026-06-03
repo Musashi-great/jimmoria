@@ -52,6 +52,20 @@ from crypto_research_agents.tools.registry import load_tool_registry
 from crypto_research_agents.web import build_overview_payload, build_run_payload, render_dashboard_html
 
 
+def _offline_no_secret_env() -> dict[str, str]:
+    return {
+        "LLM_PROVIDER": "offline",
+        "X_BEARER_TOKEN": "",
+        "TWITTER_BEARER_TOKEN": "",
+        "TELEGRAM_BOT_TOKEN": "",
+        "TELEGRAM_CHAT_ID": "",
+        "ROOTDATA_API_KEY": "",
+        "ETHERSCAN_API_KEY": "",
+        "ETH_RPC_URL": "",
+        "RPC_URL": "",
+    }
+
+
 class SmokeTest(unittest.TestCase):
     def test_cli_banner_uses_jimmoria_brand(self) -> None:
         output = StringIO()
@@ -1545,15 +1559,17 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(obsidian.selected_model, "gpt-5.5")
         self.assertEqual(writing.selected_model, "gpt-5.5")
 
-    def test_doctor_marks_live_connectors_as_placeholders(self) -> None:
-        statuses = {item.name: item.status for item in collect_capabilities()}
+    def test_doctor_marks_secret_backed_connectors_as_missing_secret(self) -> None:
+        with patch.dict("os.environ", _offline_no_secret_env(), clear=False):
+            statuses = {item.name: item.status for item in collect_capabilities()}
 
         self.assertEqual(statuses["Runtime scaffold"], "configured")
         self.assertEqual(statuses["Agent specs/personas"], "configured")
         self.assertEqual(statuses["Agent LLM routing"], "fallback")
-        self.assertEqual(statuses["X/Twitter search"], "placeholder")
-        self.assertEqual(statuses["RootData project directory"], "placeholder")
-        self.assertEqual(statuses["Explorer contract lookup"], "placeholder")
+        self.assertEqual(statuses["X/Twitter search"], "missing_secret")
+        self.assertEqual(statuses["RootData project directory"], "missing_secret")
+        self.assertEqual(statuses["Explorer contract lookup"], "missing_secret")
+        self.assertEqual(statuses["Funding/airdrop checker"], "configured")
         self.assertEqual(statuses["Docs crawler"], "configured")
         self.assertEqual(statuses["GitHub reader"], "configured")
         self.assertEqual(statuses["GitHub repo search"], "configured")
@@ -1599,44 +1615,46 @@ Usage: codex exec [OPTIONS] [PROMPT]
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             output = StringIO()
-            with redirect_stdout(output):
-                cli_main(
-                    [
-                        "doctor",
-                        "--vault",
-                        str(root / "vault"),
-                        "--reports",
-                        str(root / "reports"),
-                        "--memory",
-                        str(root / "memory.json"),
-                    ]
-                )
+            with patch.dict("os.environ", _offline_no_secret_env(), clear=False):
+                with redirect_stdout(output):
+                    cli_main(
+                        [
+                            "doctor",
+                            "--vault",
+                            str(root / "vault"),
+                            "--reports",
+                            str(root / "reports"),
+                            "--memory",
+                            str(root / "memory.json"),
+                        ]
+                    )
 
             text = output.getvalue()
             self.assertIn("Runtime scaffold", text)
-            self.assertIn("X/Twitter search: placeholder", text)
+            self.assertIn("X/Twitter search: missing_secret", text)
             self.assertIn("Core runtime and low-cost connectors run", text)
 
-    def test_tool_audit_log_records_unconfigured_live_connectors(self) -> None:
+    def test_tool_audit_log_records_live_connector_secret_states(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
-            runtime = ResearchRuntime()
-            result = runtime.run_article_research(
-                title="Live Connector Reality Check",
-                content="AI wallet automation with KOL mentions, docs, GitHub, and airdrop points.",
-                vault_dir=root / "vault",
-                reports_dir=root / "reports",
-                memory_path=root / "memory.json",
-            )
+            with patch.dict("os.environ", _offline_no_secret_env(), clear=False):
+                runtime = ResearchRuntime()
+                result = runtime.run_article_research(
+                    title="Live Connector Reality Check",
+                    content="AI wallet automation with KOL mentions, docs, GitHub, and airdrop points.",
+                    vault_dir=root / "vault",
+                    reports_dir=root / "reports",
+                    memory_path=root / "memory.json",
+                )
 
             audit_path = root / "runs" / result.room.room_id / "tool_audit_log.json"
             audit_log = json.loads(audit_path.read_text(encoding="utf-8"))
             statuses = {(item["tool_name"], item["status"]) for item in audit_log}
 
-            self.assertIn(("x_search_posts", "unconfigured"), statuses)
-            self.assertIn(("get_contract_address", "unconfigured"), statuses)
+            self.assertIn(("x_search_posts", "missing_secret"), statuses)
+            self.assertIn(("get_contract_address", "missing_input"), statuses)
             self.assertIn(("crawl_docs", "missing_input"), statuses)
-            self.assertIn(("check_airdrop_points", "unconfigured"), statuses)
+            self.assertFalse(any(tool == "check_airdrop_points" and status == "unconfigured" for tool, status in statuses))
 
     def test_tool_registry_registers_existing_connectors(self) -> None:
         registry = load_tool_registry()
@@ -1648,6 +1666,11 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(registry.get("coingecko_coin_metadata").implementation_status, "implemented")
         self.assertEqual(registry.get("create_task").implementation_status, "implemented")
         self.assertEqual(registry.get("assign_task").implementation_status, "implemented")
+        self.assertEqual(registry.get("x_search_posts").implementation_status, "implemented")
+        self.assertEqual(registry.get("telegram_read_channel").implementation_status, "implemented")
+        self.assertEqual(registry.get("rootdata_search_projects").implementation_status, "implemented")
+        self.assertEqual(registry.get("explorer_lookup").implementation_status, "implemented")
+        self.assertEqual(registry.get("check_airdrop_points").implementation_status, "implemented")
 
     def test_toolset_limits_agent_access(self) -> None:
         registry = load_tool_registry()
@@ -1748,13 +1771,14 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(results[0].matched_file, "candidates.json")
 
     def test_doctor_reports_missing_connector(self) -> None:
-        capabilities = {item.name: item for item in collect_capabilities()}
+        with patch.dict("os.environ", {"DISCORD_BOT_TOKEN": "test-token"}, clear=False):
+            capabilities = {item.name: item for item in collect_capabilities()}
 
         self.assertEqual(capabilities["Tool registry"].status, "configured")
         self.assertEqual(capabilities["Scheduled jobs"].status, "configured")
         self.assertEqual(capabilities["Worker profiles"].status, "configured")
         self.assertEqual(capabilities["Telegram delivery config"].status, "missing")
-        self.assertIn("connector not registered", capabilities["X/Twitter search"].detail)
+        self.assertIn("connector not registered", capabilities["Discord read"].detail)
 
     def test_web_dashboard_html_exposes_company_structure(self) -> None:
         html = render_dashboard_html()

@@ -4,7 +4,7 @@
 
 JIMMORIA는 크립토 가격 매매 도구가 아니라, 리서치 전용 멀티에이전트 회사 CLI다. 사용자는 터미널에서 자연어로 리서치 요청을 입력하고, Supervisor가 회사의 오케스트레이터처럼 Research Room을 열지 여부를 판단한다. 방이 열리면 Supervisor가 목표, 우선순위, 전문 에이전트별 업무, handoff, Agent Council, 최종 검토 흐름을 조율한다. 에이전트들은 소스 정리, 내러티브 분석, 초기 프로젝트 후보 발굴, KOL/소셜 체크, 온체인/제품/토큰 체크, 보고서 작성, Obsidian 노트 정리를 수행한다.
 
-현재 버전은 MVP다. 멀티에이전트 협업 구조, Supervisor Office task delegation, `orchestration_plan` 기록, 보고서 생성, 런 저장, Obsidian-style 노트 생성은 동작한다. Web Search, URL fetch, Website/Docs crawler, GitHub reader/search, DEX Screener search, CoinGecko search/metadata는 ToolGateway 뒤에 기본 connector로 등록된다. X/Twitter, Telegram, Discord, RootData, Explorer/RPC, funding/airdrop 같은 커넥터는 아직 placeholder 상태다.
+현재 버전은 MVP다. 멀티에이전트 협업 구조, Supervisor Office task delegation, `orchestration_plan` 기록, 보고서 생성, 런 저장, Obsidian-style 노트 생성은 동작한다. Web Search, URL fetch, Website/Docs crawler, GitHub reader/search, DEX Screener search, CoinGecko search/metadata는 ToolGateway 뒤에 기본 connector로 등록된다. X/Twitter, Telegram, RootData, Explorer/RPC, funding/airdrop connector도 등록되어 있다. 다만 X/Telegram/RootData/Explorer/RPC는 외부 API key, bot 권한, RPC URL 같은 secret이 있어야 live 호출이 가능하며, 없으면 `missing_secret` 또는 `missing_input`으로 기록된다. Discord, Dune, The Graph, 24h RSS monitor 고급 기능은 아직 placeholder 또는 다음 구현 대상이다.
 
 ## 1. 프로젝트 목표
 
@@ -231,10 +231,10 @@ CLI 시작 도움말에는 정적 에이전트 목록을 길게 보여주지 않
 | `ingestion_agent` | `IngestionAgent` | 소스 저장과 메타데이터 추출 | 입력 소스를 `SharedMemory.sources`에 저장하고 summary/entities/keywords 추출 |
 | `narrative_agent` | `NarrativeAgent` | 내러티브 분류 | AI wallet, Consumer Crypto, DeFi Automation 등 taxonomy 기반 narrative 분류 |
 | `discovery_agent` | `DiscoveryAgent` | 초기 프로젝트 후보 발굴 | 프로젝트명 기반 요청이면 `web_search`, GitHub, CoinGecko, DEX Screener로 후보를 resolve하고, 일반 내러티브 요청이면 fallback 후보를 생성 |
-| `social_kol_agent` | `SocialKOLAgent` | KOL/소셜 신호 확인 | X API는 아직 placeholder지만, web search와 공식 링크에서 social/community URL을 우선 추출 |
-| `contract_onchain_agent` | `ContractOnchainAgent` | 체인, 토큰, 컨트랙트 확인 | Explorer/RPC는 아직 placeholder지만 CoinGecko/DEX Screener 결과를 token/market evidence로 반영 |
+| `social_kol_agent` | `SocialKOLAgent` | KOL/소셜 신호 확인 | X recent search/user timeline/KOL list connector와 Telegram bot reader가 등록되어 있고, secret이 없으면 web search와 공식 링크에서 social/community URL을 우선 추출 |
+| `contract_onchain_agent` | `ContractOnchainAgent` | 체인, 토큰, 컨트랙트 확인 | CoinGecko/DEX Screener 결과를 token/market evidence로 반영하고, contract address와 Etherscan key가 있으면 Explorer source/supply까지 확인 |
 | `product_tech_agent` | `ProductTechAgent` | Docs, GitHub, 제품 상태 확인 | 등록된 `crawl_website`/`crawl_docs` connector로 URL이 있는 후보의 제품 상태와 공식 링크를 확인 |
-| `funding_token_agent` | `FundingTokenAgent` | 투자자, 포인트, 토큰 기회 확인 | RootData/funding connector는 아직 placeholder지만 검색/웹/문서 evidence에서 points, airdrop, mining, ticker 힌트를 추출 |
+| `funding_token_agent` | `FundingTokenAgent` | 투자자, 포인트, 토큰 기회 확인 | RootData project/investor connector와 public web 기반 airdrop/points checker를 사용하고, secret이 없으면 근거 부족 상태를 명확히 표시 |
 | `report_agent` | `ReportAgent` | 보고서 작성 | findings와 candidates를 Markdown dossier로 합성하고 Evidence Map에 웹사이트, GitHub, market, search URL을 정리 |
 | `obsidian_curator_agent` | `ObsidianCuratorAgent` | Obsidian-style 노트 정리 | Source, Project, Narrative, Report 노트 작성 |
 
@@ -617,16 +617,42 @@ github_search_repos
 read_github_repo
 dexscreener_search_pairs
 coingecko_coin_metadata
+x_search_posts
+x_get_user_timeline
+x_build_kol_list
+telegram_read_channel
+telegram_search_public_channels
+rootdata_search_projects
+rootdata_get_project
+rootdata_get_investors
+rootdata_get_hot_projects
+explorer_lookup
+explorer_get_contract_source
+explorer_get_token_supply
+explorer_get_token_holders
+rpc_read_contract
+check_airdrop_points
 ```
 
 이제 이 tool들은 `unconfigured`가 아니라 실제 connector result를 반환한다. 검색어나 URL이 부족한 경우에는 `missing_input`, 외부 요청이 실패한 경우에는 `failed`, 정상 동작 시에는 `success`로 audit log에 기록된다.
+
+Secret-backed connector는 key가 없으면 `missing_secret`으로 기록된다. 필요한 값은 다음과 같다.
+
+```powershell
+$env:X_BEARER_TOKEN="..."        # X recent search, user timeline, KOL list
+$env:TELEGRAM_BOT_TOKEN="..."    # Telegram Bot API getUpdates
+$env:TELEGRAM_CHAT_ID="..."      # 선택 사항. bot이 볼 수 있는 채널/그룹
+$env:ROOTDATA_API_KEY="..."      # RootData project/investor API
+$env:ETHERSCAN_API_KEY="..."     # Etherscan API V2 explorer metadata
+$env:ETH_RPC_URL="..."           # read-only eth_call when needed
+```
 
 아직 연결되지 않은 외부 tool을 에이전트가 호출하면 다음 같은 결과가 저장된다.
 
 ```json
 {
   "status": "unconfigured",
-  "tool": "x_search_posts",
+  "tool": "discord_read_channel",
   "message": "Tool connector is not configured in MVP runtime.",
   "data": null
 }
@@ -641,12 +667,14 @@ coingecko_coin_metadata
 | 상태 | Tool | 의미 |
 |---|---|---|
 | configured | `create_research_room`, `create_task`, `assign_task`, `agent_handoff`, `update_task_status`, `web_search`, `fetch_url`, `parse_html`, `crawl_website`, `crawl_docs`, `github_search_repos`, `read_github_repo`, `coingecko_coin_metadata`, `dexscreener_search_pairs`, `archive_source_snapshot` | Supervisor Office 내부 운영 툴과 기본 read-only connector가 실제 등록되어 호출 가능 |
-| placeholder / missing secret | `x_search_posts`, `x_get_user_timeline`, `x_build_kol_list`, `telegram_read_channel`, `discord_read_channel`, `rss_monitor_feed`, `rootdata_search_projects`, `explorer_lookup`, `get_contract_address`, `check_airdrop_points`, `dune_execute_query`, `thegraph_query_subgraph` | registry에는 있지만 API 키, connector 구현, 또는 외부 서비스 연결이 아직 필요 |
+| configured but needs secret | `x_search_posts`, `x_get_user_timeline`, `x_build_kol_list`, `telegram_read_channel`, `rootdata_search_projects`, `rootdata_get_project`, `rootdata_get_investors`, `rootdata_get_hot_projects`, `explorer_lookup`, `get_contract_address`, `explorer_get_contract_source`, `explorer_get_token_supply`, `explorer_get_token_holders`, `rpc_read_contract` | connector는 등록되어 있고, 사용자가 API key/bot token/RPC URL을 넣으면 live 호출 가능 |
+| configured without secret | `check_airdrop_points`, `telegram_search_public_channels` | public web 기반 힌트 검색 또는 Telegram Bot API 한계 안내처럼 secret 없이 동작 |
+| placeholder / missing connector | `discord_read_channel`, `rss_monitor_feed`, `dune_execute_query`, `thegraph_query_subgraph`, 일부 고급 market/monitor tool | registry에는 있지만 connector 구현 또는 외부 서비스 연결이 아직 필요 |
 | blocked | `wallet_sign`, `swap`, `transfer`, `approve`, `private_key_read`, `seed_phrase_read` | 리서치 전용 회사 경계 때문에 의도적으로 실행 금지 |
 
-따라서 Hermes 스타일 operating layer에서 가져온 toolset/worker/profile/playbook 구조는 존재하지만, 모든 외부 live research tool이 이미 작동한다는 뜻은 아니다. 현재 확실히 작동하는 것은 read-only public web/document/market metadata 계열이고, KOL timeline, Telegram/Discord, RootData, Explorer/RPC 같은 고급 live connector는 다음 구현 대상이다.
+따라서 Hermes 스타일 operating layer에서 가져온 toolset/worker/profile/playbook 구조는 존재하지만, 모든 외부 live research tool이 secret 없이 즉시 작동한다는 뜻은 아니다. 현재 확실히 동작하는 것은 read-only public web/document/market metadata 계열이고, X/Telegram/RootData/Explorer/RPC는 사용자가 secret을 넣으면 live connector가 작동한다. Discord, Dune, The Graph, RSS monitor는 다음 구현 대상이다.
 
-중요한 live stack은 다음이다. 이 중 Web Search/URL/Website/Docs/GitHub/DEX Screener/CoinGecko 계열은 초안 connector가 구현되어 있고, X/RootData/Explorer/vector 계열은 아직 다음 단계다.
+중요한 live stack은 다음이다. Web Search/URL/Website/Docs/GitHub/DEX Screener/CoinGecko/funding web checker는 secret 없이 시작할 수 있고, X/Telegram/RootData/Explorer/RPC는 secret-backed connector로 시작한다.
 
 ```text
 x_search_posts
@@ -661,7 +689,15 @@ read_github_repo
 coingecko_coin_metadata
 dexscreener_search_pairs
 explorer_lookup
+explorer_get_contract_source
+explorer_get_token_supply
+explorer_get_token_holders
+rpc_read_contract
 rootdata_search_projects
+rootdata_get_project
+rootdata_get_investors
+rootdata_get_hot_projects
+check_airdrop_points
 source_cache_write
 vector_search
 vector_upsert
@@ -739,7 +775,7 @@ User input
 이 경우 핵심은 다음이다.
 
 ```text
-아티클/질문/URL -> 기억화 + source hash/snapshot -> 내러티브 추출 -> 프로젝트명 요청이면 web/GitHub/market search로 후보 resolve -> website/docs/GitHub connector 확인 -> 나머지 미연결 검증은 placeholder -> Evidence Map 포함 보고서
+아티클/질문/URL -> 기억화 + source hash/snapshot -> 내러티브 추출 -> 프로젝트명 요청이면 web/GitHub/market search로 후보 resolve -> website/docs/GitHub connector 확인 -> X/RootData/Explorer는 secret이 있으면 live 검증, 없으면 `missing_secret`으로 표시 -> Evidence Map 포함 보고서
 ```
 
 ### Case 2. 24시간 모니터가 신호를 발견
@@ -830,14 +866,19 @@ ToolGateway 뒤에 붙는 실제 connector 구현이다.
 
 ```text
 __init__.py              register_default_connectors(tool_gateway)
-base.py                  normalized success/missing_input/failed result helper
+base.py                  normalized success/missing_input/missing_secret/failed result helper
 url_fetcher.py           fetch_url, parse_html, crawl_website, crawl_docs, source snapshot
 web_search.py            DDGS 기반 public web_search connector
 github_connector.py      github_search_repos, read_github_repo
 market_connectors.py     dexscreener_search_pairs, coingecko_coin_metadata
+x_social.py              X recent search, user timeline, KOL list builder
+telegram_connector.py    Telegram Bot API getUpdates + public channel search limitation notice
+rootdata_connector.py    RootData project search/profile/investor connector
+explorer_connector.py    Etherscan V2 metadata + read-only JSON-RPC eth_call
+opportunity_connector.py public web 기반 airdrop/points hint checker
 ```
 
-현재 connector는 비용이 낮고 API key가 거의 필요 없는 public HTTP 기반으로 시작한다. Web Search는 `ddgs`를 사용한다. GitHub는 `GITHUB_TOKEN`이 있으면 사용하지만 없어도 public API로 동작한다. DEX Screener와 CoinGecko도 public endpoint를 먼저 사용한다.
+현재 connector는 비용이 낮고 API key가 거의 필요 없는 public HTTP 기반으로 시작한다. Web Search는 `ddgs`를 사용한다. GitHub는 `GITHUB_TOKEN`이 있으면 사용하지만 없어도 public API로 동작한다. DEX Screener와 CoinGecko도 public endpoint를 먼저 사용한다. X/Telegram/RootData/Explorer/RPC는 API secret이 필요한 connector로 등록되어 있으며, secret이 없을 때는 조용히 실패하지 않고 `missing_secret`을 audit log에 남긴다.
 
 ### `crypto_research_agents/core/`
 
@@ -944,35 +985,37 @@ python -m unittest discover -s tests -v
 
 ## 18. 현재 한계
 
-현재 MVP는 리서치 회사의 뼈대와 협업 흐름에 더해, 저비용 HTTP connector 일부가 붙은 단계다.
+현재 MVP는 리서치 회사의 뼈대와 협업 흐름에 더해, 저비용 HTTP connector와 주요 secret-backed live connector가 붙은 단계다.
 
 구체적인 한계는 다음과 같다.
 
-- X/Twitter API가 아직 연결되지 않았다.
-- Telegram/Discord reader가 아직 연결되지 않았다.
+- X/Twitter API connector는 등록되어 있지만 `X_BEARER_TOKEN`이 필요하다.
+- Telegram reader는 Bot API 기반으로 등록되어 있지만 `TELEGRAM_BOT_TOKEN`이 필요하고, bot이 접근 가능한 채널/그룹 업데이트만 읽을 수 있다. 임의 공개 채널 과거 메시지 스크래핑은 Bot API 범위가 아니다.
+- Discord reader는 아직 별도 connector 구현이 필요하다.
 - Web Search/URL/Website/Docs/GitHub/DEX Screener/CoinGecko는 초안 connector가 등록되어 있지만, 검색 품질은 DDGS/provider 가용성에 영향을 받고, Playwright fallback, sitemap adapter, GitHub commit/release 상세 분석은 아직 약하다.
-- Explorer/RPC/RootData connector가 아직 등록되지 않았다.
+- RootData connector는 등록되어 있지만 `ROOTDATA_API_KEY`가 필요하다.
+- Explorer/RPC connector는 등록되어 있지만 `ETHERSCAN_API_KEY`와 필요 시 `ETH_RPC_URL`이 필요하다.
 - DiscoveryAgent는 프로젝트명 기반 요청에서 web/GitHub/CoinGecko/DEX search로 live candidate를 만들 수 있다. 다만 general narrative discovery는 아직 placeholder 후보 생성이 남아 있다.
-- Social/Contract/Funding 에이전트의 일부 핵심 live tool은 여전히 `unconfigured` audit log를 남긴다. 대신 Social은 web/social URL을 추출하고, Contract는 CoinGecko/DEX Screener를 반영하며, Funding은 evidence text에서 token/points/mining 힌트를 추출한다.
+- Social/Contract/Funding 에이전트의 일부 핵심 live tool은 secret이 없으면 `missing_secret`, 대상 contract/url/query가 부족하면 `missing_input`을 남긴다. 대신 Social은 web/social URL을 추출하고, Contract는 CoinGecko/DEX Screener를 반영하며, Funding은 web 기반 points/airdrop 힌트 checker를 실행한다.
 - Vector DB와 entity graph persistence는 아직 간단한 JSON memory 수준이다.
 
-즉, 지금은 "회사 운영 시스템"에 첫 번째 실제 리서치 도구 묶음이 붙은 상태다. 다음은 이 도구 결과를 Identity/Evidence/Collision 검증 엔진으로 엮어 보고서 신뢰도를 올리는 단계다.
+즉, 지금은 "회사 운영 시스템"에 첫 번째 실제 리서치 도구 묶음과 secret-backed live connector가 붙은 상태다. 다음은 사용자가 secret을 제공한 뒤 이 도구 결과를 Identity/Evidence/Collision 검증 엔진으로 엮어 보고서 신뢰도를 올리는 단계다.
 
 ## 19. 다음 개발 순서 제안
 
 현재 구조 기준으로 다음 순서가 자연스럽다.
 
 ```text
-1. Project Research Loop 추가: `jimmoria project --url/--ca/--x`
-2. Identity Resolver + Ticker Collision Engine 추가
-3. Evidence Validator / Citation Checker 추가
-4. GitHub connector를 commits/releases/activity까지 확장
-5. Web Search 결과를 source snapshot과 citation checker에 연결
-6. RSS monitor + Signal Queue로 24H Radar 입력원 구축
-7. X/KOL search와 local KOL DB 구현
-8. RootData/Explorer/RPC connector 구현
-9. SharedMemory를 SQLite/vector DB로 확장
-10. events.json 기반 CLI replay 또는 web visualizer 구현
+1. `jimmoria doctor`에서 X/Telegram/RootData/Explorer/RPC secret health check UX 강화
+2. Project Research Loop 추가: `jimmoria project --url/--ca/--x`
+3. Identity Resolver + Ticker Collision Engine 추가
+4. Evidence Validator / Citation Checker 추가
+5. GitHub connector를 commits/releases/activity까지 확장
+6. Web Search/RootData/X 결과를 source snapshot과 citation checker에 연결
+7. Local KOL DB와 watchlist memory 구현
+8. RSS monitor + Signal Queue로 24H Radar 입력원 구축
+9. Discord/Dune/The Graph connector 추가
+10. SharedMemory를 SQLite/vector DB로 확장하고 web visualizer에서 replay
 ```
 
 ## 20. 문서 업데이트 원칙
@@ -995,7 +1038,7 @@ python -m unittest discover -s tests -v
 
 ## 21. 한 줄 요약
 
-JIMMORIA는 현재 "채팅형 CLI + Supervisor Office delegation tools + ProcessSpec 기반 Research Room + controlled P2P Agent Bus + Agent Council consensus + Supervisor final review + Shared Memory + Codex-only Model Gateway + agent-level LLM analysis pass + Tool Gateway + 기본 Web Search/URL/Website/Docs/GitHub/DEX/CoinGecko connectors + Markdown/Obsidian output"까지 구현된 크립토 리서치 회사 MVP다. 다음 핵심 작업은 Project Research Loop, Identity/Evidence/Collision 검증 엔진, 그리고 Social/Contract/Funding 에이전트의 source-backed finding 업그레이드다.
+JIMMORIA는 현재 "채팅형 CLI + Supervisor Office delegation tools + ProcessSpec 기반 Research Room + controlled P2P Agent Bus + Agent Council consensus + Supervisor final review + Shared Memory + Codex-only Model Gateway + agent-level LLM analysis pass + Tool Gateway + 기본 Web Search/URL/Website/Docs/GitHub/DEX/CoinGecko connectors + X/Telegram/RootData/Explorer/RPC secret-backed connectors + Markdown/Obsidian output"까지 구현된 크립토 리서치 회사 MVP다. 다음 핵심 작업은 secret 설정 UX, Project Research Loop, Identity/Evidence/Collision 검증 엔진, 그리고 Social/Contract/Funding 에이전트의 source-backed finding 업그레이드다.
 ## 22. Current Runtime Update Notes
 
 최근 변경 기준으로 JIMMORIA는 live/source-backed 후보와 MVP placeholder 후보를 구분한다.
@@ -1471,7 +1514,7 @@ Telegram delivery config
 Artifact directory writable
 ```
 
-X/Twitter, Telegram, Discord, RootData, Explorer/RPC 같은 live connector가 아직 등록되지 않은 경우 placeholder/missing으로 표시된다. 이는 실패가 아니라 현재 MVP의 연결 상태를 명확히 보여주는 진단이다.
+X/Twitter, Telegram, RootData, Explorer/RPC 같은 live connector는 등록되어 있으며 secret이 없으면 `missing_secret`, 대상 입력이 부족하면 `missing_input`으로 표시된다. Discord, Dune, The Graph, RSS monitor처럼 아직 구현되지 않은 connector는 `placeholder` 또는 `missing_connector`로 표시된다. 이는 실패가 아니라 현재 MVP의 연결 상태를 명확히 보여주는 진단이다.
 
 ### Safety Gate
 

@@ -1,7 +1,22 @@
 from __future__ import annotations
 
+from crypto_research_agents.connectors.explorer_connector import (
+    explorer_get_contract_source,
+    explorer_get_token_holders,
+    explorer_get_token_supply,
+    explorer_lookup,
+    get_contract_address,
+    rpc_read_contract,
+)
 from crypto_research_agents.connectors.github_connector import github_search_repos, read_github_repo
 from crypto_research_agents.connectors.market_connectors import coingecko_coin_metadata, dexscreener_search_pairs
+from crypto_research_agents.connectors.opportunity_connector import check_airdrop_points
+from crypto_research_agents.connectors.rootdata_connector import (
+    rootdata_get_hot_projects,
+    rootdata_get_investors,
+    rootdata_get_project,
+    rootdata_search_projects,
+)
 from crypto_research_agents.connectors.supervisor_tools import (
     agent_handoff,
     assign_task,
@@ -19,7 +34,9 @@ from crypto_research_agents.connectors.url_fetcher import (
     fetch_url,
     parse_html,
 )
+from crypto_research_agents.connectors.telegram_connector import telegram_read_channel, telegram_search_public_channels
 from crypto_research_agents.connectors.web_search import web_search
+from crypto_research_agents.connectors.x_social import x_build_kol_list, x_get_user_timeline, x_search_posts
 from crypto_research_agents.core.tool_gateway import ToolGateway
 
 
@@ -44,6 +61,22 @@ def register_default_connectors(tool_gateway: ToolGateway) -> None:
     tool_gateway.register("read_github_repo", read_github_repo)
     tool_gateway.register("dexscreener_search_pairs", dexscreener_search_pairs)
     tool_gateway.register("coingecko_coin_metadata", coingecko_coin_metadata)
+    tool_gateway.register("x_search_posts", x_search_posts)
+    tool_gateway.register("x_get_user_timeline", x_get_user_timeline)
+    tool_gateway.register("x_build_kol_list", x_build_kol_list)
+    tool_gateway.register("telegram_read_channel", telegram_read_channel)
+    tool_gateway.register("telegram_search_public_channels", telegram_search_public_channels)
+    tool_gateway.register("rootdata_search_projects", rootdata_search_projects)
+    tool_gateway.register("rootdata_get_project", rootdata_get_project)
+    tool_gateway.register("rootdata_get_investors", rootdata_get_investors)
+    tool_gateway.register("rootdata_get_hot_projects", rootdata_get_hot_projects)
+    tool_gateway.register("get_contract_address", get_contract_address)
+    tool_gateway.register("explorer_lookup", explorer_lookup)
+    tool_gateway.register("explorer_get_contract_source", explorer_get_contract_source)
+    tool_gateway.register("explorer_get_token_supply", explorer_get_token_supply)
+    tool_gateway.register("explorer_get_token_holders", explorer_get_token_holders)
+    tool_gateway.register("rpc_read_contract", rpc_read_contract)
+    tool_gateway.register("check_airdrop_points", check_airdrop_points)
 
 
 __all__ = ["register_default_connectors"]

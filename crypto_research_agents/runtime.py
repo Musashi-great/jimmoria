@@ -509,21 +509,44 @@ def default_policy(agent_specs: AgentSpecRegistry | None = None) -> PolicyEngine
                 if not tool_registry.is_tool_allowed_for_research(tool):
                     continue
                 policy.allow(agent_id, tool)
-    for tool in ["x_search_posts", "telegram_read_channel", "discord_read_channel"]:
+    for tool in [
+        "x_search_posts",
+        "x_get_user_timeline",
+        "x_build_kol_list",
+        "telegram_read_channel",
+        "telegram_search_public_channels",
+        "discord_read_channel",
+    ]:
         policy.allow("social_kol_agent", tool)
     for tool in ["fetch_url", "parse_html", "archive_source_snapshot"]:
         policy.allow("ingestion_agent", tool)
-    for tool in ["web_search", "github_search_repos", "coingecko_coin_metadata", "dexscreener_search_pairs"]:
+    for tool in [
+        "web_search",
+        "github_search_repos",
+        "coingecko_coin_metadata",
+        "dexscreener_search_pairs",
+        "rootdata_search_projects",
+        "rootdata_get_hot_projects",
+    ]:
         policy.allow("discovery_agent", tool)
     for tool in ["web_search", "crawl_website"]:
         policy.allow("social_kol_agent", tool)
-    for tool in ["get_contract_address", "get_dex_pair", "get_token_metadata"]:
+    for tool in [
+        "get_contract_address",
+        "explorer_lookup",
+        "explorer_get_contract_source",
+        "explorer_get_token_supply",
+        "explorer_get_token_holders",
+        "rpc_read_contract",
+        "get_dex_pair",
+        "get_token_metadata",
+    ]:
         policy.allow("contract_onchain_agent", tool)
     for tool in ["coingecko_coin_metadata", "dexscreener_search_pairs"]:
         policy.allow("contract_onchain_agent", tool)
     for tool in ["crawl_docs", "read_github_repo", "crawl_website"]:
         policy.allow("product_tech_agent", tool)
-    for tool in ["check_airdrop_points", "crawl_funding_news"]:
+    for tool in ["check_airdrop_points", "crawl_funding_news", "rootdata_get_project", "rootdata_get_investors"]:
         policy.allow("funding_token_agent", tool)
     return policy
 

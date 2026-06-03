@@ -191,15 +191,15 @@ def render_project_dossier(
         )
     if has_live_evidence:
         connector_note = (
-            "- 참고: 가능한 곳에서는 live web/GitHub/market connector를 사용했다. Social API, RootData, explorer/RPC는 아직 placeholder일 수 있다."
+            "- 참고: live web/GitHub/market connector를 사용했고, X/Telegram/RootData/Explorer/RPC는 secret과 대상 입력이 있을 때 live 결과를 낸다."
             if korean
-            else "- Note: Live web/GitHub/market connectors were used where available; social APIs, RootData, and explorer/RPC may still be placeholders."
+            else "- Note: Live web/GitHub/market connectors were used; X/Telegram/RootData/Explorer/RPC return live results when required secrets and inputs are configured."
         )
     else:
         connector_note = (
-            "- 참고: connector 설정 전까지 live social/on-chain/product check는 local placeholder 또는 미설정 결과를 사용할 수 있다."
+            "- 참고: secret이 없는 connector는 `missing_secret`, 대상 입력이 부족한 connector는 `missing_input`으로 표시된다."
             if korean
-            else "- Note: This MVP uses local placeholders for live social/on-chain/product checks until connectors are configured."
+            else "- Note: Connectors without credentials return `missing_secret`; connectors without enough target data return `missing_input`, so those areas need follow-up verification."
         )
 
     report_title = (
@@ -456,14 +456,14 @@ def render_automatic_tldr(candidates: list[Any], *, korean: bool = False) -> str
             f"Core thesis: {narratives}. "
             f"Token status: {primary.token_status}; chain: {primary.chain or 'unknown'}. "
             f"수집된 Evidence URL: {evidence_count}. "
-            "Market/social/on-chain detail은 placeholder connector 영역에서 추가 검증이 필요하다."
+            "Market/social/on-chain detail은 connector secret 또는 대상 입력이 부족한 영역에서 추가 검증이 필요하다."
         )
     return (
         f"{primary.name} resolved as the primary candidate ({origin}). "
         f"Core thesis: {narratives}. "
         f"Token status: {primary.token_status}; chain: {primary.chain or 'unknown'}. "
         f"Evidence URLs collected: {evidence_count}. "
-        "Market/social/on-chain details still need official-source verification where connectors are placeholders."
+        "Market/social/on-chain details still need official-source verification where connector secrets or target inputs are missing."
     )
 
 

@@ -47,7 +47,7 @@ class SocialKOLAgent(BaseAgent):
                 {
                     "project_id": project_id,
                     "project_name": project.name,
-                    "mention_trend": "api_unconfigured",
+                    "mention_trend": _mention_trend(tool_result),
                     "key_accounts": social_urls,
                     "community_signal": _community_signal(social_urls, tool_result["status"], web_result["status"]),
                     "tool_status": tool_result["status"],
@@ -58,7 +58,7 @@ class SocialKOLAgent(BaseAgent):
 
         linked = sum(1 for row in rows if row["key_accounts"])
         summary = (
-            f"Social/KOL check found public social links for {linked}/{len(rows)} candidates; X API remains unconfigured."
+            f"Social/KOL check found public social links for {linked}/{len(rows)} candidates; live X status: {_status_summary(rows)}."
             if rows
             else "Social/KOL check found no candidate projects to inspect."
         )
@@ -82,7 +82,7 @@ class SocialKOLAgent(BaseAgent):
                 from_agent=self.agent_id,
                 result={"rows": rows, "finding_id": finding.finding_id, "llm_analysis": llm_analysis},
                 confidence=finding.confidence,
-                notes=["Live social connector is not configured.", str(llm_analysis.get("summary", summary))],
+                notes=[summary, str(llm_analysis.get("summary", summary))],
             )
         return AgentResult(self.agent_id, summary, {"finding_id": finding.finding_id, "rows": rows, "llm_analysis": llm_analysis}, confidence=finding.confidence)
 
@@ -120,10 +120,27 @@ def _maybe_social_url(value: object) -> list[str]:
 
 def _community_signal(social_urls: list[str], x_status: str, web_status: str) -> str:
     if social_urls:
-        return "Official/community social links found through web evidence; live post history still requires X/Telegram connectors."
-    if x_status == "unconfigured" and web_status == "success":
-        return "No social handle resolved from web search; live X/Telegram connectors are still required."
-    return "Live social connector is not configured yet."
+        if x_status == "success":
+            return "Official/community social links found and live X search returned post evidence."
+        return "Official/community social links found through web evidence; live post history still requires configured X/Telegram credentials."
+    if x_status in {"missing_secret", "unconfigured"} and web_status == "success":
+        return "No social handle resolved from web search; live X/Telegram credentials are still required."
+    if x_status == "success":
+        return "Live X connector returned data, but no official/community URL was resolved."
+    return "Live social connector did not return usable evidence yet."
+
+
+def _mention_trend(tool_result: dict[str, Any]) -> str:
+    status = str(tool_result.get("status") or "")
+    if status == "success":
+        posts = tool_result.get("data", {}).get("posts", []) if isinstance(tool_result.get("data"), dict) else []
+        return f"live_posts:{len(posts)}"
+    return status or "unknown"
+
+
+def _status_summary(rows: list[dict[str, Any]]) -> str:
+    statuses = sorted({str(row.get("tool_status") or "unknown") for row in rows})
+    return ", ".join(statuses) if statuses else "unknown"
 
 
 def _dedupe(values: list[str]) -> list[str]:

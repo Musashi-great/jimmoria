@@ -4,7 +4,7 @@ JIMMORIA는 크립토 리서치 전용 멀티에이전트 회사 CLI입니다.
 
 사용자는 터미널에서 채팅을 치고, Supervisor가 Research Room을 열어 여러 에이전트에게 일을 나눕니다. 에이전트들은 소스 정리, 내러티브 분석, 후보 프로젝트 발굴, KOL/소셜 체크, 온체인/제품/토큰 체크, 보고서 작성, Obsidian 노트 정리를 담당합니다.
 
-현재는 MVP입니다. 에이전트 협업 구조와 보고서 생성 흐름은 동작하고, Supervisor Office가 Research Room 업무를 만들고 하위 에이전트에게 배정합니다. 하위 에이전트가 수행을 마치면 Agent Council이 findings를 모아 consensus를 만들고, ReportAgent가 작성한 뒤 Supervisor가 최종 검토해서 전달 모드를 결정합니다. Web Search/URL/Website/Docs/GitHub/DEX Screener/CoinGecko 기본 connector도 ToolGateway 뒤에 붙어 있습니다. X/Twitter, Telegram, Discord, RootData, Explorer/RPC, funding/airdrop 커넥터는 아직 placeholder 상태입니다.
+현재는 MVP입니다. 에이전트 협업 구조와 보고서 생성 흐름은 동작하고, Supervisor Office가 Research Room 업무를 만들고 하위 에이전트에게 배정합니다. 하위 에이전트가 수행을 마치면 Agent Council이 findings를 모아 consensus를 만들고, ReportAgent가 작성한 뒤 Supervisor가 최종 검토해서 전달 모드를 결정합니다. Web Search/URL/Website/Docs/GitHub/DEX Screener/CoinGecko 기본 connector도 ToolGateway 뒤에 붙어 있습니다. X/Twitter, Telegram, RootData, Explorer/RPC, funding/airdrop connector도 등록되어 있고, API key나 대상 입력이 없을 때는 `missing_secret` 또는 `missing_input`으로 표시됩니다. Discord, Dune, The Graph 등은 아직 별도 connector가 필요한 상태입니다.
 
 ## Quick Start
 
@@ -112,15 +112,30 @@ configured: web_search, fetch_url, parse_html, crawl_website, crawl_docs,
             create_research_room, create_task, assign_task,
             agent_handoff, update_task_status
 
-placeholder/missing secret: X/Twitter, Telegram, Discord, RootData,
-                            Explorer/RPC, Dune, The Graph,
-                            funding/airdrop checker
+configured but needs secrets: X/Twitter, Telegram, RootData,
+                              Explorer/RPC
+
+configured without secrets: funding/airdrop checker
+
+placeholder/missing connector: Discord, RSS monitor, Dune, The Graph,
+                               some advanced market feeds
 
 blocked by design: wallet_sign, swap, transfer, approve,
                    private_key_read, seed_phrase_read
 ```
 
-즉 브라우저/웹 검색 계열은 동작하지만, KOL timeline이나 Telegram/RootData/Explorer 같은 live research connector는 API 키와 connector 구현이 붙어야 합니다.
+즉 브라우저/웹 검색 계열은 바로 동작하고, KOL timeline이나 Telegram/RootData/Explorer 같은 live research connector는 아래 secret을 넣으면 live 호출로 바뀝니다.
+
+```powershell
+$env:X_BEARER_TOKEN="..."
+$env:TELEGRAM_BOT_TOKEN="..."
+$env:TELEGRAM_CHAT_ID="..."      # 선택 사항. bot이 볼 수 있는 채널/그룹만 읽음
+$env:ROOTDATA_API_KEY="..."
+$env:ETHERSCAN_API_KEY="..."
+$env:ETH_RPC_URL="..."           # RPC read-only call을 쓸 때만 필요
+```
+
+Telegram Bot API는 임의의 공개 채널 과거 메시지를 스크래핑하는 API가 아니라 bot이 접근 가능한 업데이트를 읽는 방식입니다. 그래서 bot을 채널/그룹에 넣거나 승인된 chat id를 제공해야 합니다.
 
 ## Chat Commands
 

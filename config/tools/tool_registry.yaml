@@ -302,7 +302,7 @@
     "x_search_posts": {
       "priority": "required",
       "owner_agent": "social_kol_agent",
-      "implementation_status": "external_connector_required",
+      "implementation_status": "implemented",
       "purpose": "Search recent X posts for project, KOL, narrative, URL, and ticker mentions.",
       "provider_options": ["X API v2 recent search"],
       "required_secrets": ["X_BEARER_TOKEN"],
@@ -329,7 +329,7 @@
     "x_get_user_timeline": {
       "priority": "required",
       "owner_agent": "social_kol_agent",
-      "implementation_status": "external_connector_required",
+      "implementation_status": "implemented",
       "purpose": "Read a KOL timeline to find repeated project and narrative mentions.",
       "provider_options": ["X API v2 user timeline"],
       "required_secrets": ["X_BEARER_TOKEN"],
@@ -338,19 +338,28 @@
     "x_build_kol_list": {
       "priority": "required",
       "owner_agent": "social_kol_agent",
-      "implementation_status": "planned",
+      "implementation_status": "implemented",
       "purpose": "Build and update KOL handle sets by narrative, ecosystem, and credibility tier.",
       "provider_options": ["local KOL DB", "X API user/profile endpoints", "RootData leading figures"],
-      "required_secrets": [],
+      "required_secrets": ["X_BEARER_TOKEN"],
       "source_docs": ["https://www.rootdata.com/Api/Doc"]
     },
     "telegram_read_channel": {
       "priority": "recommended",
       "owner_agent": "social_kol_agent",
-      "implementation_status": "external_connector_required",
+      "implementation_status": "implemented",
       "purpose": "Read messages from monitored public or approved Telegram channels.",
       "provider_options": ["Telegram Bot API getUpdates", "Telegram client API for approved channels"],
       "required_secrets": ["TELEGRAM_BOT_TOKEN"],
+      "source_docs": ["https://core.telegram.org/bots/api"]
+    },
+    "telegram_search_public_channels": {
+      "priority": "optional",
+      "owner_agent": "social_kol_agent",
+      "implementation_status": "implemented",
+      "purpose": "Explain Telegram public-channel search limits and route research to approved channel reads or web search.",
+      "provider_options": ["Telegram Bot API limitation notice"],
+      "required_secrets": [],
       "source_docs": ["https://core.telegram.org/bots/api"]
     },
     "discord_read_channel": {
@@ -473,7 +482,7 @@
     "rootdata_search_projects": {
       "priority": "required",
       "owner_agent": "discovery_agent",
-      "implementation_status": "external_connector_required",
+      "implementation_status": "implemented",
       "purpose": "Search indexed crypto projects, especially early projects and official social links.",
       "provider_options": ["RootData API"],
       "required_secrets": ["ROOTDATA_API_KEY"],
@@ -482,16 +491,25 @@
     "rootdata_get_project": {
       "priority": "required",
       "owner_agent": "funding_token_agent",
-      "implementation_status": "external_connector_required",
+      "implementation_status": "implemented",
       "purpose": "Fetch project profile, team, investors, and official links when available.",
       "provider_options": ["RootData API get_item"],
+      "required_secrets": ["ROOTDATA_API_KEY"],
+      "source_docs": ["https://www.rootdata.com/Api/Doc"]
+    },
+    "rootdata_get_investors": {
+      "priority": "recommended",
+      "owner_agent": "funding_token_agent",
+      "implementation_status": "implemented",
+      "purpose": "Fetch RootData investor directory pages for funding context.",
+      "provider_options": ["RootData API get_invest"],
       "required_secrets": ["ROOTDATA_API_KEY"],
       "source_docs": ["https://www.rootdata.com/Api/Doc"]
     },
     "rootdata_get_hot_projects": {
       "priority": "recommended",
       "owner_agent": "discovery_agent",
-      "implementation_status": "external_connector_required",
+      "implementation_status": "implemented",
       "purpose": "Use hot/trending project lists as candidate discovery input.",
       "provider_options": ["RootData API"],
       "required_secrets": ["ROOTDATA_API_KEY"],
@@ -527,16 +545,52 @@
     "explorer_lookup": {
       "priority": "required",
       "owner_agent": "contract_onchain_agent",
-      "implementation_status": "external_connector_required",
+      "implementation_status": "implemented",
       "purpose": "Look up official contract pages, source verification, token supply, holder count, and explorer metadata.",
       "provider_options": ["Etherscan API v2", "Blockscout-compatible APIs"],
       "required_secrets": ["ETHERSCAN_API_KEY"],
       "source_docs": ["https://docs.etherscan.io/"]
     },
+    "explorer_get_contract_source": {
+      "priority": "recommended",
+      "owner_agent": "contract_onchain_agent",
+      "implementation_status": "implemented",
+      "purpose": "Read verified contract source metadata from Etherscan API V2.",
+      "provider_options": ["Etherscan API v2 contract getsourcecode"],
+      "required_secrets": ["ETHERSCAN_API_KEY"],
+      "source_docs": ["https://docs.etherscan.io/"]
+    },
+    "explorer_get_token_supply": {
+      "priority": "recommended",
+      "owner_agent": "contract_onchain_agent",
+      "implementation_status": "implemented",
+      "purpose": "Read token supply from Etherscan API V2.",
+      "provider_options": ["Etherscan API v2 stats tokensupply"],
+      "required_secrets": ["ETHERSCAN_API_KEY"],
+      "source_docs": ["https://docs.etherscan.io/"]
+    },
+    "explorer_get_token_holders": {
+      "priority": "optional",
+      "owner_agent": "contract_onchain_agent",
+      "implementation_status": "implemented",
+      "purpose": "Read top token holders when the configured Etherscan plan supports the endpoint.",
+      "provider_options": ["Etherscan API v2 token topholders"],
+      "required_secrets": ["ETHERSCAN_API_KEY"],
+      "source_docs": ["https://docs.etherscan.io/"]
+    },
+    "rpc_read_contract": {
+      "priority": "recommended",
+      "owner_agent": "contract_onchain_agent",
+      "implementation_status": "implemented",
+      "purpose": "Run read-only JSON-RPC eth_call against a configured endpoint.",
+      "provider_options": ["Ethereum JSON-RPC eth_call"],
+      "required_secrets": ["ETH_RPC_URL"],
+      "source_docs": ["https://ethereum.org/en/developers/docs/apis/json-rpc/"]
+    },
     "check_airdrop_points": {
       "priority": "required",
       "owner_agent": "funding_token_agent",
-      "implementation_status": "external_connector_required",
+      "implementation_status": "implemented",
       "purpose": "Detect points, quest, allowlist, testnet, and airdrop hint programs from official sources.",
       "provider_options": ["official website crawler", "docs crawler", "RSS/X monitors"],
       "required_secrets": [],
