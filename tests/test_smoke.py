@@ -1109,6 +1109,64 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(get_dex_pair()["status"], "missing_input")
         self.assertEqual(get_token_metadata()["status"], "missing_input")
 
+    def test_operator_bridge_connectors_are_registered_and_guarded(self) -> None:
+        policy = PolicyEngine()
+        agent_id = "tester"
+        for tool in [
+            "skill_view",
+            "search_files",
+            "execute_code",
+            "write_file",
+            "terminal",
+            "browser_vision",
+            "send_message",
+            "multi_tool_use.parallel",
+        ]:
+            policy.allow(agent_id, tool)
+        gateway = ToolGateway(policy)
+        register_default_connectors(gateway)
+
+        self.assertIn("skill_view", gateway.registered_tools)
+        self.assertIn("browser_console", gateway.registered_tools)
+        self.assertIn("multi_tool_use.parallel", gateway.registered_tools)
+
+        playbook = gateway.call(agent_id, "skill_view", skill_id="early-token-discovery")
+        self.assertEqual(playbook["status"], "success")
+        self.assertIn("Representative Web3 Project Diligence", playbook["data"]["content"])
+
+        search = gateway.call(
+            agent_id,
+            "search_files",
+            query="Hermes Operator Bridge",
+            root="research_playbooks",
+        )
+        self.assertEqual(search["status"], "success")
+        self.assertTrue(search["data"]["results"])
+
+        score = gateway.call(
+            agent_id,
+            "execute_code",
+            operation="score_sum",
+            payload={"components": {"identity": 20, "social": 15, "note": "ignore"}},
+        )
+        self.assertEqual(score["data"]["score"], 35)
+
+        parallel = gateway.call(agent_id, "multi_tool_use.parallel", tasks=[{"tool": "web_search"}])
+        self.assertEqual(parallel["status"], "success")
+        self.assertIn("parallel tool intent", parallel["message"])
+
+        blocked_terminal = gateway.call(agent_id, "terminal", command="echo hi")
+        self.assertEqual(blocked_terminal["status"], "failed")
+        self.assertIn("disabled", blocked_terminal["message"])
+
+        blocked_message = gateway.call(agent_id, "send_message", channel="telegram", message="hi")
+        self.assertEqual(blocked_message["status"], "failed")
+        self.assertIn("disabled", blocked_message["message"])
+
+        vision = gateway.call(agent_id, "browser_vision", url="https://example.com")
+        self.assertEqual(vision["status"], "failed")
+        self.assertEqual(vision["data"]["status"], "external_connector_required")
+
     def test_airdrop_checker_filters_generic_non_project_results(self) -> None:
         from crypto_research_agents.connectors.opportunity_connector import check_airdrop_points
 
@@ -1360,17 +1418,22 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("oauth_tokens", social.memory_scope.no_access)
         self.assertEqual(social.persona_name, "The Signal Listener")
         self.assertIn("public web and X", social.mission.primary_goal)
+        self.assertIn("browser_snapshot", social.tools.allow)
 
         supervisor = registry.get("supervisor_agent")
         self.assertIsNotNone(supervisor)
         assert supervisor is not None
         self.assertEqual(supervisor.persona_name, "The Company President")
         self.assertIn("company_settings", supervisor.memory_scope.write)
+        self.assertIn("skill_view", supervisor.tools.allow)
+        self.assertIn("multi_tool_use.parallel", supervisor.tools.allow)
 
         product = registry.get("product_tech_agent")
         self.assertIsNotNone(product)
         assert product is not None
         self.assertIn("github_search_repos", product.tools.allow)
+        self.assertIn("search_files", product.tools.allow)
+        self.assertIn("browser_console", product.tools.allow)
 
         report = registry.get("report_agent")
         self.assertIsNotNone(report)
@@ -1381,11 +1444,14 @@ class SmokeTest(unittest.TestCase):
         self.assertTrue(any("project intelligence report" in item for item in report.must_not))
         self.assertTrue(any("raw LLM JSON" in item for item in report.must_not))
         self.assertIn("evidence_packet", report.output_schema.required)
+        self.assertIn("write_file", report.tools.allow)
+        self.assertIn("execute_code", report.tools.allow)
 
         funding = registry.get("funding_token_agent")
         self.assertIsNotNone(funding)
         assert funding is not None
         self.assertIn("rootdata_get_project", funding.tools.allow)
+        self.assertIn("browser_snapshot", funding.tools.allow)
 
     def test_process_specs_load_research_and_ingestion_rooms(self) -> None:
         registry = ProcessSpecRegistry.load_dir("config/processes")
@@ -2094,11 +2160,16 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertIn("github_get_repo_activity", registry["minimum_viable_live_stack"])
         self.assertIn("defillama_protocol_search", registry["minimum_viable_live_stack"])
         self.assertIn("snapshot_get_proposals", registry["minimum_viable_live_stack"])
+        self.assertIn("skill_view", registry["operator_bridge"])
+        self.assertIn("browser_navigate", registry["operator_bridge"])
+        self.assertIn("multi_tool_use.parallel", registry["operator_bridge"])
         self.assertEqual(registry["tool_meta"]["github_get_repo_activity"]["implementation_status"], "implemented")
         self.assertEqual(registry["tool_meta"]["defillama_protocol_search"]["implementation_status"], "implemented")
         self.assertEqual(registry["tool_meta"]["snapshot_get_proposals"]["implementation_status"], "implemented")
         self.assertEqual(registry["tool_meta"]["get_dex_pair"]["implementation_status"], "implemented")
         self.assertEqual(registry["tool_meta"]["get_token_metadata"]["implementation_status"], "implemented")
+        self.assertEqual(registry["tool_meta"]["terminal"]["implementation_status"], "implemented")
+        self.assertEqual(registry["tool_meta"]["browser_vision"]["implementation_status"], "external_connector_required")
 
     def test_model_router_contains_supervisor_chat_route(self) -> None:
         router = json.loads(Path("config/models/model_router.yaml").read_text(encoding="utf-8"))
@@ -2164,7 +2235,9 @@ Usage: codex exec [OPTIONS] [PROMPT]
 
             self.assertIn(("x_search_posts", "missing_secret"), statuses)
             self.assertIn(("get_contract_address", "missing_input"), statuses)
-            self.assertIn(("crawl_docs", "missing_input"), statuses)
+            crawl_docs_statuses = {status for tool, status in statuses if tool == "crawl_docs"}
+            self.assertTrue(crawl_docs_statuses)
+            self.assertFalse("unconfigured" in crawl_docs_statuses)
             self.assertFalse(any(tool == "check_airdrop_points" and status == "unconfigured" for tool, status in statuses))
 
     def test_tool_registry_registers_existing_connectors(self) -> None:
@@ -2190,6 +2263,12 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(registry.get("rootdata_search_projects").implementation_status, "implemented")
         self.assertEqual(registry.get("explorer_lookup").implementation_status, "implemented")
         self.assertEqual(registry.get("check_airdrop_points").implementation_status, "implemented")
+        self.assertEqual(registry.get("skill_view").implementation_status, "implemented")
+        self.assertEqual(registry.get("browser_console").implementation_status, "implemented")
+        self.assertEqual(registry.get("write_file").implementation_status, "implemented")
+        self.assertEqual(registry.get("terminal").mode, "dangerous")
+        self.assertEqual(registry.get("send_message").mode, "write")
+        self.assertEqual(registry.get("browser_vision").implementation_status, "external_connector_required")
 
     def test_toolset_limits_agent_access(self) -> None:
         registry = load_tool_registry()
@@ -2198,6 +2277,14 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertIn("web_search", tools)
         self.assertIn("read_github_repo", tools)
         self.assertNotIn("wallet_sign", tools)
+
+        bridge_tools = registry.allowed_tools_for_toolsets(["operator_research_bridge"])
+        self.assertIn("browser_navigate", bridge_tools)
+        self.assertIn("write_file", bridge_tools)
+        self.assertIn("multi_tool_use.parallel", bridge_tools)
+        self.assertNotIn("terminal", bridge_tools)
+        self.assertNotIn("send_message", bridge_tools)
+        registry.assert_toolsets_research_safe(["operator_research_bridge"])
 
     def test_supervisor_office_toolset_is_research_safe(self) -> None:
         registry = load_tool_registry()

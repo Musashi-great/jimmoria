@@ -141,6 +141,9 @@ check_airdrop_points
 archive_source_snapshot
 supervisor_office tools
 local artifact/report/note writing
+Hermes-style operator bridge: skill_view, read_file, browser_navigate, browser_console,
+browser_snapshot, browser_click, search_files, execute_code, write_file, delegate_task,
+cronjob, multi_tool_use.parallel
 ```
 
 Optional secrets for stronger live research:
@@ -157,6 +160,15 @@ Not required by the current direction:
 ```text
 TELEGRAM_BOT_TOKEN
 DISCORD_BOT_TOKEN
+```
+
+Operator-style tools that remain intentionally blocked or external-only:
+
+```text
+terminal              registered for audit, arbitrary shell blocked for agents
+send_message          registered for audit, external messaging disabled
+browser_vision        future external vision connector
+vision_analyze        future external vision connector
 ```
 
 ## Concurrency Roadmap

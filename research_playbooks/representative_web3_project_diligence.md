@@ -15,7 +15,7 @@ The input can be a project name, official X profile, contract address, website, 
 
 ## Tool Mapping
 
-Original operator tools such as `skill_view`, `browser_navigate`, `browser_console`, `xurl`, shell API calls, GitHub/NPM/RPC/explorer calls, and file writes are mapped into JIMMORIA as follows:
+Original operator tools such as `skill_view`, `browser_navigate`, `browser_console`, `xurl`, shell API calls, GitHub/NPM/RPC/explorer calls, and file writes are mapped into JIMMORIA as follows. The names can be used by agent specs, but the ToolGateway keeps them inside the read-only/project-artifact research boundary.
 
 | Operator intent | JIMMORIA implementation |
 |---|---|
@@ -30,6 +30,29 @@ Original operator tools such as `skill_view`, `browser_navigate`, `browser_conso
 | RPC / explorer | `explorer_lookup`, RPC connector when configured |
 | Base narrative radar | planned workflow hook for Base CA inputs |
 | Candidate evidence packet write | `data/evidence_packets/<project>-<room_id>.md` |
+
+## Hermes Operator Bridge
+
+These Hermes-style tool names are explicitly mapped:
+
+| Tool name | JIMMORIA behavior |
+|---|---|
+| `skill_view` | Loads local JIMMORIA playbooks, including this diligence playbook and the `xurl` mapping. |
+| `read_file` | Reads project-local files through a sensitive-path guard. |
+| `browser_navigate` | Fetches a public URL using the stateless public URL fetcher. |
+| `browser_console` | Returns `document.body.innerText`-style text plus link lists from a public URL. |
+| `browser_snapshot` | Returns a compact text/link snapshot for evidence collection. |
+| `browser_scroll` | Stateless approximation that refetches the URL; there is no persistent browser session yet. |
+| `browser_click` | Stateless approximation that navigates to a supplied `link_url`. |
+| `search_files` | Searches project-local files without shell access. |
+| `execute_code` | Allows only deterministic helpers: `timestamp_kst`, `score_sum`, and `json_summary`. |
+| `write_file` | Writes research artifacts only under `data/`, `reports/`, or `vault/`. |
+| `delegate_task` | Records a Supervisor assignment to a specialist agent. |
+| `cronjob` | Lists or evaluates configured local JIMMORIA scheduled jobs. |
+| `multi_tool_use.parallel` | Records parallel intent; actual parallel execution follows the Phase 1-4 concurrency policy. |
+| `terminal` | Registered for audit clarity, but arbitrary terminal execution is blocked for agents. |
+| `browser_vision` / `vision_analyze` | Future external vision connectors; currently return `external_connector_required`. |
+| `send_message` | Registered for audit clarity, but external messaging is disabled; delivery stays in CLI/Web/local reports. |
 
 Telegram and Discord are intentionally out of scope for the current public-web-only research stack.
 
@@ -103,4 +126,3 @@ The audit trail can mention where logs are stored, but final report body should 
 ```text
 Conclusion -> Identity -> Product -> Narrative -> Social/KOL -> Founder -> Token value-capture -> Risks -> Score/Stance -> Sources
 ```
-

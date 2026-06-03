@@ -52,6 +52,9 @@
       "coingecko_latest_listings",
       "dexscreener_latest_profiles",
       "rss_monitor_feed",
+      "skill_view",
+      "browser_navigate",
+      "browser_snapshot",
       "source_cache_read",
       "vector_search"
     ],

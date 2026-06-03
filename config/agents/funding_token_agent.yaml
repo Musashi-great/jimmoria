@@ -47,6 +47,10 @@
       "rootdata_get_project",
       "rootdata_get_investors",
       "rootdata_get_hot_projects",
+      "skill_view",
+      "browser_navigate",
+      "browser_console",
+      "browser_snapshot",
       "parse_tokenomics",
       "parse_unlock_schedule",
       "check_tge_status"

@@ -45,6 +45,9 @@
       "monitor_rootdata_updates",
       "monitor_defillama_protocols",
       "dexscreener_latest_profiles",
+      "cronjob",
+      "browser_navigate",
+      "browser_snapshot",
       "push_signal_queue"
     ],
     "deny": ["telegram_send_message", "x_post_tweet"]

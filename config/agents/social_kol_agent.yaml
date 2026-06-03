@@ -58,6 +58,10 @@
       "x_build_kol_list",
       "x_track_list",
       "rss_monitor_feed",
+      "skill_view",
+      "browser_navigate",
+      "browser_console",
+      "browser_snapshot",
       "count_mentions",
       "calculate_social_momentum",
       "update_kol_profile"

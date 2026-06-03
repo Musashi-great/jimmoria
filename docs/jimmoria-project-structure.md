@@ -413,6 +413,38 @@ JIMMORIA now mirrors the useful Hermes pattern of routing every tool call throug
 
 These are read-only, local connectors. They do not add trading, wallet, Telegram, Discord, or private-channel behavior.
 
+### Hermes Operator Bridge
+
+JIMMORIA also registers Hermes-style operator tool names so agent personas can ask for familiar capabilities while the runtime still enforces the company boundary. These tools are not raw host access; they are mapped to safe local connectors or blocked stubs.
+
+| Operator tool | Runtime mapping |
+|---|---|
+| `skill_view` | Loads local research playbooks such as representative Web3 diligence and `xurl` mapping. |
+| `read_file` | Reads project-local files through a sensitive-path guard. |
+| `browser_navigate` | Stateless public URL fetch. |
+| `browser_console` | Extracts public page text and links, similar to `document.body.innerText`. |
+| `browser_snapshot` | Compact text/link snapshot for evidence packets. |
+| `browser_scroll` | Stateless refetch approximation; no persistent browser session yet. |
+| `browser_click` | Navigates to a supplied link URL. |
+| `search_files` | Keyword search over project-local files without shell access. |
+| `execute_code` | Limited deterministic utilities: timestamp, JSON summary, score aggregation. |
+| `write_file` | Writes artifacts only under `data/`, `reports/`, or `vault/`. |
+| `delegate_task` | Supervisor assignment alias for specialist work. |
+| `cronjob` | Lists/evaluates configured local scheduled jobs. |
+| `multi_tool_use.parallel` | Records parallel intent; concurrency still follows Phase 1-4 policy. |
+| `terminal` | Registered but blocked for agents; use specific read-only connectors instead. |
+| `browser_vision`, `vision_analyze` | Future external vision connectors; currently not enabled. |
+| `send_message` | Registered but disabled; output delivery stays in CLI/Web/local reports. |
+
+Agent access is role-based:
+
+- Supervisor gets planning, delegation, playbook, cron, and parallel-intent tools.
+- Ingestion gets source/file/browser text extraction.
+- Social/KOL gets X/public-web/browser snapshots for the first market-signal layer.
+- Product/Tech gets website/docs/GitHub plus guarded file search and browser text extraction.
+- Contract/On-chain and Funding/Token get browser snapshots for official/explorer/funding pages.
+- Report gets read/search/score/write tools for evidence packets and final dossiers.
+
 ### Agent Persona Updates
 
 The agent specs now include a `professional_output_contract` for Supervisor, Discovery, Product/Tech, Social/KOL, Funding/Token, and Report:

@@ -62,7 +62,12 @@
       "source_citation_check",
       "confidence_score_report",
       "claim_evidence_check",
-      "investment_advice_guard"
+      "investment_advice_guard",
+      "skill_view",
+      "read_file",
+      "search_files",
+      "execute_code",
+      "write_file"
     ],
     "deny": ["x_post_tweet", "telegram_send_message", "wallet_sign"]
   },

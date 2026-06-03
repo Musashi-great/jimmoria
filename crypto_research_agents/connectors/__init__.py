@@ -17,6 +17,25 @@ from crypto_research_agents.connectors.market_connectors import (
     get_token_metadata,
 )
 from crypto_research_agents.connectors.opportunity_connector import check_airdrop_points
+from crypto_research_agents.connectors.operator_bridge import (
+    browser_click,
+    browser_console,
+    browser_navigate,
+    browser_scroll,
+    browser_snapshot,
+    browser_vision,
+    cronjob,
+    delegate_task,
+    execute_code,
+    multi_tool_parallel,
+    read_file,
+    search_files,
+    send_message,
+    skill_view,
+    terminal,
+    vision_analyze,
+    write_file,
+)
 from crypto_research_agents.connectors.research_guardrails import (
     source_relevance_filter,
     tool_call_guardrail,
@@ -63,7 +82,24 @@ def register_default_connectors(tool_gateway: ToolGateway) -> None:
     tool_gateway.register("read_agent_status", read_agent_status)
     tool_gateway.register("task_retry", task_retry)
     tool_gateway.register("task_cancel", task_cancel)
+    tool_gateway.register("delegate_task", delegate_task)
     tool_gateway.register("fetch_url", fetch_url)
+    tool_gateway.register("skill_view", skill_view)
+    tool_gateway.register("read_file", read_file)
+    tool_gateway.register("search_files", search_files)
+    tool_gateway.register("write_file", write_file)
+    tool_gateway.register("execute_code", execute_code)
+    tool_gateway.register("terminal", terminal)
+    tool_gateway.register("browser_navigate", browser_navigate)
+    tool_gateway.register("browser_console", browser_console)
+    tool_gateway.register("browser_snapshot", browser_snapshot)
+    tool_gateway.register("browser_scroll", browser_scroll)
+    tool_gateway.register("browser_click", browser_click)
+    tool_gateway.register("browser_vision", browser_vision)
+    tool_gateway.register("vision_analyze", vision_analyze)
+    tool_gateway.register("cronjob", cronjob)
+    tool_gateway.register("send_message", send_message)
+    tool_gateway.register("multi_tool_use.parallel", multi_tool_parallel)
     tool_gateway.register("parse_html", parse_html)
     tool_gateway.register("archive_source_snapshot", archive_source_snapshot)
     tool_gateway.register("crawl_website", crawl_website)

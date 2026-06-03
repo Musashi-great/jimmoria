@@ -54,6 +54,9 @@
       "check_contract_verified",
       "check_official_links_match_contract",
       "rpc_read_contract",
+      "browser_navigate",
+      "browser_console",
+      "browser_snapshot",
       "dune_execute_query",
       "dune_get_query_results",
       "thegraph_query_subgraph"

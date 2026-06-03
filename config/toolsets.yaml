@@ -34,6 +34,29 @@ toolsets:
       - url_safety_check
       - source_relevance_filter
       - tool_call_guardrail
+  operator_research_bridge:
+    description: Hermes-style operator tool names mapped into JIMMORIA's read-only/project-artifact research boundary.
+    tools:
+      - skill_view
+      - read_file
+      - browser_navigate
+      - browser_console
+      - browser_snapshot
+      - browser_scroll
+      - browser_click
+      - search_files
+      - execute_code
+      - write_file
+      - delegate_task
+      - cronjob
+      - multi_tool_use.parallel
+  operator_blocked_or_external:
+    description: Operator-style tools that are registered for audit clarity but blocked or require future external connectors.
+    tools:
+      - terminal
+      - browser_vision
+      - vision_analyze
+      - send_message
   social_basic:
     description: Read-only public web and X/KOL signal connectors.
     tools:
@@ -131,6 +154,108 @@ tools:
     mode: artifact_write
     implementation_status: implemented
     description: Record an internal task cancellation decision.
+  delegate_task:
+    connector_name: delegate_task
+    category: supervisor_office
+    mode: artifact_write
+    implementation_status: implemented
+    description: Hermes-style delegation alias that records an internal assignment through Supervisor Office.
+  skill_view:
+    connector_name: skill_view
+    category: operator_bridge
+    mode: read_only
+    implementation_status: implemented
+    description: Load local JIMMORIA research playbooks such as representative Web3 diligence and xurl mapping.
+  read_file:
+    connector_name: read_file
+    category: operator_bridge
+    mode: read_only
+    implementation_status: implemented
+    description: Read project-local files through a sensitive-path guard.
+  search_files:
+    connector_name: search_files
+    category: operator_bridge
+    mode: read_only
+    implementation_status: implemented
+    description: Search project-local files for keywords without shell access.
+  write_file:
+    connector_name: write_file
+    category: operator_bridge
+    mode: artifact_write
+    implementation_status: implemented
+    description: Write local research artifacts only under data, reports, or vault.
+  execute_code:
+    connector_name: execute_code
+    category: operator_bridge
+    mode: read_only
+    implementation_status: implemented
+    description: Run limited deterministic utility operations such as timestamp, JSON summary, and score aggregation. Arbitrary code is blocked.
+  terminal:
+    connector_name: terminal
+    category: operator_bridge
+    mode: dangerous
+    implementation_status: implemented
+    description: Registered for audit clarity but arbitrary terminal execution is blocked for agents.
+  browser_navigate:
+    connector_name: browser_navigate
+    category: operator_bridge
+    mode: read_only
+    implementation_status: implemented
+    description: Stateless browser-style URL fetch mapped to the public URL fetcher.
+  browser_console:
+    connector_name: browser_console
+    category: operator_bridge
+    mode: read_only
+    implementation_status: implemented
+    description: Extract document.body.innerText and links from a public URL using the stateless fetcher.
+  browser_snapshot:
+    connector_name: browser_snapshot
+    category: operator_bridge
+    mode: read_only
+    implementation_status: implemented
+    description: Capture a text/link snapshot for a public URL.
+  browser_scroll:
+    connector_name: browser_scroll
+    category: operator_bridge
+    mode: read_only
+    implementation_status: implemented
+    description: Stateless scroll approximation that refetches a public URL.
+  browser_click:
+    connector_name: browser_click
+    category: operator_bridge
+    mode: read_only
+    implementation_status: implemented
+    description: Stateless click approximation that navigates to a supplied link URL.
+  browser_vision:
+    connector_name: browser_vision
+    category: operator_bridge
+    mode: read_only
+    implementation_status: external_connector_required
+    description: Future visual browser analysis connector; currently not enabled for agent runtime.
+  vision_analyze:
+    connector_name: vision_analyze
+    category: operator_bridge
+    mode: read_only
+    implementation_status: external_connector_required
+    description: Future image/vision analysis connector; currently not enabled for agent runtime.
+  cronjob:
+    connector_name: cronjob
+    category: operator_bridge
+    mode: read_only
+    implementation_status: implemented
+    description: List or evaluate configured local JIMMORIA scheduled jobs.
+  send_message:
+    connector_name: send_message
+    category: operator_bridge
+    mode: write
+    implementation_status: implemented
+    description: Registered for audit clarity but external message sending is disabled by default.
+  multi_tool_use.parallel:
+    connector_name: multi_tool_use.parallel
+    category: operator_bridge
+    mode: read_only
+    implementation_status: implemented
+    description: Records parallel-tool intent; actual parallel execution is handled by JIMMORIA concurrency phases.
   fetch_url:
     connector_name: fetch_url
     category: source_ingestion

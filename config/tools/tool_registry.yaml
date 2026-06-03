@@ -45,6 +45,25 @@
     "task_retry",
     "task_cancel"
   ],
+  "operator_bridge": [
+    "skill_view",
+    "read_file",
+    "browser_navigate",
+    "browser_console",
+    "terminal",
+    "search_files",
+    "execute_code",
+    "write_file",
+    "multi_tool_use.parallel",
+    "browser_snapshot",
+    "browser_scroll",
+    "browser_click",
+    "browser_vision",
+    "vision_analyze",
+    "delegate_task",
+    "cronjob",
+    "send_message"
+  ],
   "memory": [
     "db_read_project",
     "db_write_project",
@@ -261,6 +280,159 @@
       "implementation_status": "implemented",
       "purpose": "Record an internal task cancellation decision for future workflow executors.",
       "provider_options": ["local Supervisor Office connector"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "delegate_task": {
+      "priority": "recommended",
+      "owner_agent": "supervisor_agent",
+      "implementation_status": "implemented",
+      "purpose": "Hermes-style delegation alias that records a Supervisor assignment without opening arbitrary execution.",
+      "provider_options": ["local Supervisor Office connector"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "skill_view": {
+      "priority": "recommended",
+      "owner_agent": "supervisor_agent",
+      "implementation_status": "implemented",
+      "purpose": "Load JIMMORIA research playbooks such as representative Web3 diligence and xurl mapping.",
+      "provider_options": ["local playbook reader"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "read_file": {
+      "priority": "recommended",
+      "owner_agent": "ingestion_agent,product_tech_agent,report_agent",
+      "implementation_status": "implemented",
+      "purpose": "Read project-local files through a sensitive-path guard for research context.",
+      "provider_options": ["local guarded filesystem reader"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "search_files": {
+      "priority": "recommended",
+      "owner_agent": "product_tech_agent,report_agent",
+      "implementation_status": "implemented",
+      "purpose": "Search project-local files for contracts, SDK, docs, audit, token, revenue, deposit, withdraw, and similar keywords without shell access.",
+      "provider_options": ["local guarded file search"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "write_file": {
+      "priority": "recommended",
+      "owner_agent": "report_agent,obsidian_curator_agent",
+      "implementation_status": "implemented",
+      "purpose": "Write local research artifacts under data, reports, or vault only.",
+      "provider_options": ["local guarded artifact writer"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "execute_code": {
+      "priority": "optional",
+      "owner_agent": "report_agent",
+      "implementation_status": "implemented",
+      "purpose": "Run limited deterministic utility operations such as timestamp conversion, JSON summary, and score aggregation. Arbitrary code is blocked.",
+      "provider_options": ["local safe utility runner"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "terminal": {
+      "priority": "optional",
+      "owner_agent": "tool_policy_agent",
+      "implementation_status": "implemented",
+      "purpose": "Registered for audit clarity, but arbitrary terminal execution is blocked for agents. Use specific read-only connectors instead.",
+      "provider_options": ["blocked policy stub"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "browser_navigate": {
+      "priority": "recommended",
+      "owner_agent": "ingestion_agent,product_tech_agent,social_kol_agent",
+      "implementation_status": "implemented",
+      "purpose": "Stateless browser-style public URL fetch mapped to the URL fetcher.",
+      "provider_options": ["local stateless HTTP/browser bridge"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "browser_console": {
+      "priority": "recommended",
+      "owner_agent": "ingestion_agent,product_tech_agent",
+      "implementation_status": "implemented",
+      "purpose": "Extract document.body.innerText and link lists from a public URL.",
+      "provider_options": ["local stateless HTTP/browser bridge"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "browser_snapshot": {
+      "priority": "recommended",
+      "owner_agent": "product_tech_agent,social_kol_agent",
+      "implementation_status": "implemented",
+      "purpose": "Capture a public URL text/link snapshot for evidence collection.",
+      "provider_options": ["local stateless HTTP/browser bridge"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "browser_scroll": {
+      "priority": "optional",
+      "owner_agent": "product_tech_agent",
+      "implementation_status": "implemented",
+      "purpose": "Stateless scroll approximation that refetches a public URL.",
+      "provider_options": ["local stateless HTTP/browser bridge"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "browser_click": {
+      "priority": "optional",
+      "owner_agent": "product_tech_agent",
+      "implementation_status": "implemented",
+      "purpose": "Stateless click approximation by navigating to a supplied link URL.",
+      "provider_options": ["local stateless HTTP/browser bridge"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "browser_vision": {
+      "priority": "optional",
+      "owner_agent": "product_tech_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Future visual browser analysis connector for screenshots and rendered page perception.",
+      "provider_options": ["Playwright vision bridge"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "vision_analyze": {
+      "priority": "optional",
+      "owner_agent": "product_tech_agent,report_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Future image/vision analysis connector for screenshots, diagrams, and visual project evidence.",
+      "provider_options": ["vision model connector"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "cronjob": {
+      "priority": "recommended",
+      "owner_agent": "monitor_24h_agent,supervisor_agent",
+      "implementation_status": "implemented",
+      "purpose": "List or evaluate configured local JIMMORIA scheduled jobs.",
+      "provider_options": ["local CronRegistry"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "send_message": {
+      "priority": "optional",
+      "owner_agent": "tool_policy_agent",
+      "implementation_status": "implemented",
+      "purpose": "Registered for audit clarity, but external message sending is disabled by default; CLI/Web/local reports are the delivery channels.",
+      "provider_options": ["blocked policy stub"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "multi_tool_use.parallel": {
+      "priority": "recommended",
+      "owner_agent": "supervisor_agent",
+      "implementation_status": "implemented",
+      "purpose": "Record parallel-tool intent while actual Phase 2+ parallel execution is handled by JIMMORIA concurrency policy.",
+      "provider_options": ["local concurrency policy marker"],
       "required_secrets": [],
       "source_docs": ["https://github.com/NousResearch/hermes-agent"]
     },
