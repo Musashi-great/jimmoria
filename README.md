@@ -4,7 +4,7 @@ JIMMORIA는 크립토 리서치 전용 멀티에이전트 회사 CLI입니다.
 
 사용자는 터미널에서 채팅을 치고, Supervisor가 Research Room을 열어 여러 에이전트에게 일을 나눕니다. 에이전트들은 소스 정리, 내러티브 분석, 후보 프로젝트 발굴, KOL/소셜 체크, 온체인/제품/토큰 체크, 보고서 작성, Obsidian 노트 정리를 담당합니다.
 
-현재는 MVP입니다. 에이전트 협업 구조와 보고서 생성 흐름은 동작하고, Web Search/URL/Website/Docs/GitHub/DEX Screener/CoinGecko 기본 connector가 ToolGateway 뒤에 붙어 있습니다. X/Twitter, Telegram, Discord, RootData, Explorer/RPC, funding/airdrop 커넥터는 아직 placeholder 상태입니다.
+현재는 MVP입니다. 에이전트 협업 구조와 보고서 생성 흐름은 동작하고, Supervisor Office가 Research Room 업무를 만들고 하위 에이전트에게 배정합니다. Web Search/URL/Website/Docs/GitHub/DEX Screener/CoinGecko 기본 connector도 ToolGateway 뒤에 붙어 있습니다. X/Twitter, Telegram, Discord, RootData, Explorer/RPC, funding/airdrop 커넥터는 아직 placeholder 상태입니다.
 
 ## Quick Start
 
@@ -60,7 +60,7 @@ Obsidian curation        reasoning route
 Report synthesis         writing route
 ```
 
-CrewAI의 agent/task 분리, ChatDev의 phase/workflow와 replay, LangGraph Supervisor의 routing/handoff 패턴을 JIMMORIA 구조에 맞게 흡수했습니다. 그래서 각 전문 에이전트는 먼저 ToolGateway와 SharedMemory로 근거를 모으고, 그 다음 `llm_analysis_pass`로 요약, 근거 부족, 리스크, 다음 액션을 판단합니다.
+CrewAI의 agent/task 분리, ChatDev의 phase/workflow와 replay, LangGraph Supervisor의 routing/handoff 패턴, Hermes Agent의 toolset/delegation 운영 방식을 JIMMORIA 구조에 맞게 흡수했습니다. Supervisor는 `supervisor_office` 툴로 task를 만들고 배정하며, 각 전문 에이전트는 먼저 ToolGateway와 SharedMemory로 근거를 모은 뒤 `llm_analysis_pass`로 요약, 근거 부족, 리스크, 다음 액션을 판단합니다.
 
 이 LLM pass는 근거를 만들어내는 역할이 아닙니다. 외부 connector가 비어 있으면 “미설정/근거 부족”이라고 표시하고, 실패해도 Research Room 전체가 죽지 않게 fallback summary를 남깁니다. finding confidence는 tool/memory evidence 기준으로 유지하고, 모델의 자신감은 `llm_analysis.confidence`에 따로 저장합니다. 호출 기록은 `data/runs/<room_id>/llm_call_log.json`에 저장됩니다.
 
@@ -74,7 +74,9 @@ Codex CLI provider를 쓰고 모델명을 따로 입력하지 않으면 reasonin
 configured: web_search, fetch_url, parse_html, crawl_website, crawl_docs,
             github_search_repos, read_github_repo,
             coingecko_coin_metadata, dexscreener_search_pairs,
-            archive_source_snapshot
+            archive_source_snapshot,
+            create_research_room, create_task, assign_task,
+            agent_handoff, update_task_status
 
 placeholder/missing secret: X/Twitter, Telegram, Discord, RootData,
                             Explorer/RPC, Dune, The Graph,
@@ -132,7 +134,7 @@ jimmoria/
     console.py             터미널 화면, 히어로, 채팅 UI
     runtime.py             Research Room 실행 흐름
     agents/                실제 에이전트 구현
-    connectors/            Web Search, URL, Docs, GitHub, DEX, CoinGecko connector
+    connectors/            Supervisor Office, Web Search, URL, Docs, GitHub, DEX, CoinGecko connector
     core/                  Bus, Memory, Room, ModelGateway, ToolGateway
     storage/               JSON 저장소, run snapshot, Obsidian writer
 

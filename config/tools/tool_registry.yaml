@@ -37,6 +37,7 @@
     "assign_task",
     "agent_handoff",
     "update_task_status",
+    "read_agent_status",
     "task_retry",
     "task_cancel"
   ],
@@ -190,6 +191,78 @@
     "request_human_approval"
   ],
   "tool_meta": {
+    "create_research_room": {
+      "priority": "required",
+      "owner_agent": "supervisor_agent",
+      "implementation_status": "implemented",
+      "purpose": "Record Research Room creation as an auditable Supervisor office action before specialists run.",
+      "provider_options": ["local Supervisor Office connector"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "create_task": {
+      "priority": "required",
+      "owner_agent": "supervisor_agent",
+      "implementation_status": "implemented",
+      "purpose": "Create task ledger entries from process manifests so specialist work is explicit.",
+      "provider_options": ["local Supervisor Office connector"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "assign_task": {
+      "priority": "required",
+      "owner_agent": "supervisor_agent",
+      "implementation_status": "implemented",
+      "purpose": "Assign room tasks to specialist agents through the controlled P2P bus.",
+      "provider_options": ["local Supervisor Office connector"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "agent_handoff": {
+      "priority": "required",
+      "owner_agent": "supervisor_agent",
+      "implementation_status": "implemented",
+      "purpose": "Record auditable handoff context between Supervisor and downstream specialist agents.",
+      "provider_options": ["local Supervisor Office connector"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "update_task_status": {
+      "priority": "required",
+      "owner_agent": "supervisor_agent",
+      "implementation_status": "implemented",
+      "purpose": "Record task state transitions without giving agents filesystem or shell control.",
+      "provider_options": ["local Supervisor Office connector"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "read_agent_status": {
+      "priority": "recommended",
+      "owner_agent": "supervisor_agent",
+      "implementation_status": "implemented",
+      "purpose": "Read a compact room status snapshot for Supervisor chat and future dashboards.",
+      "provider_options": ["local Supervisor Office connector"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "task_retry": {
+      "priority": "optional",
+      "owner_agent": "supervisor_agent",
+      "implementation_status": "implemented",
+      "purpose": "Queue an internal task retry decision for future workflow executors.",
+      "provider_options": ["local Supervisor Office connector"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "task_cancel": {
+      "priority": "optional",
+      "owner_agent": "supervisor_agent",
+      "implementation_status": "implemented",
+      "purpose": "Record an internal task cancellation decision for future workflow executors.",
+      "provider_options": ["local Supervisor Office connector"],
+      "required_secrets": [],
+      "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
     "fetch_url": {
       "priority": "required",
       "owner_agent": "ingestion_agent",

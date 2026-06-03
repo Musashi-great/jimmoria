@@ -5,7 +5,8 @@
   "supervisor_mode": "company_ceo_manager",
   "inspired_by": [
     "crewAI task-specific sequential process",
-    "ChatDev phase-limited workflow"
+    "ChatDev phase-limited workflow",
+    "Hermes Agent toolsets and delegation-style subagent task routing"
   ],
   "goals": [
     "Store the source.",
@@ -46,7 +47,8 @@
   },
   "ui": {
     "default_event_style": "stream",
-    "dock": "JIMMORIA HQ runtime dock remains visible while a room runs"
+    "dock": "JIMMORIA HQ runtime dock remains visible while a room runs",
+    "supervisor_office": "Supervisor creates and assigns task records before specialist agents run"
   },
   "memory_policy": {
     "save_run": true,

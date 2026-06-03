@@ -2,6 +2,16 @@ from __future__ import annotations
 
 from crypto_research_agents.connectors.github_connector import github_search_repos, read_github_repo
 from crypto_research_agents.connectors.market_connectors import coingecko_coin_metadata, dexscreener_search_pairs
+from crypto_research_agents.connectors.supervisor_tools import (
+    agent_handoff,
+    assign_task,
+    create_research_room,
+    create_task,
+    read_agent_status,
+    task_cancel,
+    task_retry,
+    update_task_status,
+)
 from crypto_research_agents.connectors.url_fetcher import (
     archive_source_snapshot,
     crawl_docs,
@@ -16,6 +26,14 @@ from crypto_research_agents.core.tool_gateway import ToolGateway
 def register_default_connectors(tool_gateway: ToolGateway) -> None:
     """Attach low-cost public research connectors to the ToolGateway."""
 
+    tool_gateway.register("create_research_room", create_research_room)
+    tool_gateway.register("create_task", create_task)
+    tool_gateway.register("assign_task", assign_task)
+    tool_gateway.register("agent_handoff", agent_handoff)
+    tool_gateway.register("update_task_status", update_task_status)
+    tool_gateway.register("read_agent_status", read_agent_status)
+    tool_gateway.register("task_retry", task_retry)
+    tool_gateway.register("task_cancel", task_cancel)
     tool_gateway.register("fetch_url", fetch_url)
     tool_gateway.register("parse_html", parse_html)
     tool_gateway.register("archive_source_snapshot", archive_source_snapshot)

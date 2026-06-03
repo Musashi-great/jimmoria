@@ -693,6 +693,16 @@ class SmokeTest(unittest.TestCase):
             self.assertIn("finding_saved", event_types)
             self.assertIn("source_saved", event_types)
             self.assertIn("report_written", event_types)
+            audit = json.loads((root / "runs" / result.room.room_id / "tool_audit_log.json").read_text(encoding="utf-8"))
+            supervisor_tools = [
+                item["tool_name"]
+                for item in audit
+                if item["agent_id"] == "supervisor_agent"
+            ]
+            self.assertIn("create_research_room", supervisor_tools)
+            self.assertIn("create_task", supervisor_tools)
+            self.assertIn("assign_task", supervisor_tools)
+            self.assertIn("agent_handoff", supervisor_tools)
             self.assertGreaterEqual(len(runtime.model_gateway.call_log), 10)
             llm_log = json.loads((root / "runs" / result.room.room_id / "llm_call_log.json").read_text(encoding="utf-8"))
             llm_agents = {entry["agent_id"] for entry in llm_log}
@@ -772,6 +782,11 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("read_github_repo", runtime.tool_gateway.registered_tools)
         self.assertIn("dexscreener_search_pairs", runtime.tool_gateway.registered_tools)
         self.assertIn("coingecko_coin_metadata", runtime.tool_gateway.registered_tools)
+        self.assertIn("create_research_room", runtime.tool_gateway.registered_tools)
+        self.assertIn("create_task", runtime.tool_gateway.registered_tools)
+        self.assertIn("assign_task", runtime.tool_gateway.registered_tools)
+        self.assertIn("agent_handoff", runtime.tool_gateway.registered_tools)
+        self.assertIn("update_task_status", runtime.tool_gateway.registered_tools)
 
     def test_parse_html_connector_extracts_official_links(self) -> None:
         policy = PolicyEngine()
@@ -1502,6 +1517,8 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(registry.get("read_github_repo").implementation_status, "implemented")
         self.assertEqual(registry.get("dexscreener_search_pairs").implementation_status, "implemented")
         self.assertEqual(registry.get("coingecko_coin_metadata").implementation_status, "implemented")
+        self.assertEqual(registry.get("create_task").implementation_status, "implemented")
+        self.assertEqual(registry.get("assign_task").implementation_status, "implemented")
 
     def test_toolset_limits_agent_access(self) -> None:
         registry = load_tool_registry()
@@ -1510,6 +1527,15 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertIn("web_search", tools)
         self.assertIn("read_github_repo", tools)
         self.assertNotIn("wallet_sign", tools)
+
+    def test_supervisor_office_toolset_is_research_safe(self) -> None:
+        registry = load_tool_registry()
+        tools = registry.allowed_tools_for_toolsets(["supervisor_office"])
+
+        self.assertIn("create_task", tools)
+        self.assertIn("assign_task", tools)
+        self.assertIn("agent_handoff", tools)
+        registry.assert_toolsets_research_safe(["supervisor_office"])
 
     def test_read_only_boundary_blocks_dangerous_tools(self) -> None:
         registry = load_tool_registry()

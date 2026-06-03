@@ -4,7 +4,7 @@
 
 JIMMORIA는 크립토 가격 매매 도구가 아니라, 리서치 전용 멀티에이전트 회사 CLI다. 사용자는 터미널에서 자연어로 리서치 요청을 입력하고, Supervisor가 Research Room을 열어 여러 전문 에이전트에게 일을 나눈다. 에이전트들은 소스 정리, 내러티브 분석, 초기 프로젝트 후보 발굴, KOL/소셜 체크, 온체인/제품/토큰 체크, 보고서 작성, Obsidian 노트 정리를 수행한다.
 
-현재 버전은 MVP다. 멀티에이전트 협업 구조, 보고서 생성, 런 저장, Obsidian-style 노트 생성은 동작한다. Web Search, URL fetch, Website/Docs crawler, GitHub reader/search, DEX Screener search, CoinGecko search/metadata는 ToolGateway 뒤에 기본 connector로 등록된다. X/Twitter, Telegram, Discord, RootData, Explorer/RPC, funding/airdrop 같은 커넥터는 아직 placeholder 상태다.
+현재 버전은 MVP다. 멀티에이전트 협업 구조, Supervisor Office task delegation, 보고서 생성, 런 저장, Obsidian-style 노트 생성은 동작한다. Web Search, URL fetch, Website/Docs crawler, GitHub reader/search, DEX Screener search, CoinGecko search/metadata는 ToolGateway 뒤에 기본 connector로 등록된다. X/Twitter, Telegram, Discord, RootData, Explorer/RPC, funding/airdrop 같은 커넥터는 아직 placeholder 상태다.
 
 ## 1. 프로젝트 목표
 
@@ -213,7 +213,7 @@ CLI 시작 도움말에는 정적 에이전트 목록을 길게 보여주지 않
 
 | Agent ID | 구현 클래스 | 역할 | 현재 동작 |
 |---|---|---|---|
-| `supervisor_agent` | `SupervisorAgent` | 목표와 실행 방향 설정 | Research Room 목표, 참여 에이전트, 모델 선택 정보를 finding으로 기록 |
+| `supervisor_agent` | `SupervisorAgent` | 목표와 실행 방향 설정 | ProcessSpec을 읽고 Supervisor Office 툴로 task 생성/배정/handoff를 기록한 뒤 supervision finding 저장 |
 | `ingestion_agent` | `IngestionAgent` | 소스 저장과 메타데이터 추출 | 입력 소스를 `SharedMemory.sources`에 저장하고 summary/entities/keywords 추출 |
 | `narrative_agent` | `NarrativeAgent` | 내러티브 분류 | AI wallet, Consumer Crypto, DeFi Automation 등 taxonomy 기반 narrative 분류 |
 | `discovery_agent` | `DiscoveryAgent` | 초기 프로젝트 후보 발굴 | 프로젝트명 기반 요청이면 `web_search`, GitHub, CoinGecko, DEX Screener로 후보를 resolve하고, 일반 내러티브 요청이면 fallback 후보를 생성 |
@@ -311,6 +311,50 @@ memory_policy
 ```
 
 이 process metadata는 나중에 웹 visualizer가 agent workflow를 replay할 때 phase/task label로 사용할 수 있다.
+
+## 7B. Supervisor Office Delegation Tools
+
+이번 업데이트부터 Supervisor는 단순히 "리서치 방을 열겠다"고 말하는 역할을 넘어서, Hermes Agent의 toolset/delegation 패턴을 JIMMORIA식으로 흡수한 `Supervisor Office`를 사용한다.
+
+핵심은 외부 브라우저, 쉘, 파일 시스템을 Supervisor에게 무제한으로 주는 것이 아니라, Research Room 안에서 안전하게 업무를 만들고 배정하고 기록하는 내부 운영 툴을 붙이는 것이다.
+
+구현 위치:
+
+```text
+crypto_research_agents/connectors/supervisor_tools.py
+config/toolsets.yaml                supervisor_office toolset
+config/agents/supervisor.yaml       Supervisor tool allowlist
+crypto_research_agents/agents/supervisor.py
+```
+
+현재 등록된 Supervisor Office tools:
+
+```text
+create_research_room   Research Room 개설을 audit log에 기록
+create_task            process manifest의 task를 내부 task ledger 항목으로 생성
+assign_task            task를 전문 에이전트에게 배정
+agent_handoff          Supervisor -> 첫 specialist handoff 기록
+update_task_status     task 상태 전환 기록
+read_agent_status      room agent 상태 요약 조회
+task_retry             향후 retry loop를 위한 retry 결정 기록
+task_cancel            향후 cancellation flow를 위한 cancel 결정 기록
+```
+
+실행 흐름은 다음과 같다.
+
+```text
+ResearchRuntime loads ProcessSpec
+-> SupervisorAgent receives process.event_payload()
+-> Supervisor Office records room opening
+-> Supervisor creates every task from process.tasks[]
+-> Supervisor marks its own planning task done
+-> Supervisor assigns specialist tasks through ToolGateway
+-> CollaborationBus receives REQUEST messages for each specialist
+-> First handoff is recorded
+-> Specialist agents run in the existing controlled P2P order
+```
+
+따라서 이제 `tool_audit_log.json`에는 social/on-chain 같은 외부 connector 호출뿐 아니라, Supervisor가 어떤 업무를 만들고 누구에게 배정했는지도 남는다. 이것은 나중에 웹 visualizer에서 "사장이 일을 배정하고 직원들이 처리하는 회사 화면"을 만들 때 핵심 데이터가 된다.
 
 ## 8. Collaboration Bus
 
@@ -443,6 +487,14 @@ CLI에서 `/models`를 실행하면 모델/provider 설정 화면이 나온다. 
 `connectors/register_default_connectors()`는 런타임 시작 시 기본 connector를 ToolGateway에 붙인다.
 
 ```text
+create_research_room
+create_task
+assign_task
+agent_handoff
+update_task_status
+read_agent_status
+task_retry
+task_cancel
 web_search
 fetch_url
 parse_html
@@ -476,7 +528,7 @@ coingecko_coin_metadata
 
 | 상태 | Tool | 의미 |
 |---|---|---|
-| configured | `web_search`, `fetch_url`, `parse_html`, `crawl_website`, `crawl_docs`, `github_search_repos`, `read_github_repo`, `coingecko_coin_metadata`, `dexscreener_search_pairs`, `archive_source_snapshot` | 지금 런타임에서 실제 connector가 등록되어 호출 가능 |
+| configured | `create_research_room`, `create_task`, `assign_task`, `agent_handoff`, `update_task_status`, `web_search`, `fetch_url`, `parse_html`, `crawl_website`, `crawl_docs`, `github_search_repos`, `read_github_repo`, `coingecko_coin_metadata`, `dexscreener_search_pairs`, `archive_source_snapshot` | Supervisor Office 내부 운영 툴과 기본 read-only connector가 실제 등록되어 호출 가능 |
 | placeholder / missing secret | `x_search_posts`, `x_get_user_timeline`, `x_build_kol_list`, `telegram_read_channel`, `discord_read_channel`, `rss_monitor_feed`, `rootdata_search_projects`, `explorer_lookup`, `get_contract_address`, `check_airdrop_points`, `dune_execute_query`, `thegraph_query_subgraph` | registry에는 있지만 API 키, connector 구현, 또는 외부 서비스 연결이 아직 필요 |
 | blocked | `wallet_sign`, `swap`, `transfer`, `approve`, `private_key_read`, `seed_phrase_read` | 리서치 전용 회사 경계 때문에 의도적으로 실행 금지 |
 
@@ -829,7 +881,7 @@ python -m unittest discover -s tests -v
 
 ## 21. 한 줄 요약
 
-JIMMORIA는 현재 "채팅형 CLI + ProcessSpec 기반 Research Room + controlled P2P Agent Bus + Shared Memory + Model Gateway + agent-level LLM analysis pass + Tool Gateway + 기본 Web Search/URL/Website/Docs/GitHub/DEX/CoinGecko connectors + Markdown/Obsidian output"까지 구현된 크립토 리서치 회사 MVP다. 다음 핵심 작업은 Project Research Loop, Identity/Evidence/Collision 검증 엔진, 그리고 Social/Contract/Funding 에이전트의 source-backed finding 업그레이드다.
+JIMMORIA는 현재 "채팅형 CLI + Supervisor Office delegation tools + ProcessSpec 기반 Research Room + controlled P2P Agent Bus + Shared Memory + Model Gateway + agent-level LLM analysis pass + Tool Gateway + 기본 Web Search/URL/Website/Docs/GitHub/DEX/CoinGecko connectors + Markdown/Obsidian output"까지 구현된 크립토 리서치 회사 MVP다. 다음 핵심 작업은 Project Research Loop, Identity/Evidence/Collision 검증 엔진, 그리고 Social/Contract/Funding 에이전트의 source-backed finding 업그레이드다.
 ## 22. Current Runtime Update Notes
 
 최근 변경 기준으로 JIMMORIA는 live/source-backed 후보와 MVP placeholder 후보를 구분한다.

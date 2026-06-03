@@ -4,6 +4,17 @@ default_research_modes:
   - artifact_write
 
 toolsets:
+  supervisor_office:
+    description: Hermes-inspired internal delegation tools for Supervisor task routing.
+    tools:
+      - create_research_room
+      - create_task
+      - assign_task
+      - agent_handoff
+      - update_task_status
+      - read_agent_status
+      - task_retry
+      - task_cancel
   research_basic:
     description: Public read-only research connectors.
     tools:
@@ -54,6 +65,54 @@ toolsets:
       - seed_phrase_read
 
 tools:
+  create_research_room:
+    connector_name: create_research_room
+    category: supervisor_office
+    mode: artifact_write
+    implementation_status: implemented
+    description: Record a Research Room opening as an auditable Supervisor office action.
+  create_task:
+    connector_name: create_task
+    category: supervisor_office
+    mode: artifact_write
+    implementation_status: implemented
+    description: Create an internal task record from a process manifest.
+  assign_task:
+    connector_name: assign_task
+    category: supervisor_office
+    mode: artifact_write
+    implementation_status: implemented
+    description: Assign an internal task to a specialist agent.
+  agent_handoff:
+    connector_name: agent_handoff
+    category: supervisor_office
+    mode: artifact_write
+    implementation_status: implemented
+    description: Record a handoff between Supervisor and specialist agents.
+  update_task_status:
+    connector_name: update_task_status
+    category: supervisor_office
+    mode: artifact_write
+    implementation_status: implemented
+    description: Record task status transitions in the tool audit log.
+  read_agent_status:
+    connector_name: read_agent_status
+    category: supervisor_office
+    mode: read_only
+    implementation_status: implemented
+    description: Read a compact internal status snapshot for a room's agents.
+  task_retry:
+    connector_name: task_retry
+    category: supervisor_office
+    mode: artifact_write
+    implementation_status: implemented
+    description: Queue an internal task retry decision without invoking external tools.
+  task_cancel:
+    connector_name: task_cancel
+    category: supervisor_office
+    mode: artifact_write
+    implementation_status: implemented
+    description: Record an internal task cancellation decision.
   fetch_url:
     connector_name: fetch_url
     category: source_ingestion

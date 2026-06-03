@@ -5,7 +5,8 @@
   "supervisor_mode": "company_ceo_manager",
   "inspired_by": [
     "ChatDev configurable workflows/phases/roles",
-    "crewAI agents.yaml + tasks.yaml + Process.sequential"
+    "crewAI agents.yaml + tasks.yaml + Process.sequential",
+    "Hermes Agent toolsets and delegation-style subagent task routing"
   ],
   "goals": [
     "Store and summarize the source.",
@@ -119,7 +120,8 @@
   "ui": {
     "default_event_style": "stream",
     "dock": "JIMMORIA HQ runtime dock remains visible while a room runs",
-    "board_command": "/board"
+    "board_command": "/board",
+    "supervisor_office": "Supervisor creates and assigns task records before specialist agents run"
   },
   "memory_policy": {
     "save_run": true,

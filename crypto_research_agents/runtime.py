@@ -121,6 +121,7 @@ class ResearchRuntime:
                 goals=room.goals,
                 company_settings=company_settings.to_dict(),
                 intake_decision=intake_decision,
+                process=process.event_payload(),
             )
             room.set_status(RuntimeState.RUNNING)
             self._run_agent("ingestion_agent", room, title=title, content=content, url=url, source_type="article")
@@ -187,6 +188,7 @@ class ResearchRuntime:
                 goals=room.goals,
                 company_settings=company_settings.to_dict(),
                 intake_decision=intake_decision,
+                process=process.event_payload(),
             )
             room.set_status(RuntimeState.RUNNING)
             self._run_agent("ingestion_agent", room, title=title, content=content, url=url, source_type="article")
