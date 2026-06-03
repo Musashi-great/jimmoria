@@ -64,7 +64,7 @@ class SocialKOLAgent(BaseAgent):
         )
         llm_analysis = self.llm_analysis_pass(
             room=room,
-            objective="Interpret social/KOL evidence, separate official links from live mention history, and list missing connector gaps.",
+            objective="Interpret public web and X/KOL evidence, separate official links from live mention history, and avoid private chat connectors.",
             evidence={"rows": rows},
             fallback_summary=summary,
         )
@@ -97,7 +97,7 @@ def _collect_candidate_ids(requests: list[Any]) -> list[str]:
 def _social_urls(metadata: dict[str, Any], website_data: dict[str, Any], web_results: list[Any]) -> list[str]:
     urls: list[str] = []
     official_links = website_data.get("official_links") if isinstance(website_data.get("official_links"), dict) else {}
-    for bucket in ["x", "discord", "telegram"]:
+    for bucket in ["x"]:
         for link in official_links.get(bucket, []):
             if isinstance(link, dict):
                 urls.extend(_maybe_social_url(link.get("url")))
@@ -113,7 +113,7 @@ def _social_urls(metadata: dict[str, Any], website_data: dict[str, Any], web_res
 def _maybe_social_url(value: object) -> list[str]:
     url = str(value or "")
     lowered = url.lower()
-    if any(host in lowered for host in ["x.com/", "twitter.com/", "t.me/", "discord.gg/", "discord.com/"]):
+    if any(host in lowered for host in ["x.com/", "twitter.com/"]):
         return [url]
     return []
 
@@ -122,9 +122,9 @@ def _community_signal(social_urls: list[str], x_status: str, web_status: str) ->
     if social_urls:
         if x_status == "success":
             return "Official/community social links found and live X search returned post evidence."
-        return "Official/community social links found through web evidence; live post history still requires configured X/Telegram credentials."
+        return "Official X/community links found through public web evidence; private Telegram/Discord connectors are intentionally out of scope."
     if x_status in {"missing_secret", "unconfigured"} and web_status == "success":
-        return "No social handle resolved from web search; live X/Telegram credentials are still required."
+        return "No X handle resolved from web search; continue with public website, docs, GitHub, and market metadata evidence."
     if x_status == "success":
         return "Live X connector returned data, but no official/community URL was resolved."
     return "Live social connector did not return usable evidence yet."

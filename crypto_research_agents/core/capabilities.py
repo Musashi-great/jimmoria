@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -112,13 +111,6 @@ def collect_capabilities(
             "configured" if profile_registry.profiles else "missing",
             f"{len(profile_registry.profiles)} profiles configured",
         ),
-        CapabilityStatus(
-            "Telegram delivery config",
-            "configured" if os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHAT_ID") else "missing",
-            "TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID set"
-            if os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHAT_ID")
-            else "set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID for final delivery",
-        ),
         _writable_directory_status(Path(runs_dir), "Artifact directory"),
     ]
 
@@ -132,8 +124,6 @@ def collect_capabilities(
         ("X/Twitter search", "x_search_posts"),
         ("X/KOL timeline", "x_get_user_timeline"),
         ("X/KOL list builder", "x_build_kol_list"),
-        ("Telegram read", "telegram_read_channel"),
-        ("Discord read", "discord_read_channel"),
         ("RSS feed monitor", "rss_monitor_feed"),
         ("RootData project directory", "rootdata_search_projects"),
         ("CoinGecko metadata", "coingecko_coin_metadata"),

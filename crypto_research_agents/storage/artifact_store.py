@@ -60,7 +60,7 @@ class ArtifactStore:
         report_path = room.output_paths.get("report", "")
         report_text = Path(report_path).read_text(encoding="utf-8") if report_path and Path(report_path).exists() else ""
         (run_dir / "report.md").write_text(report_text, encoding="utf-8")
-        (run_dir / "report.telegram.md").write_text(render_telegram_report_stub(report_text), encoding="utf-8")
+        (run_dir / "report.compact.md").write_text(render_compact_report_stub(report_text), encoding="utf-8")
         write_json(
             run_dir / "report.json",
             {
@@ -84,8 +84,8 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     )
 
 
-def render_telegram_report_stub(report_text: str) -> str:
+def render_compact_report_stub(report_text: str) -> str:
     if not report_text.strip():
-        return "# Telegram Report\n\nReport was not generated.\n"
+        return "# Compact Report\n\nReport was not generated.\n"
     lines = [line for line in report_text.splitlines() if line.strip()]
     return "\n".join(lines[:40]) + "\n"

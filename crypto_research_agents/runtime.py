@@ -518,9 +518,6 @@ def default_policy(agent_specs: AgentSpecRegistry | None = None) -> PolicyEngine
         "x_search_posts",
         "x_get_user_timeline",
         "x_build_kol_list",
-        "telegram_read_channel",
-        "telegram_search_public_channels",
-        "discord_read_channel",
     ]:
         policy.allow("social_kol_agent", tool)
     for tool in ["fetch_url", "parse_html", "archive_source_snapshot"]:

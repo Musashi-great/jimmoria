@@ -44,7 +44,7 @@
       "name": "parallel_24h_monitoring",
       "status": "planned",
       "mode": "background_monitor_workers",
-      "description": "Run X, Telegram, GitHub, Docs, DEX, RSS, and RootData monitor workers concurrently into a signal queue.",
+      "description": "Run X, GitHub, Docs, DEX, RSS, RootData, and other public web monitor workers concurrently into a signal queue.",
       "max_parallel": 6,
       "parallel_groups": [
         {
@@ -52,7 +52,6 @@
           "agents": ["monitor_24h_agent"],
           "tools": [
             "monitor_x_list",
-            "monitor_telegram_channels",
             "monitor_github_activity",
             "monitor_docs_changes",
             "dexscreener_latest_profiles",

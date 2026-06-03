@@ -27,14 +27,11 @@ toolsets:
       - github_search_repos
       - read_github_repo
   social_basic:
-    description: Read-only social/KOL signal connectors.
+    description: Read-only public web and X/KOL signal connectors.
     tools:
       - x_search_posts
       - x_get_user_timeline
       - x_build_kol_list
-      - telegram_read_channel
-      - telegram_search_public_channels
-      - discord_read_channel
   market_basic:
     description: Read-only market metadata for identity and context, not trading advice.
     tools:
@@ -202,26 +199,6 @@ tools:
     implementation_status: implemented
     required_secrets: [X_BEARER_TOKEN]
     description: Build reusable KOL handle lists by narrative.
-  telegram_read_channel:
-    connector_name: telegram_read_channel
-    category: social
-    mode: read_only
-    implementation_status: implemented
-    required_secrets: [TELEGRAM_BOT_TOKEN]
-    description: Read approved Telegram channels.
-  telegram_search_public_channels:
-    connector_name: telegram_search_public_channels
-    category: social
-    mode: read_only
-    implementation_status: implemented
-    description: Explain Telegram public channel search limitations and route users toward web search or client API.
-  discord_read_channel:
-    connector_name: discord_read_channel
-    category: social
-    mode: read_only
-    implementation_status: external_connector_required
-    required_secrets: [DISCORD_BOT_TOKEN]
-    description: Read approved Discord channels.
   rootdata_search_projects:
     connector_name: rootdata_search_projects
     category: discovery

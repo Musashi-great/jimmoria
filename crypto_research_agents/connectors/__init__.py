@@ -34,7 +34,6 @@ from crypto_research_agents.connectors.url_fetcher import (
     fetch_url,
     parse_html,
 )
-from crypto_research_agents.connectors.telegram_connector import telegram_read_channel, telegram_search_public_channels
 from crypto_research_agents.connectors.web_search import web_search
 from crypto_research_agents.connectors.x_social import x_build_kol_list, x_get_user_timeline, x_search_posts
 from crypto_research_agents.core.tool_gateway import ToolGateway
@@ -64,8 +63,6 @@ def register_default_connectors(tool_gateway: ToolGateway) -> None:
     tool_gateway.register("x_search_posts", x_search_posts)
     tool_gateway.register("x_get_user_timeline", x_get_user_timeline)
     tool_gateway.register("x_build_kol_list", x_build_kol_list)
-    tool_gateway.register("telegram_read_channel", telegram_read_channel)
-    tool_gateway.register("telegram_search_public_channels", telegram_search_public_channels)
     tool_gateway.register("rootdata_search_projects", rootdata_search_projects)
     tool_gateway.register("rootdata_get_project", rootdata_get_project)
     tool_gateway.register("rootdata_get_investors", rootdata_get_investors)

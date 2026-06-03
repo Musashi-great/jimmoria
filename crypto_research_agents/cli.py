@@ -57,7 +57,7 @@ DEMO_TEXT = """
 An article argues that AI agents will increasingly operate wallet workflows for users.
 The core thesis combines agent automation, intent routing, consumer crypto, points programs,
 and pre-token projects building on testnet. It also mentions that docs and GitHub activity
-can reveal early infrastructure before broad KOL attention appears on X or Telegram.
+can reveal early infrastructure before broad KOL attention appears on X or public web results.
 """
 
 MODEL_ROUTE_TIERS = [
@@ -1331,7 +1331,6 @@ def doctor_command(args: argparse.Namespace | None = None) -> None:
             "Concurrency phase",
             "Scheduled jobs",
             "Worker profiles",
-            "Telegram delivery config",
             "Artifact directory",
         },
         "Live research tools": set(),

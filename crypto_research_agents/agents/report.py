@@ -191,9 +191,9 @@ def render_project_dossier(
         )
     if has_live_evidence:
         connector_note = (
-            "- 참고: live web/GitHub/market connector를 사용했고, X/Telegram/RootData/Explorer/RPC는 secret과 대상 입력이 있을 때 live 결과를 낸다."
+            "- 참고: public web/GitHub/market connector를 사용했고, X/RootData/Explorer/RPC는 optional secret과 대상 입력이 있을 때 live 결과를 낸다."
             if korean
-            else "- Note: Live web/GitHub/market connectors were used; X/Telegram/RootData/Explorer/RPC return live results when required secrets and inputs are configured."
+            else "- Note: Public web/GitHub/market connectors were used; X/RootData/Explorer/RPC return live results when optional secrets and target inputs are configured."
         )
     else:
         connector_note = (
@@ -309,9 +309,9 @@ def render_project_dossier(
             "- `mvp_placeholder` 후보는 실제 project lead로 보기 전에 `live_source_backed` 후보로 교체해야 한다."
             if korean
             else "- If a candidate is marked `mvp_placeholder`, replace it with a `live_source_backed` candidate before treating it as a real project lead.",
-            "- Live X/Twitter, Telegram, RootData, Explorer/RPC, funding connector 설정이 필요하다."
+            "- Public web source coverage를 먼저 보강하고, 필요하면 X/RootData/Explorer/RPC optional secret을 설정한다."
             if korean
-            else "- Configure live X/Twitter, Telegram, RootData, Explorer/RPC, and funding connectors.",
+            else "- Strengthen public web source coverage first; configure optional X/RootData/Explorer/RPC secrets only when needed.",
             "- 공식 social handle과 KOL mention history 검증이 필요하다."
             if korean
             else "- Validate official social handles and KOL mention history.",
@@ -387,7 +387,7 @@ def render_candidate_evidence(project: Any) -> list[str]:
         )
         official_links = website_crawl.get("official_links") if isinstance(website_crawl.get("official_links"), dict) else {}
         official_url_lines = []
-        for bucket in ["x", "discord", "telegram", "app", "docs"]:
+        for bucket in ["x", "app", "docs"]:
             for link in official_links.get(bucket, []):
                 if isinstance(link, dict) and link.get("url"):
                     official_url_lines.append(f"{bucket}: {link['url']}")

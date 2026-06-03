@@ -76,10 +76,6 @@
     "x_get_user_timeline",
     "x_build_kol_list",
     "x_track_list",
-    "telegram_read_channel",
-    "telegram_search_public_channels",
-    "discord_read_channel",
-    "discord_search_messages",
     "rss_monitor_feed",
     "count_mentions",
     "calculate_social_momentum",
@@ -151,8 +147,6 @@
   "monitor": [
     "monitor_rss",
     "monitor_x_list",
-    "monitor_telegram_channels",
-    "monitor_discord_channels",
     "monitor_github_activity",
     "monitor_docs_changes",
     "monitor_rootdata_updates",
@@ -343,33 +337,6 @@
       "provider_options": ["local KOL DB", "X API user/profile endpoints", "RootData leading figures"],
       "required_secrets": ["X_BEARER_TOKEN"],
       "source_docs": ["https://www.rootdata.com/Api/Doc"]
-    },
-    "telegram_read_channel": {
-      "priority": "recommended",
-      "owner_agent": "social_kol_agent",
-      "implementation_status": "implemented",
-      "purpose": "Read messages from monitored public or approved Telegram channels.",
-      "provider_options": ["Telegram Bot API getUpdates", "Telegram client API for approved channels"],
-      "required_secrets": ["TELEGRAM_BOT_TOKEN"],
-      "source_docs": ["https://core.telegram.org/bots/api"]
-    },
-    "telegram_search_public_channels": {
-      "priority": "optional",
-      "owner_agent": "social_kol_agent",
-      "implementation_status": "implemented",
-      "purpose": "Explain Telegram public-channel search limits and route research to approved channel reads or web search.",
-      "provider_options": ["Telegram Bot API limitation notice"],
-      "required_secrets": [],
-      "source_docs": ["https://core.telegram.org/bots/api"]
-    },
-    "discord_read_channel": {
-      "priority": "recommended",
-      "owner_agent": "social_kol_agent",
-      "implementation_status": "external_connector_required",
-      "purpose": "Read approved Discord channel messages for community and dev signal tracking.",
-      "provider_options": ["Discord REST API channel messages"],
-      "required_secrets": ["DISCORD_BOT_TOKEN"],
-      "source_docs": ["https://docs.discord.com/developers/resources/message"]
     },
     "rss_monitor_feed": {
       "priority": "required",

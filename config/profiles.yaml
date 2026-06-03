@@ -4,10 +4,10 @@ profiles:
     allowed_toolsets:
       - research_basic
       - reporting
-    output_destination: telegram_final_or_cli
+    output_destination: cli_final_or_artifact
     model_route: writing_model
   social_scout:
-    role: KOL, X, Telegram, Discord, and community signal scout.
+    role: Public web, X, KOL, and official-link signal scout.
     allowed_toolsets:
       - social_basic
       - research_basic

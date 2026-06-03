@@ -2,7 +2,7 @@ jobs:
   early_radar_30m:
     schedule: every 30m
     workflow: early_radar_v1
-    output: telegram_final_only
+    output: cli_final_or_artifact
     profile: researcher
     enabled: true
     silent_no_signal: true
@@ -18,7 +18,7 @@ jobs:
   daily_digest:
     schedule: 09:00 KST
     workflow: project_diligence_v1
-    output: telegram_final_only
+    output: cli_final_or_artifact
     profile: final_reporter
     enabled: true
     silent_no_signal: true

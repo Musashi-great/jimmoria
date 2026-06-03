@@ -58,8 +58,6 @@ def _offline_no_secret_env() -> dict[str, str]:
         "LLM_PROVIDER": "offline",
         "X_BEARER_TOKEN": "",
         "TWITTER_BEARER_TOKEN": "",
-        "TELEGRAM_BOT_TOKEN": "",
-        "TELEGRAM_CHAT_ID": "",
         "ROOTDATA_API_KEY": "",
         "ETHERSCAN_API_KEY": "",
         "ETH_RPC_URL": "",
@@ -955,9 +953,11 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("x_search_posts", social.tools.allow)
         self.assertIn("x_get_user_timeline", social.tools.allow)
         self.assertIn("rss_monitor_feed", social.tools.allow)
+        self.assertNotIn("telegram_read_channel", social.tools.allow)
+        self.assertNotIn("discord_read_channel", social.tools.allow)
         self.assertIn("oauth_tokens", social.memory_scope.no_access)
         self.assertEqual(social.persona_name, "The Signal Listener")
-        self.assertIn("소셜/KOL", social.mission.primary_goal)
+        self.assertIn("public web and X", social.mission.primary_goal)
 
         supervisor = registry.get("supervisor_agent")
         self.assertIsNotNone(supervisor)
@@ -1700,7 +1700,8 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(registry.get("create_task").implementation_status, "implemented")
         self.assertEqual(registry.get("assign_task").implementation_status, "implemented")
         self.assertEqual(registry.get("x_search_posts").implementation_status, "implemented")
-        self.assertEqual(registry.get("telegram_read_channel").implementation_status, "implemented")
+        self.assertNotIn("telegram_read_channel", registry.definitions)
+        self.assertNotIn("discord_read_channel", registry.definitions)
         self.assertEqual(registry.get("rootdata_search_projects").implementation_status, "implemented")
         self.assertEqual(registry.get("explorer_lookup").implementation_status, "implemented")
         self.assertEqual(registry.get("check_airdrop_points").implementation_status, "implemented")
@@ -1803,15 +1804,16 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(results[0].room_id, "room_contract")
         self.assertEqual(results[0].matched_file, "candidates.json")
 
-    def test_doctor_reports_missing_connector(self) -> None:
-        with patch.dict("os.environ", {"DISCORD_BOT_TOKEN": "test-token"}, clear=False):
-            capabilities = {item.name: item for item in collect_capabilities()}
+    def test_doctor_uses_public_web_research_stack_without_chat_connectors(self) -> None:
+        capabilities = {item.name: item for item in collect_capabilities()}
 
         self.assertEqual(capabilities["Tool registry"].status, "configured")
         self.assertEqual(capabilities["Scheduled jobs"].status, "configured")
         self.assertEqual(capabilities["Worker profiles"].status, "configured")
-        self.assertEqual(capabilities["Telegram delivery config"].status, "missing")
-        self.assertIn("connector not registered", capabilities["Discord read"].detail)
+        self.assertNotIn("Telegram delivery config", capabilities)
+        self.assertNotIn("Telegram read", capabilities)
+        self.assertNotIn("Discord read", capabilities)
+        self.assertIn("Public web search", capabilities)
 
     def test_web_dashboard_html_exposes_company_structure(self) -> None:
         html = render_dashboard_html()
