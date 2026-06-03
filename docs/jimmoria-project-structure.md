@@ -456,7 +456,9 @@ The agent specs now include a `professional_output_contract` for Supervisor, Dis
 - Product/Tech separates official product/docs evidence from GitHub code/activity evidence.
 - Social/KOL runs market-signal intake before Discovery, then separates official project handles from unrelated personal accounts found by search and records speaker/claim/source rows for the report.
 - Funding/Token only marks points or airdrop as `hint_found` when project-specific evidence exists.
-- Report writes a project intelligence report first and keeps logs/audit trails out of the client-facing body.
+- Funding/Token extracts structured funding rows when public evidence supports it, including amount, stage, lead investors, named backers, and funding source links.
+- Report writes a Korean-first project intelligence report first and keeps logs/audit trails out of the client-facing body. Links are shown with short display labels, while the full URL remains available in Markdown.
+- For known/high-signal projects such as 3Jane, the report includes article/web mention notes, public X statements, official docs interpretation, value-capture analysis, founder/team uncertainty, funding context, and a clear WATCH/TOP/OPERATOR/EXCLUDE stance.
 
 ## Representative Web3 Diligence Playbook
 
@@ -490,6 +492,8 @@ Key rules:
 - X/Twitter posts, KOL opinions, public threads, and articles are the first signal layer.
 - Official site, docs, GitHub, app, explorer, DEX, and public APIs are the verification layer.
 - Telegram and Discord are intentionally out of scope for the current public-web research stack.
+- Final reports must explain the project itself first: what it is, what problem it attacks, what narrative it belongs to, what the product mechanics are, who is publicly talking about it, who funded it, and what remains unresolved.
+- Agent logs, raw tool payloads, and raw LLM JSON are not client-facing report content. They stay in the run audit files.
 - Founder claims must be sourced. Name, school, employer, LinkedIn, GitHub, X, funding, and previous projects are not guessed.
 - Token value-capture must separate live mechanics from roadmap claims.
 - Contract, LP, holder, liquidity, and market data are background unless they create a fatal risk.

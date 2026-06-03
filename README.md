@@ -235,7 +235,9 @@ Inside `jimmoria`:
 
 When a Research Room passes the quality gate, JIMMORIA prints the full Markdown report in the CLI and also shows the saved report path.
 
-The report is designed as a project-understanding dossier, not an agent log. The front of the report should help you understand what the project is, what it is building, how the token/chain structure works, why the narrative matters, what risks remain, and what to verify next.
+The report is designed as a project-understanding dossier, not an agent log. The front of the report should help you understand what the project is, what it is building, how the token/chain structure works, why the narrative matters, what public X/KOL/article sources are saying, who funded it, what risks remain, and what to verify next.
+
+For Korean research requests, JIMMORIA writes Korean-first reports. Links are displayed with short labels such as `The Block`, `3Jane site`, or `x.com/3janexyz/status`, while the Markdown target keeps the full URL.
 
 Completed project reports follow this shape:
 
@@ -245,7 +247,9 @@ What the project is trying to build
 Product / technical structure
 Token / chain / on-chain state
 Social / KOL / community signals
+Article / web mention notes
 Funding / incentive / airdrop hints
+Founder / team dossier
 Research thesis
 Strengths and risks
 Follow-up checklist

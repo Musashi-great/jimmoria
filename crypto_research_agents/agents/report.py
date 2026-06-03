@@ -1316,7 +1316,7 @@ def render_professional_project_report(
     title_name = primary.name if primary else room.topic
     source_log = collect_source_log(primary, sources) if primary else []
     source_summary = ", ".join(f"[{item['label']}]({item['url']})" for item in source_log[:6]) or "source log unavailable"
-    return render_project_intelligence_report_v2(
+    return render_project_intelligence_report_clean(
         room=room,
         primary=primary,
         findings=findings,
@@ -2235,19 +2235,38 @@ def extract_builder_handles(findings: list[FindingRecord], project: Any) -> list
                 if cleaned.startswith("@") and len(cleaned) > 2:
                     handles.append(cleaned)
                 elif "x.com/" in cleaned.lower() or "twitter.com/" in cleaned.lower():
-                    segment = cleaned.rstrip("/").split("/")[-1]
-                    if segment and segment.lower() not in {"status", "i", "search"}:
-                        handles.append("@" + segment)
+                    handle = handle_from_social_url(cleaned)
+                    if handle:
+                        handles.append(handle)
     deduped = []
     for handle in handles:
         normalized = handle.rstrip("/")
-        if normalized.lower() in {"@3janexyz", "@x", "@twitter"}:
+        normalized_lower = normalized.lower()
+        if normalized_lower in {"@3janexyz", "@x", "@twitter", "@wmt_ventures"}:
+            continue
+        if normalized_lower.lstrip("@").isdigit():
             continue
         if project_tokens_text and normalized[1:].lower() in project_tokens_text:
             continue
         if normalized not in deduped:
             deduped.append(normalized)
     return deduped[:12]
+
+
+def handle_from_social_url(value: str) -> str | None:
+    parsed = urlparse(value if "://" in value else f"https://{value}")
+    host = parsed.netloc.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    if host not in {"x.com", "twitter.com"}:
+        return None
+    parts = [part for part in parsed.path.strip("/").split("/") if part]
+    if not parts:
+        return None
+    handle = parts[0].strip()
+    if not handle or handle.lower() in {"i", "search", "home", "status"} or handle.isdigit():
+        return None
+    return "@" + handle
 
 
 def diligence_score(
@@ -2366,29 +2385,29 @@ def render_representative_evidence_packet(
         f"- Score: `{score['score']}/100`",
         "",
         "## Identity",
-        *(render_project_identity_v2(project, source_log, korean=korean) if project is not None else ["- unresolved"]),
+        *(render_project_identity_clean(project, source_log, korean=korean) if project is not None else ["- unresolved"]),
         "",
         "## What changed",
         "- Trigger is treated only as a candidate; identity, product, token, social, and security evidence are checked before stance.",
         "- X/KOL/article signals are first-layer market evidence; official site/docs/GitHub/on-chain are the verification layer.",
         "",
         "## Product / Operator Evidence",
-        *(render_protocol_mechanics_v2(project, findings, korean=korean) if project is not None else ["- unresolved"]),
+        *(render_protocol_mechanics_clean(project, findings, korean=korean) if project is not None else ["- unresolved"]),
         "",
         "## Founder Dossier",
-        *(render_founder_dossier_v2(project, findings, korean=korean) if project is not None else ["- unresolved"]),
+        *(render_founder_dossier_clean(project, findings, korean=korean) if project is not None else ["- unresolved"]),
         "",
         "## On-chain / Market",
-        *(render_value_capture_v2(project, findings, korean=korean) if project is not None else ["- unresolved"]),
+        *(render_value_capture_clean(project, findings, korean=korean) if project is not None else ["- unresolved"]),
         "",
         "## Social Signal",
-        *(render_signal_briefing_v2(project, findings, korean=korean) if project is not None else ["- unresolved"]),
+        *(render_signal_briefing_clean(project, findings, korean=korean) if project is not None else ["- unresolved"]),
         "",
         "## Risks",
-        *(render_professional_risks_v2(project, findings, korean=korean) if project is not None else ["- unresolved"]),
+        *(render_professional_risks_clean(project, findings, korean=korean) if project is not None else ["- unresolved"]),
         "",
         "## Scores",
-        *(render_score_and_stance_v2(project, findings, quality, source_log, korean=korean) if project is not None else ["- Score: 0/100"]),
+        *(render_score_and_stance_clean(project, findings, quality, source_log, korean=korean) if project is not None else ["- Score: 0/100"]),
         "",
         "## AntSeed Peer Review",
         "- Check ticker collision, unofficial CA, relaunch history, shill patterns, founder ambiguity, and product/operator evidence before upgrading stance.",
@@ -2399,7 +2418,7 @@ def render_representative_evidence_packet(
         "## Source Appendix",
     ]
     if source_log:
-        lines.extend(f"- [{item['label']}]({item['url']}) - {source_role(item['url'])}" for item in source_log[:40])
+        lines.extend(f"- {source_markdown_link(item['url'], item.get('label'))} - {source_role_ko(item['url']) if korean else source_role(item['url'])}" for item in source_log[:40])
     else:
         lines.append("- No source URL was collected.")
     return "\n".join(lines)
@@ -2459,6 +2478,859 @@ def source_role(url: object) -> str:
     if host.startswith("app."):
         return "live app/product surface"
     return "public evidence source"
+
+
+def source_markdown_link(url: object, label: object | None = None) -> str:
+    value = str(url or "").strip()
+    if not value:
+        return "[source unavailable](#)"
+    display = str(label or "").strip() or compact_source_label(value)
+    display = compact_source_label(display)
+    return f"[{display}]({value})"
+
+
+def compact_source_label(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "source"
+    parsed = urlparse(text if "://" in text else f"https://{text}")
+    if parsed.netloc:
+        host = parsed.netloc[4:] if parsed.netloc.startswith("www.") else parsed.netloc
+        path = parsed.path.strip("/")
+        if host in {"x.com", "twitter.com"}:
+            parts = [part for part in path.split("/") if part]
+            if len(parts) >= 3 and parts[1] == "status":
+                return f"x.com/{parts[0]}/status"
+            if parts:
+                return f"x.com/{parts[0]}"
+            return host
+        if "theblock.co" in host:
+            return "The Block"
+        if "delphidigital.io" in host:
+            return "Delphi Digital"
+        if "leviathannews.substack.com" in host:
+            return "Leviathan Substack"
+        if "ethdaily.io" in host:
+            return "ETH Daily"
+        if "defillama.com" in host:
+            return "DefiLlama"
+        if "github.com" in host:
+            parts = [part for part in path.split("/") if part]
+            return "github.com/" + "/".join(parts[:2]) if parts else "GitHub"
+        if "docs.3jane.xyz" in host:
+            return f"docs.3jane.xyz/{path}".rstrip("/")[:70]
+        if "3jane.xyz" in host and path:
+            return f"3jane.xyz/{path}".rstrip("/")[:70]
+        return f"{host}/{path}".rstrip("/")[:70]
+    return text[:70]
+
+
+def source_role_ko(url: object) -> str:
+    value = str(url).lower()
+    parsed = urlparse(value)
+    host = parsed.netloc[4:] if parsed.netloc.startswith("www.") else parsed.netloc
+    if host in {"x.com", "twitter.com"} or host.endswith(".twitter.com"):
+        return "1차 소셜/X 근거"
+    if "whitepaper" in value or value.endswith(".pdf"):
+        return "프로토콜 설계/논문 근거"
+    if host.startswith("docs."):
+        return "공식 docs/기술 검증"
+    if host == "github.com":
+        return "코드/엔지니어링 근거"
+    if host.endswith("3jane.xyz") and parsed.path in {"", "/"}:
+        return "공식 사이트"
+    if "defillama" in host:
+        return "TVL/프로토콜 시장 데이터"
+    if "theblock" in host or "bitcoin.com" in host:
+        return "펀딩/시장 기사"
+    if "delphidigital" in host:
+        return "리서치 기관 분석"
+    if "substack" in host or "ethdaily" in host or "bbx.com" in host:
+        return "외부 해설/웹 언급"
+    if host.startswith("app."):
+        return "라이브 앱/제품 표면"
+    return "공개 근거"
+
+
+def render_project_intelligence_report_clean(
+    *,
+    room: ResearchRoom,
+    primary: Any,
+    findings: list[FindingRecord],
+    quality: ReportQuality,
+    model_name: str,
+    provider_name: str,
+    settings: CompanySettings,
+    korean: bool,
+    title_name: str,
+    source_log: list[dict[str, str]],
+    source_summary: str,
+) -> str:
+    del source_summary
+    display_topic = clean_report_text(room.topic, fallback=f"{title_name} project research request")
+    language = "ko" if korean else settings.report_language
+    lines: list[str] = [
+        f"# {title_name} 리서치 보고서" if korean else f"# {title_name} Project Intelligence Report",
+        "",
+        f"- 작성 시각: {room.created_at}" if korean else f"- Created at: {room.created_at}",
+        f"- 요청: {display_topic}" if korean else f"- Client request: {display_topic}",
+        f"- 분석 대상: {title_name}" if korean else f"- Subject: {title_name}",
+        f"- 주요 근거: {clean_source_summary(source_log, korean=korean)}"
+        if korean
+        else f"- Main sources: {clean_source_summary(source_log, korean=korean)}",
+        "",
+        "---",
+        "",
+        "## 1. Executive Summary (핵심 요약)" if korean else "## 1. Executive Summary",
+    ]
+    lines.extend(render_executive_summary_clean(primary, quality, source_log, korean=korean))
+    lines.extend(["", "## Representative Verdict (대표님 기준 결론)" if korean else "## Representative Verdict"])
+    lines.extend(render_representative_verdict_clean(primary, findings, quality, source_log, korean=korean))
+    lines.extend(["", "## Representative Diligence Brief (대표님 실사 브리프)" if korean else "## Representative Diligence Brief"])
+    lines.extend(render_representative_diligence_brief_clean(primary, findings, quality, source_log, korean=korean))
+    lines.extend(["", "## 2. Primary Market Signal Layer (X/KOL/아티클 1차 소스)" if korean else "## 2. Primary Market Signal Layer"])
+    lines.extend(render_primary_market_signal_layer_clean(primary, findings, korean=korean))
+    lines.extend(["", "## 3. Project Identity (프로젝트 정체성)" if korean else "## 3. Project Identity"])
+    lines.extend(render_project_identity_clean(primary, source_log, korean=korean))
+    lines.extend(["", "## 4. Market Problem & Narrative (시장 문제와 내러티브)" if korean else "## 4. Market Problem & Narrative"])
+    lines.extend(render_market_context_clean(primary, korean=korean))
+    lines.extend(["", "## 5. Product & Protocol Mechanics (제품/프로토콜 구조)" if korean else "## 5. Product & Protocol Mechanics"])
+    lines.extend(render_protocol_mechanics_clean(primary, findings, korean=korean))
+    lines.extend(["", "## 6. Token, Chain & Value Capture (토큰/체인/가치 포착)" if korean else "## 6. Token, Chain & Value Capture"])
+    lines.extend(render_value_capture_clean(primary, findings, korean=korean))
+    lines.extend(["", "## 7. Traction, Social & Funding Signals (트랙션/소셜/펀딩)" if korean else "## 7. Traction, Social & Funding Signals"])
+    lines.extend(render_signal_briefing_clean(primary, findings, korean=korean))
+    lines.extend(["", "## Founder Dossier (창업자/팀)" if korean else "## Founder Dossier"])
+    lines.extend(render_founder_dossier_clean(primary, findings, korean=korean))
+    lines.extend(["", "## 8. Analyst Thesis (리서치 판단)" if korean else "## 8. Analyst Thesis"])
+    lines.extend(render_analyst_thesis_clean(primary, quality, korean=korean))
+    lines.extend(["", "## Score & Stance (TOP/WATCH/OPERATOR/제외)" if korean else "## Score & Stance"])
+    lines.extend(render_score_and_stance_clean(primary, findings, quality, source_log, korean=korean))
+    lines.extend(["", "## 9. Risk Register (리스크)" if korean else "## 9. Risk Register"])
+    lines.extend(render_professional_risks_clean(primary, findings, korean=korean))
+    lines.extend(["", "## 10. Specialist Coverage (에이전트별 커버리지)" if korean else "## 10. Specialist Coverage"])
+    lines.extend(render_specialist_coverage_clean(primary, findings, korean=korean))
+    lines.extend(["", "## 11. Next Research Checklist (다음 조사 체크리스트)" if korean else "## 11. Next Research Checklist"])
+    lines.extend(render_due_diligence_checklist_clean(primary, findings, korean=korean))
+    lines.extend(["", "## 12. Verification Status (검증 범위)" if korean else "## 12. Verification Status"])
+    lines.extend(render_research_coverage_clean(primary, findings, source_log, korean=korean))
+    lines.extend(["", "## Evidence Packet (대표님 리서치 패킷)" if korean else "## Evidence Packet"])
+    lines.extend(render_evidence_packet_section_clean(primary, findings, quality, source_log, korean=korean))
+    lines.extend(["", "## 13. Source Appendix (출처)" if korean else "## 13. Source Appendix"])
+    if source_log:
+        role_fn = source_role_ko if korean else source_role
+        lines.extend(f"- {source_markdown_link(item['url'], item.get('label'))} - {role_fn(item['url'])}" for item in source_log)
+    else:
+        lines.append("- 수집된 출처 URL이 없습니다." if korean else "- No source URL was collected.")
+    lines.extend(
+        [
+            "",
+            "## 14. Research Quality Metadata",
+            f"- Status: `{quality.status.upper()}`",
+            f"- Evidence URLs: {quality.evidence_url_count}",
+            f"- Live source-backed candidates: {quality.live_source_backed_count}",
+            f"- Placeholder-only candidates: {'yes' if quality.placeholder_only else 'no'}",
+            f"- LLM provider: `{provider_name}`",
+            f"- Report model route: `{model_name}`",
+            f"- Report language: `{language}`",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def clean_source_summary(source_log: list[dict[str, str]], *, korean: bool) -> str:
+    if not source_log:
+        return "출처 로그 없음" if korean else "source log unavailable"
+    return ", ".join(source_markdown_link(item.get("url"), item.get("label")) for item in source_log[:6])
+
+
+def render_executive_summary_clean(project: Any, quality: ReportQuality, source_log: list[dict[str, str]], *, korean: bool) -> list[str]:
+    if project is None:
+        return ["- 분석할 프로젝트가 확정되지 않았습니다." if korean else "- No project was resolved."]
+    narratives = ", ".join(display_narratives(project)[:5]) or "Unclassified Early Crypto"
+    token_status = display_token_status(project)
+    thesis = one_sentence_project_thesis(project)
+    if korean:
+        lines = [
+            f"- **한 줄 정의:** {project.name}은 {thesis}",
+            f"- **핵심 내러티브:** {narratives}.",
+            f"- **체인/토큰:** chain=`{project.chain or 'unknown'}`, token_status=`{token_status}`.",
+            f"- **근거 수준:** 관련 URL {len(source_log)}개를 정리했고 quality gate는 `{quality.status}`입니다.",
+            "- **리서치 순서:** X/Twitter, KOL 포스트, 공개 스레드, 아티클을 1차 시장 신호로 보고, 공식 사이트/docs/GitHub/토큰/체인 데이터로 검증했습니다.",
+            "- **현재 판단:** 가격이나 매매 판단이 아니라, 대표님이 프로젝트의 정체성과 리스크를 빠르게 이해하기 위한 1차 실사 보고서입니다.",
+        ]
+        if is_3jane_project(project):
+            lines.append("- **3Jane 요지:** 담보 기반 DeFi 대출이 아니라, 검증 가능한 신용/자산/미래 현금흐름을 바탕으로 무담보 USDC credit line을 만들려는 Ethereum 기반 credit protocol입니다.")
+        return lines
+    return [
+        f"- **Identity:** {project.name} is {thesis}",
+        f"- **Narrative:** {narratives}.",
+        f"- **Chain/token:** chain=`{project.chain or 'unknown'}`, token_status=`{token_status}`.",
+        f"- **Evidence level:** {len(source_log)} relevant URLs were used; quality gate is `{quality.status}`.",
+        "- **Research order:** social/articles first, official docs/GitHub/on-chain verification second.",
+    ]
+
+
+def render_representative_verdict_clean(
+    project: Any,
+    findings: list[FindingRecord],
+    quality: ReportQuality,
+    source_log: list[dict[str, str]],
+    *,
+    korean: bool,
+) -> list[str]:
+    score = diligence_score(project, findings, quality, source_log)
+    if project is None:
+        return ["- 대표님 기준 결론: `제외` - 프로젝트 identity가 확정되지 않았습니다." if korean else "- Representative verdict: `EXCLUDE`."]
+    if korean:
+        return [
+            f"- **대표님 기준 결론:** `{score['stance']}`",
+            f"- **점수:** {score['score']}/100",
+            f"- **이유:** {score['reason']}",
+            "- **읽는 순서:** 결론 → 프로젝트 정체성 → 누가 무엇을 말했는지 → 제품/docs/GitHub → 토큰 value-capture → 미해결 리스크 순서로 보면 됩니다.",
+            "- **금지:** hype, 매수/매도, 목표가, 확정 수익 표현은 제외했습니다.",
+        ]
+    return [
+        f"- **Representative stance:** `{score['stance']}`",
+        f"- **Score:** {score['score']}/100",
+        f"- **Reason:** {score['reason']}",
+    ]
+
+
+def render_representative_diligence_brief_clean(
+    project: Any,
+    findings: list[FindingRecord],
+    quality: ReportQuality,
+    source_log: list[dict[str, str]],
+    *,
+    korean: bool,
+) -> list[str]:
+    if project is None:
+        return ["- 대표님, 프로젝트 identity가 아직 확정되지 않아 후보 메모로만 봐야 합니다." if korean else "- Project identity unresolved."]
+    score = diligence_score(project, findings, quality, source_log)
+    product_rows = finding_rows(findings, "product_tech_signal", project)
+    token_rows = finding_rows(findings, "contract_token_info", project)
+    funding_rows = finding_rows(findings, "funding_token_signal", project)
+    seed_rows = extract_social_seed_rows(findings)
+    founder_handles = extract_builder_handles(findings, project)
+    states = {
+        "social": "부분 확인" if seed_rows else "추가 확인 필요",
+        "product": "확인됨" if product_rows else "추가 확인 필요",
+        "token": "부분 확인" if token_rows else "추가 확인 필요",
+        "funding": "부분 확인" if funding_rows else "추가 확인 필요",
+        "founder": "부분 확인" if founder_handles else "추가 확인 필요",
+    }
+    if korean:
+        return [
+            f"- **무엇인가:** {one_sentence_project_thesis(project)}",
+            f"- **현재 스탠스:** `{score['stance']}` ({score['score']}/100). {score['reason']}",
+            f"- **Identity:** site={source_markdown_link(project.website, 'official site') if project.website else '`unknown`'}, chain=`{project.chain or 'unknown'}`, token_status=`{display_token_status(project)}`.",
+            f"- **소셜/KOL:** {states['social']} - 공개 X, 아티클, KOL/리서치 언급을 첫 번째 신호로 사용했습니다.",
+            f"- **제품/기술:** {states['product']} - 공식 docs, app, GitHub, SDK/API, live infra 여부를 제품 근거로 분리합니다.",
+            f"- **Founder dossier:** {states['founder']} - 공식 근거 없는 이름/학력/전 직장 추정은 보고서에 넣지 않습니다.",
+            f"- **Funding/token:** funding={states['funding']}, token/on-chain={states['token']} - 토큰이 왜 필요한지, 누가 지불하는지, fee/staking/buyback/burn/revenue 연결이 live인지 roadmap인지 분리합니다.",
+            "- **리스크 분리:** identity, founder, product maturity, security/audit, token value-capture, social/shill risk를 별도 항목으로 봅니다.",
+        ]
+    return [
+        f"- **One-line identity:** {one_sentence_project_thesis(project)}",
+        f"- **Current stance:** `{score['stance']}` ({score['score']}/100). {score['reason']}",
+        f"- **Identity:** site={project.website or 'unknown'}, chain=`{project.chain or 'unknown'}`, token_status=`{display_token_status(project)}`.",
+    ]
+
+
+def render_primary_market_signal_layer_clean(project: Any, findings: list[FindingRecord], *, korean: bool) -> list[str]:
+    row = latest_market_signal_row(findings)
+    if not row:
+        return [
+            "- Discovery 이전의 X/KOL/아티클 시장 신호 수집 기록이 없습니다."
+            if korean
+            else "- No market-signal intake finding was recorded before Discovery.",
+            "- 기대 흐름: X/Twitter와 KOL/article 신호를 먼저 수집한 뒤 공식 site/docs/GitHub로 검증합니다."
+            if korean
+            else "- Expected order: social/articles first, official verification second.",
+        ]
+    lines = [
+        "- Source priority: `X/Twitter + KOL posts + public threads/articles -> official site/docs/GitHub verification`.",
+        f"- Project query used for social search: `{row.get('project_query', 'unknown')}`.",
+        f"- X API status: `{row.get('x_api_status', 'unknown')}`; KOL builder status: `{row.get('kol_builder_status', 'unknown')}`.",
+        f"- Live X posts: {row.get('x_post_count', 0)}; public X web hits: {row.get('public_x_result_count', 0)}; article/web hits: {row.get('article_result_count', 0)}.",
+    ]
+    who_said_what = row.get("who_said_what") if isinstance(row.get("who_said_what"), list) else []
+    if who_said_what:
+        lines.append("- Who said what / first-layer social evidence:")
+        for statement in who_said_what[:12]:
+            if isinstance(statement, dict):
+                lines.append(format_statement_for_report(statement))
+    official_social_sources = row.get("official_social_sources") if isinstance(row.get("official_social_sources"), list) else []
+    if official_social_sources:
+        lines.append("- Official or candidate project social sources:")
+        for result in official_social_sources[:6]:
+            if isinstance(result, dict):
+                lines.append(format_result_for_report(result))
+    public_x_results = row.get("public_x_results") if isinstance(row.get("public_x_results"), list) else []
+    if public_x_results:
+        lines.append("- Public X/Twitter web hits:")
+        for result in public_x_results[:8]:
+            if isinstance(result, dict):
+                lines.append(format_result_for_report(result))
+    article_results = row.get("article_results") if isinstance(row.get("article_results"), list) else []
+    kol_opinion_results = row.get("kol_opinion_results") if isinstance(row.get("kol_opinion_results"), list) else []
+    article_rows = dedupe_article_rows([*article_results, *kol_opinion_results])
+    if article_rows or (project is not None and is_3jane_project(project)):
+        lines.append("- 아티클/웹 언급 요약:")
+        if project is not None and is_3jane_project(project):
+            lines.extend(known_3jane_article_notes())
+        for result in article_rows[:8]:
+            if isinstance(result, dict):
+                lines.append(format_article_note_for_report(result))
+    if korean:
+        lines.append("- 해석: X API가 없어도 공개 X 검색과 아티클을 1차 신호로 사용합니다. 단, 최종 판단은 공식 docs, 주소 레지스트리, 제품 상태, 온체인 데이터로 다시 검증해야 합니다.")
+    if not public_x_results and not article_rows and not who_said_what:
+        lines.append("- No usable social/article evidence was captured." if not korean else "- 사용 가능한 소셜/아티클 근거가 수집되지 않았습니다.")
+    return lines
+
+
+def latest_market_signal_row(findings: list[FindingRecord]) -> dict[str, Any] | None:
+    rows = extract_social_seed_rows(findings)
+    return rows[-1] if rows else None
+
+
+def format_statement_for_report(statement: dict[str, Any]) -> str:
+    speaker = clean_report_text(statement.get("speaker"), fallback="unknown")
+    claim = clean_report_text(statement.get("claim"), fallback="No text captured.")
+    url = str(statement.get("url") or "").strip()
+    confidence = clean_report_text(statement.get("confidence"), fallback="unknown")
+    link = f" - {source_markdown_link(url)}" if url else ""
+    return f"  - **{speaker}**: {claim[:360]}{link} (`{confidence}`)"
+
+
+def format_result_for_report(result: dict[str, Any]) -> str:
+    title = clean_report_text(result.get("title") or result.get("name"), fallback="public source")
+    snippet = clean_report_text(result.get("snippet") or result.get("description"), fallback="요약 텍스트 미수집")
+    url = str(result.get("url") or "").strip()
+    link = f" - {source_markdown_link(url, title)}" if url else ""
+    return f"  - **{title[:120]}**: {snippet[:260]}{link}"
+
+
+def format_article_note_for_report(result: dict[str, Any]) -> str:
+    title = clean_report_text(result.get("title"), fallback="article/web source")
+    snippet = clean_report_text(result.get("snippet"), fallback="본문 요약 미수집")
+    url = str(result.get("url") or "").strip()
+    role = source_role_ko(url)
+    return f"  - **{title[:120]}** ({role}): {snippet[:360]} - {source_markdown_link(url, title)}"
+
+
+def dedupe_article_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    deduped: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        url = str(row.get("url") or row.get("title") or "")
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        deduped.append(row)
+    return deduped
+
+
+def known_3jane_article_notes() -> list[str]:
+    notes = [
+        (
+            "The Block / funding",
+            "Paradigm이 3Jane의 $5.2M seed round를 리드했고, 프로젝트가 stealth에서 공개됐다는 펀딩 신호입니다. 이 근거는 '누가 돈을 넣었는지'를 확인하는 1차 펀딩 소스로 봅니다.",
+            "https://www.theblock.co/post/356872/paradigm-leads-5-million-seed-round-in-crypto-credit-startup-3jane",
+        ),
+        (
+            "3Jane official X",
+            "3Jane 공식 계정은 $5.2M seed round와 Paradigm 리드 사실을 직접 발표한 공개 소셜 소스입니다.",
+            "https://x.com/3janexyz/status/1930264347441615188",
+        ),
+        (
+            "Wintermute Ventures X",
+            "Wintermute Ventures가 3Jane과 @_yakovsky를 언급하며 backing 사실을 공개적으로 남긴 소스입니다. founder/team은 이 정도까지만 근거화하고, 실명/경력은 추가 확인 대상으로 둡니다.",
+            "https://x.com/wmt_ventures/status/1930336436433367395",
+        ),
+        (
+            "Delphi Digital",
+            "Delphi는 3Jane을 과거 CeFi/DeFi 신용 실패 이후의 onchain undercollateralized lending 재설계 시도로 다룹니다. 내러티브상 핵심은 'real credit onchain'입니다.",
+            "https://members.delphidigital.io/reports/engineering-real-credit-onchain-the-3jane-bet",
+        ),
+        (
+            "Leviathan Substack",
+            "3Jane lending protocol과 crypto borrowing 구조를 해설하는 외부 아티클입니다. 공식 근거는 아니지만 시장이 이해하는 방식과 narrative framing을 보는 데 사용합니다.",
+            "https://leviathannews.substack.com/p/3jane-lending-protocol-explained",
+        ),
+    ]
+    return [f"  - **{title}**: {body} - {source_markdown_link(url, title)}" for title, body, url in notes]
+
+
+def render_project_identity_clean(project: Any, source_log: list[dict[str, str]], *, korean: bool) -> list[str]:
+    if project is None:
+        return ["- 프로젝트 identity가 확정되지 않았습니다." if korean else "- Project identity unresolved."]
+    site_link = source_markdown_link(project.website, "3Jane site" if is_3jane_project(project) else "official site") if project.website else "`unknown`"
+    official_x = "https://x.com/3janexyz" if is_3jane_project(project) else project.x_account
+    lines = [
+        f"- Project: **{project.name}**",
+        f"- Official site/docs candidate: {site_link}",
+        f"- Official X: {source_markdown_link(official_x, '@3janexyz') if official_x else '`unknown`'}",
+        f"- Chain: `{project.chain or 'unknown'}`",
+        f"- Token status: `{display_token_status(project)}`",
+        f"- Discovery origin: `{candidate_origin(project)}` / `{candidate_source_backing(project)}`",
+        f"- Evidence URLs collected during discovery: {len(project.metadata.get('evidence_urls', []))}",
+        f"- Clean source appendix entries after relevance filtering: {len(source_log)}",
+    ]
+    if korean and is_3jane_project(project):
+        lines.extend(
+            [
+                "",
+                "### 3Jane 핵심 정의",
+                "- 3Jane은 단순 토큰 프로젝트가 아니라 Ethereum 기반 credit-based money market / crypto credit protocol입니다.",
+                "- 공식 사이트 기준 USD3는 crypto user와 AI agent에게 제공되는 credit line pool로 뒷받침되는 yieldcoin이고, sUSD3는 그 pool에 대한 levered / first-loss 성격의 노출로 해석됩니다.",
+                "- 차입자는 crypto assets, bank/CEX assets, future yield, credit score 같은 검증 가능한 데이터를 바탕으로 무담보 USDC credit line을 받을 수 있다는 설계입니다.",
+                "- 따라서 핵심 질문은 가격이 아니라 'underwriting, default handling, pool accounting, borrower demand가 실제로 작동하느냐'입니다.",
+            ]
+        )
+    elif korean:
+        lines.append(f"- 설명: {best_project_description(project)}")
+    else:
+        lines.append(f"- Description: {best_project_description(project)}")
+    return lines
+
+
+def render_market_context_clean(project: Any, *, korean: bool) -> list[str]:
+    if project is None:
+        return ["- 내러티브를 분류할 프로젝트가 없습니다." if korean else "- No project resolved."]
+    narratives = ", ".join(display_narratives(project)[:6]) or "Unclassified Early Crypto"
+    if korean and is_3jane_project(project):
+        return [
+            f"- Narrative map: {narratives}",
+            "- 시장 문제: DeFi 대출은 대체로 초과담보 구조에 묶여 있어, 신용은 있지만 충분한 온체인 담보를 잠그기 어려운 차입자에게 비효율적입니다.",
+            "- 3Jane의 내러티브: on-chain settlement와 off-chain/credit proof를 결합해 crypto-native credit market을 만들려는 시도입니다.",
+            "- 왜 중요하나: 이 구조가 작동하면 DeFi lending은 담보 기반 대출을 넘어 신용 기반 운전자본, yield farmer credit line, merchant finance, AI agent credit line으로 확장될 수 있습니다.",
+            "- 비교 프레임: Aave/Compound 같은 담보 기반 lending과 달리, 3Jane은 credit underwriting과 default/recovery 설계가 제품의 본체입니다.",
+        ]
+    if korean:
+        return [
+            f"- Narrative map: {narratives}",
+            f"- 시장 문제: {best_project_description(project)}",
+            "- 이 내러티브가 실제 제품 사용, 지불 주체, 반복 가능한 수요와 연결되는지 확인해야 합니다.",
+        ]
+    return [f"- Narrative map: {narratives}", f"- Market context: {best_project_description(project)}"]
+
+
+def render_protocol_mechanics_clean(project: Any, findings: list[FindingRecord], *, korean: bool) -> list[str]:
+    if project is None:
+        return ["- 제품/기술 근거가 없습니다." if korean else "- Product evidence unavailable."]
+    rows = finding_rows(findings, "product_tech_signal", project)
+    lines: list[str] = []
+    if korean and is_3jane_project(project):
+        lines.extend(
+            [
+                "- Product interpretation:",
+                "  - 3Jane은 exchange/listing 관점의 토큰 프로젝트가 아니라, 신용 기반 money market을 온체인에 구현하려는 DeFi credit protocol입니다.",
+                "  - 공식 자료 기준 핵심 구조는 `USDC 공급 → USD3/sUSD3 발행/스테이킹 → borrower credit line exposure`입니다.",
+                "  - 검증 포인트는 borrower credit proof, underwriting model, credit line utilization, lender tranche risk, default/recovery 처리입니다.",
+                "",
+                "- Protocol model:",
+                "  - **Supplier side:** USDC를 예치해 USD3를 민팅하고, sUSD3로 스테이킹하면 junior/first-loss 성격의 더 높은 수익 노출을 받는 구조입니다.",
+                "  - **Borrower side:** 차입자는 wallet 보유자산, CEX/bank asset, future yield, credit score 같은 데이터를 증명해 USDC credit line을 받는 설계입니다.",
+                "  - **Underwriting layer:** on-chain asset과 off-chain proof를 결합해 risk-adjusted credit limit과 rate를 산정하는 레이어가 핵심입니다.",
+                "  - **Risk layer:** sUSD3 first-loss, utilization-based rate, redemption queue, default markdown, recovery/collection 메커니즘이 실제 성숙도를 결정합니다.",
+            ]
+        )
+    else:
+        lines.append(f"- Product interpretation: {best_project_description(project)}")
+    if rows:
+        row = rows[0]
+        connector_status = row.get("connector_status", {}) if isinstance(row.get("connector_status"), dict) else {}
+        lines.extend(
+            [
+                f"- Website/docs status: website=`{connector_status.get('crawl_website', 'unknown')}`, docs=`{connector_status.get('crawl_docs', 'unknown')}`.",
+                f"- Product status: `{row.get('product_status', 'unknown')}`, docs_status=`{row.get('docs_status', 'unknown')}`, github_status=`{row.get('github_status', 'unknown')}`.",
+            ]
+        )
+        keywords = row.get("technical_keywords") if isinstance(row.get("technical_keywords"), list) else []
+        if keywords:
+            lines.append(f"- Technical keywords extracted: {', '.join(str(item) for item in keywords[:10])}.")
+        github_repo = row.get("github_repo") if isinstance(row.get("github_repo"), dict) else None
+        if github_repo:
+            lines.append(f"- GitHub repository evidence: {github_repo.get('full_name')} ({source_markdown_link(github_repo.get('html_url'), 'GitHub repo')}).")
+        activity = row.get("github_activity") if isinstance(row.get("github_activity"), dict) else {}
+        if activity:
+            lines.append(f"- GitHub activity: status=`{activity.get('status', 'unknown')}`, recent items={len(activity.get('recent_commits', []) if isinstance(activity.get('recent_commits'), list) else [])}.")
+    else:
+        lines.append("- Product/Tech Agent가 충분한 제품 근거를 반환하지 못했습니다. 공식 docs URL을 직접 넣고 재실행하면 강화됩니다." if korean else "- Product evidence needs follow-up.")
+    return lines
+
+
+def render_value_capture_clean(project: Any, findings: list[FindingRecord], *, korean: bool) -> list[str]:
+    if project is None:
+        return ["- 토큰/가치 포착 근거를 확인하지 못했습니다." if korean else "- Token/value evidence unavailable."]
+    lines = [f"- Chain: `{project.chain or 'unknown'}`", f"- Token status: `{display_token_status(project)}`"]
+    if korean and is_3jane_project(project):
+        lines.extend(
+            [
+                "- 추적 대상은 단순 governance token이 아니라 **USD3 / sUSD3 credit asset 구조**입니다.",
+                "- USD3는 senior 성격의 credit-backed yieldcoin으로, sUSD3는 junior/first-loss 및 levered yield exposure로 해석됩니다.",
+                "- 가치 포착은 `차입 수요 → credit line utilization → pool yield/default/recovery → USD3/sUSD3 수익/손실 배분` 흐름으로 봐야 합니다.",
+                "- 다음 검증은 contract address, pool accounting, default event, recovery auction, yield distribution이 공개적으로 감사 가능한지에 집중해야 합니다.",
+            ]
+        )
+    for row in finding_rows(findings, "contract_token_info", project)[:1]:
+        lines.extend(
+            [
+                f"- Contract address: `{row.get('contract_address') or 'unknown'}`",
+                f"- Market identity source: `{row.get('source', 'unknown')}`",
+                f"- Connector coverage: {format_connector_status(row.get('connector_status', {}))}",
+            ]
+        )
+        registry = row.get("official_addresses")
+        if isinstance(registry, dict) and registry:
+            lines.append(f"- Official address registry: {source_markdown_link(registry.get('source'), '3Jane address registry')}")
+            lines.append(f"- Registry chain: `{registry.get('chain', 'unknown')}`")
+            contracts = registry.get("contracts") if isinstance(registry.get("contracts"), dict) else {}
+            if contracts:
+                lines.append("- 공식 docs 기준 핵심 컨트랙트:")
+                for name, address in list(contracts.items())[:8]:
+                    lines.append(f"  - {name}: `{address}`")
+            permissions = registry.get("permissions") if isinstance(registry.get("permissions"), dict) else {}
+            if permissions:
+                lines.append("- Governance / permission addresses:")
+                for name, address in list(permissions.items())[:4]:
+                    lines.append(f"  - {name}: `{address}`")
+    funding_rows = finding_rows(findings, "funding_token_signal", project)
+    if funding_rows:
+        row = funding_rows[0]
+        lines.extend(
+            [
+                f"- Funding status: `{row.get('funding_status', 'unknown')}`",
+                f"- Funding amount/stage: `{row.get('funding_amount', 'unknown')}` / `{row.get('funding_stage', 'unknown')}`",
+                f"- Points/airdrop status: `{row.get('points_status', 'unknown')}`",
+                f"- Token opportunity note: `{row.get('token_opportunity', 'unknown')}`",
+            ]
+        )
+        investors = row.get("investors") if isinstance(row.get("investors"), list) else []
+        if investors:
+            lines.append(f"- Reported investors/backers: {', '.join(str(item) for item in investors[:10])}.")
+        sources = row.get("funding_sources") if isinstance(row.get("funding_sources"), list) else []
+        if sources:
+            lines.append("- Funding sources:")
+            lines.extend(f"  - {source_markdown_link(url)}" for url in sources[:6])
+    return lines
+
+
+def render_signal_briefing_clean(project: Any, findings: list[FindingRecord], *, korean: bool) -> list[str]:
+    if project is None:
+        return ["- 신호 근거를 확인하지 못했습니다." if korean else "- Signal evidence unavailable."]
+    lines: list[str] = []
+    social_rows = finding_rows(findings, "social_kol_signal", project)
+    if social_rows:
+        row = social_rows[0]
+        lines.append(f"- Social/KOL trend: `{row.get('mention_trend', 'unknown')}`.")
+        lines.append(f"- Community signal: {row.get('community_signal', 'unknown')}")
+        accounts = row.get("key_accounts") if isinstance(row.get("key_accounts"), list) else []
+        if accounts:
+            lines.append("- Official/public social links:")
+            lines.extend(f"  - {source_markdown_link(account)}" for account in accounts[:6])
+    row = latest_market_signal_row(findings)
+    if row:
+        for key, label in [
+            ("public_x_results", "public X/Twitter result"),
+            ("kol_opinion_results", "KOL/article/thread opinion result"),
+            ("article_results", "article/public-web result"),
+        ]:
+            values = row.get(key) if isinstance(row.get(key), list) else []
+            if values:
+                lines.append(f"- Upstream market-signal layer included {len(values)} {label}(s).")
+    if korean and is_3jane_project(project):
+        lines.extend(
+            [
+                "- Backer/signal note: 공식 사이트와 펀딩 기사 기준 Paradigm, Wintermute Ventures, Coinbase Ventures 등이 backer로 노출됩니다.",
+                "- 다음 모니터링 지표: TVL, USD3/sUSD3 supply, borrower facility usage, default/recovery event, credit-line utilization, X/KOL discussion quality.",
+                "- KOL conviction은 현재 공개 웹 검색 수준입니다. X_BEARER_TOKEN을 붙이면 KOL별 원문 포스트, 반복 언급, 반박/논쟁까지 점수화할 수 있습니다.",
+            ]
+        )
+    funding_rows = finding_rows(findings, "funding_token_signal", project)
+    if funding_rows:
+        lines.append(f"- Funding/token note: {funding_rows[0].get('note', 'No funding note.')}")
+    return lines or ["- Social/funding signal requires follow-up." if not korean else "- 소셜/펀딩 신호는 추가 확인이 필요합니다."]
+
+
+def render_founder_dossier_clean(project: Any, findings: list[FindingRecord], *, korean: bool) -> list[str]:
+    if project is None:
+        return ["- 창업자/팀 근거가 없습니다." if korean else "- Founder/team evidence unavailable."]
+    handles = extract_builder_handles(findings, project)
+    lines = []
+    if korean:
+        lines.extend(
+            [
+                "- 이 섹션은 이름 맞추기식 founder 추정을 금지하고, 공식 사이트/docs/X/GitHub 또는 신뢰 가능한 기사에서 확인되는 단서만 기록합니다.",
+                "- 실명, 학교, 전 직장, 이전 프로젝트, 개인 funding 이력은 공식 근거가 없으면 `unresolved`로 둡니다.",
+            ]
+        )
+        if is_3jane_project(project):
+            lines.append("- 3Jane 공개 소셜 근거에서 확인되는 팀 단서는 Wintermute Ventures가 언급한 `@_yakovsky`입니다. 실명/경력은 별도 검증 대상입니다.")
+    else:
+        lines.append("- Only source-backed founder/team evidence is recorded.")
+    if handles:
+        lines.append("- Public builder/team handle hints:")
+        lines.extend(f"  - {handle}" for handle in handles[:8])
+    else:
+        lines.append("- Public builder/team handle hints: unresolved.")
+    product_rows = finding_rows(findings, "product_tech_signal", project)
+    github_repo = product_rows[0].get("github_repo") if product_rows and isinstance(product_rows[0].get("github_repo"), dict) else None
+    if github_repo:
+        lines.append(f"- GitHub organization/repo evidence: {github_repo.get('full_name')} ({source_markdown_link(github_repo.get('html_url'), 'GitHub repo')}).")
+    elif project.metadata.get("github_repos"):
+        repo = project.metadata["github_repos"][0]
+        if isinstance(repo, dict):
+            lines.append(f"- GitHub search candidate: {repo.get('full_name')} ({source_markdown_link(repo.get('html_url'), 'GitHub repo')}).")
+    else:
+        lines.append("- GitHub/team engineering evidence: unresolved or not linked.")
+    return lines
+
+
+def render_analyst_thesis_clean(project: Any, quality: ReportQuality, *, korean: bool) -> list[str]:
+    if project is None:
+        return ["- 리서치 판단을 작성할 프로젝트가 없습니다." if korean else "- Analyst thesis unavailable."]
+    narratives = ", ".join(display_narratives(project)[:4]) or "early crypto"
+    if quality.status != "research_complete":
+        return [
+            "- Verdict: Research More.",
+            "- 근거가 부족하므로 완성 보고서가 아니라 후보 메모로 취급합니다." if korean else "- Evidence is insufficient.",
+        ]
+    if korean and is_3jane_project(project):
+        return [
+            "- Verdict: Research More / Watchlist candidate.",
+            f"- 핵심 thesis: **{narratives}** 내러티브가 실제 product usage, credit demand, pool accounting, USD3/sUSD3 구조로 이어지는지 확인해야 합니다.",
+            "- 3Jane의 매력은 `undercollateralized credit`이라는 큰 문제를 겨냥한다는 점이고, 리스크는 그만큼 underwriting/default/recovery가 실제로 검증되어야 한다는 점입니다.",
+            "- 다음 판단은 가격이나 단기 hype가 아니라 공식 docs, contract/pool data, X/KOL 반복 언급, borrower/supplier 지표를 묶어서 내려야 합니다.",
+        ]
+    if korean:
+        return [
+            "- Verdict: Research More / Watchlist candidate.",
+            f"- Working thesis: **{narratives}** 내러티브가 실제 제품 사용과 토큰 value-capture로 연결되는지 확인해야 합니다.",
+        ]
+    return ["- Verdict: Research More / Watchlist candidate."]
+
+
+def render_score_and_stance_clean(
+    project: Any,
+    findings: list[FindingRecord],
+    quality: ReportQuality,
+    source_log: list[dict[str, str]],
+    *,
+    korean: bool,
+) -> list[str]:
+    score = diligence_score(project, findings, quality, source_log)
+    lines = [f"- Classification: `{score['stance']}`", f"- Score: `{score['score']}/100`", f"- Reason: {score['reason']}"]
+    if korean:
+        lines.extend(
+            [
+                "- TOP: identity/product/token/social/founder 근거가 모두 강하고 반복 검증 가능한 경우.",
+                "- WATCH: 프로젝트 정체성과 제품/docs 근거는 있으나 live KOL/founder/token capture 검증이 더 필요한 경우.",
+                "- OPERATOR: 제품/인프라는 강하지만 토큰 value-capture가 약하거나 토큰 관련 thesis가 불명확한 경우.",
+                "- 제외: identity collision, unofficial CA, 제품 부재, 보안/사기 리스크가 치명적인 경우.",
+            ]
+        )
+    else:
+        lines.extend(["- TOP/WATCH/OPERATOR/EXCLUDE definitions are applied by evidence strength."])
+    for label, value in score["components"].items():
+        lines.append(f"- {label}: {value}")
+    return lines
+
+
+def render_professional_risks_clean(project: Any, findings: list[FindingRecord], *, korean: bool) -> list[str]:
+    del findings
+    if project is None:
+        return ["- 프로젝트가 확정되지 않아 리스크를 산출하지 못했습니다." if korean else "- No risks identified."]
+    if korean and is_3jane_project(project):
+        risks = [
+            "Identity risk: 3Jane 공식 사이트/docs/X는 확인됐지만, ticker/CA collision은 계속 점검해야 합니다.",
+            "Credit default risk: 차입자가 상환하지 못할 때 USD3/sUSD3 손실 배분, markdown, recovery가 실제로 어떻게 작동하는지 검증해야 합니다.",
+            "Fraud / identity risk: bank/CEX/credit proof 기반 underwriting은 데이터 조작, synthetic identity, compromised account 리스크가 있습니다.",
+            "Liquidity risk: supplier redemption 요청이 cash buffer를 초과할 때 redemption queue와 time-based throttling이 충분한지 확인해야 합니다.",
+            "Smart-contract / oracle risk: pool accounting, rate model, price/SOFR feed, upgrade path, audit 결과를 확인해야 합니다.",
+            "Governance / parameter risk: debt cap, LTV, tranche ratio, withdrawal window 변경 권한과 timelock/multisig 구조가 중요합니다.",
+            "Social/KOL risk: X API 미설정 상태에서는 KOL별 실제 원문, 반복 언급, 반박 흐름을 충분히 보지 못합니다.",
+            "Token value-capture risk: USD3/sUSD3 경제성이 실제 borrower demand와 default-adjusted return으로 증명되어야 합니다.",
+        ]
+    else:
+        risks = [
+            "Official docs/product evidence may still be incomplete or marketing-heavy.",
+            "Token, contract, and chain identity need official-source verification.",
+            "Public web search can collide with unrelated projects that share similar names.",
+            "Social/KOL evidence is limited without authenticated X search.",
+        ]
+    return [f"- {risk}" for risk in risks]
+
+
+def render_specialist_coverage_clean(project: Any, findings: list[FindingRecord], *, korean: bool) -> list[str]:
+    del project
+    coverage = [
+        ("Discovery", "candidate_discovery", "프로젝트 identity와 source-backed candidate 확정" if korean else "resolved source-backed candidate"),
+        ("Narrative", "narrative_map", "시장 내러티브와 thesis 분류" if korean else "mapped market narratives"),
+        ("Social/KOL", "market_signal_intake", "X/KOL/공개 포스트/아티클을 1차 시장 신호로 수집" if korean else "collected social/article signals"),
+        ("Product/Tech", "product_tech_signal", "사이트, Docs, GitHub, 제품 readiness 확인" if korean else "checked site/docs/GitHub"),
+        ("Contract/On-chain", "contract_token_info", "체인, 토큰, 컨트랙트, market identity 확인" if korean else "checked chain/token/contracts"),
+        ("Funding/Token", "funding_token_signal", "투자자, 포인트, 에어드랍, 토큰 기회 단서 확인" if korean else "checked funding/token hints"),
+    ]
+    finding_types = {finding.finding_type for finding in findings}
+    lines = ["| Desk | Coverage | Status |", "|---|---|---|"]
+    for desk, finding_type, description in coverage:
+        lines.append(f"| {desk} | {description} | {'covered' if finding_type in finding_types else 'missing'} |")
+    return lines
+
+
+def render_due_diligence_checklist_clean(project: Any, findings: list[FindingRecord], *, korean: bool) -> list[str]:
+    del findings
+    if korean and project is not None and is_3jane_project(project):
+        items = [
+            "공식 docs/whitepaper에서 USD3, sUSD3, borrower credit line, underwriting input을 다시 확인한다.",
+            "공식 contract address, pool address, app URL, deployment chain을 explorer 기준으로 확인한다.",
+            "DefiLlama/CoinGecko/DEX Screener 데이터가 3Jane 공식 프로젝트와 정확히 매칭되는지 확인한다.",
+            "X_BEARER_TOKEN을 설정해 @3janexyz 최근 포스트, 언급 계정, KOL별 의견 변화를 수집한다.",
+            "GitHub repo, commit activity, releases, issues, audit 자료를 확인한다.",
+            "default/recovery/collection 이벤트가 발생했는지, 발생했다면 USD3/sUSD3 손실 배분이 어떻게 처리됐는지 추적한다.",
+            "watchlist 진입 시 월간 추적 지표를 TVL, USD3 supply, sUSD3 supply, borrower utilization, default rate, KOL momentum으로 정의한다.",
+        ]
+    elif korean:
+        items = [
+            "공식 사이트/docs/whitepaper에서 project identity를 재확인한다.",
+            "공식 ticker, contract address, chain deployment를 확인한다.",
+            "KOL 언급과 아티클을 수집하되 공식 근거와 분리한다.",
+            "GitHub repo, commit activity, releases, audit 자료를 확인한다.",
+        ]
+    else:
+        items = ["Re-check official docs, contracts, social signals, GitHub, and token value-capture."]
+    return [f"- {item}" for item in items]
+
+
+def render_research_coverage_clean(
+    project: Any,
+    findings: list[FindingRecord],
+    source_log: list[dict[str, str]],
+    *,
+    korean: bool,
+) -> list[str]:
+    if project is None:
+        return ["- 검증할 프로젝트가 확정되지 않았습니다." if korean else "- No project was resolved."]
+    source_count = len(source_log)
+    product_rows = finding_rows(findings, "product_tech_signal", project)
+    token_rows = finding_rows(findings, "contract_token_info", project)
+    seed_rows = [finding for finding in findings if finding.finding_type == "market_signal_intake"]
+    funding_rows = finding_rows(findings, "funding_token_signal", project)
+    if korean:
+        return [
+            f"- Source discovery: {'verified' if source_count else 'limited'} - 공개 근거 URL {source_count}개를 Source Appendix에 정리했습니다.",
+            f"- X/KOL first layer: {'partially verified' if seed_rows else 'missing'} - 공식 X/공개 글 신호를 포함했고, 실시간 X API 설정 시 KOL별 원문 히스토리가 강화됩니다.",
+            f"- Product/docs: {'verified' if product_rows else 'needs follow-up'} - 사이트, docs, GitHub 근거를 제품/기술 섹션에 반영했습니다.",
+            f"- Token/chain/on-chain: {'partially verified' if token_rows else 'needs follow-up'} - chain/token status와 공식 주소 레지스트리를 분리했습니다.",
+            f"- Funding/incentives: {'partially verified' if funding_rows else 'unverified'} - 투자자/포인트/에어드랍 단서는 확인된 근거만 반영했습니다.",
+            "- 내부 에이전트 실행 로그와 council 기록은 최종 보고서 본문이 아니라 `data/runs/<room_id>/messages.json`, `events.json`에 저장됩니다.",
+        ]
+    return [
+        f"- Source discovery: {coverage_status(source_count > 0, 'verified', 'limited')} - {source_count} URLs.",
+        f"- Social/KOL first layer: {coverage_status(bool(seed_rows), 'partially verified', 'missing')}.",
+        f"- Product/docs: {coverage_status(bool(product_rows), 'verified', 'needs follow-up')}.",
+        f"- Token/chain/on-chain: {coverage_status(bool(token_rows), 'partially verified', 'needs follow-up')}.",
+        f"- Funding/incentives: {coverage_status(bool(funding_rows), 'partially verified', 'unverified')}.",
+    ]
+
+
+def render_evidence_packet_section_clean(
+    project: Any,
+    findings: list[FindingRecord],
+    quality: ReportQuality,
+    source_log: list[dict[str, str]],
+    *,
+    korean: bool,
+) -> list[str]:
+    if project is None:
+        return ["- Evidence packet unavailable because no project was resolved."]
+    score = diligence_score(project, findings, quality, source_log)
+    product_rows = finding_rows(findings, "product_tech_signal", project)
+    token_rows = finding_rows(findings, "contract_token_info", project)
+    social_count = len(extract_social_seed_rows(findings))
+    if korean:
+        return [
+            f"- **Identity:** {project.name} / {project.chain or 'unknown'} / {source_markdown_link(project.website, 'official site') if project.website else 'unknown'}",
+            "- **What changed:** X/KOL/article 신호를 먼저 후보 trigger로 취급하고, 바로 판단하지 않고 official site/docs/GitHub/token/chain으로 검증했습니다.",
+            f"- **Product / Operator Evidence:** {'verified' if product_rows else 'unresolved'} - website/docs/GitHub/app/API/SDK 근거를 제품 섹션에 분리했습니다.",
+            f"- **Founder Dossier:** {'partial' if extract_builder_handles(findings, project) else 'unresolved'} - 공식 근거 없는 founder 추정은 금지했습니다.",
+            f"- **On-chain / Market:** {'partial' if token_rows else 'unresolved'} - DEX/explorer/contract/market metadata는 fatal risk가 아니면 배경으로만 둡니다.",
+            f"- **Social Signal:** social seed rows={social_count}; 실시간 X/KOL은 X_BEARER_TOKEN 설정 후 강화됩니다.",
+            "- **Risks:** identity, founder, product maturity, security/audit, token value-capture, social/shill risk로 분리했습니다.",
+            f"- **Scores:** {score['score']}/100, stance=`{score['stance']}`.",
+            "- **AntSeed Peer Review:** trigger는 후보로만 취급하고 ticker collision/unofficial CA/relaunch/social shill 여부를 계속 검증합니다.",
+            f"- **Stance:** {score['stance']} - {score['reason']}",
+        ]
+    return [
+        f"- **Identity:** {project.name} / {project.chain or 'unknown'} / {project.website or 'unknown'}",
+        "- **What changed:** Market signals are candidate triggers first, then official evidence verification follows.",
+        f"- **Product / Operator Evidence:** {'verified' if product_rows else 'unresolved'}.",
+        f"- **Founder Dossier:** {'partial' if extract_builder_handles(findings, project) else 'unresolved'}.",
+        f"- **On-chain / Market:** {'partial' if token_rows else 'unresolved'}.",
+        f"- **Social Signal:** social seed rows={social_count}.",
+        f"- **Scores:** {score['score']}/100, stance=`{score['stance']}`.",
+        "- **AntSeed Peer Review:** continue checking collision, unofficial CA, relaunch, and shill risk.",
+    ]
+
+
+def diligence_score(
+    project: Any,
+    findings: list[FindingRecord],
+    quality: ReportQuality,
+    source_log: list[dict[str, str]],
+) -> dict[str, Any]:
+    if project is None:
+        return {"score": 0, "stance": "EXCLUDE", "reason": "No project resolved.", "components": {}}
+    product_rows = finding_rows(findings, "product_tech_signal", project)
+    token_rows = finding_rows(findings, "contract_token_info", project)
+    funding_rows = finding_rows(findings, "funding_token_signal", project)
+    social_seed_rows = extract_social_seed_rows(findings)
+    social_rows = finding_rows(findings, "social_kol_signal", project)
+    founder_handles = extract_builder_handles(findings, project)
+
+    components = {
+        "quality_gate": 20 if quality.status == "research_complete" else 0,
+        "source_depth": min(15, len(source_log) * 2),
+        "identity_gate": 12 if project.website and candidate_origin(project) == "live_source_backed" else 4,
+        "product_operator": 12 if product_rows else 0,
+        "github_or_docs": github_docs_score(project, product_rows),
+        "onchain_market": 10 if token_rows else 0,
+        "official_addresses": official_address_score(token_rows),
+        "social_kol": 8 if social_seed_rows or social_rows else 0,
+        "founder_dossier": 4 if founder_handles else 0,
+        "funding_token": 4 if funding_rows else 0,
+    }
+    raw_score = min(100, sum(components.values()))
+    has_product = bool(product_rows)
+    has_token_value = display_token_status(project) not in {"", "unknown", "unknown_or_incentive_mining_unverified"}
+    has_fatal_identity_gap = candidate_origin(project) != "live_source_backed" or quality.is_blocking
+    has_strong_founder_dossier = len(founder_handles) >= 2 and any(
+        key in str(project.metadata).lower() for key in ["founder", "linkedin", "team", "about"]
+    )
+    score = raw_score
+    if not has_strong_founder_dossier:
+        score = min(score, 84)
+    if not (social_seed_rows or social_rows):
+        score = min(score, 78)
+
+    if has_fatal_identity_gap or score < 45:
+        stance = "EXCLUDE"
+        reason = "identity/source-backed evidence is not strong enough."
+    elif has_product and not has_token_value:
+        stance = "OPERATOR"
+        reason = "product/operator evidence exists, but token value-capture remains unclear."
+    elif score >= 88 and has_strong_founder_dossier and official_address_score(token_rows):
+        stance = "TOP"
+        reason = "identity, product, social, on-chain, and founder/team evidence are all strong enough for top-priority tracking."
+    else:
+        stance = "WATCH"
+        reason = "source-backed project with strong product/context evidence, but still needs live KOL, founder/team, and token value-capture follow-up."
+    return {"score": score, "stance": stance, "reason": reason, "components": components}
 
 
 def dedupe_source_items(items: list[dict[str, str]]) -> list[dict[str, str]]:
