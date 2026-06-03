@@ -846,6 +846,48 @@ class SmokeTest(unittest.TestCase):
         self.assertNotIn("JIMMORIA response", text)
         self.assertNotIn("Report preview", text)
 
+    def test_run_summary_prints_full_report_for_completed_research(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report_path = root / "report.md"
+            report_path.write_text(
+                "\n".join(
+                    [
+                        "# Project Research Dossier: 3Jane",
+                        "## 1. TL;DR",
+                        "- complete",
+                        *[f"detail line {index}" for index in range(1, 16)],
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = types.SimpleNamespace(
+                room=types.SimpleNamespace(
+                    room_id="room_full",
+                    status="completed",
+                    output_paths={"report": str(report_path)},
+                    project_card={
+                        "research_quality": {
+                            "status": "research_complete",
+                        }
+                    },
+                ),
+                memory=types.SimpleNamespace(get_room_findings=lambda room_id: []),
+                bus=types.SimpleNamespace(messages=[]),
+            )
+            output = StringIO()
+            console = JimmoriaConsole(runs_dir=root / "runs")
+
+            with redirect_stdout(output):
+                console.print_run_summary(result)
+
+        text = output.getvalue()
+        self.assertIn("JIMMORIA response", text)
+        self.assertIn("Full report", text)
+        self.assertIn("Full report command: /report room_full", text)
+        self.assertIn("detail line 15", text)
+        self.assertNotIn("Report preview", text)
+
     def test_article_research_loop_writes_outputs(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

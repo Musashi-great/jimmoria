@@ -214,6 +214,21 @@ Inside `jimmoria`:
 /quit
 ```
 
+## Report Output
+
+When a Research Room passes the quality gate, JIMMORIA prints the full Markdown report in the CLI and also shows the saved report path.
+
+If evidence is insufficient, the CLI prints a diagnostic preview instead of presenting it as a finished dossier.
+
+Reprint any saved report:
+
+```text
+/report <room_id>
+jimmoria report <room_id>
+```
+
+Set `JIMMORIA_REPORT_DISPLAY=preview` when you want completed rooms to show only a preview.
+
 ## Project Structure
 
 ```text

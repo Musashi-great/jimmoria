@@ -639,6 +639,7 @@ class JimmoriaConsole:
                 lines.append(f"Quality reasons: {'; '.join(str(item) for item in quality.get('reasons', []))}")
         if report_path:
             lines.append(f"Report: {report_path}")
+            lines.append(f"Full report command: /report {room.room_id}")
         if vault_path:
             lines.append(f"Vault: {vault_path}")
         lines.append(f"Replay events: {self.runs_dir / room.room_id / 'events.json'}")
@@ -646,7 +647,10 @@ class JimmoriaConsole:
         preview_title = "Diagnostic preview" if quality_status == "insufficient_evidence" else "Report preview"
         self.block(summary_title, lines)
         if report_path:
-            self.print_report_preview(report_path, title=preview_title)
+            if self.should_print_full_report(quality_status):
+                self.print_report_full(report_path)
+            else:
+                self.print_report_preview(report_path, title=preview_title)
 
     def print_context(self) -> None:
         memory = load_memory(self.memory_path)
@@ -928,6 +932,21 @@ class JimmoriaConsole:
         lines = path.read_text(encoding="utf-8").splitlines()
         preview = [line for line in lines if line.strip()][:max_lines]
         self.block(title, preview)
+
+    def print_report_full(self, report_path: str | Path) -> None:
+        path = Path(report_path)
+        if not path.exists():
+            return
+        lines = path.read_text(encoding="utf-8").splitlines()
+        self.block("Full report", lines)
+
+    def should_print_full_report(self, quality_status: str) -> bool:
+        mode = os.getenv("JIMMORIA_REPORT_DISPLAY", "").strip().lower()
+        if mode in {"preview", "summary"}:
+            return False
+        if mode in {"full", "all"}:
+            return True
+        return quality_status != "insufficient_evidence"
 
     def agent_label(self, agent_id: str) -> str:
         spec = self.registry.get(agent_id)

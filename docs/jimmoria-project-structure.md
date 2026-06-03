@@ -319,6 +319,16 @@ report.compact.md
 report.json
 ```
 
+### CLI Report Display
+
+Research Room 결과 출력 정책:
+
+- `research_complete`: CLI에서 전체 Markdown 보고서를 `Full report`로 바로 출력한다.
+- `insufficient_evidence`: 완성 보고서처럼 보이지 않도록 `Diagnostic preview`만 출력한다.
+- 모든 report artifact는 `reports/*.md`에 저장되고, summary에는 저장 경로와 `/report <room_id>` 재출력 명령을 함께 보여준다.
+- 사용자가 전체 출력 대신 preview만 원하면 `JIMMORIA_REPORT_DISPLAY=preview`를 설정한다.
+- `JIMMORIA_REPORT_DISPLAY=full`은 quality 상태와 상관없이 report 파일 전체를 출력한다.
+
 ## 12. Web Dashboard
 
 `jimmoria web` starts a local dashboard that reads existing files from:
