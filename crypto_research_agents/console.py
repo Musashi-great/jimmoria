@@ -63,6 +63,7 @@ class JimmoriaConsole:
         self.event_style = os.getenv("JIMMORIA_EVENT_STYLE", "stream").strip().lower() or "stream"
         self.runtime_room_running = False
         self.runtime_dock_lines = 0
+        self.runtime_dock_frame = 0
 
     def print_intro(self) -> None:
         print_jimmoria_logo(self.width)
@@ -220,6 +221,8 @@ class JimmoriaConsole:
         self.print_log_line(label, text, muted=muted)
         if self.use_runtime_dock() and self.runtime_room_running:
             self.print_runtime_dock()
+        elif self.use_runtime_dock():
+            self.show_cursor()
 
     def use_stream_events(self) -> bool:
         return self.event_style not in {"card", "cards", "panel", "panels"}
@@ -236,6 +239,7 @@ class JimmoriaConsole:
         return self.read_basic_boxed_input()
 
     def read_ansi_boxed_input(self) -> str:
+        self.show_cursor()
         hint = "Type a request, URL, /command, or @path/to/file"
         border = self.input_border()
         print("")
@@ -261,6 +265,8 @@ class JimmoriaConsole:
         self.runtime_dock_lines = 0
 
     def print_runtime_dock(self) -> None:
+        self.hide_cursor()
+        self.runtime_dock_frame += 1
         border = self.input_border()
         print(self.input_border_style(border))
         print(self.input_status_line_style(self.input_text_line(self.input_status_text())))
@@ -268,6 +274,14 @@ class JimmoriaConsole:
         print(self.input_locked_line_style())
         print(self.input_border_style(border))
         self.runtime_dock_lines = 5
+
+    def hide_cursor(self) -> None:
+        if supports_color():
+            sys.stdout.write("\033[?25l")
+
+    def show_cursor(self) -> None:
+        if supports_color():
+            sys.stdout.write("\033[?25h")
 
     def read_basic_boxed_input(self) -> str:
         hint = "Type a request, URL, /command, or @path/to/file"
@@ -357,11 +371,18 @@ class JimmoriaConsole:
     def input_locked_line_style(self) -> str:
         violet = "\033[38;2;211;95;255m"
         muted = "\033[38;2;126;96;154m"
+        pink = "\033[38;2;255;92;212m"
+        blink = "\033[5m"
         reset = "\033[0m"
         inner_width = self.input_box_width() - 4
         text = "> working..."
+        visible_prefix = "> working"
+        visible_dots = "..."
         padding = " " * max(inner_width - len(text), 0)
-        return f"{violet}|{reset} {muted}{text}{reset}{padding}{violet}|{reset}"
+        return (
+            f"{violet}|{reset} {muted}{visible_prefix}{reset}"
+            f"{blink}{pink}{visible_dots}{reset}{padding}{violet}|{reset}"
+        )
 
     def input_cursor_sequence(self) -> str:
         return "\033[2A\033[4C"

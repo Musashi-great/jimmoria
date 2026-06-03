@@ -952,6 +952,8 @@ JIMMORIA CLI의 기본 runtime 이벤트 출력은 compact stream이다. 이 방
 
 Research Room이 실행 중일 때도 하단 `JIMMORIA HQ` dock은 유지된다. 새 runtime 이벤트가 도착하면 CLI는 이전 dock을 ANSI escape sequence로 지우고, 이벤트 로그를 출력한 뒤 dock을 다시 그린다. 그래서 사용자는 긴 리서치 런 중에도 채팅창이 사라진 것이 아니라 잠시 잠겨 있는 회사 프런트 데스크를 보고 있는 느낌을 받는다.
 
+이 실행 중 dock에서는 실제 터미널 커서를 숨긴다. 상태 표시는 박스 밖 커서가 아니라 dock 내부의 `> working...` 점에 blink 스타일을 주는 방식으로 처리한다. 즉, 움직임은 항상 JIMMORIA 입력 규격 안에서만 보인다.
+
 ```text
 Room > OPEN room_abc123 | agents 10 | pearl 프로젝트 리서치
 Board > 10 wait/0 done

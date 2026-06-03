@@ -583,6 +583,8 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("Room running. Input returns when Supervisor finishes this room.", clean)
         self.assertIn("> working...", clean)
         self.assertIn("\033[5A\033[5M", output.getvalue())
+        self.assertIn("\033[?25l", output.getvalue())
+        self.assertIn("\033[5m\033[38;2;255;92;212m...", output.getvalue())
         self.assertEqual(console.runtime_dock_lines, 5)
 
     def test_runtime_stream_clears_input_dock_when_room_finishes(self) -> None:
@@ -611,6 +613,7 @@ class SmokeTest(unittest.TestCase):
                 )
 
         self.assertIn("Room", output.getvalue())
+        self.assertIn("\033[?25h", output.getvalue())
         self.assertEqual(console.runtime_dock_lines, 0)
         self.assertFalse(console.runtime_room_running)
 
