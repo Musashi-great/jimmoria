@@ -156,6 +156,7 @@ Supervisor는 단순 라우터가 아니라 회사의 boss/orchestrator다.
 - 사용자 발화를 먼저 읽고 대화/설정/리서치/보고서 조회 요청을 구분
 - Research Room이 필요한지 판단
 - 보고서/dossier 작성 요청이면 사용자에게 확인 후 room open
+- 저장 보고서 조회가 실패한 뒤 사용자가 "만들어/작성해"라고 정정하면 직전 요청을 새 보고서 작성 요청으로 복구
 - 목표, 우선순위, task plan 생성
 - 하위 agent에게 작업 배정
 - Agent Council 결과를 받아 최종 검토

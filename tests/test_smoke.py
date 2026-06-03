@@ -234,6 +234,7 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(classify_chat_input("안녕"), "supervisor_chat")
 
     def test_chat_intake_classifies_saved_report_request(self) -> None:
+        self.assertEqual(classify_chat_input("3jane 관련 투자 보고서 만들어봐"), "research_request")
         self.assertEqual(classify_chat_input("3jane 보고서 만든거 보내봐 전체"), "report_retrieval")
         self.assertEqual(classify_chat_input("3jane 보고서 만들어봐"), "research_request")
         self.assertEqual(classify_chat_input("3jane 보고서 들고와봐"), "report_retrieval")
@@ -496,6 +497,46 @@ class SmokeTest(unittest.TestCase):
         text = output.getvalue()
         self.assertIn("보고서를 원하면", text)
         self.assertNotIn("Room > OPEN", text)
+
+    def test_chat_report_retrieval_miss_can_be_corrected_to_creation(self) -> None:
+        output = StringIO()
+        fake_result = types.SimpleNamespace(
+            room=types.SimpleNamespace(
+                room_id="room_followup",
+                status="completed",
+                output_paths={},
+                project_card={},
+            ),
+            memory=types.SimpleNamespace(get_room_findings=lambda room_id: []),
+            bus=types.SimpleNamespace(messages=[]),
+        )
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            args = argparse.Namespace(
+                memory=str(root / "memory.json"),
+                vault=str(root / "vault"),
+                reports=str(root / "reports"),
+                skip_model_setup=True,
+            )
+            with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(root / "model_settings.json")}, clear=True):
+                with patch("sys.stdin.isatty", return_value=True):
+                    with patch(
+                        "builtins.input",
+                        side_effect=["3jane 보고서 들고와봐", "만들어보라는거잖아", "y", "/quit"],
+                    ):
+                        with patch(
+                            "crypto_research_agents.cli.ResearchRuntime.run_article_research",
+                            return_value=fake_result,
+                        ) as run_article:
+                            with redirect_stdout(output):
+                                chat_command(args)
+
+            self.assertTrue(run_article.called)
+            self.assertIn("3jane", run_article.call_args.kwargs["title"])
+
+        text = output.getvalue()
+        self.assertIn("저장된 보고서를 찾지 못했습니다", text)
+        self.assertIn("Research Room", text)
 
     def test_runtime_records_supervisor_intake_decision(self) -> None:
         with TemporaryDirectory() as tmp:

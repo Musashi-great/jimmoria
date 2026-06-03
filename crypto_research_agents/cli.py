@@ -724,6 +724,7 @@ def chat_command(args: argparse.Namespace) -> None:
     console.print_help()
     last_room_id = ""
     supervisor_history: list[dict[str, str]] = []
+    pending_report_creation_line = ""
 
     while True:
         try:
@@ -743,12 +744,20 @@ def chat_command(args: argparse.Namespace) -> None:
 
         console.print_user_message(line)
         console.print_supervisor_working("Reading the message, choosing the response shape, and routing the company.")
+        route_line = line
+        if pending_report_creation_line and looks_like_report_creation_correction(line):
+            route_line = coerce_report_creation_request(pending_report_creation_line)
+            pending_report_creation_line = ""
+        elif pending_report_creation_line and looks_like_pending_report_cancel(line):
+            pending_report_creation_line = ""
+
         settings_path = company_settings_path_for(args.memory)
         settings = load_company_settings(settings_path)
-        intake_decision = decide_supervisor_intake(line, settings)
+        intake_decision = decide_supervisor_intake(route_line, settings)
 
         if intake_decision.intent_type == "company_config":
-            applied = apply_company_instruction(line, settings)
+            pending_report_creation_line = ""
+            applied = apply_company_instruction(route_line, settings)
             save_company_settings(settings, settings_path)
             reply = build_company_instruction_reply(applied, settings, settings_path)
             console.print_supervisor_reply(reply)
@@ -756,6 +765,7 @@ def chat_command(args: argparse.Namespace) -> None:
             continue
 
         if intake_decision.intent_type == "company_status":
+            pending_report_creation_line = ""
             reply = build_company_status_reply(settings)
             console.print_supervisor_reply(reply)
             console.print_company_settings(settings, settings_path)
@@ -763,26 +773,30 @@ def chat_command(args: argparse.Namespace) -> None:
             continue
 
         if intake_decision.intent_type == "supervisor_chat":
-            reply = generate_supervisor_chat_reply(line, settings, intake_decision, history=supervisor_history)
+            reply = generate_supervisor_chat_reply(route_line, settings, intake_decision, history=supervisor_history)
             console.print_supervisor_reply(reply)
             append_supervisor_history(supervisor_history, line, reply)
             continue
 
         if intake_decision.intent_type == "report_retrieval":
             report = find_saved_report_for_request(
-                line,
+                route_line,
                 runs_dir=Path(args.memory).parent / "runs",
                 reports_dir=args.reports,
                 last_room_id=last_room_id,
             )
             if report is None:
+                pending_report_creation_line = route_line if looks_like_report_reference(route_line) else ""
                 reply = [
                     "저장된 보고서를 찾지 못했습니다.",
                     "프로젝트 이름이나 room_id를 조금 더 정확히 주거나, /runs로 목록을 먼저 확인해 주세요.",
                 ]
+                if pending_report_creation_line:
+                    reply.append("새 보고서 작성 의도라면 '만들어' 또는 '작성해'라고 이어서 말하면 제가 직전 요청으로 Research Room을 열겠습니다.")
                 console.print_supervisor_reply(reply)
                 append_supervisor_history(supervisor_history, line, reply)
                 continue
+            pending_report_creation_line = ""
             report_path, room_id, topic = report
             reply = [
                 "찾았습니다. 새 Research Room은 열지 않고 저장된 보고서를 그대로 보여드리겠습니다.",
@@ -798,12 +812,12 @@ def chat_command(args: argparse.Namespace) -> None:
             continue
 
         if not intake_decision.needs_research_room:
-            reply = build_supervisor_reply(line, settings, intake_decision)
+            reply = build_supervisor_reply(route_line, settings, intake_decision)
             console.print_supervisor_reply(reply)
             append_supervisor_history(supervisor_history, line, reply)
             continue
 
-        title, content, url = chat_input_to_source(line)
+        title, content, url = chat_input_to_source(route_line)
         agent_count = 3 if intake_decision.intent_type == "source_ingestion" else len(DEFAULT_AGENTS)
         if not console.confirm_dispatch(
             intent_type=intake_decision.intent_type,
@@ -818,6 +832,7 @@ def chat_command(args: argparse.Namespace) -> None:
             append_supervisor_history(supervisor_history, line, reply)
             continue
 
+        pending_report_creation_line = ""
         runtime = ResearchRuntime(load_memory(args.memory))
         runtime.event_handler = console.make_event_handler()
         reply = build_supervisor_dispatch_reply(intake_decision, agent_count)
@@ -851,6 +866,43 @@ def append_supervisor_history(history: list[dict[str, str]], user_message: str, 
     history.append({"role": "user", "content": user_message})
     history.append({"role": "supervisor", "content": "\n".join(reply_lines)})
     del history[:-16]
+
+
+def looks_like_report_reference(line: str) -> bool:
+    lowered = line.lower()
+    report_words = ["보고서", "리포트", "레포트", "dossier", "report"]
+    return any(term in lowered for term in report_words) or any(term in line for term in report_words)
+
+
+def looks_like_report_creation_correction(line: str) -> bool:
+    lowered = line.lower()
+    if looks_like_pending_report_cancel(line):
+        return False
+    creation_terms = [
+        "만들어",
+        "만들",
+        "작성",
+        "생성",
+        "만들어보라는",
+        "작성하라는",
+        "생성하라는",
+        "create",
+        "write",
+        "generate",
+    ]
+    return any(term in lowered for term in creation_terms) or any(term in line for term in creation_terms)
+
+
+def looks_like_pending_report_cancel(line: str) -> bool:
+    lowered = line.lower()
+    cancel_terms = ["취소", "됐어", "하지마", "만들지마", "작성하지마", "생성하지마", "cancel", "never mind"]
+    return any(term in lowered for term in cancel_terms) or any(term in line for term in cancel_terms)
+
+
+def coerce_report_creation_request(previous_line: str) -> str:
+    if looks_like_report_creation_correction(previous_line):
+        return previous_line
+    return f"{previous_line} 새 보고서 작성해봐"
 
 
 def handle_chat_command(

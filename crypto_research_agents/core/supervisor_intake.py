@@ -173,6 +173,18 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
             supervisor_authority=authority,
         )
 
+    if _looks_like_report_creation_request(stripped, lowered):
+        return SupervisorIntakeDecision(
+            intent_type="research_request",
+            action="open_research_room",
+            output_mode="research_dossier",
+            needs_research_room=True,
+            confidence=0.84,
+            rationale="The client explicitly asked JIMMORIA to create a report or dossier.",
+            next_step="Open a full Research Room and assign specialist agents.",
+            supervisor_authority=authority,
+        )
+
     if _looks_like_report_retrieval_request(stripped, lowered):
         return SupervisorIntakeDecision(
             intent_type="report_retrieval",
@@ -200,7 +212,6 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
     has_config = _has_any(stripped, lowered, COMPANY_CONFIG_TERMS) or _is_meta_instruction(stripped)
     has_research = _has_any(stripped, lowered, RESEARCH_TERMS)
     has_explicit_research_action = _has_any(stripped, lowered, EXPLICIT_RESEARCH_ACTIONS)
-    has_report_creation = _looks_like_report_creation_request(stripped, lowered)
 
     if _looks_like_supervisor_chat(stripped, lowered) and not has_explicit_research_action:
         return SupervisorIntakeDecision(
@@ -211,18 +222,6 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
             confidence=0.8,
             rationale="The input is phrased as a conversation with the Supervisor rather than a task dispatch.",
             next_step="Answer as the company president and keep the room closed.",
-            supervisor_authority=authority,
-        )
-
-    if has_report_creation:
-        return SupervisorIntakeDecision(
-            intent_type="research_request",
-            action="open_research_room",
-            output_mode="research_dossier",
-            needs_research_room=True,
-            confidence=0.84,
-            rationale="The client explicitly asked JIMMORIA to create a report or dossier.",
-            next_step="Open a full Research Room and assign specialist agents.",
             supervisor_authority=authority,
         )
 
