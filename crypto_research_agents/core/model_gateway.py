@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+from .codex_models import codex_model_for_tier, codex_model_from_env_value
 from .llm_provider import LLMProvider, LLMRequest, LLMResponse, parse_json_response, provider_from_env
 
 
@@ -24,18 +25,17 @@ class ModelGateway:
         provider: LLMProvider | None = None,
     ) -> None:
         self.provider = provider or provider_from_env()
-        provider_name = getattr(self.provider, "provider_name", "")
-        default_model = default_model or _model_env("FAST") or _tier_default(provider_name, "FAST")
+        default_model = default_model or _model_env("FAST") or codex_model_for_tier("FAST")
         self.default_model = default_model
         self.call_log: list[dict[str, Any]] = []
 
     def select(self, *, agent_id: str, task_type: str) -> ModelDecision:
-        provider_name = getattr(self.provider, "provider_name", "")
         if task_type == "supervisor_chat":
             return ModelDecision(
-                selected_model=_model_env("FAST")
+                selected_model=_model_env("FAST_CHAT")
+                or _model_env("FAST")
                 or _model_env("STRONG")
-                or _tier_default(provider_name, "FAST_CHAT"),
+                or codex_model_for_tier("FAST_CHAT"),
                 reason=f"{agent_id} requested front-door conversation",
                 max_tokens=1200,
                 temperature=0.45,
@@ -44,7 +44,7 @@ class ModelGateway:
             return ModelDecision(
                 selected_model=_model_env("WRITING")
                 or _model_env("STRONG")
-                or _tier_default(provider_name, "WRITING"),
+                or codex_model_for_tier("WRITING"),
                 reason=f"{agent_id} requested synthesis/report work",
                 max_tokens=6000,
                 temperature=0.2,
@@ -62,7 +62,7 @@ class ModelGateway:
             return ModelDecision(
                 selected_model=_model_env("REASONING")
                 or _model_env("STRONG")
-                or _tier_default(provider_name, "REASONING"),
+                or codex_model_for_tier("REASONING"),
                 reason=f"{agent_id} requested reasoning work",
                 max_tokens=5000,
                 temperature=0.2,
@@ -132,22 +132,6 @@ class ModelGateway:
 
 
 def _model_env(tier: str) -> str | None:
-    return (
-        os.getenv(f"CODEX_CLI_MODEL_{tier}")
-        or os.getenv(f"CODEX_OAUTH_MODEL_{tier}")
-        or os.getenv(f"OPENAI_MODEL_{tier}")
+    return codex_model_from_env_value(
+        os.getenv(f"CODEX_MODEL_{tier}") or os.getenv(f"CODEX_CLI_MODEL_{tier}"),
     )
-
-
-def _tier_default(provider_name: str, tier: str) -> str:
-    if provider_name == "codex_cli" and tier in {"REASONING", "WRITING"}:
-        return "pro"
-    if tier == "FAST_CHAT":
-        return "fast_chat_model"
-    if tier == "FAST":
-        return "mvp_shared_llm"
-    if tier == "WRITING":
-        return "strong_writing_model"
-    if tier == "REASONING":
-        return "strong_reasoning_model"
-    return "mvp_shared_llm"

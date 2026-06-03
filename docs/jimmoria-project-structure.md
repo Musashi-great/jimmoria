@@ -70,7 +70,7 @@ jimmoria
 python -m pip install -e ".[all]"
 ```
 
-기본 dependency에는 콘솔 테마 렌더링을 위한 `rich`가 포함된다. `.[all]` extra는 `openai`, `httpx`, `beautifulsoup4`, `feedparser`, `ddgs`까지 설치해서 LLM/API/RSS/HTML/Web Search connector 확장에 필요한 도구를 함께 준비한다.
+기본 dependency에는 콘솔 테마 렌더링을 위한 `rich`가 포함된다. `.[codex]` extra는 공식 Codex Python SDK인 `openai-codex`를 설치하고, `.[all]` extra는 여기에 `httpx`, `beautifulsoup4`, `feedparser`, `ddgs`까지 더해 RSS/HTML/Web Search connector 확장에 필요한 도구를 함께 준비한다.
 
 ```toml
 [project.scripts]
@@ -117,7 +117,7 @@ flowchart LR
     Runtime --> Tools[ToolGateway]
     Runtime --> Events[Event Log]
 
-    Model --> Provider[Codex CLI / Codex OAuth / OpenAI / Offline]
+    Model --> Provider[Codex SDK / Codex CLI / Offline diagnostic]
     Tools --> External[Registered Connectors + Placeholder Connectors]
 
     Runtime --> Agents[Agents]
@@ -147,7 +147,7 @@ flowchart LR
 | CollaborationBus | `core/bus.py` | 에이전트 요청, 응답, 핸드오프, 업데이트 로그 |
 | SharedMemory | `core/memory.py` | 소스, 프로젝트 후보, finding, entity graph 저장 |
 | ModelGateway | `core/model_gateway.py` | task type에 따라 모델 라우팅 |
-| LLM Provider | `core/llm_provider.py` | Codex CLI, Codex OAuth, OpenAI, offline fallback 연결 |
+| LLM Provider | `core/llm_provider.py` | Codex SDK, Codex CLI, offline diagnostic fallback 연결 |
 | ToolGateway | `core/tool_gateway.py` | 에이전트별 tool 권한 검사와 audit log |
 | Connectors | `connectors/` | Web Search, URL, Website/Docs, GitHub, DEX Screener, CoinGecko connector 등록 |
 | Storage | `storage/` | memory, run snapshot, Obsidian note 저장 |
@@ -513,20 +513,39 @@ next_actions
 
 각 호출은 `ModelGateway.call_log`에 쌓이고 실행 후 `data/runs/<room_id>/llm_call_log.json`에 저장된다. 따라서 나중에 UI에서 “어떤 에이전트가 어떤 route/model로 판단했는지”를 replay할 수 있다.
 
-Codex CLI provider에서는 모델명을 따로 지정하지 않아도 reasoning/writing route의 기본값이 `pro`다. 즉 `discovery_agent`, `social_kol_agent`, `contract_onchain_agent`, `product_tech_agent`, `funding_token_agent`, `obsidian_curator_agent`, `report_agent`는 Codex CLI 환경에서 기본적으로 `pro` route를 탄다. `supervisor_chat`과 `source_ingestion`은 빠른 대화/추출용 route를 유지한다. OpenAI/OAuth provider에서는 환경변수로 명시한 모델이 우선하고, 없으면 기존 fallback placeholder route를 사용한다.
+지원 모델은 Codex 모델로 고정한다. 기본값은 공식 Codex 모델 문서의 권장 방향을 따라 research/reasoning/writing에는 `gpt-5.5`, 빠른 supervisor chat/source extraction에는 `gpt-5.4-mini`를 쓴다.
+
+| Tier | 기본 모델 | 용도 |
+|---|---|---|
+| `FAST_CHAT` | `gpt-5.4-mini` | Supervisor와 사용자 간 짧은 대화 |
+| `FAST` | `gpt-5.4-mini` | source ingestion, routine extraction |
+| `REASONING` | `gpt-5.5` | Supervisor planning, discovery, social/on-chain/product/funding 판단 |
+| `WRITING` | `gpt-5.5` | report synthesis, final delivery |
+| `STRONG` | `gpt-5.5` | 강한 fallback route |
+
+허용 모델 ID는 `core/codex_models.py`와 `config/models/model_router.yaml`에 동시에 반영된다.
+
+```text
+gpt-5.5
+gpt-5.4
+gpt-5.4-mini
+gpt-5.3-codex
+gpt-5.3-codex-spark
+```
 
 실제 provider는 `core/llm_provider.py`에서 결정된다.
 
 | Provider | 조건 | 설명 |
 |---|---|---|
+| `codex_sdk` | `LLM_PROVIDER=codex_sdk` | 공식 `openai-codex` Python SDK로 로컬 Codex app-server를 JSON-RPC로 제어 |
 | `codex_cli` | `LLM_PROVIDER=codex_cli` | 로컬 Codex CLI 로그인 세션으로 `codex exec` 호출 |
-| `codex_oauth` | `CODEX_OAUTH_TOKEN` 등 명시적 token source | OpenAI-compatible endpoint에 bearer token으로 요청 |
-| `openai` | `OPENAI_API_KEY` | OpenAI Python SDK 사용 |
-| `offline_fallback` | 설정 없음 | deterministic local fallback, 테스트와 MVP 안전장치 |
+| `offline_fallback` | 설정 없음 또는 `LLM_PROVIDER=offline` | deterministic local fallback, 테스트와 진단용 안전장치 |
+
+`codex_sdk` provider는 `openai_codex.Codex`와 `Sandbox`를 사용한다. JIMMORIA는 provider 안에서 thread를 만들고, 선택된 Codex 모델과 sandbox preset을 넘긴 뒤, 에이전트별 prompt를 `thread.run()`에 전달한다. 기본 sandbox는 `read_only`이며 `CODEX_SDK_SANDBOX=workspace_write` 또는 `full_access`로 바꿀 수 있다. 리서치 에이전트 LLM 판단은 저장소를 수정하는 작업이 아니므로 기본값은 읽기 전용이다.
 
 `codex_cli` provider는 `codex exec --help`를 읽고 현재 설치된 Codex CLI가 지원하는 옵션만 붙인다. 예를 들어 어떤 버전은 `--ask-for-approval`을 지원하지 않으므로, JIMMORIA는 이 옵션을 하드코딩하지 않는다. 현재 provider는 지원 여부를 확인한 뒤 `--ephemeral`, `--skip-git-repo-check`, `--sandbox`, `--output-last-message`, `--model` 같은 옵션을 선택적으로 사용한다. 또한 한국어 리서치 요청이 Windows 코드페이지를 타며 깨지지 않도록 `codex exec -` stdin에는 프롬프트를 UTF-8 bytes로 직접 전달한다. 이 방식은 Codex CLI 버전 차이와 터미널 인코딩 차이 때문에 리서치 런이 중간에 죽는 일을 줄이기 위한 호환성 장치다.
 
-CLI에서 `/models`를 실행하면 모델/provider 설정 화면이 나온다. 설정은 `data/model_settings.json`에 저장된다. 토큰 자체는 저장하지 않고 provider/model preference만 저장한다.
+CLI에서 `/models`를 실행하면 모델/provider 설정 화면이 나온다. 설정은 `data/model_settings.json`에 저장된다. 토큰 자체는 저장하지 않고 provider/model preference만 저장한다. OpenAI API key와 임의 OAuth bearer token provider는 JIMMORIA의 지원 모델 경로에서 제거했다.
 
 ## 11. Tool Gateway와 외부 커넥터
 
@@ -715,7 +734,8 @@ main()
 chat_command()
 handle_chat_command()
 configure_model_panel()
-configure_codex_oauth()
+configure_codex_sdk()
+configure_codex_cli()
 configure_model_routes()
 doctor_command()
 find_saved_report_for_request()
@@ -792,8 +812,9 @@ process_spec.py     Research Room process/task manifest loader
 bus.py              CollaborationBus
 message.py          AgentMessage model
 memory.py           SharedMemory, SourceRecord, ProjectCandidate, FindingRecord, source dedupe
+codex_models.py     supported Codex model list and tier defaults
 model_gateway.py    model route selector
-llm_provider.py     Codex/OpenAI/offline provider
+llm_provider.py     Codex SDK/Codex CLI/offline provider
 room.py             ResearchRoom
 runtime_state.py    room status enum
 tool_gateway.py     tool policy, calls, audit log
@@ -856,7 +877,7 @@ project_research.yaml
 - article research loop output
 - agent specs load
 - CLI research/events command
-- Codex OAuth/Codex CLI/OpenAI/offline provider selection
+- Codex SDK/Codex CLI/offline provider selection
 - Codex CLI exec flag compatibility
 - Codex CLI UTF-8 stdin handling for Korean prompts
 - agent-level LLM analysis pass and route selection
@@ -927,7 +948,7 @@ python -m unittest discover -s tests -v
 - 실행 순서나 Research Room 상태가 바뀌면 `5. Research Room 실행 흐름`을 업데이트한다.
 - CLI 명령이나 시작 UX가 바뀌면 `3. 실행 진입점`, `15. 코드 파일별 설명`을 업데이트한다.
 - CLI/UI 레퍼런스나 terminal interaction 기준이 바뀌면 `jimmoria-cli-ui-reference-notes.md`도 업데이트한다.
-- 모델 provider, Codex OAuth, OpenAI, offline fallback 흐름이 바뀌면 `10. Model Gateway와 LLM Provider`를 업데이트한다.
+- 모델 provider, Codex SDK, Codex CLI, offline diagnostic fallback 흐름이 바뀌면 `10. Model Gateway와 LLM Provider`를 업데이트한다.
 - 외부 tool이나 connector를 추가하면 `11. Tool Gateway와 외부 커넥터`, `18. 현재 한계`, `19. 다음 개발 순서 제안`을 업데이트한다.
 - 저장 파일, run snapshot, Obsidian Vault 구조가 바뀌면 `12. Storage와 출력 파일`, `13. Obsidian Vault 구조`를 업데이트한다.
 - 테스트 범위가 늘어나면 `17. 테스트 구조`를 업데이트한다.
@@ -937,7 +958,7 @@ python -m unittest discover -s tests -v
 
 ## 21. 한 줄 요약
 
-JIMMORIA는 현재 "채팅형 CLI + Supervisor Office delegation tools + ProcessSpec 기반 Research Room + controlled P2P Agent Bus + Agent Council consensus + Supervisor final review + Shared Memory + Model Gateway + agent-level LLM analysis pass + Tool Gateway + 기본 Web Search/URL/Website/Docs/GitHub/DEX/CoinGecko connectors + Markdown/Obsidian output"까지 구현된 크립토 리서치 회사 MVP다. 다음 핵심 작업은 Project Research Loop, Identity/Evidence/Collision 검증 엔진, 그리고 Social/Contract/Funding 에이전트의 source-backed finding 업그레이드다.
+JIMMORIA는 현재 "채팅형 CLI + Supervisor Office delegation tools + ProcessSpec 기반 Research Room + controlled P2P Agent Bus + Agent Council consensus + Supervisor final review + Shared Memory + Codex-only Model Gateway + agent-level LLM analysis pass + Tool Gateway + 기본 Web Search/URL/Website/Docs/GitHub/DEX/CoinGecko connectors + Markdown/Obsidian output"까지 구현된 크립토 리서치 회사 MVP다. 다음 핵심 작업은 Project Research Loop, Identity/Evidence/Collision 검증 엔진, 그리고 Social/Contract/Funding 에이전트의 source-backed finding 업그레이드다.
 ## 22. Current Runtime Update Notes
 
 최근 변경 기준으로 JIMMORIA는 live/source-backed 후보와 MVP placeholder 후보를 구분한다.

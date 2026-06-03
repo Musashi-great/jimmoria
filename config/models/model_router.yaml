@@ -1,26 +1,46 @@
 {
-  "provider": "openai_or_codex_oauth",
-  "env": {
-    "api_key": "OPENAI_API_KEY",
-    "fast_model": "OPENAI_MODEL_FAST",
-    "reasoning_model": "OPENAI_MODEL_REASONING",
-    "writing_model": "OPENAI_MODEL_WRITING",
-    "strong_model": "OPENAI_MODEL_STRONG",
-    "codex_oauth_token": "CODEX_OAUTH_TOKEN",
-    "codex_oauth_token_file": "CODEX_OAUTH_TOKEN_FILE",
-    "codex_oauth_token_command": "CODEX_OAUTH_TOKEN_COMMAND",
-    "codex_oauth_base_url": "CODEX_OAUTH_BASE_URL",
-    "codex_fast_model": "CODEX_OAUTH_MODEL_FAST",
-    "codex_reasoning_model": "CODEX_OAUTH_MODEL_REASONING",
-    "codex_writing_model": "CODEX_OAUTH_MODEL_WRITING",
-    "codex_strong_model": "CODEX_OAUTH_MODEL_STRONG"
+  "provider": "codex_only",
+  "official_docs": {
+    "codex_sdk": "https://developers.openai.com/codex/sdk",
+    "codex_models": "https://developers.openai.com/codex/models"
   },
-  "fallback": {
-    "provider": "offline_fallback",
-    "behavior": "deterministic local extraction and summarization"
+  "runtime_order": [
+    "codex_sdk",
+    "codex_cli",
+    "offline_diagnostic_fallback"
+  ],
+  "env": {
+    "provider": "LLM_PROVIDER",
+    "codex_sdk_sandbox": "CODEX_SDK_SANDBOX",
+    "codex_cli_command": "CODEX_CLI_COMMAND",
+    "codex_cli_timeout": "CODEX_CLI_TIMEOUT",
+    "fast_chat_model": "CODEX_MODEL_FAST_CHAT",
+    "fast_model": "CODEX_MODEL_FAST",
+    "reasoning_model": "CODEX_MODEL_REASONING",
+    "writing_model": "CODEX_MODEL_WRITING",
+    "strong_model": "CODEX_MODEL_STRONG",
+    "legacy_cli_fast_chat_model": "CODEX_CLI_MODEL_FAST_CHAT",
+    "legacy_cli_fast_model": "CODEX_CLI_MODEL_FAST",
+    "legacy_cli_reasoning_model": "CODEX_CLI_MODEL_REASONING",
+    "legacy_cli_writing_model": "CODEX_CLI_MODEL_WRITING",
+    "legacy_cli_strong_model": "CODEX_CLI_MODEL_STRONG"
+  },
+  "supported_models": [
+    "gpt-5.5",
+    "gpt-5.4",
+    "gpt-5.4-mini",
+    "gpt-5.3-codex",
+    "gpt-5.3-codex-spark"
+  ],
+  "defaults": {
+    "fast_chat_model": "gpt-5.4-mini",
+    "fast_model": "gpt-5.4-mini",
+    "reasoning_model": "gpt-5.5",
+    "writing_model": "gpt-5.5",
+    "strong_model": "gpt-5.5"
   },
   "routes": {
-    "supervisor_chat": "fast_model",
+    "supervisor_chat": "fast_chat_model",
     "source_ingestion": "fast_model",
     "narrative_reasoning": "reasoning_model",
     "supervision": "reasoning_model",
@@ -34,14 +54,13 @@
     "final_synthesis": "writing_model",
     "embedding_search": "embedding_model"
   },
-  "provider_defaults": {
-    "codex_cli": {
-      "reasoning_model": "pro",
-      "writing_model": "pro"
-    },
-    "other": {
-      "reasoning_model": "strong_reasoning_model",
-      "writing_model": "strong_writing_model"
-    }
-  }
+  "fallback": {
+    "provider": "offline_diagnostic_fallback",
+    "behavior": "deterministic local extraction and summarization for tests only"
+  },
+  "notes": [
+    "Supported model ids are fixed to the official Codex model list above.",
+    "JIMMORIA does not expose OpenAI API-key or OAuth bearer-token setup as model providers.",
+    "Use codex_sdk when openai-codex is installed; use codex_cli when relying on a local Codex login."
+  ]
 }

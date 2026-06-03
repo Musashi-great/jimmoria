@@ -42,18 +42,22 @@ jimmoria demo
 처음 실행하면 모델 선택 화면이 나옵니다.
 
 ```text
-1. Codex OAuth / ChatGPT login code
-2. OpenAI API Key
-3. Offline fallback
+1. Codex SDK / local app-server (Recommended)
+2. Codex CLI exec
+3. Offline diagnostic fallback
 ```
 
-추천 흐름은 `Codex OAuth / ChatGPT login code`입니다. Codex CLI의 `codex login --device-auth` 방식으로 ChatGPT 로그인 코드를 입력합니다.
+추천 흐름은 `Codex SDK / local app-server`입니다. 공식 Codex SDK는 `openai-codex` 패키지로 설치하며, 로컬 Codex app-server를 통해 thread를 만들고 실행합니다.
 
-한 번 로그인하면 보통 다시 로그인할 필요가 없습니다. 로그아웃하거나, 다른 컴퓨터로 옮기거나, 세션이 만료된 경우에만 다시 로그인하면 됩니다.
+```powershell
+python -m pip install -e ".[codex]"
+```
 
-JIMMORIA는 토큰을 저장하지 않습니다. 저장하는 것은 `data/model_settings.json`의 provider/model preference 정도입니다. 모델명을 모르면 `Use provider default for every agent`를 선택하면 됩니다.
+ChatGPT/Codex 로그인이 되어 있으면 보통 다시 로그인할 필요가 없습니다. 로그아웃하거나, 다른 컴퓨터로 옮기거나, 세션이 만료된 경우에만 다시 로그인하면 됩니다.
 
-이미 Codex CLI에 로그인되어 있으면 JIMMORIA가 자동으로 `codex_cli` provider를 감지하고 다음 실행부터 모델 설정 화면을 건너뜁니다.
+JIMMORIA는 토큰이나 API key를 저장하지 않습니다. 저장하는 것은 `data/model_settings.json`의 provider/model preference 정도입니다. 모델명을 모르면 `Use provider default for every agent`를 선택하면 됩니다.
+
+이미 Codex에 로그인되어 있으면 JIMMORIA가 자동으로 `codex_sdk` 또는 `codex_cli` provider를 감지하고 다음 실행부터 모델 설정 화면을 건너뜁니다.
 
 ## How LLMs Work
 
@@ -82,7 +86,17 @@ Supervisor plan -> task delegation -> specialist execution
 
 이 LLM pass는 근거를 만들어내는 역할이 아닙니다. 외부 connector가 비어 있으면 “미설정/근거 부족”이라고 표시하고, 실패해도 Research Room 전체가 죽지 않게 fallback summary를 남깁니다. finding confidence는 tool/memory evidence 기준으로 유지하고, 모델의 자신감은 `llm_analysis.confidence`에 따로 저장합니다. 호출 기록은 `data/runs/<room_id>/llm_call_log.json`에 저장됩니다.
 
-Codex CLI provider를 쓰고 모델명을 따로 입력하지 않으면 reasoning/writing route의 기본값은 `pro`입니다. OpenAI/OAuth provider는 환경변수로 모델을 지정하지 않으면 각 provider의 fallback route를 사용합니다.
+지원 모델은 Codex 모델로 고정했습니다.
+
+```text
+gpt-5.5              reasoning / writing 기본값
+gpt-5.4              강한 agentic workflow 대안
+gpt-5.4-mini         supervisor chat / fast extraction 기본값
+gpt-5.3-codex        coding-specialized fallback
+gpt-5.3-codex-spark  Pro research preview / near-instant iteration
+```
+
+OpenAI API Key나 임의 OAuth bearer token provider는 JIMMORIA 모델 설정 화면에서 더 이상 지원하지 않습니다. live LLM은 `codex_sdk` 또는 `codex_cli`로만 붙이고, `offline_fallback`은 테스트/진단용입니다.
 
 ## Tool Status
 
@@ -192,7 +206,7 @@ Default CLI paths resolve to the JIMMORIA project root. Running `jimmoria` from 
 - AgentSpec/persona YAML 로딩
 - ProcessSpec 기반 Research Room task manifest
 - Agent-level LLM analysis pass
-- Codex CLI login, OpenAI API key, offline fallback provider
+- Codex SDK provider, Codex CLI provider, offline diagnostic fallback
 - Web Search/URL/Website/Docs/GitHub/DEX Screener/CoinGecko 기본 connector
 - Source content hash, canonical URL, source snapshot, dedupe
 - Markdown report 생성

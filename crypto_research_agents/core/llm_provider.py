@@ -7,9 +7,6 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
-from urllib.error import HTTPError
-from urllib.request import Request as UrlRequest
-from urllib.request import urlopen
 
 
 @dataclass(slots=True)
@@ -52,7 +49,7 @@ class OfflineLLMProvider:
                 "entities": _fallback_entities(request.user_prompt),
                 "keywords": _fallback_keywords(request.user_prompt),
                 "narratives": _fallback_narratives(request.user_prompt),
-                "notes": ["Offline fallback used; configure OPENAI_API_KEY for live LLM calls."],
+                "notes": ["Offline fallback used; configure Codex SDK or Codex CLI for live LLM calls."],
             }
             text = json.dumps(payload, ensure_ascii=False)
         else:
@@ -62,49 +59,6 @@ class OfflineLLMProvider:
             model=request.model,
             provider=self.provider_name,
             usage={"mode": "offline"},
-        )
-
-
-class OpenAIChatProvider:
-    """OpenAI chat-completions provider loaded lazily to keep tests dependency-free."""
-
-    provider_name = "openai"
-
-    def __init__(self, api_key: str | None = None) -> None:
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        if not self.api_key:
-            raise RuntimeError("OPENAI_API_KEY is not set.")
-
-        try:
-            from openai import OpenAI  # type: ignore
-        except ImportError as exc:
-            raise RuntimeError("Install the OpenAI Python package to use OpenAIChatProvider.") from exc
-
-        self._client = OpenAI(api_key=self.api_key)
-
-    def complete(self, request: LLMRequest) -> LLMResponse:
-        kwargs: dict[str, Any] = {
-            "model": request.model,
-            "messages": [
-                {"role": "system", "content": request.system_prompt},
-                {"role": "user", "content": request.user_prompt},
-            ],
-            "temperature": request.temperature,
-        }
-        if request.max_tokens > 0:
-            kwargs["max_tokens"] = request.max_tokens
-        if request.response_format == "json":
-            kwargs["response_format"] = {"type": "json_object"}
-
-        response = self._client.chat.completions.create(**kwargs)
-        message = response.choices[0].message.content or ""
-        usage = response.usage.model_dump() if getattr(response, "usage", None) else {}
-        return LLMResponse(
-            text=message,
-            model=request.model,
-            provider=self.provider_name,
-            usage=usage,
-            raw=response,
         )
 
 
@@ -164,120 +118,33 @@ class CodexCliProvider:
         return self._exec_help_text
 
 
-class OAuthTokenProvider:
-    """Loads an OAuth bearer token from an explicit env, file, or command.
+class CodexSdkProvider:
+    """LLM provider backed by the local Codex SDK app-server."""
 
-    This class intentionally does not auto-read Codex's internal auth files.
-    The caller must explicitly provide a token source.
-    """
+    provider_name = "codex_sdk"
 
-    def __init__(
-        self,
-        *,
-        token: str | None = None,
-        token_env: str = "CODEX_OAUTH_TOKEN",
-        token_file_env: str = "CODEX_OAUTH_TOKEN_FILE",
-        token_command_env: str = "CODEX_OAUTH_TOKEN_COMMAND",
-    ) -> None:
-        self.token = token
-        self.token_env = token_env
-        self.token_file_env = token_file_env
-        self.token_command_env = token_command_env
-
-    def get_token(self) -> str:
-        if self.token:
-            return self.token.strip()
-
-        env_token = os.getenv(self.token_env)
-        if env_token:
-            return env_token.strip()
-
-        token_file = os.getenv(self.token_file_env)
-        if token_file:
-            from pathlib import Path
-
-            return Path(token_file).read_text(encoding="utf-8").strip()
-
-        token_command = os.getenv(self.token_command_env)
-        if token_command:
-            completed = subprocess.run(
-                token_command,
-                shell=True,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            return completed.stdout.strip()
-
-        raise RuntimeError(
-            "Codex OAuth token source is not configured. Set CODEX_OAUTH_TOKEN, "
-            "CODEX_OAUTH_TOKEN_FILE, or CODEX_OAUTH_TOKEN_COMMAND."
-        )
-
-
-class CodexOAuthChatProvider:
-    """OpenAI-compatible chat provider using an explicit OAuth bearer token."""
-
-    provider_name = "codex_oauth"
-
-    def __init__(
-        self,
-        *,
-        base_url: str | None = None,
-        token_provider: OAuthTokenProvider | None = None,
-    ) -> None:
-        self.base_url = (
-            base_url
-            or os.getenv("CODEX_OAUTH_BASE_URL")
-            or os.getenv("OPENAI_BASE_URL")
-            or "https://api.openai.com/v1"
-        ).rstrip("/")
-        self.token_provider = token_provider or OAuthTokenProvider()
-        self.timeout = float(os.getenv("CODEX_OAUTH_TIMEOUT", "60"))
+    def __init__(self) -> None:
+        self.sandbox_name = os.getenv("CODEX_SDK_SANDBOX", "read_only")
 
     def complete(self, request: LLMRequest) -> LLMResponse:
-        payload: dict[str, Any] = {
-            "model": request.model,
-            "messages": [
-                {"role": "system", "content": request.system_prompt},
-                {"role": "user", "content": request.user_prompt},
-            ],
-            "temperature": request.temperature,
-        }
-        if request.max_tokens > 0:
-            payload["max_tokens"] = request.max_tokens
-        if request.response_format == "json":
-            payload["response_format"] = {"type": "json_object"}
-
-        body = json.dumps(payload).encode("utf-8")
-        http_request = UrlRequest(
-            f"{self.base_url}/chat/completions",
-            data=body,
-            method="POST",
-            headers={
-                "Authorization": f"Bearer {self.token_provider.get_token()}",
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            },
-        )
-
         try:
-            with urlopen(http_request, timeout=self.timeout) as response:
-                response_data = json.loads(response.read().decode("utf-8"))
-        except HTTPError as exc:
-            error_body = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"Codex OAuth provider HTTP {exc.code}: {error_body}") from exc
+            from openai_codex import Codex, Sandbox  # type: ignore
+        except ImportError as exc:
+            raise RuntimeError("Install the Codex Python SDK with `pip install openai-codex`.") from exc
 
-        choices = response_data.get("choices") or []
-        message = ""
-        if choices:
-            message = choices[0].get("message", {}).get("content") or ""
+        sandbox = _codex_sdk_sandbox(Sandbox, self.sandbox_name)
+        prompt = _codex_sdk_prompt(request)
+        with Codex() as codex:
+            thread = codex.thread_start(model=request.model, sandbox=sandbox)
+            result = thread.run(prompt)
+            text = str(getattr(result, "final_response", "") or result)
+
         return LLMResponse(
-            text=message,
+            text=text.strip(),
             model=request.model,
             provider=self.provider_name,
-            usage=response_data.get("usage", {}),
-            raw=response_data,
+            usage={"mode": "codex_sdk", "sandbox": self.sandbox_name},
+            raw=result,
         )
 
 
@@ -287,23 +154,17 @@ def provider_from_env() -> LLMProvider:
         return OfflineLLMProvider()
     if provider in {"codex_cli", "codex_device", "codex_login"}:
         return CodexCliProvider()
-    if provider in {"codex_oauth", "codex", "oauth"}:
-        return CodexOAuthChatProvider()
-    if (
-        os.getenv("CODEX_OAUTH_TOKEN")
-        or os.getenv("CODEX_OAUTH_TOKEN_FILE")
-        or os.getenv("CODEX_OAUTH_TOKEN_COMMAND")
-    ):
-        try:
-            return CodexOAuthChatProvider()
-        except RuntimeError:
-            return OfflineLLMProvider()
-    if provider == "openai" or os.getenv("OPENAI_API_KEY"):
-        try:
-            return OpenAIChatProvider()
-        except RuntimeError:
-            return OfflineLLMProvider()
+    if provider in {"codex_sdk", "codex", "sdk"}:
+        return CodexSdkProvider()
     return OfflineLLMProvider()
+
+
+def codex_sdk_available() -> bool:
+    try:
+        import openai_codex  # type: ignore  # noqa: F401
+    except ImportError:
+        return False
+    return True
 
 
 def _load_codex_exec_help(command: str) -> str:
@@ -376,6 +237,29 @@ def _codex_cli_prompt(request: LLMRequest) -> str:
         f"System prompt:\n{request.system_prompt}\n\n"
         f"User prompt:\n{request.user_prompt}\n"
     )
+
+
+def _codex_sdk_prompt(request: LLMRequest) -> str:
+    response_rule = ""
+    if request.response_format == "json":
+        response_rule = "\nReturn only a valid JSON object. Do not include markdown fences."
+    return (
+        "You are serving as a Codex SDK worker inside JIMMORIA, a crypto research-only "
+        "multi-agent company. You are not here to modify the repository for this task. "
+        "Answer from the provided context and keep outputs suitable for the requesting agent."
+        f"{response_rule}\n\n"
+        f"System prompt:\n{request.system_prompt}\n\n"
+        f"User prompt:\n{request.user_prompt}\n"
+    )
+
+
+def _codex_sdk_sandbox(sandbox_module: Any, sandbox_name: str) -> Any:
+    normalized = sandbox_name.lower().replace("-", "_")
+    if normalized == "workspace_write":
+        return sandbox_module.workspace_write
+    if normalized == "full_access":
+        return sandbox_module.full_access
+    return sandbox_module.read_only
 
 
 def _is_real_model_name(model: str) -> bool:

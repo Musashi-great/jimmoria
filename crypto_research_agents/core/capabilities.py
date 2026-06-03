@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import os
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from .agent_spec import AgentSpecRegistry
-from .llm_provider import provider_from_env
+from .llm_provider import codex_sdk_available, provider_from_env
 from .model_gateway import ModelGateway
 from .tool_gateway import ToolGateway
 from .profile import WorkerProfileRegistry
@@ -77,14 +78,14 @@ def collect_capabilities(
         ),
         _agent_llm_routing_status(provider),
         CapabilityStatus(
-            "Codex OAuth token",
-            "configured" if _codex_token_configured() else "missing",
-            "explicit token source set" if _codex_token_configured() else "set CODEX_OAUTH_TOKEN, CODEX_OAUTH_TOKEN_FILE, or CODEX_OAUTH_TOKEN_COMMAND",
+            "Codex SDK package",
+            "configured" if codex_sdk_available() else "missing",
+            "openai-codex installed" if codex_sdk_available() else "install with: pip install openai-codex",
         ),
         CapabilityStatus(
-            "OpenAI API key",
-            "configured" if os.getenv("OPENAI_API_KEY") else "missing",
-            "OPENAI_API_KEY set" if os.getenv("OPENAI_API_KEY") else "set OPENAI_API_KEY",
+            "Codex CLI",
+            "configured" if shutil.which("codex") else "missing",
+            "codex command found on PATH" if shutil.which("codex") else "install Codex CLI or use the SDK package runtime",
         ),
         CapabilityStatus(
             "Tool registry",
@@ -150,14 +151,6 @@ def collect_capabilities(
         )
     capabilities.append(_overall_status(capabilities))
     return capabilities
-
-
-def _codex_token_configured() -> bool:
-    return bool(
-        os.getenv("CODEX_OAUTH_TOKEN")
-        or os.getenv("CODEX_OAUTH_TOKEN_FILE")
-        or os.getenv("CODEX_OAUTH_TOKEN_COMMAND")
-    )
 
 
 def _agent_llm_routing_status(provider: Any) -> CapabilityStatus:

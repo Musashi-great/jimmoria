@@ -5,7 +5,9 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tomllib
+import types
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
@@ -27,7 +29,7 @@ from crypto_research_agents.cli import (
 )
 from crypto_research_agents.console import JimmoriaConsole, print_jimmoria_logo
 from crypto_research_agents.core.company_settings import CompanySettings
-from crypto_research_agents.core.llm_provider import CodexCliProvider, LLMRequest, LLMResponse, OAuthTokenProvider, provider_from_env
+from crypto_research_agents.core.llm_provider import CodexCliProvider, CodexSdkProvider, LLMRequest, LLMResponse, provider_from_env
 from crypto_research_agents.core.memory import SharedMemory, SourceRecord
 from crypto_research_agents.core.model_gateway import ModelGateway
 from crypto_research_agents.core.process_spec import ProcessSpecRegistry, load_process_spec
@@ -82,8 +84,11 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(pyproject["tool"]["setuptools"]["packages"]["find"]["include"], ["crypto_research_agents*"])
         self.assertIn("rich>=13.7.0", pyproject["project"]["dependencies"])
         self.assertIn("all", pyproject["project"]["optional-dependencies"])
+        self.assertIn("codex", pyproject["project"]["optional-dependencies"])
+        self.assertIn("openai-codex", pyproject["project"]["optional-dependencies"]["codex"])
         self.assertIn("ddgs>=9.14.0", pyproject["project"]["optional-dependencies"]["all"])
         self.assertIn("feedparser>=6.0.11", pyproject["project"]["optional-dependencies"]["all"])
+        self.assertIn("openai-codex", pyproject["project"]["optional-dependencies"]["all"])
 
     def test_chat_input_uses_boxed_prompt(self) -> None:
         output = StringIO()
@@ -730,7 +735,7 @@ class SmokeTest(unittest.TestCase):
                 for entry in llm_log
                 if entry["task_type"] in {"candidate_discovery", "social_summary", "contract_info", "product_docs", "funding_token", "obsidian_sync"}
             }
-            self.assertEqual(set(reasoning_tasks.values()), {"strong_reasoning_model"})
+            self.assertEqual(set(reasoning_tasks.values()), {"gpt-5.5"})
             self.assertGreaterEqual(len(result.bus.messages), 8)
             self.assertGreaterEqual(len(result.memory.get_room_findings(result.room.room_id)), 8)
             finding_types = {
@@ -1243,15 +1248,15 @@ class SmokeTest(unittest.TestCase):
             self.assertIn("room_created", text)
             self.assertIn("agent_start", text)
 
-    def test_codex_oauth_provider_can_be_selected(self) -> None:
+    def test_codex_sdk_provider_can_be_selected(self) -> None:
         with patch.dict(
             "os.environ",
-            {"LLM_PROVIDER": "codex_oauth", "CODEX_OAUTH_TOKEN": "token-for-test"},
+            {"LLM_PROVIDER": "codex_sdk"},
             clear=True,
         ):
             provider = provider_from_env()
 
-        self.assertEqual(provider.provider_name, "codex_oauth")
+        self.assertEqual(provider.provider_name, "codex_sdk")
 
     def test_codex_cli_provider_can_be_selected(self) -> None:
         with patch.dict("os.environ", {"LLM_PROVIDER": "codex_cli"}, clear=True):
@@ -1321,7 +1326,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
 
         text = output.getvalue()
         self.assertIn("[Model Setup]", text)
-        self.assertIn("[Offline fallback]", text)
+        self.assertIn("[Offline diagnostic fallback]", text)
 
     def test_codex_setup_can_use_default_model_routes_without_model_names(self) -> None:
         output = StringIO()
@@ -1329,21 +1334,20 @@ Usage: codex exec [OPTIONS] [PROMPT]
             settings_path = str(Path(tmp) / "model_settings.json")
             env = {
                 "JIMMORIA_MODEL_SETTINGS_PATH": settings_path,
-                "CODEX_CLI_MODEL_FAST": "bad-manual-value",
+                "CODEX_MODEL_FAST": "bad-manual-value",
             }
             with patch.dict("os.environ", env, clear=True):
                 with patch("builtins.input", side_effect=["1", "", ""]):
-                    with patch("crypto_research_agents.cli.codex_login_status", return_value="Logged in using ChatGPT"):
-                        with redirect_stdout(output):
-                            configure_model_panel()
-                self.assertEqual(os.environ["LLM_PROVIDER"], "codex_cli")
-                self.assertNotIn("CODEX_CLI_MODEL_FAST", os.environ)
+                    with redirect_stdout(output):
+                        configure_model_panel()
+                self.assertEqual(os.environ["LLM_PROVIDER"], "codex_sdk")
+                self.assertNotIn("CODEX_MODEL_FAST", os.environ)
                 settings = json.loads(Path(settings_path).read_text(encoding="utf-8"))
-                self.assertEqual(settings["LLM_PROVIDER"], "codex_cli")
-                self.assertNotIn("CODEX_CLI_MODEL_FAST", settings)
+                self.assertEqual(settings["LLM_PROVIDER"], "codex_sdk")
+                self.assertNotIn("CODEX_MODEL_FAST", settings)
 
         text = output.getvalue()
-        self.assertIn("You do not need to know model names.", text)
+        self.assertIn("Supported models are fixed to the Codex model list.", text)
         self.assertIn("Using provider default for every agent.", text)
 
     def test_chat_skips_startup_model_setup_when_provider_is_saved(self) -> None:
@@ -1351,7 +1355,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             settings_path = root / "model_settings.json"
-            settings_path.write_text('{"LLM_PROVIDER": "codex_cli"}', encoding="utf-8")
+            settings_path.write_text('{"LLM_PROVIDER": "codex_sdk"}', encoding="utf-8")
             args = argparse.Namespace(
                 memory=str(root / "memory.json"),
                 vault=str(root / "vault"),
@@ -1381,39 +1385,83 @@ Usage: codex exec [OPTIONS] [PROMPT]
             )
             with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(settings_path)}, clear=True):
                 with patch("crypto_research_agents.cli.codex_login_status", return_value="Logged in using ChatGPT"):
-                    with patch("sys.stdin.isatty", return_value=True):
-                        with patch("builtins.input", return_value="/quit"):
-                            with patch("crypto_research_agents.cli.configure_model_panel") as setup_panel:
-                                with redirect_stdout(output):
-                                    chat_command(args)
-                                self.assertFalse(setup_panel.called)
-                self.assertEqual(os.environ["LLM_PROVIDER"], "codex_cli")
+                    with patch("crypto_research_agents.cli.codex_sdk_available", return_value=True):
+                        with patch("sys.stdin.isatty", return_value=True):
+                            with patch("builtins.input", return_value="/quit"):
+                                with patch("crypto_research_agents.cli.configure_model_panel") as setup_panel:
+                                    with redirect_stdout(output):
+                                        chat_command(args)
+                                    self.assertFalse(setup_panel.called)
+                self.assertEqual(os.environ["LLM_PROVIDER"], "codex_sdk")
                 settings = json.loads(settings_path.read_text(encoding="utf-8"))
-                self.assertEqual(settings["LLM_PROVIDER"], "codex_cli")
+                self.assertEqual(settings["LLM_PROVIDER"], "codex_sdk")
 
         self.assertIn("JIMMORIA v0.1.0", output.getvalue())
 
-    def test_oauth_token_provider_reads_explicit_env(self) -> None:
-        with patch.dict("os.environ", {"CODEX_OAUTH_TOKEN": "abc123"}, clear=True):
-            token = OAuthTokenProvider().get_token()
+    def test_codex_sdk_provider_runs_thread_with_selected_model(self) -> None:
+        calls: dict[str, object] = {}
 
-        self.assertEqual(token, "abc123")
+        class FakeResult:
+            final_response = "sdk ok"
+
+        class FakeThread:
+            def run(self, prompt: str) -> FakeResult:
+                calls["prompt"] = prompt
+                return FakeResult()
+
+        class FakeCodex:
+            def __enter__(self) -> "FakeCodex":
+                return self
+
+            def __exit__(self, *_args: object) -> None:
+                return None
+
+            def thread_start(self, *, model: str, sandbox: object) -> FakeThread:
+                calls["model"] = model
+                calls["sandbox"] = sandbox
+                return FakeThread()
+
+        fake_module = types.SimpleNamespace(
+            Codex=FakeCodex,
+            Sandbox=types.SimpleNamespace(
+                read_only="read_only",
+                workspace_write="workspace_write",
+                full_access="full_access",
+            ),
+        )
+        request = LLMRequest(
+            agent_id="supervisor_agent",
+            task_type="supervisor_chat",
+            model="gpt-5.4-mini",
+            system_prompt="Talk as supervisor.",
+            user_prompt="안녕",
+            max_tokens=100,
+            temperature=0.2,
+        )
+
+        with patch.dict(sys.modules, {"openai_codex": fake_module}):
+            with patch.dict("os.environ", {"CODEX_SDK_SANDBOX": "workspace_write"}, clear=True):
+                response = CodexSdkProvider().complete(request)
+
+        self.assertEqual(response.text, "sdk ok")
+        self.assertEqual(calls["model"], "gpt-5.4-mini")
+        self.assertEqual(calls["sandbox"], "workspace_write")
+        self.assertIn("안녕", str(calls["prompt"]))
 
     def test_codex_model_env_has_priority(self) -> None:
         with patch.dict(
             "os.environ",
             {
                 "CODEX_CLI_MODEL_FAST": "codex-cli-fast",
-                "CODEX_OAUTH_MODEL_FAST": "codex-oauth-fast",
-                "OPENAI_MODEL_FAST": "openai-fast",
+                "CODEX_MODEL_FAST": "gpt-5.5",
             },
             clear=True,
         ):
             gateway = ModelGateway(provider=None)
 
-        self.assertEqual(gateway.default_model, "codex-cli-fast")
+        self.assertEqual(gateway.default_model, "gpt-5.5")
 
-    def test_codex_cli_defaults_reasoning_and_writing_to_pro(self) -> None:
+    def test_codex_defaults_use_official_models_by_route(self) -> None:
         class FakeCodexCliProvider:
             provider_name = "codex_cli"
 
@@ -1432,9 +1480,12 @@ Usage: codex exec [OPTIONS] [PROMPT]
         obsidian = gateway.select(agent_id="obsidian_curator_agent", task_type="obsidian_sync")
         writing = gateway.select(agent_id="report_agent", task_type="final_synthesis")
 
-        self.assertEqual(reasoning.selected_model, "pro")
-        self.assertEqual(obsidian.selected_model, "pro")
-        self.assertEqual(writing.selected_model, "pro")
+        fast = gateway.select(agent_id="supervisor_agent", task_type="supervisor_chat")
+
+        self.assertEqual(fast.selected_model, "gpt-5.4-mini")
+        self.assertEqual(reasoning.selected_model, "gpt-5.5")
+        self.assertEqual(obsidian.selected_model, "gpt-5.5")
+        self.assertEqual(writing.selected_model, "gpt-5.5")
 
     def test_doctor_marks_live_connectors_as_placeholders(self) -> None:
         statuses = {item.name: item.status for item in collect_capabilities()}
@@ -1467,7 +1518,10 @@ Usage: codex exec [OPTIONS] [PROMPT]
     def test_model_router_contains_supervisor_chat_route(self) -> None:
         router = json.loads(Path("config/models/model_router.yaml").read_text(encoding="utf-8"))
 
-        self.assertEqual(router["routes"]["supervisor_chat"], "fast_model")
+        self.assertEqual(router["provider"], "codex_only")
+        self.assertIn("gpt-5.5", router["supported_models"])
+        self.assertIn("codex_sdk", router["runtime_order"])
+        self.assertEqual(router["routes"]["supervisor_chat"], "fast_chat_model")
         for task_type in [
             "supervision",
             "narrative_reasoning",
@@ -1479,8 +1533,9 @@ Usage: codex exec [OPTIONS] [PROMPT]
             "obsidian_sync",
         ]:
             self.assertEqual(router["routes"][task_type], "reasoning_model")
-        self.assertEqual(router["provider_defaults"]["codex_cli"]["reasoning_model"], "pro")
-        self.assertEqual(router["provider_defaults"]["codex_cli"]["writing_model"], "pro")
+        self.assertEqual(router["defaults"]["reasoning_model"], "gpt-5.5")
+        self.assertEqual(router["defaults"]["writing_model"], "gpt-5.5")
+        self.assertEqual(router["defaults"]["fast_chat_model"], "gpt-5.4-mini")
 
     def test_doctor_command_outputs_current_limitations(self) -> None:
         with TemporaryDirectory() as tmp:

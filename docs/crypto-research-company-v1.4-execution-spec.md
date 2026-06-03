@@ -278,32 +278,33 @@ Funding/airdrop live checker
 Chat mode 시작 시 모델 설정 패널을 보여준다.
 
 ```text
-1. Codex OAuth / ChatGPT login code
-2. OpenAI API Key
-3. Offline fallback
+1. Codex SDK / local app-server (Recommended)
+2. Codex CLI exec
+3. Offline diagnostic fallback
 ```
 
 Current CLI behavior:
 
 ```text
-Codex login: codex login --device-auth
+Codex SDK install: pip install openai-codex
+Codex CLI login fallback: codex login --device-auth
 Login persistence: reused until sign-out, machine change, or session expiry
 Saved local settings: data/model_settings.json
 Recommended model route: Use provider default for every agent
-Advanced model route: custom model id input only when the user already knows it
+Advanced model route: fixed Codex model list only
 ```
 
-Codex OAuth 선택 시 현재 CLI 세션에만 다음 값을 넣는다.
+JIMMORIA가 지원하는 Codex 모델 route는 다음 값으로 고정한다.
 
 ```text
-CODEX_OAUTH_TOKEN 또는 CODEX_OAUTH_TOKEN_FILE 또는 CODEX_OAUTH_TOKEN_COMMAND
-CODEX_OAUTH_MODEL_FAST
-CODEX_OAUTH_MODEL_REASONING
-CODEX_OAUTH_MODEL_WRITING
-CODEX_OAUTH_MODEL_STRONG
+CODEX_MODEL_FAST_CHAT   default gpt-5.4-mini
+CODEX_MODEL_FAST        default gpt-5.4-mini
+CODEX_MODEL_REASONING   default gpt-5.5
+CODEX_MODEL_WRITING     default gpt-5.5
+CODEX_MODEL_STRONG      default gpt-5.5
 ```
 
-토큰은 config 파일에 저장하지 않는다.
+토큰이나 API key는 config 파일에 저장하지 않는다. 저장하는 것은 provider/model preference뿐이다.
 
 ## 11. Agent Persona Layer
 
@@ -389,7 +390,7 @@ Tool Gateway: permission checked stub
 2. ToolCall 표준 로그 저장
 3. 템플릿 기반 보고서/Obsidian 작성
 4. URL fetcher / RSS connector
-5. 실제 OpenAI/Codex OAuth LLM Provider 연결
+5. 실제 Codex SDK/Codex CLI LLM Provider 연결
 6. X/Twitter, Telegram, GitHub, Explorer connector
 7. Postgres + pgvector 전환
 8. Telegram Bot 입력 채널
@@ -404,28 +405,25 @@ Agent
 -> ModelGateway
 -> Model Router
 -> LLMProvider
--> OpenAIChatProvider 또는 OfflineLLMProvider
+-> CodexSdkProvider / CodexCliProvider / OfflineLLMProvider
 -> Agent
 ```
 
 현재 구현:
 
 ```text
-OpenAIChatProvider
-- OPENAI_API_KEY가 있고 openai 패키지가 설치되어 있으면 사용
-- 모델명은 환경 변수로 지정
+CodexSdkProvider
+- LLM_PROVIDER=codex_sdk
+- 공식 openai-codex Python SDK 사용
+- 로컬 Codex app-server를 JSON-RPC로 제어
+- Codex thread_start(model=..., sandbox=...) 후 thread.run(prompt)
+- 기본 sandbox는 read_only
 
 CodexCliProvider
 - LLM_PROVIDER=codex_cli
 - Uses the local Codex CLI ChatGPT login session
 - Login is created with codex login --device-auth
-- Model route can stay on provider default; exact model ids are optional advanced input
-
-CodexOAuthChatProvider
-- LLM_PROVIDER=codex_oauth일 때 사용
-- CODEX_OAUTH_TOKEN, CODEX_OAUTH_TOKEN_FILE, CODEX_OAUTH_TOKEN_COMMAND 중 하나로 bearer token 주입
-- CODEX_OAUTH_BASE_URL로 OpenAI-compatible endpoint 변경 가능
-- Codex 내부 auth file은 자동으로 읽지 않음
+- Model route can stay on provider default; exact model ids must be from the fixed Codex list
 
 OfflineLLMProvider
 - 라이브 모델이 없을 때 deterministic fallback
@@ -435,28 +433,23 @@ OfflineLLMProvider
 환경 변수:
 
 ```powershell
-$env:LLM_PROVIDER="openai"
-$env:OPENAI_API_KEY="..."
-$env:OPENAI_MODEL_FAST="your-fast-model"
-$env:OPENAI_MODEL_REASONING="your-reasoning-model"
-$env:OPENAI_MODEL_WRITING="your-writing-model"
+$env:LLM_PROVIDER="codex_sdk"
+$env:CODEX_SDK_SANDBOX="read_only"
+$env:CODEX_MODEL_REASONING="gpt-5.5"
+$env:CODEX_MODEL_WRITING="gpt-5.5"
+$env:CODEX_MODEL_FAST="gpt-5.4-mini"
 ```
 
-Codex OAuth:
+Codex CLI fallback:
 
 ```powershell
-$env:LLM_PROVIDER="codex_oauth"
-$env:CODEX_OAUTH_TOKEN="..."
-$env:CODEX_OAUTH_MODEL_FAST="your-fast-model"
-$env:CODEX_OAUTH_MODEL_REASONING="your-reasoning-model"
-$env:CODEX_OAUTH_MODEL_WRITING="your-writing-model"
+$env:LLM_PROVIDER="codex_cli"
+$env:CODEX_CLI_MODEL_REASONING="gpt-5.5"
+$env:CODEX_CLI_MODEL_WRITING="gpt-5.5"
+$env:CODEX_CLI_MODEL_FAST="gpt-5.4-mini"
 ```
 
-명령으로 토큰을 가져올 수도 있다.
-
-```powershell
-$env:CODEX_OAUTH_TOKEN_COMMAND="your-command-that-prints-a-bearer-token"
-```
+OpenAI API Key와 임의 OAuth bearer token provider는 지원 provider 경로에서 제거했다.
 
 현재 LLM을 사용하는 에이전트:
 

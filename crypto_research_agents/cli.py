@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import getpass
 import json
 import os
 import shutil
@@ -29,6 +28,12 @@ from crypto_research_agents.core.supervisor_intake import (
 )
 from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
 from crypto_research_agents.core.model_gateway import ModelGateway
+from crypto_research_agents.core.codex_models import (
+    SUPPORTED_CODEX_MODEL_IDS,
+    model_by_index,
+    supported_codex_model_lines,
+)
+from crypto_research_agents.core.llm_provider import codex_sdk_available
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 from crypto_research_agents.core.playbook import ResearchPlaybookRegistry
 from crypto_research_agents.core.profile import WorkerProfileRegistry
@@ -56,6 +61,7 @@ can reveal early infrastructure before broad KOL attention appears on X or Teleg
 """
 
 MODEL_ROUTE_TIERS = [
+    ("FAST_CHAT", "chat / supervisor"),
     ("FAST", "fast / cheap"),
     ("REASONING", "reasoning"),
     ("WRITING", "writing"),
@@ -63,18 +69,16 @@ MODEL_ROUTE_TIERS = [
 ]
 MODEL_SETTING_ENV_NAMES = [
     "LLM_PROVIDER",
+    "CODEX_MODEL_FAST_CHAT",
+    "CODEX_MODEL_FAST",
+    "CODEX_MODEL_REASONING",
+    "CODEX_MODEL_WRITING",
+    "CODEX_MODEL_STRONG",
+    "CODEX_CLI_MODEL_FAST_CHAT",
     "CODEX_CLI_MODEL_FAST",
     "CODEX_CLI_MODEL_REASONING",
     "CODEX_CLI_MODEL_WRITING",
     "CODEX_CLI_MODEL_STRONG",
-    "CODEX_OAUTH_MODEL_FAST",
-    "CODEX_OAUTH_MODEL_REASONING",
-    "CODEX_OAUTH_MODEL_WRITING",
-    "CODEX_OAUTH_MODEL_STRONG",
-    "OPENAI_MODEL_FAST",
-    "OPENAI_MODEL_REASONING",
-    "OPENAI_MODEL_WRITING",
-    "OPENAI_MODEL_STRONG",
 ]
 
 
@@ -708,7 +712,7 @@ def inspect_command(args: argparse.Namespace) -> None:
 
 def chat_command(args: argparse.Namespace) -> None:
     apply_saved_model_settings()
-    auto_configure_codex_cli_if_logged_in()
+    auto_configure_codex_provider_if_logged_in()
     console = JimmoriaConsole(
         memory_path=args.memory,
         runs_dir=Path(args.memory).parent / "runs",
@@ -1316,7 +1320,7 @@ def doctor_command(args: argparse.Namespace | None = None) -> None:
             "Report writer",
             "Obsidian vault writer",
         },
-        "Models": {"LLM provider", "Agent LLM routing", "Codex OAuth token", "OpenAI API key"},
+        "Models": {"LLM provider", "Agent LLM routing", "Codex SDK package", "Codex CLI"},
         "Operations": {
             "Tool registry",
             "Scheduled jobs",
@@ -1379,9 +1383,9 @@ def configure_model_panel(*, clear_before: bool = True) -> None:
         [
             f"Current provider: {os.getenv('LLM_PROVIDER') or 'offline_fallback'}",
             "",
-            "1. Codex OAuth / ChatGPT login code",
-            "2. OpenAI API Key",
-            "3. Offline fallback",
+            "1. Codex SDK / local app-server (Recommended)",
+            "2. Codex CLI exec",
+            "3. Offline diagnostic fallback",
             "Enter. Keep current",
         ]
     )
@@ -1391,13 +1395,13 @@ def configure_model_panel(*, clear_before: bool = True) -> None:
         print_current_model_config()
         return
 
-    if choice in {"1", "codex", "codex_oauth"}:
-        configure_codex_oauth()
+    if choice in {"1", "codex", "codex_sdk", "sdk"}:
+        configure_codex_sdk()
         print_current_model_config()
         return
 
-    if choice in {"2", "openai"}:
-        configure_openai()
+    if choice in {"2", "codex_cli", "cli"}:
+        configure_codex_cli()
         print_current_model_config()
         return
 
@@ -1411,67 +1415,51 @@ def configure_model_panel(*, clear_before: bool = True) -> None:
     print_current_model_config()
 
 
-def configure_codex_oauth() -> None:
-    clear_openai_session_env()
-    os.environ["LLM_PROVIDER"] = "codex_cli"
-    clear_codex_token_session_env()
+def configure_codex_sdk() -> None:
+    clear_legacy_model_session_env()
+    os.environ["LLM_PROVIDER"] = "codex_sdk"
     clear_screen()
     print_screen(
-        "Codex OAuth",
+        "Codex SDK",
         [
-            "Recommended: sign in with the Codex device code flow.",
-            "This opens the same style of flow where ChatGPT shows a code login page.",
+            "JIMMORIA will use the Codex Python SDK and local Codex app-server.",
+            "Install path: pip install openai-codex",
+            f"SDK package: {'available' if codex_sdk_available() else 'not installed yet'}",
             "",
-            "1. Start Codex device login",
-            "2. Paste bearer token manually",
-            "3. Token file path",
-            "4. Command that prints bearer token",
-            "Enter. Use existing Codex login",
+            "If you have not signed in, run Codex once and complete the ChatGPT login flow.",
+            "Press Enter to continue with Codex model routes.",
         ],
     )
-    source_choice = input("Choose Codex auth method [1/2/3/4/Enter]: ").strip().lower()
-
-    if source_choice == "1":
-        run_codex_device_login()
-        os.environ["LLM_PROVIDER"] = "codex_cli"
-    elif source_choice == "2":
-        os.environ["LLM_PROVIDER"] = "codex_oauth"
-        token = getpass.getpass("CODEX_OAUTH_TOKEN: ").strip()
-        if token:
-            os.environ["CODEX_OAUTH_TOKEN"] = token
-    elif source_choice == "3":
-        os.environ["LLM_PROVIDER"] = "codex_oauth"
-        token_file = input("CODEX_OAUTH_TOKEN_FILE path: ").strip()
-        if token_file:
-            os.environ["CODEX_OAUTH_TOKEN_FILE"] = token_file
-    elif source_choice == "4":
-        os.environ["LLM_PROVIDER"] = "codex_oauth"
-        token_command = input("CODEX_OAUTH_TOKEN_COMMAND: ").strip()
-        if token_command:
-            os.environ["CODEX_OAUTH_TOKEN_COMMAND"] = token_command
-
-    configure_model_routes(prefix="CODEX_CLI_MODEL" if os.getenv("LLM_PROVIDER") == "codex_cli" else "CODEX_OAUTH_MODEL")
+    input("Continue [Enter]: ")
+    configure_model_routes(prefix="CODEX_MODEL")
     save_model_settings()
 
 
-def configure_openai() -> None:
-    clear_codex_token_session_env()
-    os.environ["LLM_PROVIDER"] = "openai"
+def configure_codex_cli() -> None:
+    clear_legacy_model_session_env()
+    os.environ["LLM_PROVIDER"] = "codex_cli"
     clear_screen()
-    print_screen("OpenAI API Key", ["Paste an API key for this terminal session."])
-    api_key = getpass.getpass("OPENAI_API_KEY: ").strip()
-    if api_key:
-        os.environ["OPENAI_API_KEY"] = api_key
-    configure_model_routes(prefix="OPENAI_MODEL")
+    print_screen(
+        "Codex CLI",
+        [
+            "JIMMORIA will call `codex exec` through your local Codex login.",
+            "",
+            "1. Start Codex device login",
+            "Enter. Use existing Codex login",
+        ],
+    )
+    source_choice = input("Choose Codex CLI auth method [1/Enter]: ").strip().lower()
+    if source_choice == "1":
+        run_codex_device_login()
+    configure_model_routes(prefix="CODEX_CLI_MODEL")
     save_model_settings()
 
 
 def configure_offline() -> None:
     os.environ["LLM_PROVIDER"] = "offline"
-    clear_codex_token_session_env()
-    clear_openai_session_env()
+    clear_legacy_model_session_env()
     clear_screen()
-    print_screen("Offline fallback", ["Live LLM calls disabled for this session."])
+    print_screen("Offline diagnostic fallback", ["Live Codex calls disabled for this session. Tests and local diagnostics only."])
     save_model_settings()
 
 
@@ -1481,13 +1469,13 @@ def configure_model_routes(prefix: str) -> None:
         "Model Routes",
         [
             f"Provider: {os.getenv('LLM_PROVIDER') or 'offline_fallback'}",
-            "You do not need to know model names.",
-            "Provider default uses whatever your account and CLI config support.",
+            "Supported models are fixed to the Codex model list.",
+            "Default: GPT-5.5 for reasoning/writing, GPT-5.4-mini for chat/extraction.",
             "",
             "1. Use provider default for every agent (Recommended)",
             "2. Keep current routes",
-            "3. Advanced: one custom model for every route",
-            "4. Advanced: custom model per route",
+            "3. Pick one supported Codex model for every route",
+            "4. Pick supported Codex model per route",
             "Enter. Use provider default",
         ],
     )
@@ -1508,13 +1496,16 @@ def configure_model_routes(prefix: str) -> None:
         print_screen(
             "Custom Model",
             [
-                "Only use this if you already know the exact model id.",
+                "Choose from the supported Codex model list.",
                 "Press Enter to fall back to provider default.",
+                "",
+                *supported_codex_model_lines(),
             ],
         )
-        model = input("Model id for every route: ").strip()
+        selected = input("Model number or id for every route: ").strip()
+        model = model_by_index(selected) or selected
         clear_model_route_env(prefix)
-        if model:
+        if model and model in SUPPORTED_CODEX_MODEL_IDS:
             for tier, _label in MODEL_ROUTE_TIERS:
                 os.environ[f"{prefix}_{tier}"] = model
         return
@@ -1532,15 +1523,18 @@ def configure_model_routes_advanced(prefix: str) -> None:
     print_screen(
         "Advanced Routes",
         [
-            "Only use exact model ids you know are available.",
+            "Choose exact Codex model ids from the supported list.",
             "Press Enter on each route to keep its current value.",
+            "",
+            *supported_codex_model_lines(),
         ],
     )
     for tier, label in MODEL_ROUTE_TIERS:
         env_name = f"{prefix}_{tier}"
         value = input_with_default(f"{env_name} ({label})", os.getenv(env_name, ""))
-        if value:
-            os.environ[env_name] = value
+        selected = model_by_index(value) or value
+        if selected and selected in SUPPORTED_CODEX_MODEL_IDS:
+            os.environ[env_name] = selected
 
 
 def clear_model_route_env(prefix: str) -> None:
@@ -1554,17 +1548,24 @@ def input_with_default(label: str, default: str) -> str:
     return value or default
 
 
-def clear_codex_token_session_env() -> None:
+def clear_legacy_model_session_env() -> None:
     for name in [
         "CODEX_OAUTH_TOKEN",
         "CODEX_OAUTH_TOKEN_FILE",
         "CODEX_OAUTH_TOKEN_COMMAND",
+        "OPENAI_API_KEY",
+        "CODEX_OAUTH_MODEL_FAST",
+        "CODEX_OAUTH_MODEL_REASONING",
+        "CODEX_OAUTH_MODEL_WRITING",
+        "CODEX_OAUTH_MODEL_STRONG",
+        "OPENAI_MODEL_FAST",
+        "OPENAI_MODEL_REASONING",
+        "OPENAI_MODEL_WRITING",
+        "OPENAI_MODEL_STRONG",
+        "CODEX_OAUTH_BASE_URL",
+        "OPENAI_BASE_URL",
     ]:
         os.environ.pop(name, None)
-
-
-def clear_openai_session_env() -> None:
-    os.environ.pop("OPENAI_API_KEY", None)
 
 
 def print_current_model_config() -> None:
@@ -1573,14 +1574,12 @@ def print_current_model_config() -> None:
     fast_decision = gateway.select(agent_id="supervisor_agent", task_type="supervisor_chat")
     reasoning_decision = gateway.select(agent_id="discovery_agent", task_type="candidate_discovery")
     writing_decision = gateway.select(agent_id="report_agent", task_type="final_synthesis")
-    if provider == "codex_cli":
+    if provider == "codex_sdk":
+        token_source = "Codex SDK app-server" + (" available" if codex_sdk_available() else " package not installed")
+    elif provider == "codex_cli":
         token_source = codex_login_status()
-    elif provider == "codex_oauth":
-        token_source = configured_codex_token_source()
-    elif provider == "openai":
-        token_source = "OPENAI_API_KEY set" if os.getenv("OPENAI_API_KEY") else "OPENAI_API_KEY not set"
     else:
-        token_source = "not required"
+        token_source = "offline diagnostic fallback"
 
     print_screen(
         "Model Config",
@@ -1590,18 +1589,9 @@ def print_current_model_config() -> None:
             f"Reasoning model: {reasoning_decision.selected_model}",
             f"Writing model: {writing_decision.selected_model}",
             f"Credential: {token_source}",
+            f"Supported Codex models: {', '.join(SUPPORTED_CODEX_MODEL_IDS)}",
         ]
     )
-
-
-def configured_codex_token_source() -> str:
-    if os.getenv("CODEX_OAUTH_TOKEN"):
-        return "CODEX_OAUTH_TOKEN set"
-    if os.getenv("CODEX_OAUTH_TOKEN_FILE"):
-        return f"file: {os.getenv('CODEX_OAUTH_TOKEN_FILE')}"
-    if os.getenv("CODEX_OAUTH_TOKEN_COMMAND"):
-        return "command configured"
-    return "not set"
 
 
 def model_settings_path() -> Path:
@@ -1627,12 +1617,12 @@ def apply_saved_model_settings() -> None:
             os.environ[name] = value
 
 
-def auto_configure_codex_cli_if_logged_in() -> None:
+def auto_configure_codex_provider_if_logged_in() -> None:
     if os.getenv("LLM_PROVIDER"):
         return
     if not codex_is_logged_in():
         return
-    os.environ["LLM_PROVIDER"] = "codex_cli"
+    os.environ["LLM_PROVIDER"] = "codex_sdk" if codex_sdk_available() else "codex_cli"
     save_model_settings()
 
 
@@ -1655,7 +1645,7 @@ def save_model_settings() -> None:
 def run_codex_device_login() -> None:
     if shutil.which("codex") is None:
         print_screen(
-            "Codex OAuth",
+            "Codex Login",
             [
                 "Codex CLI was not found on PATH.",
                 "Install or expose Codex first, then run /models again.",
