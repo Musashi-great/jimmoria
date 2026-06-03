@@ -39,11 +39,30 @@
     "fast_model": "gpt-5.4-mini",
     "reasoning_model": "gpt-5.5",
     "writing_model": "gpt-5.5",
-    "strong_model": "gpt-5.5"
+    "strong_model": "gpt-5.5",
+    "reasoning_effort": "pro"
+  },
+  "reasoning_effort": {
+    "default": "pro",
+    "codex_cli_config_key": "model_reasoning_effort",
+    "codex_cli_pro_value": "xhigh",
+    "applies_to": [
+      "supervision",
+      "source_ingestion",
+      "narrative_reasoning",
+      "candidate_discovery",
+      "social_summary",
+      "contract_info",
+      "product_docs",
+      "funding_token",
+      "obsidian_sync",
+      "report_writing",
+      "final_synthesis"
+    ]
   },
   "routes": {
     "supervisor_chat": "fast_chat_model",
-    "source_ingestion": "fast_model",
+    "source_ingestion": "reasoning_model",
     "narrative_reasoning": "reasoning_model",
     "supervision": "reasoning_model",
     "candidate_discovery": "reasoning_model",

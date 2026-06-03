@@ -2726,10 +2726,14 @@ def reader_conclusion_lines(
     narratives = ", ".join(display_narratives(project)[:4]) or "Unclassified Early Crypto"
     if is_3jane_project(project):
         lines = [
-            f"- **스탠스:** `{score['stance']}`. 3Jane은 바로 TOP으로 올리기보다는 watchlist에 두고, credit pool 지표와 founder/team 검증을 추가로 봐야 하는 후보입니다.",
-            "- **투자 가설:** DeFi lending이 초과담보 중심에 머물러 있는 한, 신용 기반 대출 시장은 아직 비어 있습니다. 3Jane은 이 빈 시장을 `onchain credit`로 열겠다는 베팅입니다.",
-            "- **왜 흥미로운가:** Paradigm 리드 $5.2M seed, Wintermute/Coinbase Ventures 등 backer 신호, 그리고 `real credit onchain` 내러티브가 동시에 확인됩니다.",
-            "- **핵심 불확실성:** 좋은 narrative와 funding만으로는 부족합니다. underwriting이 실제로 작동하는지, borrower demand가 있는지, default/recovery가 손실을 어떻게 처리하는지 확인해야 합니다.",
+            f"- **스탠스:** `{score['stance']}`. 3Jane은 바로 TOP으로 올리기보다 watchlist 상단 후보로 두고, credit pool 사용량과 founder/team 검증을 계속 붙여야 하는 프로젝트입니다.",
+            "- **한 줄 결론:** 3Jane은 `담보를 많이 맡기고 빌리는 DeFi 대출`에서 벗어나, 신용ㆍ현금흐름ㆍ외부 자산 증명을 이용해 온체인 credit line을 만들려는 Ethereum 기반 crypto credit protocol입니다.",
+            "- **투자 가설:** DeFi lending이 Aave/Compound식 초과담보 대출에 갇혀 있는 동안, 실제 신용 기반 대출 시장은 아직 crypto-native하게 열리지 않았습니다. 3Jane의 베팅은 이 빈 시장을 `real credit onchain`으로 열 수 있다는 것입니다.",
+            "- **왜 흥미로운가:** Paradigm 리드 $5.2M seed round, Wintermute Ventures/Coinbase Ventures 계열 backer 신호, 공식 docs의 USD3/sUSD3 구조, Delphi의 `real credit onchain` 프레임이 서로 같은 방향을 가리킵니다. 즉 단순한 신규 토큰 홍보가 아니라, DeFi credit primitive로 읽히는 정황이 있습니다.",
+            "- **무엇이 성립해야 하는가:** ① 실제로 빌리고 싶어 하는 borrower가 있어야 하고, ② borrower의 신용/자산/미래 현금흐름을 조작 가능성이 낮은 방식으로 검증해야 하며, ③ default가 발생했을 때 손실과 recovery가 USD3/sUSD3 구조 안에서 투명하게 처리되어야 합니다.",
+            "- **좋은 시나리오:** 3Jane이 차입자 데이터를 신뢰 가능한 방식으로 underwriting하고, 공급자가 USD3/sUSD3를 통해 default-adjusted yield를 받을 수 있다면 DeFi lending의 사용처는 담보 대출에서 실제 신용 시장으로 확장됩니다. 이 경우 3Jane은 단순 lending app이 아니라 crypto credit infrastructure에 가까워집니다.",
+            "- **나쁜 시나리오:** borrower demand가 약하거나, default/recovery가 불투명하거나, sUSD3 first-loss 구조가 시장이 감당하기 어려운 리스크로 드러나면 프로젝트는 narrative는 강하지만 실제 credit market으로 성장하지 못할 수 있습니다. 특히 credit protocol은 한 번의 큰 default가 신뢰를 빠르게 훼손할 수 있습니다.",
+            "- **대표님 기준 판단:** 지금 봐야 할 포인트는 단기 가격/상장 기대가 아니라 `신용을 온체인에서 안전하게 가격화할 수 있는가`입니다. 이 질문에 대한 증거가 쌓이면 watchlist에서 상위 추적 후보로 올릴 수 있고, 반대로 evidence가 약하면 좋은 backer가 있어도 보수적으로 봐야 합니다.",
             f"- **분류:** {narratives}. Chain=`{project.chain or 'unknown'}`, token_status=`{display_token_status(project)}`.",
         ]
     else:
@@ -2750,10 +2754,15 @@ def reader_project_explanation_lines(project: Any) -> list[str]:
         return ["- 설명할 프로젝트가 확정되지 않았습니다."]
     if is_3jane_project(project):
         return [
-            "- 3Jane은 담보를 많이 맡겨야 빌릴 수 있는 기존 DeFi lending과 달리, 신용 기반 credit line을 온체인에서 만들려는 프로토콜입니다.",
-            "- 공급자는 USDC를 넣고 USD3/sUSD3 구조로 credit pool에 노출됩니다. 차입자는 wallet asset, CEX/bank asset, future yield, credit score 같은 데이터를 근거로 USDC credit line을 받는 모델입니다.",
-            "- 그래서 핵심 제품은 토큰 자체가 아니라 **underwriting, credit limit 산정, default 처리, recovery, pool accounting**입니다.",
-            "- 내러티브로는 `Crypto Credit`, `Undercollateralized Lending`, `DeFi Automation`, `AI agent credit line` 쪽에 가깝습니다.",
+            "- 3Jane은 기존 DeFi 대출의 가장 큰 병목인 `초과담보` 문제를 건드립니다. 일반적인 온체인 lending은 돈을 빌리기 위해 그보다 더 큰 담보를 맡겨야 하므로, 레버리지나 단기 유동성에는 유용하지만 실제 신용시장처럼 작동하기 어렵습니다.",
+            "- 3Jane의 목표는 차입자의 wallet asset, CEX/bank asset, 미래 yield, credit score 같은 정보를 신용 판단 재료로 삼아 USDC credit line을 제공하는 것입니다. 여기서 중요한 점은 `온체인에서 모든 것이 끝난다`가 아니라, off-chain proof와 on-chain settlement를 결합한다는 점입니다.",
+            "- 공급자 입장에서는 USDC를 넣고 USD3/sUSD3 구조에 노출됩니다. 단순히 예치하고 이자를 받는 것처럼 보일 수 있지만, 실제로는 credit pool의 손익과 default 위험을 어떻게 배분하는지가 핵심입니다.",
+            "- 그래서 핵심 제품은 토큰 자체가 아니라 **underwriting, credit limit 산정, risk-adjusted rate, default 처리, recovery, pool accounting**입니다. 이 기능들이 투명하고 반복 가능해야 3Jane이 단순 narrative가 아니라 protocol로 인정받을 수 있습니다.",
+            "- Aave/Compound류 lending이 `담보를 맡긴 만큼 빌리는 구조`라면, 3Jane은 `검증 가능한 신용/현금흐름/외부 자산을 기반으로 빌리는 구조`에 가깝습니다. 이 차이가 프로젝트의 전체 thesis이며, 성공 시 DeFi lending의 TAM을 넓히는 방향입니다.",
+            "- 이 구조가 의미 있으려면 차입자는 담보를 과도하게 묶지 않아도 자본을 조달할 수 있어야 하고, 공급자는 그 대가로 default-adjusted yield를 받아야 합니다. 둘 중 하나라도 약하면 제품은 narrative 이상으로 확장되기 어렵습니다.",
+            "- AI agent credit line이라는 표현은 흥미롭지만, 현재 보고서에서는 이를 확정된 사용처가 아니라 확장 가능한 use case로만 봅니다. 실제 수요는 app usage, borrower pool, credit-line utilization, repeat borrower, default/recovery history로 확인해야 합니다.",
+            "- 대표님이 읽을 때는 `이 프로젝트가 어떤 토큰인가`보다 `누가 왜 빌리고, 누가 어떤 위험을 감수하고 공급하며, 손실이 발생하면 어떤 규칙으로 처리되는가`를 먼저 보면 됩니다.",
+            "- 내러티브로는 `Crypto Credit`, `Undercollateralized Lending`, `DeFi Automation`, `AI agent credit line` 쪽에 가깝습니다. 다만 이 내러티브는 멋있는 말이라기보다, 실제 credit underwriting을 얼마나 잘 수행하는지로 검증되어야 합니다.",
         ]
     return [
         f"- {best_project_description(project)}",
@@ -2774,6 +2783,11 @@ def reader_market_signal_lines(project: Any, findings: list[FindingRecord]) -> l
                 "- **The Block:** Paradigm이 $5.2M seed round를 리드했고 프로젝트가 stealth에서 공개됐다는 펀딩 기사입니다.",
                 "- **Delphi Digital:** 3Jane을 `real credit onchain` 관점에서 다루며, 과거 credit 실패 이후의 undercollateralized lending 재설계 시도로 해석합니다.",
                 "- **Leviathan Substack:** 3Jane lending protocol과 crypto borrowing 구조를 시장이 어떻게 이해하는지 보여주는 외부 해설입니다.",
+                "- **KOL/리서치 해석:** 현재 수집된 외부 해설은 3Jane을 단순 high-yield stablecoin이 아니라 `credit primitive`로 봅니다. 특히 Delphi의 프레임은 과거 CeFi/DeFi credit 실패 이후, crypto가 다시 undercollateralized credit을 시도하는 장면으로 3Jane을 위치시킵니다.",
+                "- **내러티브 해석:** 단순히 유명 VC가 투자했다는 신호보다 중요한 것은 시장이 3Jane을 DeFi lending, stable/yieldcoin, AI wallet/agent capital, 온체인 신용평가가 만나는 지점으로 해석하기 시작했다는 점입니다.",
+                "- **소셜 신호의 강점:** 공식 X, backer 언급, 전문 리서치 글, 외부 해설이 모두 같은 주제를 말합니다. 이것은 최소한 프로젝트 정체성이 시장에 어느 정도 전달되고 있다는 의미입니다.",
+                "- **소셜 신호의 약점:** 아직 KOL별 반복 언급, 반론, controversy, 실사용자 후기, builder community 반응은 충분히 수집되지 않았습니다. 따라서 `누가 어떤 논리로 긍정/부정하는가`를 더 촘촘하게 쌓아야 합니다.",
+                "- **주의할 점:** X/기사 신호는 trigger일 뿐입니다. 실제 판단은 docs의 pool mechanics, 공식 주소, app 상태, GitHub/contract, 그리고 온체인 pool 지표가 따라와야 합니다.",
             ]
         )
     if not row:
@@ -2833,6 +2847,12 @@ def reader_product_lines(project: Any, findings: list[FindingRecord]) -> list[st
                 "- supplier side는 USDC 예치, USD3 발행, sUSD3 staking/first-loss exposure로 읽어야 합니다.",
                 "- borrower side는 검증 가능한 자산/수익/신용 정보를 기반으로 USDC credit line을 받는 구조입니다.",
                 "- 검증해야 할 기술 포인트는 underwriting input, risk-adjusted rate, utilization, redemption queue, default markdown, recovery process입니다.",
+                "- 제품 플로우를 단순화하면 `USDC 공급 -> credit pool 형성 -> borrower underwriting -> credit line 사용 -> 이자/손실이 USD3/sUSD3에 반영`입니다.",
+                "- 여기서 supplier에게 중요한 것은 명목 APY가 아니라 손실 발생 시 어느 tranche가 먼저 맞는지, redemption queue가 어떻게 작동하는지, default가 markdown으로 어떻게 회계 처리되는지입니다.",
+                "- borrower에게 중요한 것은 credit line을 받기 위해 어떤 데이터를 제출해야 하는지, 그 데이터가 얼마나 자동화/검증 가능한지, rate가 담보 대출 대비 충분히 경쟁력 있는지입니다.",
+                "- protocol operator 관점에서는 borrower 심사, risk parameter 조정, pool accounting, treasury/liquidity buffer, emergency pause, governance 권한이 모두 중요합니다. credit protocol은 UI가 예쁘다고 끝나는 제품이 아니라, 리스크 운영이 제품 그 자체입니다.",
+                "- GitHub/SDK/API가 확인되면 `underwriting logic`, `pool accounting`, `borrow/repay flow`, `redemption flow`, `oracle/rate model`, `test coverage`, `audit artifacts`를 키워드로 봐야 합니다.",
+                "- 프로토콜이 성숙하려면 docs만으로는 부족하고, app에서 실제 pool 상태와 borrower utilization, default/recovery history가 투명하게 보여야 합니다. 특히 default가 아직 없다면 그것은 좋은 신호일 수도 있지만, 동시에 stress-tested evidence가 부족하다는 뜻일 수도 있습니다.",
             ]
         )
     else:
@@ -2864,6 +2884,12 @@ def reader_token_lines(project: Any, findings: list[FindingRecord]) -> list[str]
                 "- 3Jane은 일반 governance token 하나만 보는 구조가 아니라 USD3 / sUSD3 / JANE 역할을 분리해서 봐야 합니다.",
                 "- value-capture 가설은 `차입 수요 -> credit line utilization -> pool yield/default/recovery -> USD3/sUSD3 손익 배분`입니다.",
                 "- 아직 핵심은 roadmap/설계와 live 지표를 분리하는 것입니다. 실제 borrower demand, default event, recovery 결과가 쌓여야 더 강한 판단이 가능합니다.",
+                "- **USD3:** senior 성격의 credit-backed yieldcoin으로 읽힙니다. 대표님 관점에서는 `USDC 대비 왜 보유할 이유가 있는가`, `손실/유동성 리스크는 어디에 반영되는가`가 핵심입니다.",
+                "- **sUSD3:** 더 높은 수익을 기대하는 junior/first-loss exposure로 볼 수 있습니다. 그래서 sUSD3는 upside보다 downside waterfall을 먼저 확인해야 합니다.",
+                "- **JANE:** 문서화된 주소는 있지만, governance, fee capture, staking, buyback, protocol revenue 연결이 live인지 roadmap인지 분리해야 합니다.",
+                "- **경제적 질문:** USD3 holder는 어떤 위험을 감수하고 어떤 수익을 받는가, sUSD3 holder는 왜 first-loss를 감수하는가, JANE holder는 protocol risk/revenue/governance에서 어떤 권리를 갖는가를 분리해야 합니다.",
+                "- **가치 포착의 강한 조건:** borrower가 꾸준히 credit line을 사용하고, protocol이 대출/상환/손실/회수를 반복적으로 처리하며, 그 과정에서 JANE이 단순 투표권 이상으로 fee, risk buffer, staking/slashing, revenue link 중 하나와 연결되어야 합니다.",
+                "- 즉 이 프로젝트의 token thesis는 `토큰이 오른다`가 아니라, credit market이 실제로 돌아갈 때 각 token/asset layer가 어떤 경제적 권리와 리스크를 갖는지입니다.",
             ]
         )
     for row in finding_rows(findings, "contract_token_info", project)[:1]:
@@ -2892,6 +2918,11 @@ def reader_team_funding_kol_lines(project: Any, findings: list[FindingRecord]) -
                 "- 공개 backer/signal에는 Paradigm, Wintermute Ventures, Coinbase Ventures 등이 노출됩니다.",
                 "- 팀 단서는 Wintermute Ventures가 언급한 `@_yakovsky`가 가장 명확합니다. 실명, 학력, 이전 직장, 이전 프로젝트는 공식 근거가 없으면 확정하지 않습니다.",
                 "- KOL/리서치 관점에서는 Delphi의 `real credit onchain` 프레임과 Leviathan의 lending protocol 해설이 현재 수집된 주요 외부 해석입니다.",
+                "- Paradigm 리드는 이 프로젝트가 단순 airdrop/points project가 아니라, 구조적으로 어려운 credit market 문제를 푸는 팀으로 평가받고 있다는 신호입니다.",
+                "- Wintermute/Coinbase Ventures 계열 backer 신호는 market structure, liquidity, exchange/credit infra 쪽 네트워크를 기대하게 하지만, 이것이 곧 제품 성공을 보장하지는 않습니다.",
+                "- 팀 검증에서 가장 중요한 것은 단순 학력/전 직장이 아니라 `누가 underwriting 모델을 설계하는가`, `credit/default 경험이 있는가`, `risk team이 있는가`, `실제 borrower pipeline을 만들 수 있는 네트워크가 있는가`입니다.",
+                "- founder/team dossier는 아직 약합니다. 현재 보고서에서는 확인되지 않은 실명/이력을 단정하지 않고, `@_yakovsky`와 backer 언급을 출발점으로만 둡니다.",
+                "- 다음 리서치에서는 창업자 인터뷰, 팟캐스트, LinkedIn/GitHub, 이전 프로젝트, 채용 페이지, investor memo/announcement를 붙여 팀 신뢰도를 별도 점수화하는 것이 좋습니다.",
             ]
         )
     handles = extract_builder_handles(findings, project)
@@ -2919,6 +2950,11 @@ def reader_risk_lines(project: Any, findings: list[FindingRecord]) -> list[str]:
             "- **Liquidity risk:** supplier redemption이 cash buffer를 초과할 때 queue와 throttling이 충분한지 봐야 합니다.",
             "- **Security/audit risk:** pool accounting, oracle/rate model, upgrade path, multisig/timelock, audit 자료가 필요합니다.",
             "- **Social/KOL risk:** X API 미설정 상태에서는 KOL별 원문, 반복 언급, 반박/논쟁을 충분히 보지 못했습니다.",
+            "- **Regulatory/real-world data risk:** credit proof나 off-chain asset verification이 들어가는 순간, 단순 DeFi smart contract risk를 넘어 개인정보, KYC, 채권 회수, jurisdiction 문제가 생길 수 있습니다.",
+            "- **Narrative overfit risk:** `undercollateralized lending`은 매력적인 말이지만 과거 CeFi/DeFi credit 실패 사례가 많았습니다. 3Jane은 이 실패를 어떻게 피하는지 구체적으로 증명해야 합니다.",
+            "- **Value-capture risk:** USD3/sUSD3는 구조가 비교적 명확하지만, JANE의 장기 가치 포착은 아직 더 확인해야 합니다. governance token이라면 수수료, 위험 완충, staking, revenue link가 실제인지 봐야 합니다.",
+            "- **운영 리스크:** credit protocol은 launch 이후 risk parameter를 계속 조정해야 합니다. borrower quality가 변하거나 liquidity가 빠지는 시기에 protocol operator가 어떤 정책으로 대응하는지가 장기 생존에 중요합니다.",
+            "- **반론:** backer와 narrative가 좋아도, 실제 borrower가 없거나 supplier가 감수하는 위험 대비 보상이 부족하면 market은 오래 유지되지 않습니다. 이 반론은 단순 FUD가 아니라 credit business의 본질적인 체크포인트입니다.",
         ]
     return [
         "- 공식 site/docs/product 근거가 marketing-heavy일 수 있습니다.",
@@ -2937,6 +2973,11 @@ def reader_next_steps_lines(project: Any, findings: list[FindingRecord]) -> list
             "- 공식 주소 레지스트리와 explorer를 대조해 contract deployment, pool accounting, upgrade 권한을 확인합니다.",
             "- GitHub repo, commit activity, release, issue, audit 자료를 확인합니다.",
             "- watchlist 지표는 TVL, USD3/sUSD3 supply, borrower utilization, default rate, recovery event, KOL momentum으로 정의합니다.",
+            "- 특히 `누가 실제로 빌리는가`, `왜 담보 대출 대신 3Jane을 쓰는가`, `default가 발생했을 때 누가 손실을 부담하는가`를 다음 실사 질문의 중심에 둡니다.",
+            "- founder/team은 `@_yakovsky`에서 출발해 실명, 이전 경력, credit/risk 경험, GitHub/LinkedIn, 이전 프로젝트, 투자자 네트워크를 확인합니다.",
+            "- JANE 관련해서는 단순 주소 확인을 넘어 emission, utility, governance rights, fee linkage, staking/slashing 여부를 분리합니다.",
+            "- 소셜/KOL은 `누가 좋다고 했는가`보다 `왜 좋다고 했는가`, `무엇을 근거로 삼았는가`, `반대 논리는 무엇인가`를 함께 저장합니다.",
+            "- 다음 보고서 업그레이드 기준은 founder dossier 보강, live pool 지표 확보, GitHub/audit 검증, KOL 원문 10개 이상 정리, token value-capture live/roadmap 분리입니다.",
         ]
     return [
         "- 공식 site/docs/whitepaper에서 project identity를 재확인합니다.",
@@ -2950,20 +2991,28 @@ def reader_source_digest_lines(project: Any, source_log: list[dict[str, str]]) -
         return [
             "- **공식 사이트/화이트페이퍼:** 3Jane은 스스로를 crypto credit protocol로 포지셔닝합니다. 핵심은 단순 yield 상품이 아니라, crypto user와 AI agent가 사용할 수 있는 credit line을 만들고 이를 USD3/sUSD3 구조로 공급자에게 연결하는 것입니다. "
             f"({source_markdown_link('https://www.3jane.xyz/', '3Jane site')}, {source_markdown_link('https://www.3jane.xyz/pdf/whitepaper.pdf', 'whitepaper')})",
+            "  - 이 출처는 프로젝트의 identity gate에서 가장 중요합니다. 3Jane이 스스로를 어떤 문제를 푸는 protocol로 설명하는지, 그리고 market이 이 프로젝트를 어떤 category로 읽어야 하는지를 잡아줍니다.",
             "- **Docs introduction:** docs는 3Jane의 문제의식을 `undercollateralized credit`으로 잡습니다. 즉 온체인 담보만으로는 충분히 설명되지 않는 신용, 미래 수익, 외부 자산 증명을 lending 구조에 넣겠다는 방향입니다. "
             f"({source_markdown_link('https://docs.3jane.xyz/introduction', 'docs intro')})",
+            "  - 여기서 핵심은 3Jane이 단순히 `높은 APY`를 말하는 것이 아니라, 초과담보 DeFi lending이 해결하지 못한 borrower capital efficiency 문제를 정면으로 다룬다는 점입니다.",
             "- **Supplier docs:** 공급자 관점에서는 USDC 예치, USD3 민팅, sUSD3 staking/first-loss exposure가 핵심입니다. 이 구조 때문에 3Jane은 단순 거버넌스 토큰보다 credit pool과 tranche risk를 먼저 봐야 합니다. "
             f"({source_markdown_link('https://docs.3jane.xyz/architecture/core-money-market/suppliers', 'supplier docs')})",
+            "  - 공급자 문서는 보고서에서 가장 중요한 위험 해석 근거입니다. 공급자가 받는 수익이 어디서 나오고, 손실이 나면 어떤 순서로 반영되는지 파악해야 프로젝트의 yield가 지속 가능한지 볼 수 있습니다.",
             "- **Risk docs:** 공식 risk 문서는 redemption liquidity, borrower default, pool accounting, governance/parameter risk를 계속 봐야 한다는 점을 드러냅니다. 이건 3Jane의 업사이드이자 가장 큰 실사 포인트입니다. "
             f"({source_markdown_link('https://docs.3jane.xyz/risks', 'risk docs')})",
+            "  - risk 문서가 존재한다는 점은 긍정적이지만, 문서화 자체가 리스크를 해결했다는 뜻은 아닙니다. 실제 default event, recovery process, liquidity queue가 어떻게 작동했는지 별도 데이터가 필요합니다.",
             "- **Address registry:** Ethereum 기준 USD3, sUSD3, JANE, MorphoCredit 등 주요 주소가 문서화되어 있어 identity gate는 어느 정도 통과합니다. 다만 실제 pool 상태와 사용량은 별도 explorer/market 확인이 필요합니다. "
             f"({source_markdown_link('https://docs.3jane.xyz/developers/addresses', 'address registry')})",
+            "  - 주소 레지스트리는 ticker collision과 unofficial CA를 걸러내는 데 필요합니다. 3Jane처럼 USD3/JANE 등 이름이 일반적인 자산명과 충돌할 수 있는 프로젝트는 공식 주소 확인이 특히 중요합니다.",
             "- **공식 X / The Block:** 시장이 3Jane을 보게 된 가장 큰 계기는 $5.2M seed round입니다. 공식 X와 The Block 기사 모두 Paradigm 리드, stealth 공개, crypto credit startup이라는 framing을 확인해 줍니다. "
             f"({source_markdown_link('https://x.com/3janexyz/status/1930264347441615188', 'official X')}, {source_markdown_link('https://www.theblock.co/post/356872/paradigm-leads-5-million-seed-round-in-crypto-credit-startup-3jane', 'The Block')})",
+            "  - 이 소스는 funding credibility를 제공합니다. 다만 seed round와 유명 backer는 출발 신호이지 product-market fit의 증거는 아닙니다. 그래서 funding은 긍정 신호로만 두고, 제품/온체인 지표와 분리해서 봐야 합니다.",
             "- **Wintermute Ventures:** Wintermute Ventures는 backing 사실과 `@_yakovsky` 단서를 남겼습니다. 이건 team/founder dossier의 시작점이지만, 실명ㆍ이전 경력ㆍ이전 프로젝트는 아직 추가 확인 대상입니다. "
             f"({source_markdown_link('https://x.com/wmt_ventures/status/1930336436433367395', 'Wintermute Ventures')})",
+            "  - Wintermute 쪽 언급은 market structure와 liquidity 네트워크 관점에서 의미가 있습니다. 동시에 founder dossier가 아직 얕기 때문에, 다음 보고서에서는 `@_yakovsky`를 기준으로 팀 이력을 더 파야 합니다.",
             "- **Delphi / 외부 해설:** Delphi는 3Jane을 `real credit onchain` 베팅으로 해석합니다. Leviathan류 외부 글은 시장이 이 프로젝트를 unsecured/undercollateralized lending protocol로 이해하고 있음을 보여줍니다. "
             f"({source_markdown_link('https://members.delphidigital.io/reports/engineering-real-credit-onchain-the-3jane-bet', 'Delphi')}, {source_markdown_link('https://leviathannews.substack.com/p/3jane-lending-protocol-explained', 'Leviathan')})",
+            "  - 외부 해설의 가치는 `어떤 내러티브로 소비되는가`를 보여주는 데 있습니다. 현재 3Jane은 단순 DeFi yield가 아니라 real credit / undercollateralized lending의 재시도로 읽히고 있습니다.",
         ]
     return reader_source_lines(source_log)
 

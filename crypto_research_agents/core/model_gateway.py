@@ -14,6 +14,7 @@ class ModelDecision:
     reason: str
     max_tokens: int
     temperature: float
+    reasoning_effort: str = "standard"
 
 
 class ModelGateway:
@@ -39,6 +40,7 @@ class ModelGateway:
                 reason=f"{agent_id} requested front-door conversation",
                 max_tokens=1200,
                 temperature=0.45,
+                reasoning_effort=_reasoning_effort(default="standard"),
             )
         if task_type in {"report_writing", "final_synthesis"}:
             return ModelDecision(
@@ -46,10 +48,12 @@ class ModelGateway:
                 or _model_env("STRONG")
                 or codex_model_for_tier("WRITING"),
                 reason=f"{agent_id} requested synthesis/report work",
-                max_tokens=6000,
+                max_tokens=9000,
                 temperature=0.2,
+                reasoning_effort=_reasoning_effort(default="pro"),
             )
         if task_type in {
+            "source_ingestion",
             "narrative_reasoning",
             "supervision",
             "candidate_discovery",
@@ -64,8 +68,9 @@ class ModelGateway:
                 or _model_env("STRONG")
                 or codex_model_for_tier("REASONING"),
                 reason=f"{agent_id} requested reasoning work",
-                max_tokens=5000,
+                max_tokens=8000,
                 temperature=0.2,
+                reasoning_effort=_reasoning_effort(default="pro"),
             )
         if task_type == "embedding_search":
             return ModelDecision(
@@ -73,12 +78,14 @@ class ModelGateway:
                 reason="Vector lookup requested",
                 max_tokens=0,
                 temperature=0.0,
+                reasoning_effort="standard",
             )
         return ModelDecision(
             selected_model=self.default_model,
             reason=f"{agent_id} requested routine task: {task_type}",
             max_tokens=3000,
             temperature=0.1,
+            reasoning_effort=_reasoning_effort(default="standard"),
         )
 
     def complete(
@@ -100,6 +107,7 @@ class ModelGateway:
             max_tokens=decision.max_tokens,
             temperature=decision.temperature,
             response_format=response_format,
+            reasoning_effort=decision.reasoning_effort,
         )
         response = self.provider.complete(request)
         self.call_log.append(
@@ -107,6 +115,7 @@ class ModelGateway:
                 "agent_id": agent_id,
                 "task_type": task_type,
                 "selected_model": decision.selected_model,
+                "reasoning_effort": decision.reasoning_effort,
                 "provider": response.provider,
                 "usage": response.usage,
             }
@@ -135,3 +144,20 @@ def _model_env(tier: str) -> str | None:
     return codex_model_from_env_value(
         os.getenv(f"CODEX_MODEL_{tier}") or os.getenv(f"CODEX_CLI_MODEL_{tier}"),
     )
+
+
+def _reasoning_effort(*, default: str) -> str:
+    raw = (
+        os.getenv("CODEX_REASONING_EFFORT")
+        or os.getenv("CODEX_MODEL_REASONING_EFFORT")
+        or os.getenv("CODEX_CLI_MODEL_REASONING_EFFORT")
+        or default
+    )
+    normalized = raw.strip().lower().replace("-", "_")
+    if normalized in {"pro", "xhigh", "extra_high", "max", "maximum"}:
+        return "pro"
+    if normalized in {"high", "deep"}:
+        return "high"
+    if normalized in {"fast", "low"}:
+        return "fast"
+    return "standard"

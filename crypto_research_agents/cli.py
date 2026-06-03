@@ -69,6 +69,7 @@ MODEL_ROUTE_TIERS = [
 ]
 MODEL_SETTING_ENV_NAMES = [
     "LLM_PROVIDER",
+    "CODEX_REASONING_EFFORT",
     "CODEX_MODEL_FAST_CHAT",
     "CODEX_MODEL_FAST",
     "CODEX_MODEL_REASONING",
@@ -1652,6 +1653,7 @@ def print_current_model_config() -> None:
             f"Fast model: {fast_decision.selected_model}",
             f"Reasoning model: {reasoning_decision.selected_model}",
             f"Writing model: {writing_decision.selected_model}",
+            f"Reasoning effort: {reasoning_decision.reasoning_effort}",
             f"Credential: {token_source}",
             f"Supported Codex models: {', '.join(SUPPORTED_CODEX_MODEL_IDS)}",
         ]

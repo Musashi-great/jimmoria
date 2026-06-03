@@ -979,9 +979,15 @@ class SmokeTest(unittest.TestCase):
             reasoning_tasks = {
                 entry["task_type"]: entry["selected_model"]
                 for entry in llm_log
-                if entry["task_type"] in {"candidate_discovery", "social_summary", "contract_info", "product_docs", "funding_token", "obsidian_sync"}
+                if entry["task_type"] in {"source_ingestion", "candidate_discovery", "social_summary", "contract_info", "product_docs", "funding_token", "obsidian_sync"}
             }
             self.assertEqual(set(reasoning_tasks.values()), {"gpt-5.5"})
+            reasoning_efforts = {
+                entry["task_type"]: entry.get("reasoning_effort")
+                for entry in llm_log
+                if entry["task_type"] in {"source_ingestion", "candidate_discovery", "social_summary", "contract_info", "product_docs", "funding_token", "report_writing", "final_synthesis"}
+            }
+            self.assertEqual(set(reasoning_efforts.values()), {"pro"})
             self.assertGreaterEqual(len(result.bus.messages), 8)
             self.assertGreaterEqual(len(result.memory.get_room_findings(result.room.room_id)), 8)
             finding_types = {
@@ -1434,6 +1440,7 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("## 7. 리스크와 반론", report)
         self.assertIn("## 8. 다음 실사 질문", report)
         self.assertIn("## 9. 확인된 내용 요약", report)
+        self.assertGreater(len(report), 10000)
         self.assertIn("`WATCH`", report)
         self.assertIn("# Evidence Packet: 3Jane Protocol", evidence_packet)
         self.assertIn("## Founder Dossier", evidence_packet)
@@ -1461,6 +1468,17 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("Delphi", report)
         self.assertIn("Wintermute", report)
         self.assertIn("투자 가설", report)
+        self.assertIn("한 줄 결론", report)
+        self.assertIn("무엇이 성립해야 하는가", report)
+        self.assertIn("credit pool 사용량", report)
+        self.assertIn("대표님이 읽을 때", report)
+        self.assertIn("KOL/리서치 해석", report)
+        self.assertIn("소셜 신호의 약점", report)
+        self.assertIn("protocol operator 관점", report)
+        self.assertIn("경제적 질문", report)
+        self.assertIn("가치 포착의 강한 조건", report)
+        self.assertIn("운영 리스크", report)
+        self.assertIn("반론", report)
         self.assertIn("공식 사이트/화이트페이퍼", report)
         self.assertIn("Docs introduction", report)
         self.assertIn("Supplier docs", report)
@@ -1972,6 +1990,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
   -s, --sandbox <SANDBOX_MODE>
   -o, --output-last-message <FILE>
   -m, --model <MODEL>
+  -c, --config <key=value>
 """
         commands: list[list[str]] = []
         run_kwargs: list[dict[str, object]] = []
@@ -1995,6 +2014,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
             max_tokens=100,
             temperature=0.1,
             response_format="json",
+            reasoning_effort="pro",
         )
 
         with patch("crypto_research_agents.core.llm_provider.subprocess.run", side_effect=fake_run):
@@ -2005,11 +2025,15 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertIn("--sandbox", exec_command)
         self.assertIn("--output-last-message", exec_command)
         self.assertIn("--model", exec_command)
+        self.assertIn("--config", exec_command)
+        self.assertIn('model_reasoning_effort="xhigh"', exec_command)
         self.assertNotIn("--ask-for-approval", exec_command)
         self.assertEqual(exec_command[-1], "-")
         exec_kwargs = run_kwargs[1]
         self.assertIsInstance(exec_kwargs["input"], bytes)
         self.assertIn("pearl 크립토 프로젝트", exec_kwargs["input"].decode("utf-8"))
+        self.assertEqual(response.usage["reasoning_effort"], "pro")
+        self.assertEqual(response.usage["codex_model_reasoning_effort"], "xhigh")
         self.assertIs(exec_kwargs["text"], False)
 
     def test_model_setup_offline_choice_uses_screen_flow(self) -> None:
@@ -2170,6 +2194,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertIn("안녕", str(calls["prompt"]))
         self.assertEqual(response.usage["approval_mode"], "deny_all")
         self.assertEqual(response.usage["duration_ms"], 123)
+        self.assertEqual(response.usage["reasoning_effort"], "standard")
 
     def test_codex_model_env_has_priority(self) -> None:
         with patch.dict(
@@ -2217,15 +2242,22 @@ Usage: codex exec [OPTIONS] [PROMPT]
             gateway = ModelGateway(provider=FakeCodexCliProvider())
 
         reasoning = gateway.select(agent_id="discovery_agent", task_type="candidate_discovery")
+        ingestion = gateway.select(agent_id="ingestion_agent", task_type="source_ingestion")
         obsidian = gateway.select(agent_id="obsidian_curator_agent", task_type="obsidian_sync")
         writing = gateway.select(agent_id="report_agent", task_type="final_synthesis")
 
         fast = gateway.select(agent_id="supervisor_agent", task_type="supervisor_chat")
 
         self.assertEqual(fast.selected_model, "gpt-5.4-mini")
+        self.assertEqual(ingestion.selected_model, "gpt-5.5")
         self.assertEqual(reasoning.selected_model, "gpt-5.5")
         self.assertEqual(obsidian.selected_model, "gpt-5.5")
         self.assertEqual(writing.selected_model, "gpt-5.5")
+        self.assertEqual(fast.reasoning_effort, "standard")
+        self.assertEqual(ingestion.reasoning_effort, "pro")
+        self.assertEqual(reasoning.reasoning_effort, "pro")
+        self.assertEqual(obsidian.reasoning_effort, "pro")
+        self.assertEqual(writing.reasoning_effort, "pro")
 
     def test_doctor_marks_secret_backed_connectors_as_missing_secret(self) -> None:
         with patch.dict("os.environ", _offline_no_secret_env(), clear=False):
@@ -2285,6 +2317,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(router["routes"]["supervisor_chat"], "fast_chat_model")
         for task_type in [
             "supervision",
+            "source_ingestion",
             "narrative_reasoning",
             "candidate_discovery",
             "social_summary",
@@ -2297,6 +2330,9 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(router["defaults"]["reasoning_model"], "gpt-5.5")
         self.assertEqual(router["defaults"]["writing_model"], "gpt-5.5")
         self.assertEqual(router["defaults"]["fast_chat_model"], "gpt-5.4-mini")
+        self.assertEqual(router["defaults"]["reasoning_effort"], "pro")
+        self.assertEqual(router["routes"]["source_ingestion"], "reasoning_model")
+        self.assertEqual(router["reasoning_effort"]["codex_cli_pro_value"], "xhigh")
 
     def test_doctor_command_outputs_current_limitations(self) -> None:
         with TemporaryDirectory() as tmp:

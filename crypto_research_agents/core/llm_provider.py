@@ -21,6 +21,7 @@ class LLMRequest:
     max_tokens: int
     temperature: float
     response_format: str = "text"
+    reasoning_effort: str = "standard"
 
 
 @dataclass(slots=True)
@@ -60,7 +61,7 @@ class OfflineLLMProvider:
             text=text,
             model=request.model,
             provider=self.provider_name,
-            usage={"mode": "offline"},
+            usage={"mode": "offline", "reasoning_effort": request.reasoning_effort},
         )
 
 
@@ -83,6 +84,7 @@ class CodexCliProvider:
                 help_text=self.exec_help_text(),
                 output_path=output_path,
                 model=request.model,
+                reasoning_effort=request.reasoning_effort,
             )
 
             completed = subprocess.run(
@@ -111,7 +113,11 @@ class CodexCliProvider:
             text=text,
             model=request.model,
             provider=self.provider_name,
-            usage={"mode": "codex_cli"},
+            usage={
+                "mode": "codex_cli",
+                "reasoning_effort": request.reasoning_effort,
+                "codex_model_reasoning_effort": _codex_config_reasoning_effort(request.reasoning_effort),
+            },
         )
 
     def exec_help_text(self) -> str:
@@ -166,6 +172,7 @@ class CodexSdkProvider:
                 sandbox=self.sandbox_name,
                 approval_mode=self.approval_mode_name,
                 cwd=self.cwd,
+                reasoning_effort=request.reasoning_effort,
             ),
             raw=result,
         )
@@ -218,6 +225,7 @@ def _build_codex_exec_command(
     help_text: str,
     output_path: Path,
     model: str,
+    reasoning_effort: str = "standard",
 ) -> list[str]:
     command = [executable, "exec"]
 
@@ -240,6 +248,11 @@ def _build_codex_exec_command(
     if _is_real_model_name(model) and _codex_exec_supports(help_text, "--model"):
         command.extend(["--model", model])
 
+    if _codex_exec_supports(help_text, "--config"):
+        codex_effort = _codex_config_reasoning_effort(reasoning_effort)
+        if codex_effort:
+            command.extend(["--config", f'model_reasoning_effort="{codex_effort}"'])
+
     command.append("-")
     return command
 
@@ -256,6 +269,9 @@ def _codex_cli_prompt(request: LLMRequest) -> str:
         "You are serving as an LLM provider inside JIMMORIA, a crypto research-only "
         "multi-agent runtime. Follow the system prompt and user prompt. Do not browse "
         "or run tools unless explicitly necessary; answer from the provided context."
+        f"\nReasoning effort requested: {request.reasoning_effort.upper()}."
+        "\nFor PRO effort, slow down mentally, compare alternatives, identify missing evidence, "
+        "and produce a richer synthesis without inventing facts."
         f"{response_rule}\n\n"
         f"System prompt:\n{request.system_prompt}\n\n"
         f"User prompt:\n{request.user_prompt}\n"
@@ -270,6 +286,9 @@ def _codex_sdk_prompt(request: LLMRequest) -> str:
         "You are serving as a Codex SDK worker inside JIMMORIA, a crypto research-only "
         "multi-agent company. You are not here to modify the repository for this task. "
         "Answer from the provided context and keep outputs suitable for the requesting agent."
+        f"\nReasoning effort requested: {request.reasoning_effort.upper()}."
+        "\nFor PRO effort, slow down mentally, compare alternatives, identify missing evidence, "
+        "and produce a richer synthesis without inventing facts."
         f"{response_rule}\n\n"
         f"System prompt:\n{request.system_prompt}\n\n"
         f"User prompt:\n{request.user_prompt}\n"
@@ -292,12 +311,13 @@ def _codex_sdk_approval_mode(approval_module: Any, approval_mode: str) -> Any:
     return approval_module.deny_all
 
 
-def _codex_sdk_usage(result: Any, *, sandbox: str, approval_mode: str, cwd: str) -> dict[str, Any]:
+def _codex_sdk_usage(result: Any, *, sandbox: str, approval_mode: str, cwd: str, reasoning_effort: str) -> dict[str, Any]:
     usage: dict[str, Any] = {
         "mode": "codex_sdk",
         "sandbox": sandbox,
         "approval_mode": approval_mode,
         "cwd": cwd,
+        "reasoning_effort": reasoning_effort,
     }
     for attr_name in ["id", "status", "duration_ms"]:
         value = getattr(result, attr_name, None)
@@ -310,6 +330,17 @@ def _codex_sdk_usage(result: Any, *, sandbox: str, approval_mode: str, cwd: str)
         else:
             usage["token_usage"] = token_usage
     return usage
+
+
+def _codex_config_reasoning_effort(reasoning_effort: str) -> str:
+    normalized = (reasoning_effort or "standard").strip().lower().replace("-", "_")
+    if normalized in {"pro", "xhigh", "extra_high", "max", "maximum"}:
+        return "xhigh"
+    if normalized in {"high", "deep"}:
+        return "high"
+    if normalized in {"fast", "low"}:
+        return "low"
+    return "medium"
 
 
 def _is_real_model_name(model: str) -> bool:

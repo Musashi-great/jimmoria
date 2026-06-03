@@ -78,6 +78,17 @@ python -m pip install -e ".[codex]"
 
 If Codex login already exists locally, JIMMORIA can reuse it. It stores provider/model preferences in `data/model_settings.json`, not raw tokens.
 
+Default model routing:
+
+```text
+Supervisor chat:        gpt-5.4-mini unless CODEX_REASONING_EFFORT overrides it
+Source ingestion:       gpt-5.5 + pro reasoning
+Specialist reasoning:   gpt-5.5 + pro reasoning
+Report synthesis:       gpt-5.5 + pro reasoning
+```
+
+For Codex CLI, JIMMORIA maps `pro` to the local Codex config value `model_reasoning_effort="xhigh"` when the installed `codex exec` supports `--config`.
+
 ## How The Company Works
 
 The user talks to the Supervisor. The Supervisor acts as the company boss and orchestrator.
@@ -236,6 +247,8 @@ Inside `jimmoria`:
 When a Research Room passes the quality gate, JIMMORIA prints the full Markdown report in the CLI and also shows the saved report path.
 
 The report is designed as a project-understanding and investment-memo style dossier, not an agent log or a source list. It should explain what the project is, what it is building, how the token/chain structure works, why the narrative matters, what public X/KOL/article sources actually say, who funded it, what risks remain, and what to verify next.
+
+For high-signal projects, the report should be prose-rich enough to read like a research memo: conclusion first, project mechanics explained in plain language, social/KOL interpretation separated from official proof, token value-capture discussed as live-vs-roadmap, and risks written as counter-thesis rather than raw warnings.
 
 For Korean research requests, JIMMORIA writes Korean-first reports. Links are displayed with short labels such as `The Block`, `3Jane site`, or `x.com/3janexyz/status`, while the Markdown target keeps the full URL.
 

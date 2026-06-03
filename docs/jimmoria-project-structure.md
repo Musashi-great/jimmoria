@@ -142,10 +142,31 @@ flowchart LR
 | Collaboration Bus | `core/bus.py` | 요청, 응답, handoff, update 기록 |
 | Shared Memory | `core/memory.py` | sources, candidates, findings, entity graph |
 | Tool Gateway | `core/tool_gateway.py` | tool 권한, connector 호출, audit log |
-| Model Gateway | `core/model_gateway.py` | task type별 Codex model route |
+| Model Gateway | `core/model_gateway.py` | task type별 Codex model route, pro reasoning effort |
 | Concurrency Policy | `core/concurrency.py`, `config/concurrency.yaml` | Phase 1-4 병렬화 정책 |
 | Storage | `storage/` | run snapshot, reports, vault notes |
 | Web Dashboard | `web/` | 로컬 구조/런타임 시각화 |
+
+## 5.1 Model Routing
+
+JIMMORIA는 현재 Codex-only 모델 정책을 사용한다.
+
+```text
+supervisor_chat       gpt-5.4-mini, standard by default
+source_ingestion      gpt-5.5, pro reasoning
+supervision           gpt-5.5, pro reasoning
+narrative_reasoning   gpt-5.5, pro reasoning
+candidate_discovery   gpt-5.5, pro reasoning
+social_summary        gpt-5.5, pro reasoning
+contract_info         gpt-5.5, pro reasoning
+product_docs          gpt-5.5, pro reasoning
+funding_token         gpt-5.5, pro reasoning
+obsidian_sync         gpt-5.5, pro reasoning
+report_writing        gpt-5.5, pro reasoning
+final_synthesis       gpt-5.5, pro reasoning
+```
+
+`CODEX_REASONING_EFFORT=pro`는 ModelGateway에서 `reasoning_effort=pro`로 기록되고, Codex CLI provider는 `codex exec --config model_reasoning_effort="xhigh"`로 매핑한다. 이 값은 `data/runs/<room_id>/llm_call_log.json`에도 남아 나중에 어떤 작업이 어느 노력도로 실행됐는지 확인할 수 있다.
 
 ## 6. Supervisor Role
 
@@ -346,6 +367,15 @@ Research Room 결과 출력 정책:
 ```
 
 즉 ReportAgent는 "누가 무엇을 했는지"나 "어떤 링크를 봤는지"보다 "그 링크와 자료에서 어떤 내용이 확인됐고, 그래서 이 프로젝트를 어떻게 이해해야 하는지"를 앞세운다. 에이전트별 실행 로그, council 토론, tool payload, raw LLM output은 최종 보고서 본문에 넣지 않고 `data/runs/<room_id>/messages.json`, `events.json`, `tool_audit_log.json`, `llm_call_log.json`에 감사 trail로 남긴다.
+
+특히 3Jane 같은 high-signal 프로젝트는 짧은 링크 요약으로 끝내지 않는다. 보고서는 다음을 반드시 풀어쓴다.
+
+- 프로젝트가 무엇을 하는지와 기존 DeFi 구조와 다른 점
+- X/KOL/article에서 시장이 어떤 내러티브로 읽고 있는지
+- 공식 사이트/docs/whitepaper에서 실제로 확인되는 제품 구조
+- 토큰/체인/value-capture가 live인지 roadmap인지
+- 팀/펀딩/KOL 신호가 무엇을 의미하고 무엇은 아직 미확인인지
+- bull case, bear case, 반론, 다음 실사 질문
 
 ### Current Reader-Friendly Report Shape
 
