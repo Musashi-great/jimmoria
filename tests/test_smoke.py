@@ -216,6 +216,7 @@ class SmokeTest(unittest.TestCase):
 
     def test_chat_intake_classifies_saved_report_request(self) -> None:
         self.assertEqual(classify_chat_input("3jane 보고서 만든거 보내봐 전체"), "report_retrieval")
+        self.assertEqual(classify_chat_input("3jane 보고서 만들어봐"), "report_retrieval")
         self.assertEqual(classify_chat_input("3jane 보고서 들고와봐"), "report_retrieval")
         self.assertEqual(classify_chat_input("show 3jane full report"), "report_retrieval")
         self.assertEqual(classify_chat_input("3jane 보고서 가지고 와봐"), "report_retrieval")
@@ -396,7 +397,7 @@ class SmokeTest(unittest.TestCase):
             )
             with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(root / "model_settings.json")}, clear=True):
                 with patch("sys.stdin.isatty", return_value=True):
-                    with patch("builtins.input", side_effect=["3jane 보고서 들고와봐", "/quit"]):
+                    with patch("builtins.input", side_effect=["3jane 보고서 만들어봐", "/quit"]):
                         with redirect_stdout(output):
                             chat_command(args)
 
@@ -1072,6 +1073,38 @@ class SmokeTest(unittest.TestCase):
 
             found = find_saved_report_for_request(
                 "3jane 보고서 들고와봐",
+                runs_dir=root / "data" / "runs",
+                reports_dir=root / "reports",
+            )
+
+        self.assertIsNotNone(found)
+        assert found is not None
+        self.assertEqual(found[0], report_path)
+        self.assertEqual(found[1], "room_3jane")
+
+    def test_saved_report_request_finds_make_phrasing(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report_path = root / "reports" / "3jane-dossier.md"
+            run_dir = root / "data" / "runs" / "room_3jane"
+            report_path.parent.mkdir(parents=True)
+            run_dir.mkdir(parents=True)
+            report_path.write_text("# 3jane Report\n\nFull dossier body.", encoding="utf-8")
+            (run_dir / "room.json").write_text(
+                json.dumps(
+                    {
+                        "room_id": "room_3jane",
+                        "topic": "3jane crypto project research",
+                        "status": "completed",
+                        "output_paths": {"report": str(report_path)},
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            found = find_saved_report_for_request(
+                "3jane 보고서 만들어봐",
                 runs_dir=root / "data" / "runs",
                 reports_dir=root / "reports",
             )

@@ -83,7 +83,7 @@ JIMMORIA에 적용할 기준은 다음이다.
 - Stable input dock: 입력창은 하단 dock처럼 계속 유지되어야 한다. 로그가 올라와도 사용자는 "회사와 대화 중"이라는 감각을 잃지 않아야 한다.
 - Compact logs: 실시간 로그는 `Room >`, `Agent >`, `Tool >`, `Output >` 한 줄 stream을 기본값으로 둔다.
 - Deep logs elsewhere: 자세한 board, message, event, tool audit은 `/board`, `/messages`, `/events`, `data/runs/<room_id>`로 보낸다.
-- Report is not default: 모든 입력을 보고서로 만들지 않는다. report/research/analyze/dossier처럼 명확한 요청일 때만 보고서를 만든다.
+- Report is not default: 모든 입력을 보고서로 만들지 않는다. 저장된 산출물을 부르는 `3jane 보고서 만들어봐/들고와봐/보내봐` 류는 report lookup으로 처리하고, `새로`, `리서치`, `조사`, `분석`이 있을 때만 새 Research Room을 연다.
 - External tools are visible: connector가 없거나 실패하면 조용히 넘어가지 않고, `unconfigured`, `missing evidence`, `insufficient_evidence`를 명확히 표시한다.
 - Visual future: CLI event stream은 나중에 ChatDev-style workflow canvas나 web visualizer가 replay할 수 있는 구조로 유지한다.
 

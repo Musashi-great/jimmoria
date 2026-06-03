@@ -480,6 +480,25 @@ REPORT_CREATE_TERMS = [
     "generate",
 ]
 
+REPORT_NEW_RESEARCH_TERMS = [
+    "새로",
+    "신규",
+    "다시",
+    "업데이트",
+    "최신",
+    "조사",
+    "리서치",
+    "리서칭",
+    "분석",
+    "research",
+    "analyze",
+    "analyse",
+    "investigate",
+    "fresh",
+    "new",
+    "update",
+]
+
 
 def _has_any(original: str, lowered: str, terms: list[str]) -> bool:
     return any(term in lowered for term in terms) or any(term in original for term in terms)
@@ -498,17 +517,19 @@ def _looks_like_source_only_request(original: str, lowered: str) -> bool:
 
 
 def _looks_like_report_retrieval_request(original: str, lowered: str) -> bool:
+    if _has_any(original, lowered, COMPANY_CONFIG_TERMS) or _is_meta_instruction(original):
+        return False
     normal_report_words = ["보고서", "리포트", "레포트", "report"]
     if _has_any(original, lowered, normal_report_words):
         if _has_any(original, lowered, REPORT_CREATE_TERMS):
-            return False
+            return not _has_any(original, lowered, REPORT_NEW_RESEARCH_TERMS)
         if _has_any(original, lowered, REPORT_RETRIEVAL_TERMS):
             return True
     report_words = ["보고서", "리포트", "레포트", "report"]
     if not _has_any(original, lowered, report_words):
         return False
     if _has_any(original, lowered, REPORT_CREATE_TERMS):
-        return False
+        return not _has_any(original, lowered, REPORT_NEW_RESEARCH_TERMS)
     return _has_any(original, lowered, REPORT_RETRIEVAL_TERMS)
 
 

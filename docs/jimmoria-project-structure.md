@@ -150,7 +150,7 @@ flowchart LR
 
 일반 리서치 요청은 `ResearchRuntime.run_article_research()`로 들어간다.
 
-단, 모든 채팅 입력이 Research Room으로 들어가는 것은 아니다. 사용자가 "보고서 만든 거 보내줘", "전체 보고서 보여줘", `/report 3jane`처럼 기존 산출물을 요청하면 Supervisor가 `report_retrieval`로 분류하고 새 Research Room을 열지 않는다. 이 경우 `data/runs/*/room.json`과 `reports/*.md`에서 기존 보고서를 찾아 출력한다.
+단, 모든 채팅 입력이 Research Room으로 들어가는 것은 아니다. 사용자가 "보고서 만든 거 보내줘", "전체 보고서 보여줘", "3jane 보고서 만들어봐", `/report 3jane`처럼 기존 산출물을 요청하면 Supervisor가 `report_retrieval`로 분류하고 새 Research Room을 열지 않는다. 이 경우 `data/runs/*/room.json`과 `reports/*.md`에서 기존 보고서를 찾아 출력한다. 새 조사를 원하면 "새로", "리서치", "조사", "분석"처럼 새 Research Room 의도를 명시해야 한다.
 
 또한 Research Room을 여는 요청은 바로 실행하지 않는다. Supervisor가 먼저 입력을 해석해 `Supervisor check`를 보여주고, 사용자가 Enter/Y로 확인해야 `project_research_room` 또는 `source_ingestion_room`이 열린다. 사용자가 `n`을 입력하면 에이전트는 실행되지 않고 run/report 산출물도 만들지 않는다.
 
@@ -845,12 +845,22 @@ JIMMORIA는 이제 모든 일반 채팅 입력을 바로 보고서 생성으로 
 | 인사/잡담/애매한 입력 | Research Room을 열지 않고 Supervisor가 방향을 확인 |
 | 상태/설정 확인 요청 | Research Room을 열지 않고 settings/status panel 출력 |
 | source-only ingestion 요청 | 작은 ingestion room을 열고 Source Note만 저장 |
+| 기존 보고서 요청 | 저장된 run/report를 먼저 찾고 Research Room을 열지 않음 |
 | URL 입력 | 기본적으로 research flow로 라우팅하되 source-only 표현이 있으면 ingestion만 실행 |
 
 예시:
 
 ```text
 pearl 프로젝트 리서치 보고서 만들어봐
+-> research_request
+-> Research Room opened
+
+3jane 보고서 만들어봐
+-> report_retrieval
+-> saved report lookup
+-> Research Room not opened
+
+3jane 새로 리서치 보고서 만들어봐
 -> research_request
 -> Research Room opened
 
@@ -939,6 +949,7 @@ Runtime 연결:
 - `supervisor_chat`이면 `Supervisor reply`로 바로 답하고 종료한다.
 - 인사와 애매한 입력은 `company_config`로 저장하지 않고 `supervisor_chat`으로 처리한다.
 - `company_status`면 `/settings`와 같은 settings/status panel을 보여주고 종료한다.
+- `report_retrieval`이면 `find_saved_report_for_request()`로 기존 run/report를 찾고, 없으면 Research Room을 열지 않은 채 "저장된 보고서를 찾지 못했다"고 답한다.
 - `source_ingestion`이면 작은 ingestion room을 열어 Source Note만 저장한다.
 - `research_request`면 기존처럼 `ResearchRuntime.run_article_research()`를 실행한다.
 - `supervisor_chat` 응답은 `supervisor_chat` 모델 라우트를 사용한다. live LLM이 있으면 자연어 응답을 생성하고, offline fallback이면 로컬 대화 응답을 사용한다.

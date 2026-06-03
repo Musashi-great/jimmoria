@@ -75,6 +75,9 @@ Natural language report retrieval also works. The Supervisor should not open a n
 ```text
 You > 3jane 보고서 만든거 보내봐 전체
 Supervisor > finds and prints the saved report
+
+You > 3jane 보고서 만들어봐
+Supervisor > treats this as an existing-report lookup unless the message says 리서치/조사/분석/새로
 ```
 
 ## Project Structure
@@ -178,6 +181,7 @@ Runtime은 이 manifest를 읽어 room goals와 agent order를 결정하고, `ev
 JIMMORIA는 이제 모든 일반 입력을 바로 보고서로 만들지 않는다.
 
 - `pearl 프로젝트 리서치 보고서 만들어봐`처럼 리서치/분석/보고서 요청이 명확하면 Research Room을 연다.
+- `3jane 보고서 만들어봐`처럼 특정 기존 산출물을 부르는 말은 먼저 저장된 보고서 조회로 처리한다. 새 리서치가 필요하면 `새로`, `리서치`, `조사`, `분석`을 명시한다.
 - `보고서는 한글로 만들어봐`, `로그 스타일 바꿔`, `슈퍼바이저 역할을 사장처럼 가져가` 같은 말은 회사 운영 설정으로 반영한다.
 - 설정은 `data/company_settings.json`에 저장된다.
 - `/settings`로 현재 회사 설정을 확인할 수 있다.
@@ -204,6 +208,8 @@ JIMMORIA의 일반 채팅 상대는 Supervisor다. 사용자는 먼저 Superviso
 ```
 
 예를 들어 `pearl 프로젝트를 분석해봐`는 리서치 방을 열지만, `보고서는 한글로 만들어`, `슈퍼바이저 권한을 더 크게 가져가`, `로그 스타일을 바꿔` 같은 말은 보고서를 만들지 않고 회사 운영 설정으로 반영된다. `지금 보고서 작성은 한글 위주로 세팅된 게 맞지?` 같은 말은 Research Room 없이 Supervisor가 직접 답한다. `안녕` 같은 인사는 설정으로 저장하지 않는다.
+
+기존 산출물 요청은 더 보수적으로 처리한다. `3jane 보고서 들고와봐`, `3jane 보고서 보내봐`, `3jane 보고서 만들어봐`는 새 Research Room을 열지 않고 `data/runs/*/room.json`과 `reports/*.md`에서 저장된 보고서를 먼저 찾는다. `3jane 새로 리서치 보고서 만들어봐`처럼 새 조사 의도가 분명할 때만 에이전트 방을 연다.
 
 Research Room이 필요한 경우에만 Supervisor가 방을 열고 에이전트들에게 작업을 배정한다. 그렇지 않으면 Supervisor가 바로 답하거나 설정을 반영하고 끝낸다.
 
