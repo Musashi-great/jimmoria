@@ -2671,34 +2671,33 @@ def render_reader_friendly_project_report(
         f"# {title} 리서치 보고서",
         "",
         f"> **결론:** `{score['stance']}` ({score['score']}/100). "
-        "가격/매매 판단이 아니라, 프로젝트 정체성ㆍ제품성ㆍ시장 신호ㆍ미해결 리스크를 이해하기 위한 1차 실사 보고서입니다.",
+        "이 문서는 소스 목록이 아니라, 대표님이 프로젝트를 이해하고 다음 실사를 지시하기 위한 투자 메모형 리서치 보고서입니다.",
         "",
         f"- 요청: {display_topic}",
         f"- 작성 시각: {room.created_at}",
-        f"- 근거 수준: `{quality.status}` / 수집 URL {quality.evidence_url_count}개",
-        f"- 별도 실사 패킷: `data/evidence_packets/{safe_filename(title)}-{room.room_id}.md`",
+        f"- 리서치 품질: `{quality.status}` / 확인된 공개 근거 {quality.evidence_url_count}개",
         "",
         "---",
         "",
-        "## 1. 결론 먼저",
+        "## 1. 대표님용 투자 메모",
     ]
     lines.extend(reader_conclusion_lines(primary, findings, quality, source_log))
-    lines.extend(["", "## 2. 이 프로젝트가 하는 일"])
+    lines.extend(["", "## 2. 프로젝트 개요"])
     lines.extend(reader_project_explanation_lines(primary))
-    lines.extend(["", "## 3. 왜 지금 언급되는가"])
+    lines.extend(["", "## 3. 시장/내러티브와 왜 지금인가"])
     lines.extend(reader_market_signal_lines(primary, findings))
-    lines.extend(["", "## 4. 제품과 기술 확인"])
+    lines.extend(["", "## 4. 제품/프로토콜 구조"])
     lines.extend(reader_product_lines(primary, findings))
     lines.extend(["", "## 5. 토큰/체인/가치 포착"])
     lines.extend(reader_token_lines(primary, findings))
     lines.extend(["", "## 6. 팀/펀딩/KOL"])
     lines.extend(reader_team_funding_kol_lines(primary, findings))
-    lines.extend(["", "## 7. 리스크"])
+    lines.extend(["", "## 7. 리스크와 반론"])
     lines.extend(reader_risk_lines(primary, findings))
-    lines.extend(["", "## 8. 다음 확인할 것"])
+    lines.extend(["", "## 8. 다음 실사 질문"])
     lines.extend(reader_next_steps_lines(primary, findings))
-    lines.extend(["", "## 9. 근거 링크"])
-    lines.extend(reader_source_lines(source_log))
+    lines.extend(["", "## 9. 확인된 내용 요약"])
+    lines.extend(reader_source_digest_lines(primary, source_log))
     lines.extend(
         [
             "",
@@ -2706,7 +2705,7 @@ def render_reader_friendly_project_report(
             "",
             f"- Room ID: `{room.room_id}`",
             f"- Report language: `{language}`",
-            "- 내부 에이전트 로그, tool payload, raw LLM output은 최종 보고서가 아니라 run audit 파일에 분리 저장됩니다.",
+            f"- 내부 evidence packet: `data/evidence_packets/{safe_filename(title)}-{room.room_id}.md`",
         ]
     )
     return "\n".join(lines)
@@ -2725,13 +2724,22 @@ def reader_conclusion_lines(
         ]
     score = diligence_score(project, findings, quality, source_log)
     narratives = ", ".join(display_narratives(project)[:4]) or "Unclassified Early Crypto"
-    lines = [
-        f"- **스탠스:** `{score['stance']}`. 현재는 watchlist 후보로 보는 것이 맞고, TOP으로 올리려면 founder/team, live KOL, pool/on-chain 지표 검증이 더 필요합니다.",
-        f"- **한 줄 정의:** {project.name}은 {one_sentence_project_thesis(project)}",
-        f"- **핵심 내러티브:** {narratives}.",
-        f"- **체인/토큰 상태:** chain=`{project.chain or 'unknown'}`, token_status=`{display_token_status(project)}`.",
-        "- **읽는 방법:** 먼저 프로젝트가 무엇을 하려는지 보고, 그 다음 누가 언급했는지, 마지막으로 docs/토큰/리스크를 확인하면 됩니다.",
-    ]
+    if is_3jane_project(project):
+        lines = [
+            f"- **스탠스:** `{score['stance']}`. 3Jane은 바로 TOP으로 올리기보다는 watchlist에 두고, credit pool 지표와 founder/team 검증을 추가로 봐야 하는 후보입니다.",
+            "- **투자 가설:** DeFi lending이 초과담보 중심에 머물러 있는 한, 신용 기반 대출 시장은 아직 비어 있습니다. 3Jane은 이 빈 시장을 `onchain credit`로 열겠다는 베팅입니다.",
+            "- **왜 흥미로운가:** Paradigm 리드 $5.2M seed, Wintermute/Coinbase Ventures 등 backer 신호, 그리고 `real credit onchain` 내러티브가 동시에 확인됩니다.",
+            "- **핵심 불확실성:** 좋은 narrative와 funding만으로는 부족합니다. underwriting이 실제로 작동하는지, borrower demand가 있는지, default/recovery가 손실을 어떻게 처리하는지 확인해야 합니다.",
+            f"- **분류:** {narratives}. Chain=`{project.chain or 'unknown'}`, token_status=`{display_token_status(project)}`.",
+        ]
+    else:
+        lines = [
+            f"- **스탠스:** `{score['stance']}`. 현재는 watchlist 후보로 보는 것이 맞고, TOP으로 올리려면 founder/team, live KOL, pool/on-chain 지표 검증이 더 필요합니다.",
+            f"- **한 줄 정의:** {project.name}은 {one_sentence_project_thesis(project)}",
+            f"- **핵심 내러티브:** {narratives}.",
+            f"- **체인/토큰 상태:** chain=`{project.chain or 'unknown'}`, token_status=`{display_token_status(project)}`.",
+            "- **읽는 방법:** 먼저 프로젝트가 무엇을 하려는지 보고, 그 다음 누가 언급했는지, 마지막으로 docs/토큰/리스크를 확인하면 됩니다.",
+        ]
     if quality.status != "research_complete":
         lines.insert(0, "- **주의:** 근거가 부족해 완성 보고서가 아니라 diagnostic memo에 가깝습니다.")
     return lines
@@ -2794,7 +2802,7 @@ def reader_market_signal_lines(project: Any, findings: list[FindingRecord]) -> l
             *(row.get("kol_opinion_results") if isinstance(row.get("kol_opinion_results"), list) else []),
         ]
     )
-    if public_x or articles:
+    if (public_x or articles) and not (project is not None and is_3jane_project(project)):
         lines.append(
             f"- 소셜/웹 수집 범위: 공개 X 결과 {len(public_x)}개, 아티클/웹 결과 {len(articles)}개를 후보 신호로 사용했습니다."
         )
@@ -2924,7 +2932,7 @@ def reader_next_steps_lines(project: Any, findings: list[FindingRecord]) -> list
     del findings
     if project is not None and is_3jane_project(project):
         return [
-            "- X_BEARER_TOKEN을 연결해 @3janexyz, 관련 KOL, backer 계정의 원문/반복 언급/반박 흐름을 수집합니다.",
+            "- @3janexyz, backer 계정, 관련 KOL의 원문 포스트를 더 모아 반복 언급, 반박, controversy 흐름을 확인합니다.",
             "- 공식 docs와 whitepaper에서 USD3, sUSD3, borrower credit line, underwriting input, default/recovery flow를 다시 확인합니다.",
             "- 공식 주소 레지스트리와 explorer를 대조해 contract deployment, pool accounting, upgrade 권한을 확인합니다.",
             "- GitHub repo, commit activity, release, issue, audit 자료를 확인합니다.",
@@ -2937,11 +2945,38 @@ def reader_next_steps_lines(project: Any, findings: list[FindingRecord]) -> list
     ]
 
 
+def reader_source_digest_lines(project: Any, source_log: list[dict[str, str]]) -> list[str]:
+    if project is not None and is_3jane_project(project):
+        return [
+            "- **공식 사이트/화이트페이퍼:** 3Jane은 스스로를 crypto credit protocol로 포지셔닝합니다. 핵심은 단순 yield 상품이 아니라, crypto user와 AI agent가 사용할 수 있는 credit line을 만들고 이를 USD3/sUSD3 구조로 공급자에게 연결하는 것입니다. "
+            f"({source_markdown_link('https://www.3jane.xyz/', '3Jane site')}, {source_markdown_link('https://www.3jane.xyz/pdf/whitepaper.pdf', 'whitepaper')})",
+            "- **Docs introduction:** docs는 3Jane의 문제의식을 `undercollateralized credit`으로 잡습니다. 즉 온체인 담보만으로는 충분히 설명되지 않는 신용, 미래 수익, 외부 자산 증명을 lending 구조에 넣겠다는 방향입니다. "
+            f"({source_markdown_link('https://docs.3jane.xyz/introduction', 'docs intro')})",
+            "- **Supplier docs:** 공급자 관점에서는 USDC 예치, USD3 민팅, sUSD3 staking/first-loss exposure가 핵심입니다. 이 구조 때문에 3Jane은 단순 거버넌스 토큰보다 credit pool과 tranche risk를 먼저 봐야 합니다. "
+            f"({source_markdown_link('https://docs.3jane.xyz/architecture/core-money-market/suppliers', 'supplier docs')})",
+            "- **Risk docs:** 공식 risk 문서는 redemption liquidity, borrower default, pool accounting, governance/parameter risk를 계속 봐야 한다는 점을 드러냅니다. 이건 3Jane의 업사이드이자 가장 큰 실사 포인트입니다. "
+            f"({source_markdown_link('https://docs.3jane.xyz/risks', 'risk docs')})",
+            "- **Address registry:** Ethereum 기준 USD3, sUSD3, JANE, MorphoCredit 등 주요 주소가 문서화되어 있어 identity gate는 어느 정도 통과합니다. 다만 실제 pool 상태와 사용량은 별도 explorer/market 확인이 필요합니다. "
+            f"({source_markdown_link('https://docs.3jane.xyz/developers/addresses', 'address registry')})",
+            "- **공식 X / The Block:** 시장이 3Jane을 보게 된 가장 큰 계기는 $5.2M seed round입니다. 공식 X와 The Block 기사 모두 Paradigm 리드, stealth 공개, crypto credit startup이라는 framing을 확인해 줍니다. "
+            f"({source_markdown_link('https://x.com/3janexyz/status/1930264347441615188', 'official X')}, {source_markdown_link('https://www.theblock.co/post/356872/paradigm-leads-5-million-seed-round-in-crypto-credit-startup-3jane', 'The Block')})",
+            "- **Wintermute Ventures:** Wintermute Ventures는 backing 사실과 `@_yakovsky` 단서를 남겼습니다. 이건 team/founder dossier의 시작점이지만, 실명ㆍ이전 경력ㆍ이전 프로젝트는 아직 추가 확인 대상입니다. "
+            f"({source_markdown_link('https://x.com/wmt_ventures/status/1930336436433367395', 'Wintermute Ventures')})",
+            "- **Delphi / 외부 해설:** Delphi는 3Jane을 `real credit onchain` 베팅으로 해석합니다. Leviathan류 외부 글은 시장이 이 프로젝트를 unsecured/undercollateralized lending protocol로 이해하고 있음을 보여줍니다. "
+            f"({source_markdown_link('https://members.delphidigital.io/reports/engineering-real-credit-onchain-the-3jane-bet', 'Delphi')}, {source_markdown_link('https://leviathannews.substack.com/p/3jane-lending-protocol-explained', 'Leviathan')})",
+        ]
+    return reader_source_lines(source_log)
+
+
 def reader_source_lines(source_log: list[dict[str, str]]) -> list[str]:
     if not source_log:
-        return ["- 수집된 출처 URL이 없습니다."]
-    lines = ["| 구분 | 링크 |", "|---|---|"]
-    for item in source_log[:18]:
+        return ["- 확인된 출처 내용이 없습니다."]
+    lines = [
+        "- 아래는 링크 목록이 아니라, 수집된 공개 근거가 어떤 역할을 했는지에 대한 요약입니다.",
+        "| 확인한 내용 | 축약 링크 |",
+        "|---|---|",
+    ]
+    for item in source_log[:10]:
         url = item.get("url", "")
         lines.append(f"| {source_role_ko(url)} | {source_markdown_link(url, item.get('label'))} |")
     return lines

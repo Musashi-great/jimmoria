@@ -235,7 +235,7 @@ Inside `jimmoria`:
 
 When a Research Room passes the quality gate, JIMMORIA prints the full Markdown report in the CLI and also shows the saved report path.
 
-The report is designed as a project-understanding dossier, not an agent log. The front of the report should help you understand what the project is, what it is building, how the token/chain structure works, why the narrative matters, what public X/KOL/article sources are saying, who funded it, what risks remain, and what to verify next.
+The report is designed as a project-understanding and investment-memo style dossier, not an agent log or a source list. It should explain what the project is, what it is building, how the token/chain structure works, why the narrative matters, what public X/KOL/article sources actually say, who funded it, what risks remain, and what to verify next.
 
 For Korean research requests, JIMMORIA writes Korean-first reports. Links are displayed with short labels such as `The Block`, `3Jane site`, or `x.com/3janexyz/status`, while the Markdown target keeps the full URL.
 
@@ -243,14 +243,14 @@ Completed project reports follow this shape:
 
 ```text
 1. Conclusion first
-2. What the project does
-3. Why it is being discussed now
-4. Product and technical verification
+2. Project overview
+3. Market narrative and why now
+4. Product / protocol structure
 5. Token / chain / value-capture
 6. Team / funding / KOL
-7. Risks
-8. What to verify next
-9. Evidence links
+7. Risks and counter-thesis
+8. Diligence questions
+9. Confirmed content summary
 ```
 
 Agent execution logs, council discussion, tool payloads, raw LLM output, specialist coverage, and AntSeed-style peer review are kept in `data/runs/<room_id>/` and `data/evidence_packets/`. They are not part of the completed report body.

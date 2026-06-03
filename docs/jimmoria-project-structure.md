@@ -334,33 +334,33 @@ Research Room 결과 출력 정책:
 완료 보고서의 1차 목표는 에이전트 로그를 보여주는 것이 아니라, 사용자가 프로젝트나 내러티브를 이해하도록 돕는 것이다. 그래서 `research_complete` 보고서는 다음 순서로 작성한다.
 
 ```text
-1. 결론 먼저
-2. 이 프로젝트가 하는 일
-3. 왜 지금 언급되는가
-4. 제품과 기술 확인
+1. 대표님용 투자 메모
+2. 프로젝트 개요
+3. 시장 / 내러티브와 왜 지금인가
+4. 제품 / 프로토콜 구조
 5. 토큰 / 체인 / 가치 포착
 6. 팀 / 펀딩 / KOL
-7. 리스크
-8. 다음 확인할 것
-9. 근거 링크
+7. 리스크와 반론
+8. 다음 실사 질문
+9. 확인된 내용 요약
 ```
 
-즉 ReportAgent는 "누가 무엇을 했는지"보다 "이 프로젝트를 어떻게 이해해야 하는지"를 앞세운다. 에이전트별 실행 로그, council 토론, tool payload, raw LLM output은 최종 보고서 본문에 넣지 않고 `data/runs/<room_id>/messages.json`, `events.json`, `tool_audit_log.json`, `llm_call_log.json`에 감사 trail로 남긴다.
+즉 ReportAgent는 "누가 무엇을 했는지"나 "어떤 링크를 봤는지"보다 "그 링크와 자료에서 어떤 내용이 확인됐고, 그래서 이 프로젝트를 어떻게 이해해야 하는지"를 앞세운다. 에이전트별 실행 로그, council 토론, tool payload, raw LLM output은 최종 보고서 본문에 넣지 않고 `data/runs/<room_id>/messages.json`, `events.json`, `tool_audit_log.json`, `llm_call_log.json`에 감사 trail로 남긴다.
 
 ### Current Reader-Friendly Report Shape
 
 `research_complete` report output is now written as a reader-friendly project dossier, not an internal agent activity log. The client-facing report uses this shape:
 
 ```text
-1. 결론 먼저
-2. 이 프로젝트가 하는 일
-3. 왜 지금 언급되는가
-4. 제품과 기술 확인
+1. 대표님용 투자 메모
+2. 프로젝트 개요
+3. 시장 / 내러티브와 왜 지금인가
+4. 제품 / 프로토콜 구조
 5. 토큰 / 체인 / 가치 포착
 6. 팀 / 펀딩 / KOL
-7. 리스크
-8. 다음 확인할 것
-9. 근거 링크
+7. 리스크와 반론
+8. 다음 실사 질문
+9. 확인된 내용 요약
 ```
 
 Internal Supervisor final review, agent council notes, tool payloads, raw LLM JSON, execution logs, detailed specialist coverage, and AntSeed peer review stay in `data/runs/<room_id>/` and `data/evidence_packets/<project>-<room_id>.md` instead of being appended to the final report body.
