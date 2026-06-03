@@ -424,6 +424,68 @@ The agent specs now include a `professional_output_contract` for Supervisor, Dis
 - Funding/Token only marks points or airdrop as `hint_found` when project-specific evidence exists.
 - Report writes a project intelligence report first and keeps logs/audit trails out of the client-facing body.
 
+## Representative Web3 Diligence Playbook
+
+JIMMORIA now has a dedicated representative-grade Web3 project/token diligence playbook:
+
+```text
+research_playbooks/representative_web3_project_diligence.md
+```
+
+This playbook is used when the client asks for a project, token, X profile, contract address, site, or narrative report. The central rule is that the trigger is only a candidate until the Identity Gate passes.
+
+The report order is:
+
+```text
+1. Conclusion first
+2. Identity Gate: project / ticker / chain / CA / site / X / docs / GitHub / DEX / explorer
+3. Product-first explanation
+4. X/KOL/article market signal layer
+5. Website / docs / app / GitHub / SDK / API / live infra verification
+6. Founder dossier
+7. Token value-capture
+8. On-chain / market background
+9. Risk separation
+10. TOP / WATCH / OPERATOR / EXCLUDE stance
+11. Evidence Packet
+12. Sources
+```
+
+Key rules:
+
+- X/Twitter posts, KOL opinions, public threads, and articles are the first signal layer.
+- Official site, docs, GitHub, app, explorer, DEX, and public APIs are the verification layer.
+- Telegram and Discord are intentionally out of scope for the current public-web research stack.
+- Founder claims must be sourced. Name, school, employer, LinkedIn, GitHub, X, funding, and previous projects are not guessed.
+- Token value-capture must separate live mechanics from roadmap claims.
+- Contract, LP, holder, liquidity, and market data are background unless they create a fatal risk.
+- No hype, buy/sell, target, or guaranteed-return language.
+
+Every completed room now writes two client-useful artifacts:
+
+```text
+reports/<project>-<room_id>.md
+data/evidence_packets/<project>-<room_id>.md
+```
+
+The evidence packet contains:
+
+```text
+Identity
+What changed
+Product / Operator Evidence
+Founder Dossier
+On-chain / Market
+Social Signal
+Risks
+Scores
+AntSeed Peer Review
+Stance
+Source Appendix
+```
+
+This keeps the final report focused on project understanding while preserving the audit trail for later review.
+
 ## 12. Web Dashboard
 
 `jimmoria web` starts a local dashboard that reads existing files from:

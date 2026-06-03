@@ -623,6 +623,7 @@ class JimmoriaConsole:
         memory = result.memory
         bus = result.bus
         report_path = room.output_paths.get("report", "")
+        evidence_packet_path = room.output_paths.get("evidence_packet", "")
         vault_path = room.output_paths.get("obsidian_vault", "")
         lines = [
             f"Room: {room.room_id}",
@@ -640,6 +641,8 @@ class JimmoriaConsole:
         if report_path:
             lines.append(f"Report: {report_path}")
             lines.append(f"Full report command: /report {room.room_id}")
+        if evidence_packet_path:
+            lines.append(f"Evidence packet: {evidence_packet_path}")
         if vault_path:
             lines.append(f"Vault: {vault_path}")
         lines.append(f"Replay events: {self.runs_dir / room.room_id / 'events.json'}")
@@ -703,6 +706,7 @@ class JimmoriaConsole:
                 f"Events: {len(events)}",
                 f"Unconfigured tool calls: {unconfigured}",
                 f"Report: {output_paths.get('report', '')}",
+                f"Evidence packet: {output_paths.get('evidence_packet', '')}",
                 f"Vault: {output_paths.get('obsidian_vault', '')}",
             ],
         )

@@ -1,35 +1,45 @@
 {
   "process_id": "project_research_room",
-  "name": "Project Research Room",
+  "name": "Representative Web3 Project Research Room",
   "process_type": "sequential_controlled_p2p",
   "supervisor_mode": "company_ceo_manager",
   "execution_strategy": {
     "current_phase": 1,
     "current_mode": "sequential",
     "phase_1": "Run the full Research Room sequentially until the room is stable end-to-end.",
-    "phase_2": "After discovery_agent, re-run candidate-specific social_kol_agent plus contract_onchain_agent, product_tech_agent, and funding_token_agent in one bounded evidence_checks group.",
-    "phase_3": "Run 24H monitor collectors for X/KOL, articles, GitHub, Docs, DEX, RSS, RootData, and public web sources in parallel into a signal queue.",
-    "phase_4": "Run multiple candidate Research Rooms in parallel and merge their room-level summaries."
+    "phase_2": "After discovery_agent, run candidate-specific social_kol_agent, contract_onchain_agent, product_tech_agent, and funding_token_agent in one bounded evidence_checks group.",
+    "phase_3": "Run 24H public-web monitor collectors for X/KOL, articles, GitHub, Docs, DEX, RSS, RootData, and other public web sources in parallel into a signal queue.",
+    "phase_4": "Run multiple candidate Research Rooms in parallel and merge room-level summaries."
   },
   "inspired_by": [
     "ChatDev configurable workflows/phases/roles",
     "crewAI agents.yaml + tasks.yaml + Process.sequential",
-    "Hermes Agent toolsets and delegation-style subagent task routing"
+    "Hermes Agent toolsets and delegation-style subagent task routing",
+    "Representative Web3 project/token diligence profile"
+  ],
+  "playbooks": [
+    "representative_web3_project_diligence",
+    "ticker_collision_review",
+    "kol_shill_quality_review",
+    "base_token_identity_gate"
   ],
   "goals": [
-    "Store and summarize the source or user request.",
-    "Collect X/Twitter, KOL, public posting, and article market signals first.",
-    "Resolve the project identity and market narrative from those signals.",
-    "Verify the project through official site, docs, GitHub, token, and market metadata.",
-    "Create a project intelligence dossier and Obsidian notes."
+    "Treat the user trigger as a candidate only until Identity Gate passes.",
+    "Collect X/Twitter, KOL, public post, and article market signals as the first evidence layer.",
+    "Resolve project identity: name, ticker, chain, CA, official site, official X, docs, GitHub, DEX/explorer, ticker collision, unofficial CA, and relaunch history.",
+    "Explain the project first: what it does, who uses it, what product exists, and what problem it solves.",
+    "Verify product and operator evidence through site, docs, app, GitHub, repo activity, packages, SDK/API, and live infra where available.",
+    "Check token, contract, security, market, and value-capture evidence without over-weighting LP/holder/liquidity unless fatal.",
+    "Separate identity, founder, product maturity, security/audit, token value-capture, and social/shill risks.",
+    "Create a Korean project intelligence report plus a separate evidence packet."
   ],
   "tasks": [
     {
       "task_id": "orchestrate_room",
       "agent_id": "supervisor_agent",
       "phase": "management",
-      "description": "Set research objective, priority, agent order, quality bar, handoff checkpoints, Agent Council role, and final output mode.",
-      "expected_output": "Orchestration plan with intake decision, room goals, delegated tasks, and coordination checkpoints.",
+      "description": "Act as company CEO/orchestrator: confirm this is a report request, set the diligence plan, apply the representative Web3 profile, assign specialists, and define final review gates.",
+      "expected_output": "Orchestration plan with intent, Identity Gate, task delegation, debate checkpoints, final report mode, and evidence packet requirement.",
       "output_channels": ["finding", "event"]
     },
     {
@@ -37,8 +47,8 @@
       "agent_id": "ingestion_agent",
       "phase": "source_memory",
       "requires": ["orchestrate_room"],
-      "description": "Store source text/URL and extract entities, keywords, metadata, canonical links, and source note candidates.",
-      "expected_output": "SourceRecord plus ingestion finding.",
+      "description": "Store source text/URL/name/CA and extract entities, ticker hints, official-link candidates, keywords, metadata, and source note candidates.",
+      "expected_output": "SourceRecord plus ingestion finding with identity hints.",
       "output_channels": ["memory.sources", "finding", "obsidian.source"]
     },
     {
@@ -46,8 +56,8 @@
       "agent_id": "social_kol_agent",
       "phase": "market_signal_intake",
       "requires": ["ingest_source"],
-      "description": "Use X/Twitter recent search when credentials exist, plus public web searches for X posts, KOL opinions, threads, and articles. This is the first research evidence layer.",
-      "expected_output": "Market signal intake finding with X API status, public X web hits, KOL/profile candidates, article hits, and source priority.",
+      "description": "Use X/Twitter recent search when credentials exist, plus public web searches for X posts, KOL opinions, threads, official posts, builder/ecosystem mentions, controversies, clarifications, and articles. Telegram and Discord are out of scope.",
+      "expected_output": "Market signal intake finding with X API status, public X web hits, KOL/profile candidates, article hits, official-post hints, and shill/controversy flags.",
       "output_channels": ["finding", "tool_audit", "bus.update"]
     },
     {
@@ -55,53 +65,53 @@
       "agent_id": "narrative_agent",
       "phase": "thesis_mapping",
       "requires": ["collect_market_signal"],
-      "description": "Classify the source and market-signal intake into crypto market narratives and thesis categories.",
-      "expected_output": "Narrative finding with categories and confidence.",
+      "description": "Classify the market-signal intake into crypto narratives and separate hype narrative from product thesis.",
+      "expected_output": "Narrative finding with categories, confidence, and why this narrative matters.",
       "output_channels": ["finding", "memory.entity_graph"]
     },
     {
-      "task_id": "discover_candidates",
+      "task_id": "identity_gate_and_discovery",
       "agent_id": "discovery_agent",
       "phase": "candidate_discovery",
       "requires": ["map_narratives"],
-      "description": "Resolve named projects or find early project candidates from narrative, X/KOL, article, public web, and source signals.",
-      "expected_output": "ProjectCandidate records with origin/source_backing labels and social-first evidence where available.",
+      "description": "Run Identity Gate before judgment: resolve official project, ticker, chain, CA, site, X, docs, GitHub, DEX/explorer, ticker collision, unofficial CA, and relaunch history. Only then create source-backed ProjectCandidate records.",
+      "expected_output": "ProjectCandidate records with candidate_origin/source_backing labels, identity confidence, collision notes, and official evidence URLs.",
       "output_channels": ["memory.projects", "finding", "bus.requests"]
     },
     {
       "task_id": "check_social_kol",
       "agent_id": "social_kol_agent",
       "phase": "evidence_checks",
-      "requires": ["discover_candidates"],
-      "description": "Run candidate-specific social verification after discovery: official X handles, KOL mentions, community links, and public social evidence.",
-      "expected_output": "Candidate-specific Social/KOL finding with citations or connector limitations.",
+      "requires": ["identity_gate_and_discovery"],
+      "description": "Run candidate-specific social verification: official X handle, recent official posts, KOL thesis, builder/ecosystem mentions, controversy/clarification, and social/shill risk.",
+      "expected_output": "Candidate-specific Social/KOL finding with who said what, links, confidence, and unresolved gaps.",
       "output_channels": ["finding", "tool_audit"]
     },
     {
       "task_id": "check_contract_onchain",
       "agent_id": "contract_onchain_agent",
       "phase": "evidence_checks",
-      "requires": ["discover_candidates"],
-      "description": "Verify chain, token identity, contract, DEX/explorer metadata, and ambiguity risk.",
-      "expected_output": "Contract/on-chain finding with token status and unresolved risks.",
+      "requires": ["identity_gate_and_discovery"],
+      "description": "Verify chain, token identity, contract, DEX/explorer metadata, security background, tax/mintability/honeypot/launchpad status where available. Keep LP/holder/liquidity short unless fatal.",
+      "expected_output": "Contract/on-chain finding with official vs unofficial CA separation, security flags, and token status.",
       "output_channels": ["finding", "tool_audit"]
     },
     {
       "task_id": "check_product_tech",
       "agent_id": "product_tech_agent",
       "phase": "evidence_checks",
-      "requires": ["discover_candidates"],
-      "description": "Verify what the project is after market-signal discovery by checking website, docs, GitHub, product surface, and implementation readiness.",
-      "expected_output": "Product/tech finding with official links and product maturity.",
+      "requires": ["identity_gate_and_discovery"],
+      "description": "Verify product reality through website, docs, app, GitHub, repo structure, recent commits, contracts, circuits, SDK, tests, docs, package releases, API, and live infra where available.",
+      "expected_output": "Product/tech finding with what the project does, operator evidence, GitHub/docs maturity, and live infra response status.",
       "output_channels": ["finding", "tool_audit"]
     },
     {
       "task_id": "check_funding_token",
       "agent_id": "funding_token_agent",
       "phase": "opportunity_checks",
-      "requires": ["discover_candidates"],
-      "description": "Review investors, funding hints, token status, points, airdrop, and opportunity windows.",
-      "expected_output": "Funding/token finding with opportunity and uncertainty labels.",
+      "requires": ["identity_gate_and_discovery"],
+      "description": "Review founder dossier, investor/funding evidence, point/airdrop hints, token status, and token value-capture: why token is needed, who pays, fee/gas/burn/buyback/staking/revenue connection, and live vs roadmap separation.",
+      "expected_output": "Founder/funding/token finding with sourced founder data, value-capture analysis, and uncertainty labels.",
       "output_channels": ["finding", "tool_audit"]
     },
     {
@@ -114,16 +124,16 @@
         "check_product_tech",
         "check_funding_token"
       ],
-      "description": "Turn agent findings into a human-readable project research dossier.",
-      "expected_output": "Markdown dossier with TL;DR, candidate table, evidence, risks, and next questions.",
-      "output_channels": ["report", "finding"]
+      "description": "Write the Korean project intelligence report for the client. It must explain the project, not the agent workflow. Conclusion first, then identity, product, narrative, social/KOL, founder, token value-capture, risks, score/stance, and sources.",
+      "expected_output": "Markdown project intelligence dossier plus evidence packet with Identity, What changed, Product/Operator Evidence, Founder Dossier, On-chain/Market, Social Signal, Risks, Scores, AntSeed Peer Review, and Stance.",
+      "output_channels": ["report", "evidence_packet", "finding"]
     },
     {
       "task_id": "sync_obsidian",
       "agent_id": "obsidian_curator_agent",
       "phase": "knowledge_ops",
       "requires": ["write_dossier"],
-      "description": "Save sources, candidates, narratives, and reports into the local Obsidian-style vault.",
+      "description": "Save sources, candidates, narratives, reports, and evidence packet links into the local Obsidian-style vault.",
       "expected_output": "Vault notes and links for long-term memory.",
       "output_channels": ["obsidian.project", "obsidian.source", "obsidian.report"]
     }
@@ -133,6 +143,7 @@
     "candidate": "SharedMemory.projects + source_backing/origin fields",
     "finding": "SharedMemory.findings",
     "report": "reports/*.md + vault/50_Reports",
+    "evidence_packet": "data/evidence_packets/*.md",
     "replay": "data/runs/<room_id>/events.json"
   },
   "ui": {
@@ -141,7 +152,7 @@
     "board_command": "/board",
     "supervisor_office": "Supervisor creates and assigns task records before specialist agents run",
     "agent_council": "Specialist findings are deliberated before report writing",
-    "final_review": "Supervisor reviews report quality and delivery mode before Obsidian sync"
+    "final_review": "Supervisor reviews report quality, evidence packet, and delivery mode before Obsidian sync"
   },
   "memory_policy": {
     "save_run": true,

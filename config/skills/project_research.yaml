@@ -1,17 +1,45 @@
 {
   "skill_id": "project_research",
-  "description": "프로젝트 기본 정보, 소셜 신호, 컨트랙트/토큰, 제품 상태, 내러티브를 조사한다.",
+  "description": "Social-first Web3 project/token diligence with identity gate, product-first verification, founder dossier, token value-capture analysis, score/stance, and evidence packet output.",
+  "playbooks": [
+    "representative_web3_project_diligence",
+    "ticker_collision_review",
+    "kol_shill_quality_review",
+    "base_token_identity_gate"
+  ],
   "steps": [
     "create_research_room",
+    "treat_trigger_as_candidate_only",
+    "run_identity_gate",
     "run_market_signal_intake",
     "request_x_kol_article_signal_check",
     "request_narrative_check",
     "run_discovery",
-    "request_candidate_social_check",
-    "request_contract_check",
-    "request_product_check",
+    "request_product_tech_live_infra_check",
+    "request_github_operator_evidence_check",
+    "request_contract_market_security_check",
+    "request_founder_dossier_check",
+    "request_token_value_capture_check",
     "merge_findings",
-    "write_candidate_dossier"
+    "score_top_watch_operator_exclude",
+    "write_project_intelligence_report",
+    "write_evidence_packet"
   ],
-  "required_output": ["candidate_dossier", "agent_findings", "sources"]
+  "quality_gates": [
+    "identity_match_required",
+    "ticker_collision_checked",
+    "official_site_x_docs_github_preferred",
+    "project_first_before_market_metrics",
+    "lp_holder_liquidity_background_unless_fatal",
+    "no_hype_no_buy_sell_no_target",
+    "agent_logs_kept_out_of_final_report"
+  ],
+  "required_output": [
+    "project_intelligence_report",
+    "evidence_packet",
+    "stance_top_watch_operator_exclude",
+    "source_appendix",
+    "agent_findings",
+    "tool_audit_trail"
+  ]
 }

@@ -39,6 +39,7 @@ class ProcessSpec:
     process_type: str = "sequential"
     supervisor_mode: str = "controlled_p2p"
     goals: list[str] = field(default_factory=list)
+    playbooks: list[str] = field(default_factory=list)
     tasks: list[TaskSpec] = field(default_factory=list)
     execution_strategy: dict[str, Any] = field(default_factory=dict)
     artifact_contracts: dict[str, str] = field(default_factory=dict)
@@ -53,6 +54,7 @@ class ProcessSpec:
             process_type=data.get("process_type", "sequential"),
             supervisor_mode=data.get("supervisor_mode", "controlled_p2p"),
             goals=list(data.get("goals", [])),
+            playbooks=list(data.get("playbooks", [])),
             tasks=[TaskSpec.from_dict(item) for item in data.get("tasks", [])],
             execution_strategy=dict(data.get("execution_strategy", {})),
             artifact_contracts=dict(data.get("artifact_contracts", {})),
@@ -81,6 +83,7 @@ class ProcessSpec:
             "process_type": self.process_type,
             "supervisor_mode": self.supervisor_mode,
             "execution_strategy": self.execution_strategy,
+            "playbooks": self.playbooks,
             "tasks": [
                 {
                     "task_id": task.task_id,

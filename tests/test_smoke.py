@@ -891,14 +891,15 @@ class SmokeTest(unittest.TestCase):
     def test_article_research_loop_writes_outputs(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
-            runtime = ResearchRuntime()
-            result = runtime.run_article_research(
-                title="AI Wallet Automation",
-                content="AI agent wallet automation with points and testnet docs.",
-                vault_dir=root / "vault",
-                reports_dir=root / "reports",
-                memory_path=root / "memory.json",
-            )
+            with patch.dict("os.environ", {"JIMMORIA_SKIP_EXTERNAL_SEARCH": "1"}, clear=False):
+                runtime = ResearchRuntime()
+                result = runtime.run_article_research(
+                    title="AI Wallet Automation",
+                    content="AI agent wallet automation with points and testnet docs.",
+                    vault_dir=root / "vault",
+                    reports_dir=root / "reports",
+                    memory_path=root / "memory.json",
+                )
 
             self.assertEqual(result.room.status, "completed")
             self.assertTrue(Path(result.room.output_paths["report"]).exists())
@@ -1015,14 +1016,15 @@ class SmokeTest(unittest.TestCase):
                 json.dumps(settings.to_dict(), ensure_ascii=False),
                 encoding="utf-8",
             )
-            runtime = ResearchRuntime()
-            result = runtime.run_article_research(
-                title="AI Wallet Automation",
-                content="AI agent wallet automation with points and testnet docs.",
-                vault_dir=root / "vault",
-                reports_dir=root / "reports",
-                memory_path=root / "memory.json",
-            )
+            with patch.dict("os.environ", {"JIMMORIA_SKIP_EXTERNAL_SEARCH": "1"}, clear=False):
+                runtime = ResearchRuntime()
+                result = runtime.run_article_research(
+                    title="AI Wallet Automation",
+                    content="AI agent wallet automation with points and testnet docs.",
+                    vault_dir=root / "vault",
+                    reports_dir=root / "reports",
+                    memory_path=root / "memory.json",
+                )
 
             report = Path(result.room.output_paths["report"]).read_text(encoding="utf-8")
             self.assertIn("# 리서치 미완료 / Research Not Completed", report)
@@ -1258,6 +1260,9 @@ class SmokeTest(unittest.TestCase):
                     memory_path=root / "memory.json",
                 )
                 report = Path(result.room.output_paths["report"]).read_text(encoding="utf-8")
+                evidence_packet_path = Path(result.room.output_paths["evidence_packet"])
+                evidence_packet_exists = evidence_packet_path.exists()
+                evidence_packet = evidence_packet_path.read_text(encoding="utf-8")
 
         candidates = [candidate.to_dict() for candidate in result.memory.projects.values()]
         quality = result.room.project_card["research_quality"]
@@ -1268,7 +1273,19 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(candidates[0]["name"], "3Jane Protocol")
         self.assertEqual(candidates[0]["metadata"]["candidate_origin"], "live_source_backed")
         self.assertIn("https://www.3jane.xyz/pdf/whitepaper.pdf", candidates[0]["metadata"]["evidence_urls"])
+        self.assertTrue(evidence_packet_exists)
         self.assertIn("# 3Jane Protocol Project Intelligence Report", report)
+        self.assertIn("Representative Verdict", report)
+        self.assertIn("대표님 실사 브리프", report)
+        self.assertIn("Founder Dossier", report)
+        self.assertIn("Score & Stance", report)
+        self.assertIn("Evidence Packet", report)
+        self.assertIn("TOP/WATCH/OPERATOR", report)
+        self.assertIn("AntSeed Peer Review", report)
+        self.assertIn("# Evidence Packet: 3Jane Protocol", evidence_packet)
+        self.assertIn("## Founder Dossier", evidence_packet)
+        self.assertIn("## AntSeed Peer Review", evidence_packet)
+        self.assertIn("## Stance", evidence_packet)
         self.assertNotIn("GPU Mining", report)
         self.assertNotIn("native_coin_reported", report)
         self.assertNotIn("Crypto Airdrops List", report)
@@ -1358,11 +1375,12 @@ class SmokeTest(unittest.TestCase):
         report = registry.get("report_agent")
         self.assertIsNotNone(report)
         assert report is not None
-        self.assertIn("프로젝트를 이해", report.mission.primary_goal)
-        self.assertTrue(any("프로젝트 설명" in item for item in report.must_follow))
-        self.assertTrue(any("도메인별 프로젝트 정보" in item for item in report.must_follow))
+        self.assertEqual(report.output_schema.type, "project_intelligence_report")
+        self.assertIn("Korean project intelligence report", report.mission.primary_goal)
+        self.assertTrue(any("client comprehension" in item for item in report.must_follow))
+        self.assertTrue(any("project intelligence report" in item for item in report.must_not))
         self.assertTrue(any("raw LLM JSON" in item for item in report.must_not))
-        self.assertTrue(any("회의록" in item for item in report.must_not))
+        self.assertIn("evidence_packet", report.output_schema.required)
 
         funding = registry.get("funding_token_agent")
         self.assertIsNotNone(funding)
@@ -1389,7 +1407,10 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(len(research.agent_ids), 10)
         self.assertEqual(research.agent_ids[2], "social_kol_agent")
         self.assertIn("market_signal_intake", {task.phase for task in research.tasks})
+        self.assertIn("representative_web3_project_diligence", research.playbooks)
         self.assertIn("dossier", research.task_for_agent("report_agent").expected_output.lower())
+        self.assertIn("evidence packet", research.task_for_agent("report_agent").expected_output.lower())
+        self.assertEqual(research.artifact_contracts["evidence_packet"], "data/evidence_packets/*.md")
         self.assertEqual(source_only.agent_ids, ["supervisor_agent", "ingestion_agent", "obsidian_curator_agent"])
         self.assertIn("prevent unnecessary research", source_only.tasks[0].description)
 

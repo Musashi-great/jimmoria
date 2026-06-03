@@ -151,7 +151,18 @@ class ResearchRuntime:
             self._run_agent_council(room)
             room.set_status(RuntimeState.READY_FOR_REPORT)
             room.set_status(RuntimeState.WRITING_REPORT)
-            self._run_agent("report_agent", room, reports_dir=reports_dir, company_settings=company_settings)
+            evidence_packet_dir = (
+                Path(memory_path).parent / "evidence_packets"
+                if memory_path is not None
+                else Path("data/evidence_packets")
+            )
+            self._run_agent(
+                "report_agent",
+                room,
+                reports_dir=reports_dir,
+                evidence_packet_dir=evidence_packet_dir,
+                company_settings=company_settings,
+            )
             room.set_status(RuntimeState.SUPERVISOR_REVIEWING)
             self._run_supervisor_final_review(room, company_settings=company_settings)
             room.set_status(RuntimeState.OBSIDIAN_SYNCING)
