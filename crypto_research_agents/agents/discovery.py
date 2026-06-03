@@ -472,6 +472,8 @@ def select_project_website(project_query: str, web_results: list[Any]) -> str | 
             score += 4
         if any(word in text for word in ["proof-of-useful-work", "proof of useful work", "pearl network"]):
             score += 8
+        if urlparse(url).path.lower().endswith(".pdf"):
+            score -= 12
         if host in {"github.com", "x.com", "twitter.com"} or any(bad in host for bad in ["coinmarketcap", "coingecko", "tomshardware", "reddit", "lablockchainsummit"]):
             score -= 8
         scored.append((score, url))

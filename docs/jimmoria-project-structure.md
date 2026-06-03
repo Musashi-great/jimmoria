@@ -179,7 +179,7 @@ Supervisor는 단순 라우터가 아니라 회사의 boss/orchestrator다.
 | `contract_onchain_agent` | Chain verifier | chain/token/contract/explorer/DEX identity 확인 |
 | `product_tech_agent` | Product analyst | website, docs, GitHub, product readiness 확인 |
 | `funding_token_agent` | Opportunity analyst | investor, points, airdrop, token status hint 확인 |
-| `report_agent` | Research editor | findings를 dossier로 작성 |
+| `report_agent` | Research editor | findings를 프로젝트 이해 중심의 통합 dossier로 작성 |
 | `obsidian_curator_agent` | Knowledge curator | vault note 생성 |
 | `monitor_24h_agent` | Planned watcher | public web/X/GitHub/docs/RSS/DEX/RootData signal queue 예정 |
 
@@ -328,6 +328,28 @@ Research Room 결과 출력 정책:
 - 모든 report artifact는 `reports/*.md`에 저장되고, summary에는 저장 경로와 `/report <room_id>` 재출력 명령을 함께 보여준다.
 - 사용자가 전체 출력 대신 preview만 원하면 `JIMMORIA_REPORT_DISPLAY=preview`를 설정한다.
 - `JIMMORIA_REPORT_DISPLAY=full`은 quality 상태와 상관없이 report 파일 전체를 출력한다.
+
+### Completed Report Shape
+
+완료 보고서의 1차 목표는 에이전트 로그를 보여주는 것이 아니라, 사용자가 프로젝트나 내러티브를 이해하도록 돕는 것이다. 그래서 `research_complete` 보고서는 다음 순서로 작성한다.
+
+```text
+1. 핵심 결론
+2. 프로젝트가 무엇을 하려는지
+3. 제품 / 기술 구조
+4. 토큰 / 체인 / 온체인 상태
+5. 소셜 / KOL / 커뮤니티 신호
+6. 펀딩 / 인센티브 / 에어드랍 단서
+7. 리서치 thesis
+8. 강점
+9. 약점 / 리스크
+10. 앞으로 확인해야 할 것
+11. 에이전트별 조사 결과
+12. Source Log
+13. Research Quality Gate
+```
+
+즉 ReportAgent는 "누가 무엇을 했는지"보다 "이 프로젝트를 어떻게 이해해야 하는지"를 앞세운다. 에이전트별 로그와 품질 게이트는 보고서 후반의 근거/감사 trail로 남긴다.
 
 ## 12. Web Dashboard
 

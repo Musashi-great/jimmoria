@@ -218,6 +218,24 @@ Inside `jimmoria`:
 
 When a Research Room passes the quality gate, JIMMORIA prints the full Markdown report in the CLI and also shows the saved report path.
 
+The report is designed as a project-understanding dossier, not an agent log. The front of the report should help you understand what the project is, what it is building, how the token/chain structure works, why the narrative matters, what risks remain, and what to verify next.
+
+Completed project reports follow this shape:
+
+```text
+Core conclusion
+What the project is trying to build
+Product / technical structure
+Token / chain / on-chain state
+Social / KOL / community signals
+Funding / incentive / airdrop hints
+Research thesis
+Strengths and risks
+Follow-up checklist
+Agent notes and source log
+Research quality gate
+```
+
 If evidence is insufficient, the CLI prints a diagnostic preview instead of presenting it as a finished dossier.
 
 Reprint any saved report:

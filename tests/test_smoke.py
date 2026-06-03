@@ -1219,6 +1219,7 @@ class SmokeTest(unittest.TestCase):
                     reports_dir=root / "reports",
                     memory_path=root / "memory.json",
                 )
+                report = Path(result.room.output_paths["report"]).read_text(encoding="utf-8")
 
         candidates = [candidate.to_dict() for candidate in result.memory.projects.values()]
         quality = result.room.project_card["research_quality"]
@@ -1229,6 +1230,15 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(candidates[0]["name"], "3Jane Protocol")
         self.assertEqual(candidates[0]["metadata"]["candidate_origin"], "live_source_backed")
         self.assertIn("https://www.3jane.xyz/pdf/whitepaper.pdf", candidates[0]["metadata"]["evidence_urls"])
+        self.assertIn("# 3Jane Protocol 리서치 보고서 - 통합본", report)
+        self.assertIn("## 1. 핵심 결론", report)
+        self.assertIn("## 2. 3Jane Protocol는 무엇을 하려는 프로젝트인가", report)
+        self.assertIn("## 3. 제품 / 기술 구조", report)
+        self.assertIn("## 4. 토큰 / 체인 / 온체인 상태", report)
+        self.assertIn("## 7. 리서치 Thesis", report)
+        self.assertIn("## 10. 앞으로 확인해야 할 것", report)
+        self.assertIn("## 12. Source Log", report)
+        self.assertIn("## 13. Research Quality Gate", report)
 
     def test_message_summary_uses_response_result_fallback(self) -> None:
         message = {
@@ -1276,6 +1286,12 @@ class SmokeTest(unittest.TestCase):
         self.assertIsNotNone(product)
         assert product is not None
         self.assertIn("github_search_repos", product.tools.allow)
+
+        report = registry.get("report_agent")
+        self.assertIsNotNone(report)
+        assert report is not None
+        self.assertIn("프로젝트를 이해", report.mission.primary_goal)
+        self.assertTrue(any("프로젝트 설명" in item for item in report.must_follow))
 
         funding = registry.get("funding_token_agent")
         self.assertIsNotNone(funding)
