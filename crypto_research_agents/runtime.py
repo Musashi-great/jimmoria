@@ -20,6 +20,7 @@ from crypto_research_agents.connectors import register_default_connectors
 from crypto_research_agents.core.bus import CollaborationBus
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
 from crypto_research_agents.core.company_settings import company_settings_path_for, load_company_settings
+from crypto_research_agents.core.concurrency import ConcurrencyPolicy, load_concurrency_policy
 from crypto_research_agents.core.hooks import HookEngine
 from crypto_research_agents.core.memory import FindingRecord, SharedMemory
 from crypto_research_agents.core.model_gateway import ModelGateway
@@ -71,6 +72,7 @@ class ResearchRuntime:
         *,
         agent_spec_dir: str | Path = "config/agents",
         process_spec_dir: str | Path = "config/processes",
+        concurrency_policy_path: str | Path = "config/concurrency.yaml",
     ) -> None:
         self.memory = memory or SharedMemory()
         self.bus = CollaborationBus()
@@ -78,6 +80,7 @@ class ResearchRuntime:
         self.model_gateway = ModelGateway()
         self.agent_specs = AgentSpecRegistry.load_dir(resolve_project_path(agent_spec_dir))
         self.process_spec_dir = resolve_project_path(process_spec_dir)
+        self.concurrency_policy: ConcurrencyPolicy = load_concurrency_policy(concurrency_policy_path)
         self.tool_gateway = ToolGateway(default_policy(self.agent_specs))
         register_default_connectors(self.tool_gateway)
         self.event_log: list[dict[str, Any]] = []
@@ -122,6 +125,7 @@ class ResearchRuntime:
             goals=room.goals,
             agents=room.agents,
             process=process.event_payload(),
+            concurrency=self.concurrency_policy.event_payload(),
         )
 
         try:
@@ -193,6 +197,7 @@ class ResearchRuntime:
             goals=room.goals,
             agents=room.agents,
             process=process.event_payload(),
+            concurrency=self.concurrency_policy.event_payload(),
         )
 
         try:

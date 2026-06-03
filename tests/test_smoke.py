@@ -29,6 +29,7 @@ from crypto_research_agents.cli import (
 )
 from crypto_research_agents.console import JimmoriaConsole, print_jimmoria_logo
 from crypto_research_agents.core.company_settings import CompanySettings
+from crypto_research_agents.core.concurrency import load_concurrency_policy
 from crypto_research_agents.core.llm_provider import CodexCliProvider, CodexSdkProvider, LLMRequest, LLMResponse, provider_from_env
 from crypto_research_agents.core.memory import SharedMemory, SourceRecord
 from crypto_research_agents.core.model_gateway import ModelGateway
@@ -986,12 +987,44 @@ class SmokeTest(unittest.TestCase):
         assert source_only is not None
         self.assertEqual(loaded_research.process_id, research.process_id)
         self.assertEqual(research.process_type, "sequential_controlled_p2p")
+        self.assertEqual(research.execution_strategy["current_phase"], 1)
+        self.assertIn("phase_2", research.execution_strategy)
         self.assertEqual(research.agent_ids[0], "supervisor_agent")
         self.assertEqual(research.agent_ids[-1], "obsidian_curator_agent")
         self.assertEqual(len(research.tasks), 10)
         self.assertIn("dossier", research.task_for_agent("report_agent").expected_output.lower())
         self.assertEqual(source_only.agent_ids, ["supervisor_agent", "ingestion_agent", "obsidian_curator_agent"])
         self.assertIn("prevent unnecessary research", source_only.tasks[0].description)
+
+    def test_concurrency_policy_loads_phase_roadmap(self) -> None:
+        policy = load_concurrency_policy()
+
+        self.assertEqual(policy.active.phase, 1)
+        self.assertEqual(policy.active.mode, "sequential")
+        self.assertEqual(policy.active.max_parallel, 1)
+        self.assertEqual(len(policy.phases), 4)
+        phase_two = [phase for phase in policy.phases if phase.phase == 2][0]
+        self.assertEqual(phase_two.mode, "bounded_parallel_agent_group")
+        self.assertEqual(phase_two.max_parallel, 4)
+        self.assertEqual(phase_two.parallel_groups[0].group_id, "evidence_checks")
+        self.assertIn("social_kol_agent", phase_two.parallel_groups[0].agents)
+
+    def test_runtime_room_created_event_includes_concurrency_policy(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runtime = ResearchRuntime()
+            result = runtime.run_source_ingestion(
+                title="Concurrency Event",
+                content="Store this source and expose active concurrency phase.",
+                vault_dir=root / "vault",
+                memory_path=root / "memory.json",
+            )
+
+            room_created = [event for event in runtime.event_log if event["type"] == "room_created"][0]
+
+        self.assertEqual(result.room.status, "completed")
+        self.assertEqual(room_created["concurrency"]["active_phase"]["phase"], 1)
+        self.assertEqual(room_created["concurrency"]["active_phase"]["mode"], "sequential")
 
     def test_process_specs_load_when_cli_runs_outside_project_root(self) -> None:
         original_cwd = Path.cwd()

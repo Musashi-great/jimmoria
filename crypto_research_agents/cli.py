@@ -1328,6 +1328,7 @@ def doctor_command(args: argparse.Namespace | None = None) -> None:
         "Models": {"LLM provider", "Agent LLM routing", "Codex SDK package", "Codex CLI"},
         "Operations": {
             "Tool registry",
+            "Concurrency phase",
             "Scheduled jobs",
             "Worker profiles",
             "Telegram delivery config",

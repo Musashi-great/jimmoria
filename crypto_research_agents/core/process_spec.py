@@ -40,6 +40,7 @@ class ProcessSpec:
     supervisor_mode: str = "controlled_p2p"
     goals: list[str] = field(default_factory=list)
     tasks: list[TaskSpec] = field(default_factory=list)
+    execution_strategy: dict[str, Any] = field(default_factory=dict)
     artifact_contracts: dict[str, str] = field(default_factory=dict)
     ui: dict[str, Any] = field(default_factory=dict)
     memory_policy: dict[str, Any] = field(default_factory=dict)
@@ -53,6 +54,7 @@ class ProcessSpec:
             supervisor_mode=data.get("supervisor_mode", "controlled_p2p"),
             goals=list(data.get("goals", [])),
             tasks=[TaskSpec.from_dict(item) for item in data.get("tasks", [])],
+            execution_strategy=dict(data.get("execution_strategy", {})),
             artifact_contracts=dict(data.get("artifact_contracts", {})),
             ui=dict(data.get("ui", {})),
             memory_policy=dict(data.get("memory_policy", {})),
@@ -74,6 +76,7 @@ class ProcessSpec:
             "process_name": self.name,
             "process_type": self.process_type,
             "supervisor_mode": self.supervisor_mode,
+            "execution_strategy": self.execution_strategy,
             "tasks": [
                 {
                     "task_id": task.task_id,

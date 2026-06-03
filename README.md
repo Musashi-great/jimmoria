@@ -190,6 +190,7 @@ jimmoria/
 
   config/
     agents/                에이전트 persona, 권한, tool policy
+    concurrency.yaml       병렬화 phase policy
     processes/             Research Room process/task manifest
     models/                모델 라우팅 기본 설정
     skills/                리서치 workflow 정의
@@ -222,6 +223,7 @@ Default CLI paths resolve to the JIMMORIA project root. Running `jimmoria` from 
 - Supervisor + controlled P2P Agent Bus
 - AgentSpec/persona YAML 로딩
 - ProcessSpec 기반 Research Room task manifest
+- Concurrency Phase 1 policy: Research Room sequential execution
 - Agent-level LLM analysis pass
 - Codex SDK provider, Codex CLI provider, offline diagnostic fallback
 - Web Search/URL/Website/Docs/GitHub/DEX Screener/CoinGecko 기본 connector
@@ -231,13 +233,13 @@ Default CLI paths resolve to the JIMMORIA project root. Running `jimmoria` from 
 - Obsidian-style note 생성
 ```
 
-아직 live 연결 전:
+다음 확장:
 
 ```text
-- X/Twitter/KOL 검색
-- Telegram/Discord 채널 읽기
-- Explorer/RPC contract metadata
-- RootData/funding/airdrop/points checker
+- Phase 2: Discovery 이후 Social/Contract/Product/Funding evidence check 병렬화
+- Phase 3: X/Telegram/GitHub/Docs/DEX/RSS/RootData 24H monitor worker 병렬화
+- Phase 4: Candidate A/B/C를 각각 별도 Research Room으로 병렬 조사
+- Discord/Dune/The Graph/RSS monitor connector
 - DDGS public web search 품질과 검색 provider 가용성
 - GitHub commits/releases/activity 심화 분석
 - Identity resolver, ticker collision, evidence validator
@@ -253,6 +255,7 @@ jimmoria doctor
 
 ```text
 config/agents/*.yaml                         에이전트 정의
+config/concurrency.yaml                       병렬화 phase policy
 config/processes/*.yaml                      Research Room process/task manifest
 config/tools/tool_registry.yaml              필요한 외부 tool 목록
 config/models/model_router.yaml              모델 라우팅 기준

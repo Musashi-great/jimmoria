@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .agent_spec import AgentSpecRegistry
+from .concurrency import load_concurrency_policy
 from .llm_provider import codex_sdk_available, provider_from_env
 from .model_gateway import ModelGateway
 from .tool_gateway import ToolGateway
@@ -42,6 +43,7 @@ def collect_capabilities(
     provider = provider_from_env()
     agent_spec_status = _agent_spec_status(agent_spec_dir)
     tool_registry = load_tool_registry()
+    concurrency_policy = load_concurrency_policy()
     cron_registry = CronRegistry.load()
     profile_registry = WorkerProfileRegistry.load()
     capabilities = [
@@ -91,6 +93,14 @@ def collect_capabilities(
             "Tool registry",
             "configured" if tool_registry.definitions else "missing",
             f"{len(tool_registry.definitions)} tools, {len(tool_registry.toolsets)} toolsets",
+        ),
+        CapabilityStatus(
+            "Concurrency phase",
+            "configured",
+            (
+                f"Phase {concurrency_policy.active.phase}: {concurrency_policy.active.name} "
+                f"({concurrency_policy.active.mode}, max_parallel={concurrency_policy.active.max_parallel})"
+            ),
         ),
         CapabilityStatus(
             "Scheduled jobs",

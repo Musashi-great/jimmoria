@@ -3,6 +3,14 @@
   "name": "Project Research Room",
   "process_type": "sequential_controlled_p2p",
   "supervisor_mode": "company_ceo_manager",
+  "execution_strategy": {
+    "current_phase": 1,
+    "current_mode": "sequential",
+    "phase_1": "Run the full Research Room sequentially until the room is stable end-to-end.",
+    "phase_2": "After discovery_agent, run social_kol_agent, contract_onchain_agent, product_tech_agent, and funding_token_agent in one bounded evidence_checks group.",
+    "phase_3": "Run 24H monitor collectors for X, Telegram, GitHub, Docs, DEX, RSS, and RootData in parallel into a signal queue.",
+    "phase_4": "Run multiple candidate Research Rooms in parallel and merge their room-level summaries."
+  },
   "inspired_by": [
     "ChatDev configurable workflows/phases/roles",
     "crewAI agents.yaml + tasks.yaml + Process.sequential",

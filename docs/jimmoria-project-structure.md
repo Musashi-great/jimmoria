@@ -36,6 +36,7 @@ jimmoria/
 
   config/
     agents/
+    concurrency.yaml
     processes/
     models/
     skills/
@@ -142,7 +143,8 @@ flowchart LR
 | Console | `crypto_research_agents/console.py` | JIMMORIA 로고, 박스형 입력창, 도움말, 실시간 에이전트 상황판 출력 |
 | Web Dashboard | `crypto_research_agents/web.py` | run snapshot, event stream, agent board, report preview를 웹에서 시각화 |
 | Runtime | `crypto_research_agents/runtime.py` | Research Room 생성과 에이전트 실행 순서 관리 |
-| ProcessSpec | `core/process_spec.py` + `config/processes/` | Research Room의 goals, task order, expected output, artifact contract 정의 |
+| ProcessSpec | `core/process_spec.py` + `config/processes/` | Research Room의 goals, task order, expected output, artifact contract, execution strategy 정의 |
+| Concurrency Policy | `core/concurrency.py` + `config/concurrency.yaml` | Phase 1~4 병렬화 로드맵과 active execution phase 정의 |
 | Supervisor Orchestrator | `agents/supervisor.py` + `connectors/supervisor_tools.py` | plan -> delegate -> coordinate -> council -> final review 흐름을 만들고 기록 |
 | ResearchRoom | `core/room.py` | 하나의 리서치 작업 단위와 상태 |
 | CollaborationBus | `core/bus.py` | 에이전트 요청, 응답, 핸드오프, 업데이트 로그 |
@@ -218,6 +220,32 @@ Council > DONE write_diagnostic_memo | Agent council reached a guarded consensus
 Supervisor > FINAL diagnostic_memo | Supervisor approved delivery as a diagnostic memo
 Output > Report written | reports/pearl-room_abc123.md
 ```
+
+## 5A. Concurrency Roadmap
+
+병렬화는 한 번에 전체를 바꾸지 않는다. Research Room이 끝까지 안정적으로 도는 것을 먼저 고정하고, evidence check, monitoring, multi-room 순서로 확장한다.
+
+현재 기준은 `config/concurrency.yaml`에 들어 있다. `active_phase`는 `1`이며 runtime은 `room_created` 이벤트에 active concurrency phase를 포함한다. `jimmoria doctor`에서도 `Concurrency phase`로 현재 실행 모드를 확인할 수 있다.
+
+| Phase | 상태 | 실행 방식 | 목적 |
+|---|---|---|---|
+| Phase 1 | active | 전체 Research Room 순차 처리 | 지금처럼 안정적으로 방이 끝까지 도는지 확인한다. Supervisor, ingestion, narrative, discovery, evidence checks, council, report, final review, Obsidian sync가 순서대로 실행된다. |
+| Phase 2 | planned | Discovery 이후 evidence check만 병렬화 | `social_kol_agent`, `contract_onchain_agent`, `product_tech_agent`, `funding_token_agent`를 같은 bounded parallel group으로 실행한다. 모두 끝난 뒤 Agent Council로 합류한다. |
+| Phase 3 | planned | 24H Monitoring worker 병렬화 | X, Telegram, GitHub, Docs, DEX, RSS, RootData monitor collector를 동시에 돌려 signal queue로 넣고 dedupe한다. |
+| Phase 4 | planned | 여러 프로젝트를 각각 Research Room으로 병렬 실행 | Candidate A, B, C를 별도 Research Room으로 동시에 조사하고, room-level summary를 합쳐 Daily Radar나 portfolio-style 비교 결과로 만든다. |
+
+Phase 2부터 필요한 추가 장치는 다음이다.
+
+```text
+- SharedMemory write serialization or lock
+- ToolGateway audit log thread-safe append
+- per-agent timeout/retry policy
+- evidence check join barrier
+- UI event stream ordering and room focus
+- final report single-writer guarantee
+```
+
+즉, Phase 1은 안정성 검증 단계이고 Phase 2는 "한 방 안에서 specialist evidence check 병렬화", Phase 3은 "백그라운드 monitor 병렬 수집", Phase 4는 "여러 Research Room worker pool"로 나뉜다.
 
 ## 6. 에이전트 구성
 
@@ -887,6 +915,7 @@ opportunity_connector.py public web 기반 airdrop/points hint checker
 ```text
 agent_spec.py       YAML persona/spec loader
 process_spec.py     Research Room process/task manifest loader
+concurrency.py      Phase 1~4 concurrency policy loader
 bus.py              CollaborationBus
 message.py          AgentMessage model
 memory.py           SharedMemory, SourceRecord, ProjectCandidate, FindingRecord, source dedupe
@@ -924,6 +953,10 @@ paths.py            safe filename helper
 
 Research Room의 process/task manifest다. ChatDev처럼 workflow/phase/role을 설정으로 관리하고, crewAI처럼 agent와 task를 분리한다. 현재 `project_research_room.yaml`은 full research dossier를 위한 10-agent process이고, `source_ingestion_room.yaml`은 source-only ingestion을 위한 3-agent process다. Runtime은 이 manifest에서 goals와 agent order를 읽고, `room_created.process` event에 process metadata를 저장한다.
 
+### `config/concurrency.yaml`
+
+Research Room 병렬화 phase policy다. 현재 `active_phase`는 `1`이고 전체 Research Room은 순차 실행한다. Phase 2는 discovery 이후 evidence check agent들을 병렬 실행하는 계획, Phase 3은 24H monitor collector 병렬화, Phase 4는 candidate별 Research Room 병렬 실행 계획을 담는다. Runtime은 `room_created.concurrency` event에 active phase를 저장한다.
+
 ### `config/models/model_router.yaml`
 
 모델 route와 환경변수 기준이다. 실제 코드의 `ModelGateway`와 CLI model setup이 이 개념을 따른다.
@@ -954,6 +987,7 @@ project_research.yaml
 - pyproject script entrypoint
 - article research loop output
 - agent specs load
+- process spec execution strategy and concurrency phase roadmap
 - CLI research/events command
 - Codex SDK/Codex CLI/offline provider selection
 - Codex CLI exec flag compatibility

@@ -1,0 +1,83 @@
+{
+  "policy_version": "0.1",
+  "active_phase": 1,
+  "default_max_parallel": 1,
+  "safety": {
+    "shared_memory_writes": "serialized",
+    "report_writing": "single_writer",
+    "obsidian_sync": "single_writer",
+    "tool_calls": "read_only_or_artifact_write_only"
+  },
+  "phases": [
+    {
+      "phase": 1,
+      "name": "sequential_room",
+      "status": "active",
+      "mode": "sequential",
+      "description": "Run the whole Research Room sequentially until every agent path is stable.",
+      "max_parallel": 1,
+      "parallel_groups": []
+    },
+    {
+      "phase": 2,
+      "name": "parallel_evidence_checks",
+      "status": "planned",
+      "mode": "bounded_parallel_agent_group",
+      "description": "After Discovery, run Social, Contract, Product, and Funding evidence checks at the same time.",
+      "max_parallel": 4,
+      "parallel_groups": [
+        {
+          "group_id": "evidence_checks",
+          "after_agent": "discovery_agent",
+          "agents": [
+            "social_kol_agent",
+            "contract_onchain_agent",
+            "product_tech_agent",
+            "funding_token_agent"
+          ],
+          "join_before": "agent_council"
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "parallel_24h_monitoring",
+      "status": "planned",
+      "mode": "background_monitor_workers",
+      "description": "Run X, Telegram, GitHub, Docs, DEX, RSS, and RootData monitor workers concurrently into a signal queue.",
+      "max_parallel": 6,
+      "parallel_groups": [
+        {
+          "group_id": "monitor_collectors",
+          "agents": ["monitor_24h_agent"],
+          "tools": [
+            "monitor_x_list",
+            "monitor_telegram_channels",
+            "monitor_github_activity",
+            "monitor_docs_changes",
+            "dexscreener_latest_profiles",
+            "rss_monitor_feed",
+            "monitor_rootdata_updates"
+          ],
+          "join_before": "signal_queue_dedupe"
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "parallel_research_rooms",
+      "status": "planned",
+      "mode": "room_worker_pool",
+      "description": "Investigate Candidate A, B, C in separate Research Rooms at the same time, then merge room-level summaries.",
+      "max_parallel": 3,
+      "parallel_groups": [
+        {
+          "group_id": "candidate_rooms",
+          "room_template": "project_research_room",
+          "candidate_fanout": true,
+          "join_before": "portfolio_or_daily_radar_summary"
+        }
+      ]
+    }
+  ]
+}
