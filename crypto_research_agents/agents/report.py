@@ -1750,6 +1750,23 @@ def is_3jane_project(project: Any) -> bool:
     return "3jane" in project_evidence_text(project)
 
 
+def is_pearl_project(project: Any) -> bool:
+    if project is None:
+        return False
+    evidence = project_evidence_text(project)
+    name = str(getattr(project, "name", "") or "").lower()
+    return any(
+        marker in evidence or marker in name
+        for marker in [
+            "pearl network",
+            "pearl research labs",
+            "pearlresearch.ai",
+            "proof-of-useful-work",
+            "proof of useful work",
+        ]
+    )
+
+
 def project_evidence_text(project: Any) -> str:
     if project is None:
         return ""
@@ -2926,6 +2943,18 @@ def reader_conclusion_lines(
             "- **대표님 기준 판단:** 지금 봐야 할 포인트는 단기 가격/상장 기대가 아니라 `신용을 온체인에서 안전하게 가격화할 수 있는가`입니다. 이 질문에 대한 증거가 쌓이면 watchlist에서 상위 추적 후보로 올릴 수 있고, 반대로 evidence가 약하면 좋은 backer가 있어도 보수적으로 봐야 합니다.",
             f"- **분류:** {narratives}. Chain=`{project.chain or 'unknown'}`, token_status=`{display_token_status(project)}`.",
         ]
+    elif is_pearl_project(project):
+        lines = [
+            f"- **스탠스:** `{score['stance']}`. Pearl은 단순 PoW 코인으로 보기보다 `유용한 연산을 채굴 보안과 결합하려는 L1/AI compute 인프라 후보`로 봐야 합니다. 다만 TOP으로 올리려면 실제 compute 수요, 채굴 경제성, 네트워크 사용량, 팀/펀딩 검증이 더 필요합니다.",
+            "- **한 줄 결론:** Pearl Network는 채굴자가 해시만 계산하는 기존 PoW와 달리, matrix multiplication 같은 유용한 연산을 수행하면서 네트워크 보안과 블록 생성에 참여하도록 설계된 Proof-of-Useful-Work 계열 L1 후보입니다.",
+            "- **투자 가설:** AI/compute 수요가 커지는 환경에서 PoW의 에너지 소비 비판을 줄이고, 채굴 보상을 실제 유용 연산 공급과 연결할 수 있다면 Pearl은 `AI compute + L1 security + mining economy`가 만나는 실험이 됩니다.",
+            "- **왜 흥미로운가:** 공식 사이트/화이트페이퍼, GitHub monorepo, explorer, mining pool, Together AI 파트너십으로 보이는 공개 근거가 함께 잡힙니다. 즉 단순 티커 검색 결과가 아니라, PoUW 논문/프로토콜/체인 운영 흔적이 동시에 존재하는 후보입니다.",
+            "- **무엇이 성립해야 하는가:** ① 채굴자가 수행하는 연산이 실제로 외부 수요가 있는 유용 compute여야 하고, ② 그 결과를 네트워크가 검증 가능한 방식으로 받아들여야 하며, ③ 보상 구조가 단순 채굴자 보조금이 아니라 compute buyer와 network security를 연결해야 합니다.",
+            "- **좋은 시나리오:** Pearl이 GPU 채굴자에게 새로운 수익원을 주고, AI/ML workload나 matrix computation 수요를 네트워크 보안과 결합한다면 기존 PoW의 에너지 낭비 프레임을 `compute marketplace` 내러티브로 바꿀 수 있습니다.",
+            "- **나쁜 시나리오:** 유용 연산 수요가 실제로 붙지 않거나, 검증 비용이 너무 높거나, 채굴 보상이 토큰 발행에만 의존하면 Pearl은 PoUW라는 이름은 흥미롭지만 경제적으로는 일반 mining coin과 크게 다르지 않을 수 있습니다.",
+            "- **대표님 기준 판단:** 지금 봐야 할 포인트는 `PRL 가격`이 아니라 Pearl이 정말로 유용 compute를 생산하고 있는지, 그 compute가 누가 돈을 내는 수요인지, 네트워크가 단순 채굴 이벤트를 넘어 제품/인프라로 성장하는지입니다.",
+            f"- **분류:** {narratives}. Chain=`{project.chain or 'unknown'}`, token_status=`{display_token_status(project)}`.",
+        ]
     else:
         lines = [
             f"- **스탠스:** `{score['stance']}`. 현재는 watchlist 후보로 보는 것이 맞고, TOP으로 올리려면 founder/team, live KOL, pool/on-chain 지표 검증이 더 필요합니다.",
@@ -2954,6 +2983,19 @@ def reader_project_explanation_lines(project: Any) -> list[str]:
             "- 대표님이 읽을 때는 `이 프로젝트가 어떤 토큰인가`보다 `누가 왜 빌리고, 누가 어떤 위험을 감수하고 공급하며, 손실이 발생하면 어떤 규칙으로 처리되는가`를 먼저 보면 됩니다.",
             "- 내러티브로는 `Crypto Credit`, `Undercollateralized Lending`, `DeFi Automation`, `AI agent credit line` 쪽에 가깝습니다. 다만 이 내러티브는 멋있는 말이라기보다, 실제 credit underwriting을 얼마나 잘 수행하는지로 검증되어야 합니다.",
         ]
+    if is_pearl_project(project):
+        return [
+            "- Pearl은 기존 PoW의 핵심 문제, 즉 `네트워크 보안을 위해 막대한 연산을 쓰지만 그 연산 자체는 외부 효용이 거의 없다`는 비판을 정면으로 건드립니다. Pearl의 핵심은 채굴자가 의미 없는 해시 경쟁만 하는 것이 아니라, AI/ML에서 쓰일 수 있는 행렬 연산 같은 유용 compute를 수행하도록 만드는 것입니다.",
+            "- 공개 근거 기준 Pearl은 Proof-of-Useful-Work를 L1 합의와 결합하려는 프로젝트입니다. 채굴자는 GPU/compute 자원을 제공하고, 네트워크는 그 결과를 검증해 블록 생성과 보상에 반영하는 구조를 지향합니다.",
+            "- 이 프로젝트를 단순히 `새로운 PoW 코인`으로 보면 놓치는 부분이 있습니다. 더 중요한 질문은 Pearl이 compute demand, mining supply, L1 security를 하나의 경제 시스템으로 묶을 수 있느냐입니다.",
+            "- Pearl의 제품 표면은 세 가지로 나뉩니다. 첫째, 체인/노드/채굴 인프라입니다. 둘째, 유용 연산을 정의하고 검증하는 PoUW 프로토콜입니다. 셋째, 외부 compute buyer 또는 AI 인프라 파트너가 실제 작업을 네트워크에 던질 수 있는 수요 측 연결입니다.",
+            "- 공식 사이트와 화이트페이퍼가 말하는 핵심은 `arbitrary matrix multiplication` 기반 유용 연산입니다. 이것이 실제로 AI 학습/추론 workload와 얼마나 직접 연결되는지는 더 검증해야 하지만, 내러티브상으로는 AI compute shortage와 PoW security를 연결하는 방향입니다.",
+            "- GitHub monorepo와 explorer가 존재한다면 제품은 최소한 문서 수준을 넘어 코드/네트워크 흔적을 갖는 것으로 볼 수 있습니다. 다만 repo activity, release, node setup, miner setup, test coverage, security review까지 확인해야 제품 성숙도를 제대로 판단할 수 있습니다.",
+            "- mining pool과 explorer 흔적은 네트워크가 실제로 운영되고 있거나 운영을 준비 중이라는 신호입니다. 하지만 이것만으로 제품-시장 적합성이 입증되는 것은 아닙니다. 실제 compute task가 어디서 오고, 누가 비용을 지불하는지가 더 중요합니다.",
+            "- Together AI 파트너십성 공개 언급은 Pearl을 단순 mining coin이 아니라 AI compute 인프라 실험으로 읽게 만드는 중요한 외부 맥락입니다. 다만 파트너십의 범위가 연구 협력인지, 실제 workload 공급인지, 상용 compute 수요인지 구분해야 합니다.",
+            "- 대표님이 읽을 때는 `Pearl이 채굴 가능한가`보다 `채굴자가 수행한 일이 누구에게 쓸모가 있고, 그 쓸모가 토큰 경제에 어떻게 반영되는가`를 먼저 보면 됩니다.",
+            "- 내러티브로는 `Proof-of-Useful-Work`, `AI Compute`, `GPU Mining`, `L1 Blockchain`, `Decentralized AI Infrastructure`에 가깝습니다. 이 중 진짜 판단 포인트는 AI compute 쪽 수요가 실제로 네트워크 경제에 연결되는지입니다.",
+        ]
     return [
         f"- {best_project_description(project)}",
         "- 이 보고서는 가격보다 프로젝트 identity, 제품 작동 방식, token value-capture, 미해결 리스크를 우선 정리합니다.",
@@ -2978,6 +3020,21 @@ def reader_market_signal_lines(project: Any, findings: list[FindingRecord]) -> l
                 "- **소셜 신호의 강점:** 공식 X, backer 언급, 전문 리서치 글, 외부 해설이 모두 같은 주제를 말합니다. 이것은 최소한 프로젝트 정체성이 시장에 어느 정도 전달되고 있다는 의미입니다.",
                 "- **소셜 신호의 약점:** 아직 KOL별 반복 언급, 반론, controversy, 실사용자 후기, builder community 반응은 충분히 수집되지 않았습니다. 따라서 `누가 어떤 논리로 긍정/부정하는가`를 더 촘촘하게 쌓아야 합니다.",
                 "- **주의할 점:** X/기사 신호는 trigger일 뿐입니다. 실제 판단은 docs의 pool mechanics, 공식 주소, app 상태, GitHub/contract, 그리고 온체인 pool 지표가 따라와야 합니다.",
+            ]
+        )
+    elif project is not None and is_pearl_project(project):
+        lines.extend(
+            [
+                "- **공식 사이트/화이트페이퍼:** Pearl Research Labs / Pearl Network 쪽 공개 근거는 Proof-of-Useful-Work L1과 matrix multiplication 기반 유용 연산을 핵심 thesis로 제시합니다. 이 출처는 identity gate의 중심입니다.",
+                "- **GitHub:** `pearl-research-labs/pearl` 계열 repo는 Pearl이 단순 랜딩페이지 프로젝트가 아니라 코드/프로토콜 구현 흔적을 가진 후보임을 보여줍니다. 다음 실사에서는 commit activity, node/miner setup, tests, release, security docs를 봐야 합니다.",
+                "- **Explorer / Blockbook:** explorer와 blockbook 계열 링크는 네트워크 운영 흔적을 확인하는 데 중요합니다. 다만 explorer가 있다는 사실과 경제적 수요가 있다는 사실은 다르므로, block production, active miners, transaction activity, compute task flow를 분리해서 봐야 합니다.",
+                "- **Mining pool:** Herominers, LuckyPool 같은 pool 링크가 잡히면 `채굴 가능성`은 신호로 볼 수 있습니다. 하지만 투자 보고서에서는 hashrate, pool 분산도, 채굴 보상, 토큰 발행 구조가 함께 확인되어야 합니다.",
+                "- **Together AI 관련 공개 글:** Together AI와의 파트너십성 언급은 Pearl을 AI compute 인프라 내러티브로 읽게 만듭니다. 다만 이 관계가 실제 workload, 연구 협력, 홍보성 언급 중 무엇인지 추가 확인이 필요합니다.",
+                "- **KOL/리서치 해석:** 현재 Pearl은 3Jane처럼 Delphi/The Block급 전문 리서치 프레임이 강하게 잡힌 상태라기보다, PoUW/AI compute라는 기술 내러티브가 먼저 보이는 프로젝트입니다. 따라서 KOL conviction보다 공식 문서와 네트워크/코드 검증 비중을 높여야 합니다.",
+                "- **내러티브 해석:** 시장이 Pearl을 주목한다면 그 이유는 `PoW를 AI compute로 재해석한다`는 점입니다. 이는 에너지 소비 비판, GPU 채굴자 수익성, AI compute shortage, decentralized infra라는 여러 테마가 만나는 지점입니다.",
+                "- **소셜 신호의 강점:** 공식/후보 X, mining community, compute/AI 관련 기사, GitHub, explorer가 같은 프로젝트 정체성을 가리킨다면 identity 신뢰도는 높아집니다.",
+                "- **소셜 신호의 약점:** 실시간 X API 없이 공개 웹 결과만으로는 KOL별 원문, 반복 언급, 반박, controversy, 채굴자 커뮤니티 반응을 충분히 보지 못합니다. 특히 Pearl처럼 이름 충돌이 많은 프로젝트는 official handle과 unofficial/shill account를 분리해야 합니다.",
+                "- **주의할 점:** PoUW 내러티브는 매력적이지만, `유용한 연산`이라는 말이 실제 수요와 검증 가능한 결과로 이어지지 않으면 일반 PoW 토큰 홍보와 구분하기 어렵습니다.",
             ]
         )
     if not row:
@@ -3045,6 +3102,21 @@ def reader_product_lines(project: Any, findings: list[FindingRecord]) -> list[st
                 "- 프로토콜이 성숙하려면 docs만으로는 부족하고, app에서 실제 pool 상태와 borrower utilization, default/recovery history가 투명하게 보여야 합니다. 특히 default가 아직 없다면 그것은 좋은 신호일 수도 있지만, 동시에 stress-tested evidence가 부족하다는 뜻일 수도 있습니다.",
             ]
         )
+    elif is_pearl_project(project):
+        lines.extend(
+            [
+                "- Pearl의 제품/프로토콜 구조는 일반적인 DeFi app보다 `chain + miner + useful compute verification + external workload demand` 조합으로 봐야 합니다.",
+                "- 공식 문서가 말하는 Proof-of-Useful-Work는 채굴자가 수행한 연산이 네트워크 보안에만 쓰이는 것이 아니라 외부적으로도 쓸모 있는 computation이어야 한다는 주장입니다.",
+                "- 핵심 기술 질문은 세 가지입니다. 첫째, 어떤 연산이 유용하다고 인정되는가. 둘째, 그 연산 결과를 네트워크가 어떻게 검증하는가. 셋째, 검증 비용이 보상/보안 모델을 망치지 않을 정도로 낮은가입니다.",
+                "- Pearl이 제시하는 matrix multiplication은 AI/ML workload와 연결될 수 있는 연산입니다. 다만 임의 행렬곱이 실제 customer workload와 얼마나 직접 대응되는지, 또는 benchmark/보안 장치로 쓰이는지 분리해서 확인해야 합니다.",
+                "- miner 입장에서는 `GPU를 제공하면 PRL/native reward를 받는다`는 구조일 가능성이 큽니다. 하지만 장기적으로는 단순 발행 보상보다 compute buyer payment가 붙어야 지속 가능한 token economy가 됩니다.",
+                "- network operator 관점에서는 node software, miner client, task distribution, result verification, block reward accounting, explorer transparency가 제품의 본체입니다.",
+                "- GitHub repo가 확인되면 `consensus`, `miner`, `matrix`, `proof`, `verification`, `rpc`, `node`, `wallet`, `explorer`, `test`, `audit` 키워드를 중심으로 구조를 봐야 합니다.",
+                "- explorer와 blockbook은 chain이 돌아간다는 신호지만, 실제 product readiness는 active miners, block cadence, failed task rate, compute task demand, RPC stability, docs completeness까지 봐야 합니다.",
+                "- mining pool은 초기에 커뮤니티와 보안 공급을 만드는 데 중요하지만, pool concentration이 높으면 네트워크 탈중앙성 리스크가 커집니다.",
+                "- 따라서 Pearl의 제품 성숙도는 `문서가 있다`가 아니라 `채굴자가 붙고, compute 수요가 들어오고, 검증 가능한 방식으로 보상이 정산된다`로 판단해야 합니다.",
+            ]
+        )
     else:
         lines.append(f"- 제품 설명: {best_project_description(project)}")
     if rows:
@@ -3082,6 +3154,20 @@ def reader_token_lines(project: Any, findings: list[FindingRecord]) -> list[str]
                 "- 즉 이 프로젝트의 token thesis는 `토큰이 오른다`가 아니라, credit market이 실제로 돌아갈 때 각 token/asset layer가 어떤 경제적 권리와 리스크를 갖는지입니다.",
             ]
         )
+    elif is_pearl_project(project):
+        lines.extend(
+            [
+                "- Pearl의 토큰/체인 thesis는 일반 utility token보다 native L1 mining economy에 가깝게 봐야 합니다.",
+                "- token_status가 `native_coin_reported`로 잡힌 경우, 핵심은 PRL/native coin이 block reward, transaction fee, miner incentive, compute task settlement 중 어디에 실제로 쓰이는지입니다.",
+                "- 가치 포착의 강한 조건은 `외부 compute 수요 -> miner가 유용 연산 수행 -> 네트워크가 결과 검증 -> block/security/reward에 반영 -> native token이 demand 또는 fee sink를 갖는 구조`입니다.",
+                "- 단순 발행 보상만으로 채굴자를 유인하면 초기 bootstrap은 가능하지만, 장기적으로는 token inflation과 sell pressure가 커질 수 있습니다.",
+                "- 반대로 실제 compute buyer가 네트워크에 비용을 지불하고, 그 비용이 miner reward 또는 token sink와 연결되면 Pearl의 경제성은 일반 PoW보다 강한 설명력을 갖습니다.",
+                "- chain 관점에서는 Pearl L1로 분류되지만, EVM 호환성, RPC 안정성, wallet 지원, bridge, explorer, exchange/DEX 접근성은 별도 확인이 필요합니다.",
+                "- token value-capture는 live와 roadmap을 분리해야 합니다. 현재 확인해야 할 것은 `실제 compute payment가 있는가`, `fee가 누구에게 가는가`, `block reward schedule이 무엇인가`, `miner concentration이 어떤가`입니다.",
+                "- mining token은 narrative가 좋아도 emission 구조가 약하면 초기 유동성 이후 가격 방어가 어렵습니다. 따라서 FDV보다 emission, hashrate, miner profitability, external compute revenue를 먼저 봐야 합니다.",
+                "- 대표님 관점에서는 Pearl의 토큰을 `AI compute 수요에 의해 뒷받침되는 채굴 경제`로 볼 수 있는지, 아니면 `흥미로운 PoW 변형이지만 수요가 없는 발행 보상`인지가 핵심 판단입니다.",
+            ]
+        )
     for row in finding_rows(findings, "contract_token_info", project)[:1]:
         registry = row.get("official_addresses")
         if isinstance(registry, dict) and registry:
@@ -3115,6 +3201,19 @@ def reader_team_funding_kol_lines(project: Any, findings: list[FindingRecord]) -
                 "- 다음 리서치에서는 창업자 인터뷰, 팟캐스트, LinkedIn/GitHub, 이전 프로젝트, 채용 페이지, investor memo/announcement를 붙여 팀 신뢰도를 별도 점수화하는 것이 좋습니다.",
             ]
         )
+    elif is_pearl_project(project):
+        lines.extend(
+            [
+                "- Pearl의 팀/펀딩 섹션은 아직 3Jane처럼 명확한 seed round 기사나 대형 VC 리드가 중심에 서는 구조로 보이지 않습니다. 따라서 팀 신뢰도는 공식 사이트, GitHub organization, paper/whitepaper author, partnership 글, 채굴 커뮤니티 반응을 나눠 확인해야 합니다.",
+                "- Pearl Research Labs라는 명칭과 GitHub organization은 프로젝트의 기술 주체를 추적하는 시작점입니다. repo owner, maintainer, commit author, issue activity, release signer를 확인해야 합니다.",
+                "- Together AI 관련 공개 글은 Pearl을 AI compute 인프라 관점에서 보게 만드는 중요한 외부 신호입니다. 다만 funding과 partnership은 다릅니다. 실제 투자 유치인지, 연구/기술 협력인지, 공동 마케팅인지 분리해야 합니다.",
+                "- KOL 측면에서는 PoUW/AI compute를 해석하는 전문 리서치 글이 충분히 모이면 conviction이 올라갑니다. 현재는 공개 웹/공식 소스 중심으로 보고, X API를 붙이면 KOL별 원문 포스트와 반복 언급을 별도 맵으로 만들어야 합니다.",
+                "- mining community 반응도 Pearl에서는 중요합니다. 채굴자들이 실제로 노드/마이너를 돌리는지, pool이 분산되어 있는지, 보상 구조에 대한 불만이 있는지 확인해야 합니다.",
+                "- founder dossier는 아직 미완성으로 두는 것이 맞습니다. 공식적으로 확인된 이름, LinkedIn, GitHub, 이전 프로젝트, 학력/전 직장 근거가 없으면 추정하지 않습니다.",
+                "- 투자자/펀딩이 미확인이라면 약점이지만 곧바로 제외 사유는 아닙니다. PoW/L1 프로젝트는 초기에 community/miner bootstrap이 더 강한 신호일 수도 있습니다. 다만 장기 개발비와 생태계 확장 비용을 감당할 capital source는 확인해야 합니다.",
+                "- 다음 단계는 GitHub maintainer map, official announcement archive, partnership 글 원문, founder/interview, mining pool 운영자/커뮤니티 반응을 한 번에 묶어 팀/운영 점수를 따로 산출하는 것입니다.",
+            ]
+        )
     handles = extract_builder_handles(findings, project)
     if handles:
         lines.append("- 공개 builder/team handle 후보:")
@@ -3146,6 +3245,19 @@ def reader_risk_lines(project: Any, findings: list[FindingRecord]) -> list[str]:
             "- **운영 리스크:** credit protocol은 launch 이후 risk parameter를 계속 조정해야 합니다. borrower quality가 변하거나 liquidity가 빠지는 시기에 protocol operator가 어떤 정책으로 대응하는지가 장기 생존에 중요합니다.",
             "- **반론:** backer와 narrative가 좋아도, 실제 borrower가 없거나 supplier가 감수하는 위험 대비 보상이 부족하면 market은 오래 유지되지 않습니다. 이 반론은 단순 FUD가 아니라 credit business의 본질적인 체크포인트입니다.",
         ]
+    if is_pearl_project(project):
+        return [
+            "- **Identity/ticker risk:** Pearl이라는 이름은 충돌 가능성이 높습니다. Pearl Research Labs, pearlresearch.ai, GitHub repo, explorer, official X/채굴 pool이 같은 프로젝트를 가리키는지 계속 확인해야 합니다.",
+            "- **Useful-compute demand risk:** PoUW가 성립하려면 외부에서 실제로 필요로 하는 computation이 있어야 합니다. 수요자가 없으면 채굴자는 유용 연산을 한다기보다 token emission을 받기 위한 계산만 하게 됩니다.",
+            "- **Verification cost risk:** 유용 연산 결과를 검증하는 비용이 높으면 네트워크 보안, 처리량, 경제성이 모두 약해질 수 있습니다. PoUW는 `연산이 유용하다`뿐 아니라 `검증 가능하다`가 핵심입니다.",
+            "- **Mining centralization risk:** GPU/compute 기반 네트워크는 pool concentration, ASIC/GPU 우위, 특정 채굴자 집중으로 탈중앙성 리스크가 커질 수 있습니다.",
+            "- **Token inflation risk:** native mining reward가 초기 공급의 대부분을 만든다면 external compute revenue가 붙기 전까지 sell pressure가 커질 수 있습니다.",
+            "- **Product maturity risk:** explorer, pool, GitHub가 있어도 실제 customer workload, RPC 안정성, docs completeness, wallet/ecosystem 지원이 부족하면 L1로서 성숙도가 낮습니다.",
+            "- **Security risk:** consensus, miner client, verification logic, RPC, explorer, bridge가 모두 공격면입니다. audit 또는 peer review가 없으면 기술 리스크가 큽니다.",
+            "- **Social/shill risk:** PoW/mining 프로젝트는 커뮤니티 홍보와 채굴 수익 기대가 과장되기 쉽습니다. KOL 언급은 원문, 이해관계, 반복성, 반론을 함께 봐야 합니다.",
+            "- **반론:** Pearl의 내러티브는 강하지만, 실제 compute buyer가 붙지 않으면 `AI compute L1`이 아니라 `새로운 채굴 코인`으로 축소될 수 있습니다. 이 반론을 깨려면 수요 측 evidence가 필요합니다.",
+            "- **운영 리스크:** L1은 출시 이후 노드 안정성, chain halt, upgrade, wallet support, developer ecosystem을 계속 관리해야 합니다. 작은 팀이 이 운영 부담을 감당할 수 있는지도 확인해야 합니다.",
+        ]
     return [
         "- 공식 site/docs/product 근거가 marketing-heavy일 수 있습니다.",
         "- token, contract, chain identity는 공식 출처와 explorer 기준으로 재확인해야 합니다.",
@@ -3168,6 +3280,19 @@ def reader_next_steps_lines(project: Any, findings: list[FindingRecord]) -> list
             "- JANE 관련해서는 단순 주소 확인을 넘어 emission, utility, governance rights, fee linkage, staking/slashing 여부를 분리합니다.",
             "- 소셜/KOL은 `누가 좋다고 했는가`보다 `왜 좋다고 했는가`, `무엇을 근거로 삼았는가`, `반대 논리는 무엇인가`를 함께 저장합니다.",
             "- 다음 보고서 업그레이드 기준은 founder dossier 보강, live pool 지표 확보, GitHub/audit 검증, KOL 원문 10개 이상 정리, token value-capture live/roadmap 분리입니다.",
+        ]
+    if project is not None and is_pearl_project(project):
+        return [
+            "- 공식 사이트/화이트페이퍼에서 PoUW 정의, task generation, result verification, block reward accounting을 다시 확인합니다.",
+            "- GitHub repo를 clone/read해 consensus, miner, matrix multiplication, proof verification, RPC, node setup, tests, release, audit 관련 파일을 확인합니다.",
+            "- explorer와 blockbook에서 block cadence, active addresses, transaction count, miner distribution, chain halt 여부를 확인합니다.",
+            "- mining pool별 hashrate, reward, pool concentration, miner onboarding 문서를 확인합니다.",
+            "- Together AI 관련 글의 원문을 읽고 실제 partnership 범위가 commercial workload인지, research collaboration인지, marketing mention인지 분리합니다.",
+            "- official X와 public X/KOL 검색으로 PoUW thesis에 대한 반복 언급, 반론, controversy, 채굴자 커뮤니티 반응을 수집합니다.",
+            "- token emission schedule, block reward, fee model, burn/buyback/staking 여부, compute buyer payment path를 분리합니다.",
+            "- founder/team은 GitHub maintainer, paper author, official profile, LinkedIn, 이전 프로젝트, funding/partnership announcement를 기준으로 검증합니다.",
+            "- Pearl을 WATCH에서 TOP으로 올리려면 `실제 compute 수요`, `검증 가능한 PoUW result`, `분산된 mining participation`, `명확한 token value-capture`가 동시에 필요합니다.",
+            "- 반대로 compute 수요가 없고 emission 중심으로만 돌아가면 PoUW 내러티브가 있어도 OPERATOR 또는 제외 후보로 낮춰야 합니다.",
         ]
     return [
         "- 공식 site/docs/whitepaper에서 project identity를 재확인합니다.",
@@ -3203,6 +3328,27 @@ def reader_source_digest_lines(project: Any, source_log: list[dict[str, str]]) -
             "- **Delphi / 외부 해설:** Delphi는 3Jane을 `real credit onchain` 베팅으로 해석합니다. Leviathan류 외부 글은 시장이 이 프로젝트를 unsecured/undercollateralized lending protocol로 이해하고 있음을 보여줍니다. "
             f"({source_markdown_link('https://members.delphidigital.io/reports/engineering-real-credit-onchain-the-3jane-bet', 'Delphi')}, {source_markdown_link('https://leviathannews.substack.com/p/3jane-lending-protocol-explained', 'Leviathan')})",
             "  - 외부 해설의 가치는 `어떤 내러티브로 소비되는가`를 보여주는 데 있습니다. 현재 3Jane은 단순 DeFi yield가 아니라 real credit / undercollateralized lending의 재시도로 읽히고 있습니다.",
+        ]
+    if project is not None and is_pearl_project(project):
+        return [
+            "- **공식 사이트/화이트페이퍼:** Pearl은 Proof-of-Useful-Work L1 thesis를 제시합니다. 핵심은 채굴 연산이 네트워크 보안뿐 아니라 외부적으로도 유용한 computation이 될 수 있다는 주장입니다. "
+            f"({source_markdown_link('https://pearlresearch.ai/', 'Pearl site')}, {source_markdown_link('https://pearlresearch.ai/Pearl_Whitepaper.pdf', 'whitepaper')})",
+            "  - 이 출처는 identity gate와 narrative gate의 중심입니다. Pearl을 일반 PoW 코인이 아니라 PoUW/AI compute 인프라 후보로 분류할 근거가 여기서 나옵니다.",
+            "- **GitHub:** Pearl Research Labs의 repo는 프로토콜이 문서만 있는지, 실제 node/miner/consensus 구현이 있는지 확인하는 핵심 근거입니다. "
+            f"({source_markdown_link('https://github.com/pearl-research-labs/pearl', 'GitHub repo')})",
+            "  - repo는 단순 링크가 아니라 실사 대상입니다. commit activity, miner setup, verification logic, tests, release, security docs가 실제 성숙도를 결정합니다.",
+            "- **Explorer / Blockbook:** explorer와 blockbook은 네트워크 운영 흔적을 확인하는 데 쓰입니다. block cadence, transaction activity, active miner/validator 분포, chain halt 여부를 봐야 합니다. "
+            f"({source_markdown_link('https://explorer.pearlresearch.ai/?network=mainnet', 'explorer')}, {source_markdown_link('https://blockbook.pearlresearch.ai/blocks?page=1', 'blockbook')})",
+            "  - explorer가 존재한다는 점은 긍정적이지만, 그 자체로 product-market fit이나 economic demand를 증명하지는 않습니다.",
+            "- **Mining pool:** 공개 pool 링크는 Pearl이 채굴자 네트워크를 형성하려는 신호입니다. 다만 pool concentration과 보상 구조를 확인하지 않으면 탈중앙성과 emission 리스크를 평가하기 어렵습니다. "
+            f"({source_markdown_link('https://pearl.herominers.com/', 'Herominers')}, {source_markdown_link('https://pearl.luckypool.io/', 'LuckyPool')})",
+            "  - mining pool 자료는 채굴 가능성 확인에는 좋지만, 장기 thesis는 `누가 compute를 구매하는가`까지 이어져야 합니다.",
+            "- **Together AI 관련 글:** Together AI와 Pearl Research Labs 관련 공개 글은 Pearl을 AI compute 내러티브로 해석할 수 있게 하는 외부 맥락입니다. "
+            f"({source_markdown_link('https://www.together.ai/blog/together-ai-partners-with-pearl-research-labs', 'Together AI')})",
+            "  - 이 출처는 강한 신호일 수 있지만, partnership 범위가 실제 workload 공급인지, 연구 협력인지, marketing collaboration인지 원문 기준으로 분리해야 합니다.",
+            "- **커뮤니티/뉴스:** PearlNews나 공식/후보 X 소스는 커뮤니티 업데이트를 추적하는 데 쓰되, 공식 여부와 이해관계를 별도 확인해야 합니다.",
+            "  - 특히 Pearl은 이름 충돌이 많기 때문에, 모든 X/커뮤니티 소스는 official source와 candidate source를 분리해서 저장해야 합니다.",
+            "- **투자 보고서 해석:** 현재 공개 근거만 놓고 보면 Pearl의 핵심은 `AI compute 수요를 PoW 보안과 연결할 수 있는가`입니다. 이 질문에 답하는 증거가 늘어나면 WATCH 상단 후보가 될 수 있고, 반대로 수요 측 근거가 약하면 기술적으로 흥미롭지만 투자 리서치 conviction은 제한됩니다.",
         ]
     return reader_source_lines(source_log)
 
@@ -3244,6 +3390,8 @@ def render_executive_summary_clean(project: Any, quality: ReportQuality, source_
         ]
         if is_3jane_project(project):
             lines.append("- **3Jane 요지:** 담보 기반 DeFi 대출이 아니라, 검증 가능한 신용/자산/미래 현금흐름을 바탕으로 무담보 USDC credit line을 만들려는 Ethereum 기반 credit protocol입니다.")
+        elif is_pearl_project(project):
+            lines.append("- **Pearl 요지:** 기존 PoW의 해시 경쟁을 유용 compute로 바꾸려는 Proof-of-Useful-Work L1 후보입니다. 핵심 판단은 채굴 보상이 실제 AI/compute 수요와 연결되는지입니다.")
         return lines
     return [
         f"- **Identity:** {project.name} is {thesis}",

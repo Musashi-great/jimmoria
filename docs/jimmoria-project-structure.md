@@ -535,7 +535,7 @@ Research Room 결과 출력 정책:
 
 즉 ReportAgent는 "누가 무엇을 했는지"나 "어떤 링크를 봤는지"보다 "그 링크와 자료에서 어떤 내용이 확인됐고, 그래서 이 프로젝트를 어떻게 이해해야 하는지"를 앞세운다. 에이전트별 실행 로그, council 토론, tool payload, raw LLM output은 최종 보고서 본문에 넣지 않고 `data/runs/<room_id>/messages.json`, `events.json`, `tool_audit_log.json`, `llm_call_log.json`에 감사 trail로 남긴다.
 
-특히 3Jane 같은 high-signal 프로젝트는 짧은 링크 요약으로 끝내지 않는다. 보고서는 다음을 반드시 풀어쓴다.
+특히 3Jane 같은 high-signal 프로젝트나 Pearl 같은 기술 내러티브 프로젝트는 짧은 링크 요약으로 끝내지 않는다. 보고서는 다음을 반드시 풀어쓴다.
 
 - 프로젝트가 무엇을 하는지와 기존 DeFi 구조와 다른 점
 - X/KOL/article에서 시장이 어떤 내러티브로 읽고 있는지
@@ -543,6 +543,16 @@ Research Room 결과 출력 정책:
 - 토큰/체인/value-capture가 live인지 roadmap인지
 - 팀/펀딩/KOL 신호가 무엇을 의미하고 무엇은 아직 미확인인지
 - bull case, bear case, 반론, 다음 실사 질문
+
+ReportAgent의 persona는 `The Buy-Side Research Editor`다. 즉 이 에이전트는 에이전트별 활동 요약자가 아니라 투자 리서치 문서의 편집장이다. 최종 보고서는 다음 원칙을 따른다.
+
+- 본문은 링크 목록이 아니라 해석 중심으로 작성한다.
+- 각 출처는 "무슨 내용이 확인됐는가"와 "그 내용이 프로젝트 판단에 왜 중요한가"로 번역한다.
+- 프로젝트 타입별 경제 메커니즘을 설명한다: 누가 지불하고, 누가 벌고, 어떤 위험이 이전되고, 무엇이 검증되어야 하는가.
+- PoUW/L1/mining 프로젝트는 compute 수요, miner incentive, verification cost, emission, explorer/pool/GitHub evidence를 중심으로 쓴다.
+- Credit/DeFi 프로젝트는 borrower demand, supplier risk, default/recovery, pool accounting, token value-capture를 중심으로 쓴다.
+- 모든 보고서는 한국어를 기본으로 하되, `Proof-of-Useful-Work`, `credit line`, `value-capture`처럼 기술적으로 더 명확한 영어 표현은 유지할 수 있다.
+- evidence packet과 source appendix는 감사 trail이고, 최종 보고서의 본문을 대체하지 않는다.
 
 ### Current Reader-Friendly Report Shape
 

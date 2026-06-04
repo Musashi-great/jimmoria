@@ -1736,6 +1736,58 @@ class SmokeTest(unittest.TestCase):
         self.assertNotIn('"title":', report)
         self.assertNotIn("obsidian_note", report)
 
+    def test_runtime_pearl_report_reads_like_investment_research(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch.dict("os.environ", {**_offline_no_secret_env(), "JIMMORIA_SKIP_EXTERNAL_SEARCH": "1"}, clear=False):
+                runtime = ResearchRuntime()
+                result = runtime.run_article_research(
+                    title="pearl 리서치 보고서 만들어봐",
+                    content="pearl 리서치 보고서 만들어봐",
+                    vault_dir=root / "vault",
+                    reports_dir=root / "reports",
+                    memory_path=root / "memory.json",
+                )
+                report = Path(result.room.output_paths["report"]).read_text(encoding="utf-8")
+
+        candidates = [candidate.to_dict() for candidate in result.memory.projects.values()]
+        quality = result.room.project_card["research_quality"]
+
+        self.assertEqual(result.room.status, "completed")
+        self.assertEqual(quality["status"], "research_complete")
+        self.assertEqual(candidates[0]["name"], "Pearl Network")
+        self.assertIn("# Pearl Network 리서치 보고서", report)
+        self.assertIn("## 1. 대표님용 투자 메모", report)
+        self.assertIn("## 2. 프로젝트 개요", report)
+        self.assertIn("## 3. 시장/내러티브와 왜 지금인가", report)
+        self.assertIn("## 4. 제품/프로토콜 구조", report)
+        self.assertIn("## 5. 토큰/체인/가치 포착", report)
+        self.assertIn("## 6. 팀/펀딩/KOL", report)
+        self.assertIn("## 7. 리스크와 반론", report)
+        self.assertIn("## 8. 다음 실사 질문", report)
+        self.assertIn("## 9. 확인된 내용 요약", report)
+        self.assertGreater(len(report), 10000)
+        self.assertIn("Proof-of-Useful-Work", report)
+        self.assertIn("matrix multiplication", report)
+        self.assertIn("AI compute", report)
+        self.assertIn("채굴 경제", report)
+        self.assertIn("유용 compute", report)
+        self.assertIn("compute buyer", report)
+        self.assertIn("Together AI", report)
+        self.assertIn("GitHub repo", report)
+        self.assertIn("Explorer / Blockbook", report)
+        self.assertIn("Mining pool", report)
+        self.assertIn("native_coin_reported", report)
+        self.assertIn("value-capture", report)
+        self.assertIn("반론", report)
+        self.assertIn("Pearl을 WATCH에서 TOP으로 올리려면", report)
+        self.assertNotIn("Agent Research Notes", report)
+        self.assertNotIn("LLM synthesis", report)
+        self.assertNotIn('"title":', report)
+        self.assertNotIn("????", report)
+        self.assertNotIn("?묒", report)
+        self.assertNotIn("李", report)
+
     def test_message_summary_uses_response_result_fallback(self) -> None:
         message = {
             "type": "RESPONSE",
@@ -1792,7 +1844,7 @@ class SmokeTest(unittest.TestCase):
         self.assertIsNotNone(report)
         assert report is not None
         self.assertEqual(report.output_schema.type, "project_intelligence_report")
-        self.assertIn("Korean project intelligence report", report.mission.primary_goal)
+        self.assertIn("Korean-first investment-style project report", report.mission.primary_goal)
         self.assertTrue(any("client comprehension" in item for item in report.must_follow))
         self.assertTrue(any("project intelligence report" in item for item in report.must_not))
         self.assertTrue(any("raw LLM JSON" in item for item in report.must_not))
