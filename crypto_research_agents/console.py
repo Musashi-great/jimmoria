@@ -835,6 +835,9 @@ class JimmoriaConsole:
         report_path = room.output_paths.get("report", "")
         evidence_packet_path = room.output_paths.get("evidence_packet", "")
         vault_path = room.output_paths.get("obsidian_vault", "")
+        retention = room.project_card.get("run_retention") if isinstance(room.project_card, dict) else {}
+        if not isinstance(retention, dict):
+            retention = {}
         lines = [
             f"Room: {room.room_id}",
             f"Status: {room.status}",
@@ -854,11 +857,16 @@ class JimmoriaConsole:
         if report_path:
             lines.append(f"Report: {report_path}")
             lines.append(f"Full report command: /report {room.room_id}")
-        if evidence_packet_path:
+        if evidence_packet_path and not retention.get("evidence_packet_deleted"):
             lines.append(f"Evidence packet: {evidence_packet_path}")
         if vault_path:
             lines.append(f"Vault: {vault_path}")
-        lines.append(f"Replay events: {self.runs_dir / room.room_id / 'events.json'}")
+        if isinstance(retention, dict) and retention.get("run_snapshot_deleted"):
+            lines.append("Room data: cleaned after report delivery")
+            if retention.get("report_index"):
+                lines.append(f"Report index: {retention.get('report_index')}")
+        else:
+            lines.append(f"Replay events: {self.runs_dir / room.room_id / 'events.json'}")
         summary_title = "JIMMORIA diagnostic" if quality_status == "insufficient_evidence" else "JIMMORIA response"
         preview_title = "Diagnostic preview" if quality_status == "insufficient_evidence" else "Report preview"
         self.block(summary_title, lines)

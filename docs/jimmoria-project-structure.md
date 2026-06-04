@@ -489,6 +489,7 @@ Safety rules:
 data/memory.json
 data/company_settings.json
 data/model_settings.json
+data/report_index.json
 data/runs/<room_id>/room.json
 data/runs/<room_id>/messages.json
 data/runs/<room_id>/events.json
@@ -500,6 +501,38 @@ vault/20_Sources/*.md
 vault/30_Narratives/*.md
 vault/50_Reports/*.md
 ```
+
+### 11.1 Retention Policy
+
+대화형 `jimmoria` 채팅에서는 기본 retention이 `report_only`다. 즉 보고서 요청이 끝나면 최종 산출물은 남기고 중간 실행 데이터는 정리한다.
+
+기본 보존:
+
+```text
+reports/*.md
+vault/*
+data/report_index.json
+data/company_settings.json
+data/model_settings.json
+```
+
+기본 삭제:
+
+```text
+data/runs/<room_id>/
+data/memory.json
+data/evidence_packets/<room_id or project>.md
+```
+
+이렇게 하는 이유는 사용자가 같은 프로젝트를 다시 요청했을 때 이전 최종 보고서는 참고하되, 매번 생성된 room 로그와 임시 메모리가 쌓이지 않게 하기 위해서다. `data/report_index.json`은 room id, topic, report path, quality status만 담는 작은 인덱스다.
+
+디버깅, `/events`, `/messages`, web replay가 필요하면 다음처럼 run 데이터를 보존한다.
+
+```powershell
+$env:JIMMORIA_CHAT_RUN_RETENTION = "debug"
+```
+
+런타임을 직접 호출하는 테스트/개발 코드는 기본적으로 debug retention을 유지한다. 필요하면 `run_article_research(..., retention_policy="report_only")`로 같은 cleanup 정책을 명시할 수 있다.
 
 ### Runtime Telemetry
 
@@ -760,6 +793,8 @@ This keeps the final report focused on project understanding while preserving th
 - `data/runs`
 - `reports`
 - `vault`
+
+If interactive chat is using the default `report_only` retention, completed room snapshots are cleaned after delivery and the dashboard will mainly show reports/Vault data. For full event replay in the web dashboard, run with `JIMMORIA_CHAT_RUN_RETENTION=debug` before creating the room.
 
 It is intended for:
 

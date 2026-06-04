@@ -31,6 +31,7 @@ from crypto_research_agents.cli import (
     find_saved_report_for_request,
     main as cli_main,
     message_summary,
+    previous_report_context,
     print_banner,
 )
 from crypto_research_agents.console import JimmoriaConsole, print_jimmoria_logo
@@ -55,7 +56,7 @@ from crypto_research_agents.core.workflow import LoopCounter
 from crypto_research_agents.core.workflow_executor import WorkflowExecutor
 from crypto_research_agents.core.workflow_loader import WorkflowSpecRegistry, load_workflow_spec
 from crypto_research_agents.storage.artifact_store import ArtifactStore
-from crypto_research_agents.storage.run_store import events_after_seq
+from crypto_research_agents.storage.run_store import events_after_seq, load_report_index
 from crypto_research_agents.storage.session_store import search_sessions
 from crypto_research_agents.tools.registry import load_tool_registry
 from crypto_research_agents.web import build_overview_payload, build_run_payload, render_dashboard_html
@@ -1239,6 +1240,72 @@ class SmokeTest(unittest.TestCase):
             note_text = project_notes[0].read_text(encoding="utf-8")
             self.assertIn("candidate_origin: mvp_placeholder", note_text)
             self.assertIn("source_backing: narrative_seed_only", note_text)
+
+    def test_report_only_retention_keeps_report_and_deletes_room_data(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch.dict("os.environ", {"JIMMORIA_SKIP_EXTERNAL_SEARCH": "1"}, clear=False):
+                runtime = ResearchRuntime()
+                result = runtime.run_article_research(
+                    title="AI Wallet Automation",
+                    content="AI agent wallet automation with points and testnet docs.",
+                    vault_dir=root / "vault",
+                    reports_dir=root / "reports",
+                    memory_path=root / "memory.json",
+                    retention_policy="report_only",
+                )
+
+            report_path = Path(result.room.output_paths["report"])
+            self.assertTrue(report_path.exists())
+            self.assertFalse((root / "runs" / result.room.room_id).exists())
+            self.assertFalse((root / "memory.json").exists())
+            self.assertEqual(result.room.project_card["run_retention"]["policy"], "report_only")
+            self.assertTrue(result.room.project_card["run_retention"]["run_snapshot_deleted"])
+            self.assertTrue(result.room.project_card["run_retention"]["memory_deleted"])
+            index = load_report_index(root / "runs")
+            self.assertEqual(index[0]["room_id"], result.room.room_id)
+            self.assertEqual(index[0]["report"], str(report_path))
+
+            found = find_saved_report_for_request(
+                "AI Wallet Automation report",
+                runs_dir=root / "runs",
+                reports_dir=root / "reports",
+            )
+            self.assertIsNotNone(found)
+            assert found is not None
+            self.assertEqual(found[0], report_path)
+            self.assertEqual(found[1], result.room.room_id)
+
+    def test_previous_report_context_uses_report_index_after_room_cleanup(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report_path = root / "reports" / "3jane-room_old.md"
+            report_path.parent.mkdir(parents=True)
+            report_path.write_text("# 3Jane Report\n\n이전 리서치 핵심 내용.", encoding="utf-8")
+            (root / "report_index.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "room_id": "room_old",
+                            "topic": "3jane 보고서 다시 만들어봐",
+                            "status": "completed",
+                            "report": str(report_path),
+                        }
+                    ],
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            context = previous_report_context(
+                "3jane 보고서 다시 만들어봐",
+                runs_dir=root / "runs",
+                reports_dir=root / "reports",
+            )
+
+            self.assertIn("[Previous JIMMORIA report context]", context)
+            self.assertIn("room_old", context)
+            self.assertIn("이전 리서치 핵심 내용", context)
 
     def test_report_uses_korean_company_setting(self) -> None:
         with TemporaryDirectory() as tmp:

@@ -46,6 +46,66 @@ def save_run_snapshot(
     return run_dir
 
 
+def delete_run_snapshot(*, room_id: str, root_dir: str | Path = "data/runs") -> bool:
+    run_dir = Path(root_dir) / room_id
+    if not run_dir.exists():
+        return False
+    if not run_dir.is_dir():
+        return False
+    shutil.rmtree(run_dir)
+    return True
+
+
+def report_index_path(root_dir: str | Path = "data/runs") -> Path:
+    return Path(root_dir).parent / "report_index.json"
+
+
+def load_report_index(root_dir: str | Path = "data/runs") -> list[dict[str, Any]]:
+    path = report_index_path(root_dir)
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(data, list):
+        return []
+    return [item for item in data if isinstance(item, dict)]
+
+
+def append_report_index(
+    *,
+    room: ResearchRoom,
+    root_dir: str | Path = "data/runs",
+) -> Path | None:
+    report_path = room.output_paths.get("report")
+    if not report_path:
+        return None
+    path = report_index_path(root_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = load_report_index(root_dir)
+    rows = [row for row in rows if str(row.get("room_id") or "") != room.room_id]
+    quality = room.project_card.get("research_quality") if isinstance(room.project_card, dict) else {}
+    if not isinstance(quality, dict):
+        quality = {}
+    rows.insert(
+        0,
+        {
+            "room_id": room.room_id,
+            "topic": room.topic,
+            "status": room.status,
+            "created_at": room.created_at,
+            "indexed_at": utc_now(),
+            "report": report_path,
+            "vault": room.output_paths.get("obsidian_vault", ""),
+            "quality_status": quality.get("status", ""),
+            "quality_reasons": quality.get("reasons", []),
+        },
+    )
+    path.write_text(json.dumps(rows[:200], ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
+
+
 def list_run_summaries(root_dir: str | Path = "data/runs") -> list[dict[str, Any]]:
     root = Path(root_dir)
     if not root.exists():

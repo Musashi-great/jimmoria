@@ -333,7 +333,9 @@ Completed project reports follow this shape:
 9. Confirmed content summary
 ```
 
-Agent execution logs, council discussion, tool payloads, raw LLM output, specialist coverage, and AntSeed-style peer review are kept in `data/runs/<room_id>/` and `data/evidence_packets/`. They are not part of the completed report body.
+In interactive chat, JIMMORIA keeps the final report and Vault notes, then cleans transient room data by default. The retained pointer is `data/report_index.json`, so a later request for the same project can still find and reference the previous report. Set `JIMMORIA_CHAT_RUN_RETENTION=debug` if you want to keep `data/runs/<room_id>/`, `memory.json`, evidence packets, and replay events for debugging or web replay.
+
+Agent execution logs, council discussion, tool payloads, raw LLM output, specialist coverage, and AntSeed-style peer review are written under `data/runs/<room_id>/` only when debug retention is enabled. They are not part of the completed report body.
 
 Completed reports now include a claim-level evidence ledger. This separates major claims such as identity, product, social/KOL, funding/team, token/on-chain, GitHub activity, and live metrics so a report is not marked strong merely because it collected many URLs.
 

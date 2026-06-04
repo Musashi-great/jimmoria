@@ -57,6 +57,7 @@ from crypto_research_agents.storage.paths import default_project_path, resolve_p
 from crypto_research_agents.storage.run_store import (
     events_after_seq,
     fork_run_snapshot,
+    load_report_index,
     list_run_summaries,
     load_run_file,
 )
@@ -891,6 +892,14 @@ def chat_command(args: argparse.Namespace) -> None:
             continue
 
         title, content, url = chat_input_to_source(route_line)
+        previous_context = previous_report_context(
+            route_line,
+            runs_dir=Path(args.memory).parent / "runs",
+            reports_dir=args.reports,
+            last_room_id=last_room_id,
+        )
+        if previous_context:
+            content = f"{content}\n\n{previous_context}"
         agent_count = 3 if intake_decision.intent_type == "source_ingestion" else len(DEFAULT_AGENTS)
         if not console.confirm_dispatch(
             intent_type=intake_decision.intent_type,
@@ -926,6 +935,7 @@ def chat_command(args: argparse.Namespace) -> None:
                 reports_dir=args.reports,
                 memory_path=args.memory,
                 intake_decision=intake_decision.to_dict(),
+                retention_policy=chat_run_retention_policy(),
             )
         last_room_id = result.room.room_id
         console.last_room_id = last_room_id
@@ -936,6 +946,44 @@ def append_supervisor_history(history: list[dict[str, str]], user_message: str, 
     history.append({"role": "user", "content": user_message})
     history.append({"role": "supervisor", "content": "\n".join(reply_lines)})
     del history[:-16]
+
+
+def chat_run_retention_policy() -> str:
+    return os.getenv("JIMMORIA_CHAT_RUN_RETENTION", "report_only")
+
+
+def previous_report_context(
+    line: str,
+    *,
+    runs_dir: str | Path,
+    reports_dir: str | Path,
+    last_room_id: str = "",
+    max_chars: int = 6000,
+) -> str:
+    report = find_saved_report_for_request(
+        line,
+        runs_dir=runs_dir,
+        reports_dir=reports_dir,
+        last_room_id=last_room_id,
+    )
+    if report is None:
+        return ""
+    report_path, room_id, topic = report
+    try:
+        text = report_path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    excerpt = text[:max_chars].rstrip()
+    if not excerpt:
+        return ""
+    return (
+        "[Previous JIMMORIA report context]\n"
+        f"Previous room: {room_id or 'unknown'}\n"
+        f"Previous topic: {topic}\n"
+        f"Previous report path: {report_path}\n"
+        "Use this as background memory only. Re-check the live web/social/product evidence and update the final judgment if new evidence differs.\n\n"
+        f"{excerpt}"
+    )
 
 
 def looks_like_report_reference(line: str) -> bool:
@@ -1277,7 +1325,7 @@ def find_saved_report_for_request(
     runs_root = resolve_project_path(runs_dir)
     reports_root = resolve_project_path(reports_dir)
     query = extract_report_lookup_query(line)
-    candidates = list_run_summaries(runs_root)
+    candidates = _report_lookup_candidates(runs_root)
 
     if query:
         for item in candidates:
@@ -1318,6 +1366,20 @@ def find_saved_report_for_request(
     if reports and not query:
         return reports[0], "", reports[0].stem
     return None
+
+
+def _report_lookup_candidates(runs_root: Path) -> list[dict[str, object]]:
+    candidates: list[dict[str, object]] = []
+    seen: set[tuple[str, str]] = set()
+    for item in [*load_report_index(runs_root), *list_run_summaries(runs_root)]:
+        report = str(item.get("report") or "")
+        room_id = str(item.get("room_id") or "")
+        key = (room_id, report)
+        if key in seen:
+            continue
+        seen.add(key)
+        candidates.append(item)
+    return candidates
 
 
 def extract_report_lookup_query(line: str) -> str:

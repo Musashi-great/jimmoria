@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import os
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -37,7 +38,7 @@ from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 from crypto_research_agents.core.usage import aggregate_llm_usage
 from crypto_research_agents.storage.json_store import save_memory
 from crypto_research_agents.storage.paths import resolve_project_path
-from crypto_research_agents.storage.run_store import save_run_snapshot
+from crypto_research_agents.storage.run_store import append_report_index, delete_run_snapshot, save_run_snapshot
 from crypto_research_agents.tools.registry import load_tool_registry
 
 
@@ -129,6 +130,7 @@ class ResearchRuntime:
         reports_dir: str | Path = "reports",
         memory_path: str | Path | None = "data/memory.json",
         intake_decision: dict[str, Any] | None = None,
+        retention_policy: str | None = None,
     ) -> ResearchRunResult:
         company_settings = load_company_settings(company_settings_path_for(memory_path))
         process = load_process_spec("project_research_room", self.process_spec_dir)
@@ -199,6 +201,7 @@ class ResearchRuntime:
         room.close()
         self._emit_room_completed(room)
         self._save_run(room, memory_path)
+        self._apply_retention_policy(room, memory_path, retention_policy)
         return ResearchRunResult(room=room, memory=self.memory, bus=self.bus)
 
     def run_source_ingestion(
@@ -763,9 +766,58 @@ class ResearchRuntime:
             root_dir=Path(memory_path).parent / "runs",
         )
 
+    def _apply_retention_policy(
+        self,
+        room: ResearchRoom,
+        memory_path: str | Path | None,
+        retention_policy: str | None,
+    ) -> None:
+        policy = _normalize_retention_policy(retention_policy)
+        if policy != "report_only" or memory_path is None:
+            return
+        memory_file = Path(memory_path)
+        runs_dir = memory_file.parent / "runs"
+        index_path = append_report_index(room=room, root_dir=runs_dir)
+        run_deleted = delete_run_snapshot(room_id=room.room_id, root_dir=runs_dir)
+        memory_deleted = _delete_file(memory_file)
+        evidence_deleted = _delete_file(Path(room.output_paths.get("evidence_packet", "")))
+        retention = {
+            "policy": policy,
+            "report_index": str(index_path) if index_path is not None else "",
+            "run_snapshot_deleted": run_deleted,
+            "memory_deleted": memory_deleted,
+            "evidence_packet_deleted": evidence_deleted,
+            "kept": {
+                "report": room.output_paths.get("report", ""),
+                "vault": room.output_paths.get("obsidian_vault", ""),
+            },
+        }
+        room.project_card["run_retention"] = retention
+        room.output_paths["report_index"] = retention["report_index"]
+        room.output_paths["run_snapshot"] = ""
+
 
 def _elapsed_ms(started: float) -> int:
     return int((perf_counter() - started) * 1000)
+
+
+def _normalize_retention_policy(value: str | None) -> str:
+    raw = (value or os.getenv("JIMMORIA_RUN_RETENTION") or "debug").strip().lower().replace("-", "_")
+    if raw in {"report_only", "final_report_only", "clean", "cleanup", "delete_room", "delete_run"}:
+        return "report_only"
+    return "debug"
+
+
+def _delete_file(path: Path) -> bool:
+    if not str(path):
+        return False
+    try:
+        if path.exists() and path.is_file():
+            path.unlink()
+            return True
+    except OSError:
+        return False
+    return False
 
 
 def _swarm_agent_kwargs(agent_id: str, *, title: str, content: str, url: str | None) -> dict[str, Any]:
