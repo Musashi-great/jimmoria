@@ -27,6 +27,7 @@ from crypto_research_agents.core.model_gateway import ModelGateway
 from crypto_research_agents.core.process_spec import load_process_spec
 from crypto_research_agents.core.room import ResearchRoom
 from crypto_research_agents.core.runtime_state import RuntimeState
+from crypto_research_agents.core.time import utc_now
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 from crypto_research_agents.storage.json_store import save_memory
 from crypto_research_agents.storage.paths import resolve_project_path
@@ -420,7 +421,12 @@ class ResearchRuntime:
         room.report_draft = updated
 
     def _emit(self, event_type: str, **payload: Any) -> None:
-        event = {"type": event_type, **payload}
+        event = {
+            "seq": len(self.event_log) + 1,
+            "type": event_type,
+            "timestamp": utc_now(),
+            **payload,
+        }
         self.event_log.append(event)
         if self.event_handler is not None:
             self.event_handler(event)

@@ -222,6 +222,10 @@ jimmoria runs               List previous runs
 jimmoria status <room_id>   Show room status
 jimmoria messages <room_id> Show collaboration messages
 jimmoria events <room_id>   Show replay events
+jimmoria events <room_id> --after-seq 40
+                            Show only events after a known cursor
+jimmoria fork <room_id> --seq 40
+                            Fork a saved room from an event checkpoint
 jimmoria report <room_id>   Print saved report
 ```
 
@@ -278,6 +282,28 @@ jimmoria report <room_id>
 ```
 
 Set `JIMMORIA_REPORT_DISPLAY=preview` when you want completed rooms to show only a preview.
+
+## AX-Inspired Runtime Controls
+
+JIMMORIA does not depend on Google's AX runtime, but it now borrows the parts that fit this company structure:
+
+- a single Supervisor/Runtime path acts as the controller for each room
+- every runtime event gets a stable `seq`
+- `events.json` can be replayed from a cursor instead of reading the whole room again
+- a saved room can be forked from a checkpoint for alternate follow-up work
+- the web dashboard shows the latest event cursor as `last_seq`
+
+Resume-style event catch-up:
+
+```text
+jimmoria events <room_id> --after-seq 40
+```
+
+Checkpoint fork:
+
+```text
+jimmoria fork <room_id> --seq 40
+```
 
 ## Project Structure
 

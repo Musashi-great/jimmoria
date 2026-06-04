@@ -91,6 +91,10 @@ jimmoria runs               Previous runs
 jimmoria status <room_id>   Room status
 jimmoria messages <room_id> Collaboration messages
 jimmoria events <room_id>   Replay events
+jimmoria events <room_id> --after-seq <N>
+                            Replay events after a cursor
+jimmoria fork <room_id> --seq <N>
+                            Fork a room from an event checkpoint
 jimmoria report <room_id>   Saved report
 ```
 
@@ -560,6 +564,29 @@ It is intended for:
 - Research Room status
 - report preview
 - event replay
+
+### 12.1 AX-Style Event Runtime
+
+Google AX was reviewed as a reference for distributed agent runtime design. JIMMORIA does not import AX as a dependency because the company already has a Supervisor, Research Room, CollaborationBus, ToolGateway, and local Run Store. Instead, the useful runtime ideas were adapted into the existing structure.
+
+Applied ideas:
+
+- Single controller: one Supervisor/ResearchRuntime path controls each room, so state changes stay auditable.
+- Sequenced event log: every runtime event now carries a stable `seq`.
+- Cursor resume: `jimmoria events <room_id> --after-seq <N>` prints only events after the last sequence the client already saw.
+- Checkpoint fork: `jimmoria fork <room_id> --seq <N>` creates a new saved room snapshot from a previous event checkpoint.
+- Web trace support: the dashboard normalizes legacy events, shows event sequence numbers, and exposes `event_cursor.last_seq`.
+
+New run snapshot fields:
+
+```text
+events.json[].seq
+room.json.parent_room_id       only on forked rooms
+room.json.forked_from          source room, source seq, created_at
+web payload.event_cursor       last_seq and resume hint
+```
+
+This makes the current Phase 1 sequential runtime easier to replay, debug, and later upgrade into Phase 2/3/4 parallel execution without losing the audit trail.
 
 ## 13. Tests
 

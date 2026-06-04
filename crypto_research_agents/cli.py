@@ -48,7 +48,12 @@ from crypto_research_agents.core.workflow_loader import (
 from crypto_research_agents.storage.artifact_store import ArtifactStore
 from crypto_research_agents.storage.json_store import load_memory
 from crypto_research_agents.storage.paths import default_project_path, resolve_project_path
-from crypto_research_agents.storage.run_store import list_run_summaries, load_run_file
+from crypto_research_agents.storage.run_store import (
+    events_after_seq,
+    fork_run_snapshot,
+    list_run_summaries,
+    load_run_file,
+)
 from crypto_research_agents.storage.session_store import search_sessions
 from crypto_research_agents.tools.registry import load_tool_registry
 
@@ -151,7 +156,15 @@ def main(argv: list[str] | None = None) -> None:
     events_parser = subparsers.add_parser("events", help="Show UI/replay events for a run.")
     events_parser.add_argument("room_id")
     events_parser.add_argument("--limit", type=int, default=30)
+    events_parser.add_argument("--after-seq", type=int, default=0, help="Only show events after this sequence.")
+    events_parser.add_argument("--json", action="store_true", help="Print filtered events as JSON.")
     add_inspect_args(events_parser)
+
+    fork_parser = subparsers.add_parser("fork", help="Fork a saved run snapshot from an event checkpoint.")
+    fork_parser.add_argument("room_id")
+    fork_parser.add_argument("--seq", type=int, help="Fork from this event sequence. Defaults to the latest event.")
+    fork_parser.add_argument("--dest-room-id", help="Optional destination room id.")
+    add_inspect_args(fork_parser)
 
     report_parser = subparsers.add_parser(
         "show-report",
@@ -270,7 +283,7 @@ def main(argv: list[str] | None = None) -> None:
         sessions_command(args)
         return
 
-    if args.command in {"runs", "rooms", "status", "messages", "events", "show-report", "report"}:
+    if args.command in {"runs", "rooms", "status", "messages", "events", "fork", "show-report", "report"}:
         inspect_command(args)
         return
 
@@ -695,13 +708,29 @@ def inspect_command(args: argparse.Namespace) -> None:
     if args.command == "events":
         events = load_run_file(args.room_id, "events.json", args.runs_dir)
         assert isinstance(events, list)
-        for event in events[: args.limit]:
+        selected_events = events_after_seq(events, args.after_seq)
+        if args.json:
+            print(json.dumps(selected_events[: args.limit], ensure_ascii=False, indent=2))
+            return
+        for event in selected_events[: args.limit]:
+            seq = event.get("seq", "")
             event_type = event.get("type", "")
             agent_id = event.get("agent_id", "")
             room_id = event.get("room_id", "")
             topic = event.get("topic", "")
             summary = event.get("summary", "")
-            print(f"{event_type} | room={room_id} | agent={agent_id} | topic={topic} | {summary}")
+            print(f"seq={seq} | {event_type} | room={room_id} | agent={agent_id} | topic={topic} | {summary}")
+        return
+
+    if args.command == "fork":
+        forked_dir = fork_run_snapshot(
+            src_room_id=args.room_id,
+            src_seq=args.seq,
+            dest_room_id=args.dest_room_id,
+            root_dir=args.runs_dir,
+        )
+        print(f"forked: {args.room_id} -> {forked_dir.name}")
+        print(f"run_dir: {forked_dir}")
         return
 
     if args.command in {"show-report", "report"}:

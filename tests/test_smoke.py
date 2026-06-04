@@ -54,6 +54,7 @@ from crypto_research_agents.core.workflow import LoopCounter
 from crypto_research_agents.core.workflow_executor import WorkflowExecutor
 from crypto_research_agents.core.workflow_loader import WorkflowSpecRegistry, load_workflow_spec
 from crypto_research_agents.storage.artifact_store import ArtifactStore
+from crypto_research_agents.storage.run_store import events_after_seq
 from crypto_research_agents.storage.session_store import search_sessions
 from crypto_research_agents.tools.registry import load_tool_registry
 from crypto_research_agents.web import build_overview_payload, build_run_payload, render_dashboard_html
@@ -818,6 +819,67 @@ class SmokeTest(unittest.TestCase):
             self.assertIn("pearl pow project research", text)
             self.assertIn("insufficient_evidence", text)
             self.assertIn("ingestion_agent", text)
+
+    def test_ax_style_event_resume_and_fork_cli(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runs_dir = root / "runs"
+            run_dir = runs_dir / "room_ax"
+            run_dir.mkdir(parents=True)
+            (run_dir / "room.json").write_text(
+                json.dumps(
+                    {
+                        "room_id": "room_ax",
+                        "topic": "AX-style resume test",
+                        "status": "completed",
+                        "output_paths": {},
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (run_dir / "events.json").write_text(
+                json.dumps(
+                    [
+                        {"seq": 1, "type": "room_created", "room_id": "room_ax"},
+                        {"seq": 2, "type": "agent_start", "room_id": "room_ax", "agent_id": "supervisor_agent"},
+                        {"seq": 3, "type": "agent_done", "room_id": "room_ax", "agent_id": "supervisor_agent", "summary": "done"},
+                    ],
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            (run_dir / "messages.json").write_text("[]", encoding="utf-8")
+            (run_dir / "tool_audit_log.json").write_text("[]", encoding="utf-8")
+            (run_dir / "llm_call_log.json").write_text("[]", encoding="utf-8")
+
+            output = StringIO()
+            with redirect_stdout(output):
+                cli_main(["events", "room_ax", "--runs-dir", str(runs_dir), "--after-seq", "1"])
+            text = output.getvalue()
+            self.assertNotIn("room_created", text)
+            self.assertIn("seq=2", text)
+            self.assertIn("seq=3", text)
+
+            with redirect_stdout(StringIO()):
+                cli_main(["fork", "room_ax", "--runs-dir", str(runs_dir), "--seq", "2", "--dest-room-id", "room_ax_fork"])
+
+            forked_room = json.loads((runs_dir / "room_ax_fork" / "room.json").read_text(encoding="utf-8"))
+            forked_events = json.loads((runs_dir / "room_ax_fork" / "events.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(forked_room["room_id"], "room_ax_fork")
+        self.assertEqual(forked_room["parent_room_id"], "room_ax")
+        self.assertEqual(forked_room["status"], "forked")
+        self.assertEqual([event["seq"] for event in forked_events], [1, 2, 3])
+        self.assertEqual(forked_events[-1]["type"], "run_forked")
+
+    def test_events_after_seq_normalizes_legacy_event_logs(self) -> None:
+        events = [{"type": "room_created"}, {"type": "agent_start"}, {"seq": 7, "type": "agent_done"}]
+        resumed = events_after_seq(events, last_seq=1)
+
+        self.assertEqual([event["type"] for event in resumed], ["agent_start", "agent_done"])
+        self.assertEqual(resumed[0]["seq"], 2)
+        self.assertEqual(resumed[1]["seq"], 7)
 
     def test_run_summary_labels_insufficient_evidence_as_diagnostic(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -2596,6 +2658,9 @@ Usage: codex exec [OPTIONS] [PROMPT]
 
         self.assertEqual(payload["room"]["room_id"], "room_web")
         self.assertEqual(payload["counters"]["events"], 2)
+        self.assertEqual(payload["events"][0]["seq"], 1)
+        self.assertEqual(payload["events"][1]["seq"], 2)
+        self.assertEqual(payload["event_cursor"]["last_seq"], 2)
         self.assertEqual(payload["agent_state"][0]["state"], "DONE")
         self.assertIn("Web Report", payload["report_preview"])
 

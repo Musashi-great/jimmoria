@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from crypto_research_agents.core.bus import CollaborationBus
 from crypto_research_agents.core.room import ResearchRoom
+from crypto_research_agents.core.time import utc_now
 
 
 def save_run_snapshot(
@@ -35,8 +38,9 @@ def save_run_snapshot(
         json.dumps(llm_call_log or [], ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    normalized_events = normalize_event_log(event_log or [])
     (run_dir / "events.json").write_text(
-        json.dumps(event_log or [], ensure_ascii=False, indent=2),
+        json.dumps(normalized_events, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     return run_dir
@@ -71,3 +75,88 @@ def load_run_file(room_id: str, filename: str, root_dir: str | Path = "data/runs
     if not path.exists():
         raise FileNotFoundError(path)
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def normalize_event_log(events: list[Any]) -> list[dict[str, Any]]:
+    """Return event rows with stable AX-style sequence numbers."""
+
+    normalized: list[dict[str, Any]] = []
+    for index, event in enumerate(events, start=1):
+        if not isinstance(event, dict):
+            event = {"type": "unknown", "raw": event}
+        row = dict(event)
+        try:
+            seq = int(row.get("seq", index))
+        except (TypeError, ValueError):
+            seq = index
+        if seq <= 0:
+            seq = index
+        row["seq"] = seq
+        normalized.append(row)
+    return normalized
+
+
+def events_after_seq(events: list[Any], last_seq: int = 0) -> list[dict[str, Any]]:
+    normalized = normalize_event_log(events)
+    return [event for event in normalized if int(event.get("seq", 0)) > last_seq]
+
+
+def fork_run_snapshot(
+    *,
+    src_room_id: str,
+    dest_room_id: str | None = None,
+    src_seq: int | None = None,
+    root_dir: str | Path = "data/runs",
+) -> Path:
+    """Fork a saved run directory from a checkpoint sequence into a new run snapshot."""
+
+    root = Path(root_dir)
+    src_dir = root / src_room_id
+    if not src_dir.exists():
+        raise FileNotFoundError(src_dir)
+
+    dest_room_id = dest_room_id or f"room_fork_{uuid4().hex[:10]}"
+    dest_dir = root / dest_room_id
+    if dest_dir.exists():
+        raise FileExistsError(dest_dir)
+
+    shutil.copytree(src_dir, dest_dir)
+
+    room_path = dest_dir / "room.json"
+    room = json.loads(room_path.read_text(encoding="utf-8")) if room_path.exists() else {}
+    output_paths = room.get("output_paths") if isinstance(room.get("output_paths"), dict) else {}
+    room.update(
+        {
+            "room_id": dest_room_id,
+            "parent_room_id": src_room_id,
+            "forked_from": {
+                "room_id": src_room_id,
+                "seq": src_seq,
+                "created_at": utc_now(),
+            },
+            "status": "forked",
+            "output_paths": output_paths,
+        }
+    )
+    room_path.write_text(json.dumps(room, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    events_path = dest_dir / "events.json"
+    events = normalize_event_log(json.loads(events_path.read_text(encoding="utf-8")) if events_path.exists() else [])
+    if src_seq is not None:
+        if not any(int(event.get("seq", 0)) == src_seq for event in events):
+            raise ValueError(f"Source sequence does not exist in {src_room_id}: {src_seq}")
+        events = [event for event in events if int(event.get("seq", 0)) <= src_seq]
+    next_seq = (max((int(event.get("seq", 0)) for event in events), default=0) + 1)
+    events.append(
+        {
+            "seq": next_seq,
+            "type": "run_forked",
+            "room_id": dest_room_id,
+            "parent_room_id": src_room_id,
+            "src_seq": src_seq,
+            "summary": "Forked a saved Research Room event log from a checkpoint.",
+        }
+    )
+    events_path.write_text(json.dumps(events, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    return dest_dir

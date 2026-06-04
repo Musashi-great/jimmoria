@@ -15,7 +15,7 @@ from crypto_research_agents.core.capabilities import collect_capabilities
 from crypto_research_agents.core.process_spec import ProcessSpecRegistry
 from crypto_research_agents.runtime import COUNCIL_AGENTS, DEFAULT_AGENTS
 from crypto_research_agents.storage.paths import default_project_path, resolve_project_path
-from crypto_research_agents.storage.run_store import list_run_summaries
+from crypto_research_agents.storage.run_store import list_run_summaries, normalize_event_log
 
 
 AGENT_WORK = {
@@ -115,7 +115,10 @@ def build_overview_payload(
             {"label": "ToolGateway", "description": "Checks tool permissions, calls connectors, and records audit logs."},
             {"label": "SharedMemory", "description": "Stores sources, projects, findings, and entity links across runs."},
             {"label": "CollaborationBus", "description": "Records requests, responses, handoffs, and updates between agents."},
-            {"label": "Run Store", "description": "Persists room.json, events.json, messages.json, tool logs, and LLM logs."},
+            {
+                "label": "Run Store",
+                "description": "Persists room snapshots with sequenced events, resume cursors, fork checkpoints, and audit logs.",
+            },
         ],
         "capabilities": [item.to_dict() for item in capabilities],
     }
@@ -137,7 +140,7 @@ def build_run_payload(
         raise FileNotFoundError(run_dir)
 
     room = _load_json(run_dir / "room.json", {})
-    events = _load_json(run_dir / "events.json", [])
+    events = normalize_event_log(_load_json(run_dir / "events.json", []))
     messages = _load_json(run_dir / "messages.json", [])
     tool_log = _load_json(run_dir / "tool_audit_log.json", [])
     llm_log = _load_json(run_dir / "llm_call_log.json", [])
@@ -158,6 +161,10 @@ def build_run_payload(
             "tool_calls": len(tool_log),
             "llm_calls": len(llm_log),
             "findings": len(room.get("shared_findings", [])),
+        },
+        "event_cursor": {
+            "last_seq": max((int(event.get("seq", 0)) for event in events), default=0),
+            "resume_hint": "Use events --after-seq <last_seq> to catch up without replaying the whole room.",
         },
         "artifacts": {
             "run_dir": str(run_dir),
@@ -520,7 +527,7 @@ def render_dashboard_html() -> str:
         card.classList.toggle("active", card.dataset.roomId === roomId);
       }
       renderBoard(state.selected.agent_state);
-      renderArtifacts(state.selected.artifacts, state.selected.counters);
+      renderArtifacts(state.selected.artifacts, state.selected.counters, state.selected.event_cursor);
       renderEvents(state.selected.events);
       el("reportPreview").textContent = state.selected.report_preview || "No report preview available.";
     }
@@ -537,7 +544,7 @@ def render_dashboard_html() -> str:
       }
     }
 
-    function renderArtifacts(artifacts, counters) {
+    function renderArtifacts(artifacts, counters, eventCursor) {
       const target = el("artifacts");
       target.innerHTML = "";
       for (const [key, value] of Object.entries(artifacts)) {
@@ -547,6 +554,9 @@ def render_dashboard_html() -> str:
       target.appendChild(document.createElement("hr"));
       for (const [key, value] of Object.entries(counters)) {
         target.appendChild(node("span", "pill", `${key}: ${value}`));
+      }
+      if (eventCursor) {
+        target.appendChild(node("span", "pill", `last_seq: ${eventCursor.last_seq || 0}`));
       }
     }
 
@@ -560,7 +570,7 @@ def render_dashboard_html() -> str:
       }
       for (const event of rows) {
         const row = node("div", "log-row");
-        row.appendChild(node("div", "type", `${event.type || "event"} ${event.agent_id ? " / " + event.agent_id : ""}`));
+        row.appendChild(node("div", "type", `#${event.seq || "?"} ${event.type || "event"} ${event.agent_id ? " / " + event.agent_id : ""}`));
         row.appendChild(node("div", "summary", compact(event.summary || event.topic || event.error || JSON.stringify(event), 220)));
         target.appendChild(row);
       }
