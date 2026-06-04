@@ -15,5 +15,5 @@
     "live_vs_roadmap_required",
     "no_buy_sell_target_language"
   ],
-  "required_output": ["founders", "funding_status", "points_status", "token_value_capture", "risks", "sources"]
+  "required_output": ["founders", "funding_status", "points_status", "token_value_capture", "unclear_points", "sources"]
 }

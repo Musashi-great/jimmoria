@@ -1,0 +1,20 @@
+{
+  "skill_id": "signal_triage",
+  "description": "Deduplicate raw monitor signals, resolve likely project identity, score priority, and route the item to archive, watchlist, or Supervisor review.",
+  "steps": [
+    "load_signal_queue_item",
+    "merge_duplicate_signals",
+    "resolve_project_guess",
+    "score_priority",
+    "classify_suggested_action",
+    "write_triaged_signal",
+    "notify_supervisor_if_high_priority"
+  ],
+  "quality_gates": [
+    "signal_sources_required",
+    "suggested_action_required",
+    "no_final_judgment",
+    "research_room_requires_high_priority_source_backing"
+  ],
+  "required_output": ["project_name", "signal_sources", "why_interesting", "suggested_action", "priority", "confidence"]
+}

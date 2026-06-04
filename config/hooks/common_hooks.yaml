@@ -1,0 +1,46 @@
+{
+  "common_hooks": {
+    "before_run": [
+      "load_agent_profile",
+      "load_room_context",
+      "load_company_settings",
+      "retrieve_relevant_memory",
+      "apply_agent_scope",
+      "cost_guard"
+    ],
+    "before_tool_call": [
+      "permission_check",
+      "attach_credential_server_side",
+      "rate_limit_check",
+      "input_normalizer",
+      "cache_lookup",
+      "secret_redaction"
+    ],
+    "after_tool_call": [
+      "result_normalizer",
+      "source_id_writer",
+      "tool_audit_writer",
+      "cache_write",
+      "evidence_url_extractor",
+      "connector_status_writer"
+    ],
+    "after_run": [
+      "finding_writer",
+      "confidence_recalculator",
+      "missing_info_checker",
+      "handoff_notifier",
+      "event_log_writer"
+    ],
+    "before_report": [
+      "claim_coverage_check",
+      "source_backing_check",
+      "placeholder_candidate_check",
+      "risk_to_unclear_points_transform"
+    ],
+    "after_report": [
+      "supervisor_final_review",
+      "evidence_packet_writer",
+      "obsidian_sync_request"
+    ]
+  }
+}

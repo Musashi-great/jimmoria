@@ -381,11 +381,13 @@ The goal is to stop treating "12 URLs collected" as equivalent to "all important
 | `obsidian_curator_agent` | Knowledge curator | vault note 생성 |
 | `monitor_24h_agent` | Planned watcher | public web/X/GitHub/docs/RSS/DEX/RootData signal queue 예정 |
 
+| `signal_triage_agent` | Planned signal curator | raw monitor signals -> archive/watchlist/Supervisor review routing |
+
 ## 7.1 Agent Skills And Runtime Hooks
 
 Each agent spec in `config/agents/*.yaml` now declares two extra operating contracts:
 
-- `skills`: local playbooks the agent is expected to use.
+- `skills`: local playbooks the agent is expected to use, split into `primary`, `secondary`, and `disabled`.
 - `hooks`: runtime checkpoints that fire before/after work and tool calls.
 
 The runtime emits these checkpoints as `agent_hook` events. That gives the future web/TUI visualizer a clean trace of which playbook and quality gate each agent passed without showing raw tool logs to the user.
@@ -403,26 +405,40 @@ The runtime emits these checkpoints as `agent_hook` events. That gives the futur
 | `report_agent` | `investment_report_synthesis`, `project_research`, `identity_gate` | `claim_evidence_check`, `no_agent_log_in_final`, `korean_first_output` |
 | `obsidian_curator_agent` | `obsidian_memory_sync` | `no_new_research_claims`, `source_links_preserved` |
 | `monitor_24h_agent` | `social_signal_intake`, `early_token_discovery` | `signal_url_required`, `candidate_not_final_judgment` |
+| `signal_triage_agent` | `signal_triage` | `suggested_action_required`, `no_final_judgment` |
 | `memory_retrieval_agent` | `obsidian_memory_sync`, `narrative_mapping` | `source_id_or_report_path_required`, `no_memory_overclaim` |
 | `tool_policy_agent` | `tool_policy_guardrail` | `no_secret_leak`, `read_only_boundary` |
 
 Hook phases:
 
 ```text
-before_run     load context, skill, profile, and prior memory
-before_tool    check permissions, public-source scope, and read-only boundaries
-after_tool     normalize evidence, dedupe, and record audit-friendly traces
-quality_gate   reject missing identity, unsupported claims, hype, or agent-log output
-after_run      hand off verified findings to the next company step
+before_run        load context, skill, profile, and prior memory
+before_tool_call  check permissions, public-source scope, and read-only boundaries
+after_tool_call   normalize evidence, dedupe, and record audit-friendly traces
+before_report     run report-only claim coverage, source backing, and template checks
+after_report      write report/evidence artifacts and request Supervisor final review
+quality_gate      reject missing identity, unsupported claims, hype, or agent-log output
+after_run         hand off verified findings to the next company step
 ```
 
 Skill files live in:
 
 ```text
 config/skills/
+config/skills/skill_registry.yaml
+config/hooks/common_hooks.yaml
 ```
 
 These skill files are intentionally small and structured. Agents can read them through `skill_view`, and the Supervisor can use the same names when assigning tasks. The hook names are also stable handles for future real validator functions.
+
+Social/KOL has two explicit skill modes:
+
+```text
+market_signal_intake_skill          runs as the first public signal layer
+candidate_social_verification_skill runs after candidate context exists
+```
+
+The current full-parallel swarm keeps these modes inside one Social/KOL worker run, but the process spec names both so the company can split them into separate tasks later without changing the agent contract.
 
 ## 8. Tool Policy
 

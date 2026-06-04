@@ -37,7 +37,11 @@
     "write": ["sources", "source_embeddings", "source_notes"],
     "no_access": ["oauth_tokens", "billing"]
   },
-  "skills": ["article_ingestion", "source_evidence_intake"],
+  "skills": {
+    "primary": ["article_ingestion", "source_evidence_intake"],
+    "secondary": ["source_ingestion_skill", "source_snapshot_skill", "metadata_extraction_skill", "entity_extraction_skill", "canonical_source_dedupe_skill", "claim_extraction_skill", "source_quality_scoring_skill"],
+    "disabled": []
+  },
   "tools": {
     "allow": [
       "fetch_url",
@@ -56,8 +60,8 @@
   },
   "hooks": {
     "before_run": ["source_safety_check", "dedupe_source", "load_article_ingestion_skill"],
-    "before_tool": ["url_safety_check", "source_rights_check"],
-    "after_tool": ["archive_source_snapshot", "normalize_source_metadata"],
+    "before_tool_call": ["url_safety_check", "source_rights_check", "cache_lookup"],
+    "after_tool_call": ["archive_source_snapshot", "normalize_source_metadata", "source_id_writer"],
     "quality_gate": ["source_id_required", "no_claim_invention"],
     "after_run": ["write_source_record", "handoff_entities_to_narrative"]
   },

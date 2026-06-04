@@ -34,7 +34,11 @@
     "write": ["signal_queue"],
     "no_access": ["oauth_tokens"]
   },
-  "skills": ["social_signal_intake", "early_token_discovery"],
+  "skills": {
+    "primary": ["social_signal_intake", "early_token_discovery"],
+    "secondary": ["scheduled_market_monitoring_skill", "source_worker_dispatch_skill", "raw_signal_collection_skill", "signal_queue_push_skill", "rss_monitoring_skill", "github_activity_monitoring_skill", "docs_change_monitoring_skill", "dex_pair_monitoring_skill", "x_list_monitoring_skill"],
+    "disabled": ["telegram_channel_reader_skill", "discord_channel_reader_skill"]
+  },
   "tools": {
     "allow": [
       "monitor_x_list",
@@ -55,8 +59,8 @@
   },
   "hooks": {
     "before_run": ["schedule_window_check", "load_monitor_sources", "public_web_only_scope"],
-    "before_tool": ["rate_limit_check", "source_scope_check"],
-    "after_tool": ["signal_dedupe", "normalize_signal"],
+    "before_tool_call": ["rate_limit_check", "source_scope_check", "connector_health_check", "cursor_attach"],
+    "after_tool_call": ["normalize_market_signal", "signal_dedupe", "source_id_writer", "update_last_seen_cursor"],
     "quality_gate": ["signal_url_required", "candidate_not_final_judgment"],
     "after_run": ["push_signal_queue", "notify_supervisor_if_urgent"]
   },

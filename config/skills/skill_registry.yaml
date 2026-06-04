@@ -1,0 +1,28 @@
+{
+  "skills": {
+    "market_signal_intake_skill": {
+      "owner": "social_kol_agent",
+      "steps": ["build_x_and_public_web_queries", "search_live_x_if_available", "search_public_web_fallback", "extract_official_handles", "build_who_said_what_rows", "write_market_signal_finding"]
+    },
+    "candidate_social_verification_skill": {
+      "owner": "social_kol_agent",
+      "steps": ["read_candidate_context", "check_official_account", "collect_recent_posts", "cluster_kol_opinions", "write_social_verification_finding"]
+    },
+    "candidate_discovery_skill": {
+      "owner": "discovery_agent",
+      "steps": ["read_narrative_and_market_signal", "search_web_github_market", "resolve_project_identity", "select_official_site", "create_candidate_record", "request_specialist_checks"]
+    },
+    "contract_token_info_skill": {
+      "owner": "contract_onchain_agent",
+      "steps": ["resolve_chain", "read_official_address_registry", "lookup_explorer", "search_dex_pairs", "classify_token_status", "write_contract_info"]
+    },
+    "project_dossier_render_skill": {
+      "owner": "report_agent",
+      "steps": ["merge_agent_findings", "build_quick_card", "build_claim_ledger", "render_dossier", "render_unclear_points", "compile_sources"]
+    },
+    "signal_dedup_skill": {
+      "owner": "signal_triage_agent",
+      "steps": ["load_signal_queue", "merge_duplicate_signals", "rank_priority", "route_archive_watchlist_or_supervisor"]
+    }
+  }
+}

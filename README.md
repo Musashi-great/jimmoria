@@ -193,13 +193,22 @@ product_tech_agent        Checks website, docs, GitHub, and product readiness
 funding_token_agent       Reviews investors, points, airdrop, and token hints
 report_agent              Turns findings into a human-readable dossier
 obsidian_curator_agent    Saves projects, sources, narratives, and reports
+signal_triage_agent       Planned: routes monitor signals to archive/watchlist/Supervisor review
 ```
 
 ## Agent Skills And Hooks
 
 Each agent now has explicit `skills` and runtime `hooks` in `config/agents/*.yaml`.
 
-Skills are local playbooks in `config/skills/`. They define the workflow an agent owns. Hooks are runtime checkpoints that fire around agent execution and tool usage, then appear as `agent_hook` events for future CLI/web replay.
+Skills are local playbooks in `config/skills/`. Each agent uses a structured skill policy:
+
+```text
+primary     core playbooks the agent owns
+secondary   reusable sub-skills and repeated work patterns
+disabled    capabilities this agent must not use
+```
+
+Hooks are runtime checkpoints that fire around agent execution, tool usage, and report writing. They appear as `agent_hook` events for future CLI/web replay.
 
 ```text
 supervisor_agent          supervisor_orchestration, project_research, identity_gate
@@ -212,16 +221,19 @@ product_tech_agent        product_tech_diligence, identity_gate
 funding_token_agent       funding_token_diligence, identity_gate
 report_agent              investment_report_synthesis, project_research, identity_gate
 obsidian_curator_agent    obsidian_memory_sync
+signal_triage_agent       signal_triage
 ```
 
 Hook phases:
 
 ```text
-before_run     prepare context and load the right playbook
-before_tool    check permission, source scope, and read-only boundaries
-after_tool     normalize evidence and write audit-friendly traces
-quality_gate   verify the agent output is usable for the final report
-after_run      hand off findings to the next company step
+before_run        prepare context and load the right playbook
+before_tool_call  check permission, source scope, and read-only boundaries
+after_tool_call   normalize evidence and write audit-friendly traces
+before_report     run report-specific claim and source coverage checks
+after_report      write artifact/evidence handoff and request final review
+quality_gate      verify the agent output is usable for the final report
+after_run         hand off findings to the next company step
 ```
 
 ## Tool Status

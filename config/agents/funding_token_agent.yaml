@@ -37,7 +37,11 @@
     "write": ["funding_findings", "pre_token_db"],
     "no_access": ["oauth_tokens"]
   },
-  "skills": ["funding_token_diligence", "identity_gate"],
+  "skills": {
+    "primary": ["funding_token_diligence", "identity_gate"],
+    "secondary": ["funding_profile_skill", "investor_extraction_skill", "points_airdrop_hint_skill", "token_opportunity_skill", "value_capture_summary_skill", "rootdata_profile_skill", "launch_or_tge_signal_skill"],
+    "disabled": []
+  },
   "tools": {
     "allow": [
       "check_airdrop_points",
@@ -60,8 +64,8 @@
   },
   "hooks": {
     "before_run": ["load_token_value_capture_skill", "airdrop_no_promise_guard"],
-    "before_tool": ["funding_source_reputation_check", "token_claim_scope_check"],
-    "after_tool": ["separate_confirmed_hint_unknown", "normalize_value_capture_claims"],
+    "before_tool_call": ["funding_source_reputation_check", "token_claim_scope_check", "funding_query_builder", "source_reliability_filter"],
+    "after_tool_call": ["normalize_funding_sources", "extract_investors", "separate_confirmed_hint_unknown", "normalize_value_capture_claims"],
     "quality_gate": ["no_airdrop_promise", "live_vs_roadmap_required"],
     "after_run": ["write_funding_token_finding", "handoff_token_thesis_to_report"]
   },

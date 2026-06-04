@@ -37,7 +37,11 @@
     "write": ["narrative_map", "narrative_findings"],
     "no_access": ["oauth_tokens"]
   },
-  "skills": ["narrative_mapping", "project_research"],
+  "skills": {
+    "primary": ["narrative_mapping", "project_research"],
+    "secondary": ["narrative_mapping_skill", "thesis_extraction_skill", "related_memory_search_skill", "similar_project_context_skill", "narrative_timeline_update_skill", "entity_graph_linking_skill"],
+    "disabled": []
+  },
   "tools": {
     "allow": [
       "vector_search",
@@ -57,8 +61,8 @@
   },
   "hooks": {
     "before_run": ["load_narrative_mapping_skill", "fetch_prior_narrative_memory"],
-    "before_tool": ["source_relevance_filter"],
-    "after_tool": ["dedupe_narrative_sources", "score_narrative_fit"],
+    "before_tool_call": ["source_relevance_filter"],
+    "after_tool_call": ["dedupe_narrative_sources", "score_narrative_fit", "entity_relation_writer"],
     "quality_gate": ["avoid_shallow_tags", "require_thesis_reason"],
     "after_run": ["write_narrative_map", "handoff_to_discovery_and_report"]
   },

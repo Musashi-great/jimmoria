@@ -68,6 +68,9 @@ def skill_view(skill_id: str | None = None, *, name: str | None = None) -> dict[
     config_skill = PROJECT_ROOT / "config" / "skills" / f"{normalized.replace('-', '_')}.yaml"
     if config_skill.exists():
         return _read_known_skill("skill_view", normalized, config_skill)
+    registry_entry = _read_skill_registry_entry(normalized)
+    if registry_entry is not None:
+        return success("skill_view", registry_entry, "skill registry entry loaded")
     return failed("skill_view", f"skill not found: {selected}", {"known": ["early-token-discovery", "xurl"]})
 
 
@@ -89,6 +92,28 @@ def read_file(path: str | None = None, *, max_chars: int = 12000) -> dict[str, A
         },
         "file read",
     )
+
+
+def _read_skill_registry_entry(normalized: str) -> dict[str, Any] | None:
+    registry_path = PROJECT_ROOT / "config" / "skills" / "skill_registry.yaml"
+    if not registry_path.exists():
+        return None
+    try:
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    skills = registry.get("skills")
+    if not isinstance(skills, dict):
+        return None
+    for skill_id, entry in skills.items():
+        canonical = str(skill_id).lower().replace("_", "-")
+        if canonical != normalized:
+            continue
+        data = dict(entry) if isinstance(entry, dict) else {"value": entry}
+        data["skill_id"] = str(skill_id)
+        data["source_path"] = str(registry_path)
+        return data
+    return None
 
 
 def search_files(

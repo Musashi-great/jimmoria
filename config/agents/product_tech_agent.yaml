@@ -37,7 +37,11 @@
     "write": ["product_findings"],
     "no_access": ["oauth_tokens"]
   },
-  "skills": ["product_tech_diligence", "identity_gate"],
+  "skills": {
+    "primary": ["product_tech_diligence", "identity_gate"],
+    "secondary": ["website_product_surface_skill", "docs_crawl_skill", "github_repo_resolution_skill", "github_activity_skill", "product_stage_classification_skill", "app_surface_check_skill", "technical_keyword_extraction_skill"],
+    "disabled": ["github_write_skill"]
+  },
   "tools": {
     "allow": [
       "crawl_website",
@@ -66,8 +70,8 @@
   },
   "hooks": {
     "before_run": ["load_product_tech_skill", "reject_generic_platform_links"],
-    "before_tool": ["official_site_docs_priority", "read_only_repo_guard"],
-    "after_tool": ["extract_product_mechanics", "classify_product_stage"],
+    "before_tool_call": ["official_site_docs_priority", "read_only_repo_guard", "url_relevance_check", "github_rate_limit_check"],
+    "after_tool_call": ["normalize_website_crawl", "normalize_docs_crawl", "normalize_github_repo", "extract_product_mechanics", "classify_product_stage"],
     "quality_gate": ["product_claim_requires_source", "github_generic_link_filter"],
     "after_run": ["write_product_finding", "handoff_product_mechanics_to_report"]
   },

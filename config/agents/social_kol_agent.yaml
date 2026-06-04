@@ -47,7 +47,11 @@
     "write": ["kol_mentions", "social_findings"],
     "no_access": ["oauth_tokens", "billing", "user_private_notes"]
   },
-  "skills": ["social_signal_intake", "project_research"],
+  "skills": {
+    "primary": ["social_signal_intake", "project_research"],
+    "secondary": ["market_signal_intake_skill", "x_kol_public_search_skill", "who_said_what_extraction_skill", "official_social_handle_resolution_skill", "candidate_social_verification_skill", "mention_trend_skill", "official_account_check_skill", "community_signal_summary_skill", "kol_opinion_clustering_skill", "controversy_or_counter_thesis_skill"],
+    "disabled": ["telegram_channel_reader_skill", "discord_channel_reader_skill"]
+  },
   "tools": {
     "allow": [
       "x_search_posts",
@@ -71,11 +75,11 @@
     "deny": ["x_post_tweet", "telegram_send_message", "wallet_sign", "delete_source"]
   },
   "hooks": {
-    "before_run": ["load_social_signal_skill", "public_web_only_scope", "prepare_who_said_what_schema"],
-    "before_tool": ["x_public_source_guard", "redact_sensitive_inputs"],
-    "after_tool": ["normalize_who_said_what", "label_social_confidence"],
+    "before_run": ["load_social_signal_skill", "public_web_only_scope", "prepare_who_said_what_schema", "decide_seed_or_candidate_mode", "build_social_search_plan"],
+    "before_tool_call": ["x_public_source_guard", "public_web_fallback_if_no_x_token", "query_expansion_for_kol_terms", "redact_sensitive_inputs"],
+    "after_tool_call": ["normalize_who_said_what", "normalize_x_posts", "extract_handles", "label_social_confidence"],
     "quality_gate": ["official_handle_or_unknown", "no_hype_as_fact"],
-    "after_run": ["handoff_social_seed_to_discovery", "write_social_finding"]
+    "after_run": ["write_market_signal_intake_or_social_finding", "update_kol_db", "handoff_social_seed_to_discovery"]
   },
   "output_schema": {
     "type": "social_finding",

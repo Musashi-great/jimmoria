@@ -73,7 +73,11 @@
     "write": ["research_rooms", "agent_tasks", "company_settings", "conversation_state"],
     "no_access": ["oauth_tokens", "provider_api_keys"]
   },
-  "skills": ["supervisor_orchestration", "project_research", "identity_gate"],
+  "skills": {
+    "primary": ["supervisor_orchestration", "project_research", "identity_gate"],
+    "secondary": ["intake_classification_skill", "research_room_planning_skill", "task_delegation_skill", "agent_council_skill", "final_review_skill", "missing_info_routing_skill", "output_mode_selection_skill", "research_quality_briefing_skill"],
+    "disabled": []
+  },
   "tools": {
     "allow": [
       "classify_client_request",
@@ -98,8 +102,8 @@
   },
   "hooks": {
     "before_run": ["load_company_context", "classify_client_intent", "load_project_research_playbook"],
-    "before_tool": ["permission_check", "redact_sensitive_inputs"],
-    "after_tool": ["record_orchestration_action", "update_task_status"],
+    "before_tool_call": ["permission_check", "redact_sensitive_inputs"],
+    "after_tool_call": ["record_orchestration_action", "update_task_status"],
     "quality_gate": ["confirm_room_needed", "verify_specialist_assignment"],
     "after_run": ["handoff_plan_to_research_room", "persist_supervisor_decision"]
   },

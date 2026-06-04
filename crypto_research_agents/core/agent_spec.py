@@ -54,6 +54,45 @@ class MemoryScope:
 
 
 @dataclass(slots=True)
+class SkillPolicy:
+    primary: list[str] = field(default_factory=list)
+    secondary: list[str] = field(default_factory=list)
+    disabled: list[str] = field(default_factory=list)
+
+    @classmethod
+    def from_value(cls, value: Any) -> "SkillPolicy":
+        if isinstance(value, cls):
+            return value
+        if isinstance(value, list):
+            return cls(primary=[str(item) for item in value])
+        if isinstance(value, dict):
+            return cls(
+                primary=[str(item) for item in value.get("primary", [])],
+                secondary=[str(item) for item in value.get("secondary", [])],
+                disabled=[str(item) for item in value.get("disabled", [])],
+            )
+        return cls()
+
+    def all(self) -> list[str]:
+        seen: set[str] = set()
+        ordered: list[str] = []
+        for skill in [*self.primary, *self.secondary]:
+            if skill and skill not in seen:
+                ordered.append(skill)
+                seen.add(skill)
+        return ordered
+
+    def __bool__(self) -> bool:
+        return bool(self.primary or self.secondary or self.disabled)
+
+    def __contains__(self, item: object) -> bool:
+        return str(item) in self.all()
+
+    def __iter__(self):
+        return iter(self.all())
+
+
+@dataclass(slots=True)
 class ToolPolicy:
     allow: list[str] = field(default_factory=list)
     deny: list[str] = field(default_factory=list)
@@ -79,7 +118,7 @@ class AgentSpec:
     scope: ScopeSpec = field(default_factory=ScopeSpec)
     model_policy: ModelPolicy = field(default_factory=ModelPolicy)
     memory_scope: MemoryScope = field(default_factory=MemoryScope)
-    skills: list[str] = field(default_factory=list)
+    skills: SkillPolicy = field(default_factory=SkillPolicy)
     tools: ToolPolicy = field(default_factory=ToolPolicy)
     hooks: dict[str, list[str]] = field(default_factory=dict)
     output_schema: OutputSchema | None = None
@@ -102,7 +141,7 @@ class AgentSpec:
             scope=ScopeSpec(**data.get("scope", {})),
             model_policy=ModelPolicy(**data.get("model_policy", {})),
             memory_scope=MemoryScope(**data.get("memory_scope", {})),
-            skills=list(data.get("skills", [])),
+            skills=SkillPolicy.from_value(data.get("skills", {})),
             tools=ToolPolicy(**data.get("tools", {})),
             hooks=data.get("hooks", {}),
             output_schema=OutputSchema(**output_schema) if output_schema else None,
@@ -130,7 +169,13 @@ class AgentSpec:
         if self.personality.tone:
             lines.append("Tone: " + ", ".join(self.personality.tone))
         if self.skills:
-            lines.append("Skills/playbooks: " + ", ".join(self.skills))
+            lines.append("Skills/playbooks: " + ", ".join(self.skills.all()))
+            if self.skills.primary:
+                lines.append("Primary skills: " + ", ".join(self.skills.primary))
+            if self.skills.secondary:
+                lines.append("Secondary skills: " + ", ".join(self.skills.secondary))
+            if self.skills.disabled:
+                lines.append("Disabled skills: " + ", ".join(self.skills.disabled))
         if self.hooks:
             lines.append("Runtime hooks:")
             for hook_phase, hook_names in self.hooks.items():

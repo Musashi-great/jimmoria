@@ -14,6 +14,7 @@ from io import StringIO
 from unittest.mock import patch
 
 from crypto_research_agents.runtime import ResearchRuntime
+from crypto_research_agents.agents.base import normalize_llm_analysis
 from crypto_research_agents.agents.discovery import build_live_candidates, extract_project_query, project_identity_hints, should_live_discover
 from crypto_research_agents.agents.social_kol import (
     build_public_social_queries,
@@ -1141,8 +1142,10 @@ class SmokeTest(unittest.TestCase):
             self.assertIn("before_run", hook_phases)
             self.assertIn("quality_gate", hook_phases)
             self.assertIn("after_run", hook_phases)
-            self.assertIn("before_tool", hook_phases)
-            self.assertIn("after_tool", hook_phases)
+            self.assertIn("before_tool_call", hook_phases)
+            self.assertIn("after_tool_call", hook_phases)
+            self.assertIn("before_report", hook_phases)
+            self.assertIn("after_report", hook_phases)
             self.assertIn(
                 "supervisor_orchestration",
                 runtime.agent_specs.get("supervisor_agent").skills,
@@ -1445,6 +1448,9 @@ class SmokeTest(unittest.TestCase):
         playbook = gateway.call(agent_id, "skill_view", skill_id="early-token-discovery")
         self.assertEqual(playbook["status"], "success")
         self.assertIn("Representative Web3 Project Diligence", playbook["data"]["content"])
+        registry_skill = gateway.call(agent_id, "skill_view", skill_id="market_signal_intake_skill")
+        self.assertEqual(registry_skill["status"], "success")
+        self.assertEqual(registry_skill["data"]["owner"], "social_kol_agent")
 
         search = gateway.call(
             agent_id,
@@ -1953,6 +1959,8 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("public web and X", social.mission.primary_goal)
         self.assertIn("browser_snapshot", social.tools.allow)
         self.assertIn("social_signal_intake", social.skills)
+        self.assertIn("market_signal_intake_skill", social.skills)
+        self.assertIn("telegram_channel_reader_skill", social.skills.disabled)
         self.assertIn("prepare_who_said_what_schema", social.hooks["before_run"])
         self.assertIn("no_hype_as_fact", social.hooks["quality_gate"])
 
@@ -1971,6 +1979,7 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("skill_view", supervisor.tools.allow)
         self.assertIn("multi_tool_use.parallel", supervisor.tools.allow)
         self.assertIn("supervisor_orchestration", supervisor.skills)
+        self.assertIn("intake_classification_skill", supervisor.skills.secondary)
         self.assertIn("classify_client_intent", supervisor.hooks["before_run"])
         self.assertIn("verify_specialist_assignment", supervisor.hooks["quality_gate"])
         supervisor_prompt = supervisor.system_prompt()
@@ -1991,8 +2000,10 @@ class SmokeTest(unittest.TestCase):
         assert report is not None
         self.assertEqual(report.output_schema.type, "project_intelligence_report")
         self.assertIn("investment_report_synthesis", report.skills)
+        self.assertIn("project_dossier_render_skill", report.skills.secondary)
         self.assertIn("claim_evidence_check", report.hooks["quality_gate"])
         self.assertIn("no_agent_log_in_final", report.hooks["quality_gate"])
+        self.assertIn("risk_to_unclear_points_transform", report.hooks["before_report"])
         self.assertIn("Korean-first investment-style project report", report.mission.primary_goal)
         self.assertTrue(any("client comprehension" in item for item in report.must_follow))
         self.assertTrue(any("project intelligence report" in item for item in report.must_not))
@@ -2008,6 +2019,29 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("browser_snapshot", funding.tools.allow)
         self.assertIn("funding_token_diligence", funding.skills)
         self.assertIn("no_airdrop_promise", funding.hooks["quality_gate"])
+
+        triage = registry.get("signal_triage_agent")
+        self.assertIsNotNone(triage)
+        assert triage is not None
+        self.assertIn("signal_triage", triage.skills)
+        self.assertIn("signal_dedup_skill", triage.skills.secondary)
+        self.assertIn("route_to_archive_watchlist_or_supervisor", triage.hooks["after_run"])
+
+    def test_llm_analysis_normalizes_risks_to_unclear_points(self) -> None:
+        normalized = normalize_llm_analysis(
+            {
+                "summary": "ok",
+                "confidence": 0.7,
+                "evidence_gaps": ["missing founder source"],
+                "risks": ["token value-capture unclear"],
+                "next_actions": ["check docs"],
+            },
+            fallback_summary="fallback",
+        )
+
+        self.assertEqual(normalized["summary"], "ok")
+        self.assertEqual(normalized["unclear_points"], ["token value-capture unclear"])
+        self.assertEqual(normalized["risks"], ["token value-capture unclear"])
 
     def test_process_specs_load_research_and_ingestion_rooms(self) -> None:
         registry = ProcessSpecRegistry.load_dir("config/processes")

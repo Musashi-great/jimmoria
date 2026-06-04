@@ -52,7 +52,11 @@
     "write": ["reports", "evidence_packets"],
     "no_access": ["oauth_tokens"]
   },
-  "skills": ["investment_report_synthesis", "project_research", "identity_gate"],
+  "skills": {
+    "primary": ["investment_report_synthesis", "project_research", "identity_gate"],
+    "secondary": ["agent_findings_merge_skill", "claim_ledger_compilation_skill", "project_dossier_render_skill", "quick_card_render_skill", "source_appendix_skill", "unclear_points_render_skill", "evidence_packet_skill", "score_breakdown_skill", "report_language_localization_skill"],
+    "disabled": ["raw_agent_log_render_skill"]
+  },
   "tools": {
     "allow": [
       "merge_agent_findings",
@@ -75,8 +79,10 @@
   },
   "hooks": {
     "before_run": ["load_report_synthesis_skill", "load_evidence_quality_gate", "client_report_shape"],
-    "before_tool": ["source_citation_check", "investment_advice_guard"],
-    "after_tool": ["claim_evidence_check", "dedupe_source_appendix"],
+    "before_tool_call": ["source_citation_check", "investment_advice_guard"],
+    "after_tool_call": ["claim_evidence_check", "dedupe_source_appendix"],
+    "before_report": ["claim_coverage_check", "source_backing_check", "placeholder_candidate_check", "missing_section_check", "no_hardcoded_project_profile_check", "risk_to_unclear_points_transform"],
+    "after_report": ["write_report_artifact", "write_evidence_packet", "report_quality_score", "request_supervisor_final_review"],
     "quality_gate": ["claim_evidence_check", "no_agent_log_in_final", "korean_first_output"],
     "after_run": ["write_evidence_packet", "final_report_path_required"]
   },

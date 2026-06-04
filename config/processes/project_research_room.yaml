@@ -6,7 +6,7 @@
   "execution_strategy": {
     "current_phase": 3,
     "current_mode": "full_parallel_agent_swarm",
-    "phase_3": "Supervisor seeds the source/candidate context, then ingestion, social/KOL, narrative, discovery, contract/on-chain, product/tech, and funding/token agents run together as research_swarm.",
+    "phase_3": "Supervisor seeds the source/candidate context, then the research_swarm runs together. Social/KOL carries two roles inside the swarm: market_signal_intake as the first public-signal layer and candidate_social_verification after candidate context exists.",
     "phase_4": "Run multiple candidate Research Rooms in parallel and merge room-level summaries."
   },
   "inspired_by": [
@@ -19,7 +19,8 @@
     "representative_web3_project_diligence",
     "ticker_collision_review",
     "kol_shill_quality_review",
-    "base_token_identity_gate"
+    "base_token_identity_gate",
+    "signal_triage"
   ],
   "goals": [
     "Treat the user trigger as a candidate only until Identity Gate passes.",
@@ -54,7 +55,7 @@
       "agent_id": "social_kol_agent",
       "phase": "research_swarm",
       "requires": ["orchestrate_room"],
-      "description": "Use X/Twitter recent search when credentials exist, plus public web searches for X posts, KOL opinions, threads, official posts, builder/ecosystem mentions, controversies, clarifications, and articles. Telegram and Discord are out of scope.",
+      "description": "Market signal seed mode. Use X/Twitter recent search when credentials exist, plus public web searches for X posts, KOL opinions, threads, official posts, builder/ecosystem mentions, controversies, clarifications, and articles. Telegram and Discord are out of scope.",
       "expected_output": "Market signal intake finding with X API status, public X web hits, official/candidate X handles, timeline status, KOL/profile candidates, who-said-what rows, article hits, official-post hints, and shill/controversy flags.",
       "output_channels": ["finding", "tool_audit", "bus.update"]
     },
@@ -81,7 +82,7 @@
       "agent_id": "social_kol_agent",
       "phase": "research_swarm",
       "requires": ["orchestrate_room"],
-      "description": "Run candidate-specific social verification: official X handle, recent official posts, KOL thesis, builder/ecosystem mentions, controversy/clarification, and social/shill risk.",
+      "description": "Candidate verification mode. Run candidate-specific social verification: official X handle, recent official posts, KOL thesis, builder/ecosystem mentions, controversy/clarification, and social/shill risk.",
       "expected_output": "Candidate-specific Social/KOL finding with who said what, links, confidence, and unresolved gaps.",
       "output_channels": ["finding", "tool_audit"]
     },

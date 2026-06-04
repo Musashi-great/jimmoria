@@ -74,7 +74,7 @@ class BaseAgent:
                 "summary",
                 "confidence",
                 "evidence_gaps",
-                "risks",
+                "unclear_points",
                 "next_actions",
             ],
         }
@@ -95,6 +95,7 @@ class BaseAgent:
                 "summary": fallback_summary,
                 "confidence": 0.0,
                 "evidence_gaps": ["LLM analysis pass failed."],
+                "unclear_points": [str(exc)],
                 "risks": [str(exc)],
                 "next_actions": [],
             }
@@ -142,11 +143,13 @@ def normalize_llm_analysis(data: dict[str, Any], *, fallback_summary: str) -> di
     confidence = max(0.0, min(confidence, 1.0))
 
     summary = str(data.get("summary") or fallback_summary).strip() or fallback_summary
+    unclear_points = string_list(data.get("unclear_points") or data.get("risks"))
     return {
         "status": "ok",
         "summary": summary,
         "confidence": confidence,
         "evidence_gaps": string_list(data.get("evidence_gaps") or data.get("gaps")),
-        "risks": string_list(data.get("risks")),
+        "unclear_points": unclear_points,
+        "risks": unclear_points,
         "next_actions": string_list(data.get("next_actions") or data.get("next_steps")),
     }

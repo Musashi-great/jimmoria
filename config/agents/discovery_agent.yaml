@@ -37,7 +37,11 @@
     "write": ["projects", "watchlist", "candidate_findings"],
     "no_access": ["oauth_tokens"]
   },
-  "skills": ["early_token_discovery", "identity_gate", "project_research"],
+  "skills": {
+    "primary": ["early_token_discovery", "identity_gate", "project_research"],
+    "secondary": ["project_identity_resolution_skill", "candidate_discovery_skill", "official_site_selection_skill", "evidence_url_collection_skill", "candidate_scoring_skill", "similar_project_search_skill", "market_metadata_collision_check_skill"],
+    "disabled": []
+  },
   "tools": {
     "allow": [
       "find_similar_projects",
@@ -62,9 +66,9 @@
     "deny": ["telegram_send_message", "x_post_tweet"]
   },
   "hooks": {
-    "before_run": ["load_early_discovery_skill", "load_identity_gate", "seed_previous_report_context"],
-    "before_tool": ["search_query_scope_check", "ticker_collision_guard"],
-    "after_tool": ["dedupe_candidates", "classify_source_backing"],
+    "before_run": ["load_early_discovery_skill", "load_identity_gate", "load_market_signal_intake", "seed_previous_report_context"],
+    "before_tool_call": ["search_query_scope_check", "ticker_collision_guard", "query_builder", "source_quality_filter"],
+    "after_tool_call": ["dedupe_candidates", "rank_search_results", "select_best_official_site", "extract_evidence_urls", "classify_source_backing"],
     "quality_gate": ["identity_gate_required", "candidate_origin_required"],
     "after_run": ["dispatch_specialist_verification", "update_watchlist"]
   },

@@ -279,6 +279,8 @@ class ResearchRuntime:
             task_type=agent.task_type,
         )
         self._run_agent_spec_hooks(agent_id, "before_run", room_id=room.room_id, task_type=agent.task_type)
+        if agent_id == "report_agent":
+            self._run_agent_spec_hooks(agent_id, "before_report", room_id=room.room_id, task_type=agent.task_type)
         if start_barrier is not None and hasattr(start_barrier, "wait"):
             try:
                 start_barrier.wait(timeout=10)
@@ -322,6 +324,14 @@ class ResearchRuntime:
             llm_usage=self._agent_llm_usage(agent_id, llm_start_index),
         )
         self._emit_output_events(room, result)
+        if agent_id == "report_agent":
+            self._run_agent_spec_hooks(
+                agent_id,
+                "after_report",
+                room_id=room.room_id,
+                task_type=agent.task_type,
+                result_summary=result.summary,
+            )
         self._run_agent_spec_hooks(
             agent_id,
             "after_run",
@@ -662,7 +672,7 @@ class ResearchRuntime:
         if event_type == "tool_start":
             self._run_agent_spec_hooks(
                 str(payload.get("agent_id") or ""),
-                "before_tool",
+                "before_tool_call",
                 room_id=str(payload.get("room_id") or ""),
                 tool_name=str(payload.get("tool_name") or ""),
             )
@@ -679,7 +689,7 @@ class ResearchRuntime:
         if event_type in {"tool_done", "tool_failed", "tool_denied", "tool_unconfigured"}:
             self._run_agent_spec_hooks(
                 str(payload.get("agent_id") or ""),
-                "after_tool",
+                "after_tool_call",
                 room_id=str(payload.get("room_id") or ""),
                 tool_name=str(payload.get("tool_name") or ""),
                 tool_status=str(payload.get("status") or event_type.replace("tool_", "")),
@@ -691,7 +701,7 @@ class ResearchRuntime:
         spec = self.agent_specs.get(agent_id)
         if spec is None:
             return
-        hook_names = spec.hooks.get(phase, [])
+        hook_names = self._hook_names_for_phase(spec.hooks, phase)
         for hook_name in hook_names:
             hook_payload = {
                 "agent_id": agent_id,
@@ -705,6 +715,21 @@ class ResearchRuntime:
                 **hook_payload,
                 summary=f"{agent_id} hook {phase}:{hook_name}",
             )
+
+    @staticmethod
+    def _hook_names_for_phase(hooks: dict[str, list[str]], phase: str) -> list[str]:
+        aliases = {
+            "before_tool_call": ["before_tool"],
+            "after_tool_call": ["after_tool"],
+            "before_tool": ["before_tool_call"],
+            "after_tool": ["after_tool_call"],
+        }
+        ordered: list[str] = []
+        for key in [phase, *aliases.get(phase, [])]:
+            for hook_name in hooks.get(key, []):
+                if hook_name not in ordered:
+                    ordered.append(hook_name)
+        return ordered
 
     def _emit_room_completed(self, room: ResearchRoom) -> None:
         quality = room.project_card.get("research_quality") if isinstance(room.project_card, dict) else {}
