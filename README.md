@@ -100,20 +100,24 @@ If Codex login already exists locally, JIMMORIA can reuse it. It stores provider
 Optional Grok/xAI provider:
 
 ```powershell
-$env:LLM_PROVIDER = "grok"
-$env:XAI_API_KEY = "xai-..."
+hermes auth add xai-oauth
+$env:LLM_PROVIDER = "xai_oauth"
 jimmoria
 ```
 
-OAuth-style bearer token sources are also accepted for operator workflows:
+This uses the Hermes xAI OAuth session stored in `~/.hermes/auth.json`. Hermes opens `accounts.x.ai`, stores the xAI OAuth tokens, refreshes them when needed, and JIMMORIA reuses that session without saving raw tokens.
+
+API-key and explicit bearer-token sources are still accepted for fallback/operator workflows:
 
 ```powershell
+$env:LLM_PROVIDER = "grok"
+$env:XAI_API_KEY = "xai-..."
 $env:GROK_OAUTH_TOKEN = "..."
 $env:GROK_OAUTH_TOKEN_FILE = "C:\path\to\xai-token.txt"
 $env:GROK_OAUTH_TOKEN_COMMAND = "op read op://vault/xai/token"
 ```
 
-The xAI API uses an OpenAI-compatible endpoint at `https://api.x.ai/v1`. JIMMORIA does not save raw Grok/XAI tokens in `data/model_settings.json`; it only saves route preferences, token file paths, or token commands.
+The xAI API uses an OpenAI-compatible endpoint at `https://api.x.ai/v1`. JIMMORIA does not save raw Grok/XAI tokens in `data/model_settings.json`; it only saves provider/model preferences, token file paths, or token commands. With `LLM_PROVIDER=xai_oauth`, Hermes OAuth is preferred over `XAI_API_KEY`. With `LLM_PROVIDER=grok`, API key/env sources are preferred and Hermes OAuth is used as a fallback.
 
 Default model routing:
 

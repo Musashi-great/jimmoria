@@ -192,11 +192,29 @@ class GrokProvider:
         api_key: str | None = None,
         base_url: str | None = None,
         api_mode: str | None = None,
+        prefer_hermes_oauth: bool | None = None,
     ) -> None:
-        token, source = (api_key, "constructor") if api_key else _grok_bearer_token()
+        if prefer_hermes_oauth is None:
+            prefer_hermes_oauth = os.getenv("LLM_PROVIDER", "").strip().lower() in {
+                "grok_oauth",
+                "xai_oauth",
+                "xai-oauth",
+                "grok-oauth",
+            }
+        token, source, auth_base_url = (
+            (api_key, "constructor", None)
+            if api_key
+            else _grok_bearer_token(prefer_hermes_oauth=prefer_hermes_oauth)
+        )
         self.api_key = token or ""
         self.auth_source = source
-        self.base_url = (base_url or os.getenv("GROK_BASE_URL") or os.getenv("XAI_BASE_URL") or "https://api.x.ai/v1").rstrip("/")
+        self.base_url = (
+            base_url
+            or os.getenv("GROK_BASE_URL")
+            or os.getenv("XAI_BASE_URL")
+            or auth_base_url
+            or "https://api.x.ai/v1"
+        ).rstrip("/")
         self.api_mode = (api_mode or os.getenv("GROK_API_MODE") or "responses").strip().lower()
         self.timeout = float(os.getenv("GROK_API_TIMEOUT") or os.getenv("XAI_API_TIMEOUT") or "360")
 
@@ -208,8 +226,8 @@ class GrokProvider:
         if not self.api_key:
             raise RuntimeError(
                 "Grok provider is missing a bearer token. Set XAI_API_KEY, GROK_API_KEY, "
-                "GROK_OAUTH_TOKEN, XAI_OAUTH_TOKEN, GROK_OAUTH_TOKEN_FILE, or "
-                "GROK_OAUTH_TOKEN_COMMAND."
+                "GROK_OAUTH_TOKEN, XAI_OAUTH_TOKEN, GROK_OAUTH_TOKEN_FILE, "
+                "GROK_OAUTH_TOKEN_COMMAND, or run `hermes auth add xai-oauth`."
             )
 
         if self.api_mode in {"chat", "chat_completions", "chat-completions"}:
@@ -256,16 +274,18 @@ def provider_from_env() -> LLMProvider:
         return CodexCliProvider()
     if provider in {"codex_sdk", "codex", "sdk"}:
         return CodexSdkProvider()
-    if provider in {"grok", "xai", "grok_oauth", "xai_oauth"}:
+    if provider in {"grok", "xai"}:
         return GrokProvider()
+    if provider in {"grok_oauth", "xai_oauth", "grok-oauth", "xai-oauth"}:
+        return GrokProvider(prefer_hermes_oauth=True)
     return OfflineLLMProvider()
 
 
 def grok_auth_status() -> str:
-    token, source = _grok_bearer_token()
+    token, source, _base_url = _grok_bearer_token(prefer_hermes_oauth=True)
     if token:
         return f"Grok/xAI bearer token from {source}"
-    return "missing Grok/xAI token; set XAI_API_KEY, GROK_API_KEY, or GROK_OAUTH_TOKEN"
+    return "missing Grok/xAI token; run `hermes auth add xai-oauth` or set XAI_API_KEY"
 
 
 def codex_sdk_available() -> bool:
@@ -436,11 +456,16 @@ def _is_real_model_name(model: str) -> bool:
     return bool(model and model not in placeholders)
 
 
-def _grok_bearer_token() -> tuple[str | None, str]:
+def _grok_bearer_token(*, prefer_hermes_oauth: bool = False) -> tuple[str | None, str, str | None]:
+    if prefer_hermes_oauth:
+        hermes_token, hermes_source, hermes_base_url = _hermes_xai_oauth_bearer_token()
+        if hermes_token:
+            return hermes_token, hermes_source, hermes_base_url
+
     for name in ["GROK_OAUTH_TOKEN", "XAI_OAUTH_TOKEN", "GROK_API_KEY", "XAI_API_KEY"]:
         value = os.getenv(name)
         if value:
-            return value.strip(), name
+            return value.strip(), name, None
 
     for name in ["GROK_OAUTH_TOKEN_FILE", "XAI_OAUTH_TOKEN_FILE", "GROK_TOKEN_FILE", "XAI_TOKEN_FILE"]:
         path = os.getenv(name)
@@ -451,7 +476,7 @@ def _grok_bearer_token() -> tuple[str | None, str]:
         except OSError:
             continue
         if value:
-            return value, name
+            return value, name, None
 
     for name in ["GROK_OAUTH_TOKEN_COMMAND", "XAI_OAUTH_TOKEN_COMMAND", "GROK_TOKEN_COMMAND", "XAI_TOKEN_COMMAND"]:
         command = os.getenv(name)
@@ -470,8 +495,93 @@ def _grok_bearer_token() -> tuple[str | None, str]:
         if completed.returncode == 0:
             value = completed.stdout.strip()
             if value:
-                return value, name
-    return None, "missing"
+                return value, name, None
+
+    if not prefer_hermes_oauth:
+        hermes_token, hermes_source, hermes_base_url = _hermes_xai_oauth_bearer_token()
+        if hermes_token:
+            return hermes_token, hermes_source, hermes_base_url
+    return None, "missing", None
+
+
+def _hermes_xai_oauth_bearer_token() -> tuple[str | None, str, str | None]:
+    """Resolve a Grok OAuth token from Hermes without exposing token material."""
+
+    try:
+        from hermes_cli.auth import resolve_xai_oauth_runtime_credentials  # type: ignore
+
+        creds = resolve_xai_oauth_runtime_credentials()
+        token = str(creds.get("api_key") or "").strip()
+        base_url = str(creds.get("base_url") or "").strip().rstrip("/") or None
+        if token:
+            return token, "Hermes xai-oauth session", base_url
+    except Exception:
+        pass
+
+    return _read_hermes_xai_oauth_auth_json()
+
+
+def _read_hermes_xai_oauth_auth_json() -> tuple[str | None, str, str | None]:
+    auth_path = _hermes_auth_json_path()
+    if not auth_path.exists():
+        return None, "missing", None
+    try:
+        data = json.loads(auth_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, "missing", None
+    if not isinstance(data, dict):
+        return None, "missing", None
+
+    providers = data.get("providers")
+    if isinstance(providers, dict):
+        state = providers.get("xai-oauth") or providers.get("grok-oauth")
+        if isinstance(state, dict):
+            tokens = state.get("tokens")
+            if isinstance(tokens, dict):
+                token = str(tokens.get("access_token") or "").strip()
+                if token:
+                    return token, f"Hermes auth.json ({auth_path})", _auth_json_xai_base_url(state)
+
+    pool = data.get("credential_pool")
+    if isinstance(pool, dict):
+        entries = pool.get("xai-oauth") or pool.get("grok-oauth")
+        if isinstance(entries, list):
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                token = str(entry.get("access_token") or "").strip()
+                if token:
+                    base_url = str(entry.get("base_url") or entry.get("inference_base_url") or "").strip().rstrip("/")
+                    return token, f"Hermes credential_pool ({auth_path})", base_url or None
+    return None, "missing", None
+
+
+def _auth_json_xai_base_url(state: dict[str, Any]) -> str | None:
+    base_url = str(
+        state.get("base_url")
+        or state.get("inference_base_url")
+        or state.get("api_base_url")
+        or ""
+    ).strip().rstrip("/")
+    if base_url:
+        return base_url
+    return None
+
+
+def _hermes_auth_json_path() -> Path:
+    configured = os.getenv("HERMES_AUTH_JSON")
+    if configured:
+        return Path(configured).expanduser()
+    hermes_home = os.getenv("HERMES_HOME")
+    if hermes_home:
+        return Path(hermes_home).expanduser() / "auth.json"
+    home = os.getenv("USERPROFILE") or os.getenv("HOME")
+    if home:
+        return Path(home).expanduser() / ".hermes" / "auth.json"
+    try:
+        return Path.home() / ".hermes" / "auth.json"
+    except RuntimeError:
+        return Path(".hermes") / "auth.json"
 
 
 def _grok_responses_payload(request: LLMRequest) -> dict[str, Any]:

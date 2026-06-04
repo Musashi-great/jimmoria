@@ -238,6 +238,11 @@ Grok defaults
 Grok credential sources:
 
 ```text
+Hermes xAI OAuth session
+  hermes auth add xai-oauth
+  LLM_PROVIDER=xai_oauth
+  stored by Hermes in ~/.hermes/auth.json
+
 XAI_API_KEY
 GROK_API_KEY
 GROK_OAUTH_TOKEN / XAI_OAUTH_TOKEN
@@ -245,7 +250,9 @@ GROK_OAUTH_TOKEN_FILE / XAI_OAUTH_TOKEN_FILE
 GROK_OAUTH_TOKEN_COMMAND / XAI_OAUTH_TOKEN_COMMAND
 ```
 
-Raw Grok/XAI bearer tokens are not saved in `data/model_settings.json`. Only file paths, commands, base URL, API mode, and model route preferences are persisted.
+`LLM_PROVIDER=xai_oauth` prefers the Hermes OAuth session over API-key env vars. `LLM_PROVIDER=grok` keeps API-key/env sources first and falls back to Hermes OAuth if no explicit bearer exists.
+
+Raw Grok/XAI bearer tokens are not saved in `data/model_settings.json`. Only provider choice, file paths, commands, base URL, API mode, and model route preferences are persisted. When Hermes is installed in the same Python environment, JIMMORIA asks `hermes_cli.auth.resolve_xai_oauth_runtime_credentials()` for a refreshed runtime bearer. If that module is not importable, it falls back to reading `~/.hermes/auth.json` directly without printing token values.
 
 `CODEX_REASONING_EFFORT=pro` remains the shared effort control. Codex CLI maps it to `model_reasoning_effort="xhigh"` where supported. Grok maps it to xAI Responses API `reasoning.effort="high"` for `grok-4.3`; `grok-4.20-multi-agent` maps pro to `xhigh`.
 

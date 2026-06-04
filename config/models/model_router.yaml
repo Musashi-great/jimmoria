@@ -10,6 +10,7 @@
   "runtime_order": [
     "codex_sdk",
     "codex_cli",
+    "xai_oauth",
     "grok",
     "offline_diagnostic_fallback"
   ],
@@ -32,6 +33,8 @@
     "legacy_cli_strong_model": "CODEX_CLI_MODEL_STRONG",
     "grok_api_key": "GROK_API_KEY",
     "xai_api_key": "XAI_API_KEY",
+    "hermes_home": "HERMES_HOME",
+    "hermes_auth_json": "HERMES_AUTH_JSON",
     "grok_oauth_token": "GROK_OAUTH_TOKEN",
     "xai_oauth_token": "XAI_OAUTH_TOKEN",
     "grok_oauth_token_file": "GROK_OAUTH_TOKEN_FILE",
@@ -122,8 +125,9 @@
   },
   "notes": [
     "Codex remains the recommended default because it can reuse the local ChatGPT/Codex login.",
-    "Grok/xAI is available through the OpenAI-compatible xAI API at https://api.x.ai/v1.",
-    "Official xAI API documentation describes bearer API-key auth. JIMMORIA also accepts OAuth-style bearer token env/file/command sources for operator workflows.",
+    "Grok/xAI is available through Hermes xAI OAuth (LLM_PROVIDER=xai_oauth) and through the OpenAI-compatible xAI API at https://api.x.ai/v1.",
+    "Hermes xAI OAuth uses accounts.x.ai and stores tokens in ~/.hermes/auth.json; JIMMORIA imports the runtime bearer without persisting token material.",
+    "JIMMORIA also accepts explicit bearer token env/file/command sources for operator workflows.",
     "Raw Grok/XAI bearer tokens are not persisted in data/model_settings.json; only file paths, commands, base URL, API mode, and model route preferences are saved.",
     "Grok defaults to the Responses API so reasoning.effort can be mapped from JIMMORIA pro/high/standard/fast effort levels."
   ]

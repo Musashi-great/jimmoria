@@ -93,6 +93,8 @@ MODEL_SETTING_ENV_NAMES = [
     "CODEX_CLI_MODEL_STRONG",
     "GROK_BASE_URL",
     "XAI_BASE_URL",
+    "HERMES_HOME",
+    "HERMES_AUTH_JSON",
     "GROK_API_MODE",
     "GROK_OAUTH_TOKEN_FILE",
     "XAI_OAUTH_TOKEN_FILE",
@@ -1502,7 +1504,7 @@ def configure_model_panel(*, clear_before: bool = True) -> None:
             "",
             "1. Codex SDK / local app-server (Recommended)",
             "2. Codex CLI exec",
-            "3. Grok / xAI API bearer token",
+            "3. Grok / xAI OAuth or API key",
             "4. Offline diagnostic fallback",
             "Enter. Keep current",
         ]
@@ -1586,26 +1588,35 @@ def configure_grok() -> None:
         "Grok / xAI",
         [
             "JIMMORIA will call the xAI OpenAI-compatible API.",
-            "Official xAI auth is Authorization: Bearer <xAI API key>.",
-            "OAuth-style bearer token sources are accepted for compatibility.",
+            "Preferred auth: Hermes xAI OAuth (SuperGrok / X Premium+) via accounts.x.ai.",
+            "Fallback auth: Authorization: Bearer <xAI API key>.",
             "",
-            "1. Use existing XAI_API_KEY / GROK_API_KEY env",
-            "2. Paste bearer token for this session only",
-            "3. Token file path",
-            "4. Command that prints bearer token",
+            "1. Start Hermes xAI OAuth browser login (Recommended)",
+            "2. Use existing Hermes xAI OAuth session",
+            "3. Use existing XAI_API_KEY / GROK_API_KEY env",
+            "4. Paste bearer token for this session only",
+            "5. Token file path",
+            "6. Command that prints bearer token",
             "Enter. Continue with current Grok credential source",
         ],
     )
-    source_choice = input("Choose Grok credential source [1/2/3/4/Enter]: ").strip().lower()
-    if source_choice == "2":
+    source_choice = input("Choose Grok credential source [1/2/3/4/5/6/Enter]: ").strip().lower()
+    if source_choice in {"1", "hermes", "oauth", "login", "xai_oauth"}:
+        os.environ["LLM_PROVIDER"] = "xai_oauth"
+        run_hermes_xai_oauth_login()
+    elif source_choice in {"2", "existing", "session"}:
+        os.environ["LLM_PROVIDER"] = "xai_oauth"
+    elif source_choice in {"3", "api", "api_key", "key"}:
+        os.environ["LLM_PROVIDER"] = "grok"
+    elif source_choice == "4":
         token = getpass.getpass("Paste Grok/xAI bearer token (not saved): ").strip()
         if token:
             os.environ["GROK_OAUTH_TOKEN"] = token
-    elif source_choice == "3":
+    elif source_choice == "5":
         path = input("Token file path: ").strip()
         if path:
             os.environ["GROK_OAUTH_TOKEN_FILE"] = path
-    elif source_choice == "4":
+    elif source_choice == "6":
         command = input("Token command: ").strip()
         if command:
             os.environ["GROK_OAUTH_TOKEN_COMMAND"] = command
@@ -1619,6 +1630,56 @@ def configure_grok() -> None:
         model_by_index_fn=grok_model_by_index,
     )
     save_model_settings()
+
+
+def run_hermes_xai_oauth_login() -> None:
+    hermes_command = shutil.which("hermes")
+    if not hermes_command:
+        clear_screen()
+        print_screen(
+            "Hermes xAI OAuth",
+            [
+                "`hermes` command was not found on PATH.",
+                "Install or open Hermes first, then run: hermes auth add xai-oauth",
+                "JIMMORIA will still try to reuse ~/.hermes/auth.json if it exists.",
+            ],
+        )
+        input("Continue [Enter]: ")
+        return
+
+    clear_screen()
+    print_screen(
+        "Hermes xAI OAuth",
+        [
+            "JIMMORIA will run: hermes auth add xai-oauth",
+            "Hermes opens accounts.x.ai in your browser and stores tokens in ~/.hermes/auth.json.",
+            "After login, JIMMORIA reuses that session and does not save raw tokens.",
+            "",
+            "If browser callback fails on a remote shell, cancel and run:",
+            "hermes auth add xai-oauth --manual-paste",
+        ],
+    )
+    input("Start login [Enter]: ")
+    completed = subprocess.run([hermes_command, "auth", "add", "xai-oauth"], check=False)
+    clear_screen()
+    if completed.returncode == 0:
+        print_screen(
+            "Hermes xAI OAuth",
+            [
+                "Hermes OAuth login completed or existing session was refreshed.",
+                grok_auth_status(),
+            ],
+        )
+    else:
+        print_screen(
+            "Hermes xAI OAuth",
+            [
+                "Hermes OAuth login did not complete.",
+                "Try manually: hermes auth add xai-oauth --manual-paste",
+                grok_auth_status(),
+            ],
+        )
+    input("Continue [Enter]: ")
 
 
 def configure_offline() -> None:

@@ -36,7 +36,7 @@ from crypto_research_agents.cli import (
 from crypto_research_agents.console import JimmoriaConsole, print_jimmoria_logo
 from crypto_research_agents.core.company_settings import CompanySettings
 from crypto_research_agents.core.concurrency import load_concurrency_policy
-from crypto_research_agents.core.llm_provider import CodexCliProvider, CodexSdkProvider, LLMRequest, LLMResponse, parse_json_response, provider_from_env
+from crypto_research_agents.core.llm_provider import CodexCliProvider, CodexSdkProvider, LLMRequest, LLMResponse, grok_auth_status, parse_json_response, provider_from_env
 from crypto_research_agents.core.memory import FindingRecord, ProjectCandidate, SharedMemory, SourceRecord
 from crypto_research_agents.core.model_gateway import ModelGateway
 from crypto_research_agents.core.process_spec import ProcessSpecRegistry, load_process_spec
@@ -2253,6 +2253,78 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(provider.provider_name, "grok")
         self.assertTrue(getattr(provider, "is_configured", False))
 
+    def test_grok_oauth_provider_reuses_hermes_xai_auth_json(self) -> None:
+        with TemporaryDirectory() as tmp:
+            hermes_home = Path(tmp) / ".hermes"
+            hermes_home.mkdir()
+            (hermes_home / "auth.json").write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "providers": {
+                            "xai-oauth": {
+                                "tokens": {
+                                    "access_token": "oauth-access-token",
+                                    "refresh_token": "oauth-refresh-token",
+                                },
+                                "base_url": "https://api.x.ai/v1",
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                "os.environ",
+                {
+                    "LLM_PROVIDER": "xai_oauth",
+                    "HERMES_HOME": str(hermes_home),
+                    "XAI_API_KEY": "api-key-should-not-win",
+                },
+                clear=True,
+            ):
+                provider = provider_from_env()
+
+        self.assertEqual(provider.provider_name, "grok")
+        self.assertEqual(getattr(provider, "api_key", ""), "oauth-access-token")
+        self.assertIn("Hermes", getattr(provider, "auth_source", ""))
+
+    def test_grok_plain_provider_prefers_api_key_before_hermes_oauth(self) -> None:
+        with TemporaryDirectory() as tmp:
+            hermes_home = Path(tmp) / ".hermes"
+            hermes_home.mkdir()
+            (hermes_home / "auth.json").write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "providers": {
+                            "xai-oauth": {
+                                "tokens": {
+                                    "access_token": "oauth-access-token",
+                                    "refresh_token": "oauth-refresh-token",
+                                }
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                "os.environ",
+                {
+                    "LLM_PROVIDER": "grok",
+                    "HERMES_HOME": str(hermes_home),
+                    "XAI_API_KEY": "api-key-wins",
+                },
+                clear=True,
+            ):
+                provider = provider_from_env()
+
+        self.assertEqual(getattr(provider, "api_key", ""), "api-key-wins")
+        self.assertEqual(getattr(provider, "auth_source", ""), "XAI_API_KEY")
+
     def test_grok_provider_calls_xai_responses_api(self) -> None:
         seen: dict[str, object] = {}
 
@@ -2384,7 +2456,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
                 {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path, "GROK_OAUTH_TOKEN": "session-secret"},
                 clear=True,
             ):
-                with patch("builtins.input", side_effect=["3", "1", ""]):
+                with patch("builtins.input", side_effect=["3", "3", ""]):
                     with redirect_stdout(output):
                         configure_model_panel()
                 self.assertEqual(os.environ["LLM_PROVIDER"], "grok")
@@ -2395,6 +2467,23 @@ Usage: codex exec [OPTIONS] [PROMPT]
         text = output.getvalue()
         self.assertIn("[Grok / xAI]", text)
         self.assertIn("Supported models are fixed to the Grok/xAI model list.", text)
+
+    def test_model_setup_grok_oauth_choice_uses_hermes_session_without_raw_token(self) -> None:
+        output = StringIO()
+        with TemporaryDirectory() as tmp:
+            settings_path = str(Path(tmp) / "model_settings.json")
+            with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path}, clear=True):
+                with patch("builtins.input", side_effect=["3", "2", ""]):
+                    with redirect_stdout(output):
+                        configure_model_panel()
+                self.assertEqual(os.environ["LLM_PROVIDER"], "xai_oauth")
+                settings = json.loads(Path(settings_path).read_text(encoding="utf-8"))
+                self.assertEqual(settings["LLM_PROVIDER"], "xai_oauth")
+                self.assertNotIn("GROK_OAUTH_TOKEN", settings)
+
+        text = output.getvalue()
+        self.assertIn("Hermes xAI OAuth", text)
+        self.assertIn("Provider: xai_oauth", text)
 
     def test_codex_setup_can_use_default_model_routes_without_model_names(self) -> None:
         output = StringIO()
@@ -2679,7 +2768,10 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertIn("gpt-5.5", router["supported_models"]["codex"])
         self.assertIn("grok-4.3", router["supported_models"]["grok"])
         self.assertIn("codex_sdk", router["runtime_order"])
+        self.assertIn("xai_oauth", router["runtime_order"])
         self.assertIn("grok", router["runtime_order"])
+        self.assertEqual(router["env"]["hermes_home"], "HERMES_HOME")
+        self.assertEqual(router["env"]["hermes_auth_json"], "HERMES_AUTH_JSON")
         self.assertEqual(router["routes"]["supervisor_chat"], "fast_chat_model")
         for task_type in [
             "supervision",
