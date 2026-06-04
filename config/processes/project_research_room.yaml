@@ -1,11 +1,11 @@
 {
   "process_id": "project_research_room",
   "name": "Representative Web3 Project Research Room",
-  "process_type": "sequential_controlled_p2p",
+  "process_type": "controlled_p2p_with_parallel_evidence_checks",
   "supervisor_mode": "company_ceo_manager",
   "execution_strategy": {
-    "current_phase": 1,
-    "current_mode": "sequential",
+    "current_phase": 2,
+    "current_mode": "bounded_parallel_agent_group",
     "phase_1": "Run the full Research Room sequentially until the room is stable end-to-end.",
     "phase_2": "After discovery_agent, run candidate-specific social_kol_agent, contract_onchain_agent, product_tech_agent, and funding_token_agent in one bounded evidence_checks group.",
     "phase_3": "Run 24H public-web monitor collectors for X/KOL, articles, GitHub, Docs, DEX, RSS, RootData, and other public web sources in parallel into a signal queue.",

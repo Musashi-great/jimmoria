@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import threading
 from dataclasses import asdict, dataclass, field
 from typing import Any
 from uuid import uuid4
@@ -77,44 +78,53 @@ class SharedMemory:
         self.projects: dict[str, ProjectCandidate] = {}
         self.findings: dict[str, FindingRecord] = {}
         self.entity_graph: dict[str, set[str]] = {}
+        self._lock = threading.RLock()
 
     def add_source(self, source: SourceRecord) -> SourceRecord:
-        existing = self.find_duplicate_source(source)
-        if existing is not None:
-            existing.metadata.update({key: value for key, value in source.metadata.items() if key not in existing.metadata})
-            return existing
-        self.sources[source.source_id] = source
-        return source
+        with self._lock:
+            existing = self.find_duplicate_source(source)
+            if existing is not None:
+                existing.metadata.update({key: value for key, value in source.metadata.items() if key not in existing.metadata})
+                return existing
+            self.sources[source.source_id] = source
+            return source
 
     def find_duplicate_source(self, source: SourceRecord) -> SourceRecord | None:
-        for existing in self.sources.values():
-            if source.canonical_url and existing.canonical_url == source.canonical_url:
-                return existing
-            if source.content.strip() and existing.content_hash == source.content_hash:
-                return existing
+        with self._lock:
+            for existing in self.sources.values():
+                if source.canonical_url and existing.canonical_url == source.canonical_url:
+                    return existing
+                if source.content.strip() and existing.content_hash == source.content_hash:
+                    return existing
         return None
 
     def upsert_project(self, project: ProjectCandidate) -> ProjectCandidate:
-        self.projects[project.project_id] = project
-        for narrative in project.narratives:
-            self.link_entity(project.name, narrative)
-        return project
+        with self._lock:
+            self.projects[project.project_id] = project
+            for narrative in project.narratives:
+                self.link_entity(project.name, narrative)
+            return project
 
     def add_finding(self, finding: FindingRecord) -> FindingRecord:
-        self.findings[finding.finding_id] = finding
-        return finding
+        with self._lock:
+            self.findings[finding.finding_id] = finding
+            return finding
 
     def link_entity(self, left: str, right: str) -> None:
-        self.entity_graph.setdefault(left, set()).add(right)
-        self.entity_graph.setdefault(right, set()).add(left)
+        with self._lock:
+            self.entity_graph.setdefault(left, set()).add(right)
+            self.entity_graph.setdefault(right, set()).add(left)
 
     def get_room_findings(self, room_id: str) -> list[FindingRecord]:
-        return [finding for finding in self.findings.values() if finding.room_id == room_id]
+        with self._lock:
+            return [finding for finding in self.findings.values() if finding.room_id == room_id]
 
     def search_sources(self, query: str, limit: int = 5) -> list[SourceRecord]:
         tokens = _tokens(query)
         scored: list[tuple[int, SourceRecord]] = []
-        for source in self.sources.values():
+        with self._lock:
+            sources = list(self.sources.values())
+        for source in sources:
             haystack = f"{source.title} {source.content}".lower()
             score = sum(1 for token in tokens if token in haystack)
             if score:
@@ -125,7 +135,9 @@ class SharedMemory:
     def search_projects(self, query: str, limit: int = 10) -> list[ProjectCandidate]:
         tokens = _tokens(query)
         scored: list[tuple[int, ProjectCandidate]] = []
-        for project in self.projects.values():
+        with self._lock:
+            projects = list(self.projects.values())
+        for project in projects:
             haystack = " ".join(
                 [
                     project.name,
@@ -142,12 +154,13 @@ class SharedMemory:
         return [project for _, project in scored[:limit]]
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "sources": {key: value.to_dict() for key, value in self.sources.items()},
-            "projects": {key: value.to_dict() for key, value in self.projects.items()},
-            "findings": {key: value.to_dict() for key, value in self.findings.items()},
-            "entity_graph": {key: sorted(value) for key, value in self.entity_graph.items()},
-        }
+        with self._lock:
+            return {
+                "sources": {key: value.to_dict() for key, value in self.sources.items()},
+                "projects": {key: value.to_dict() for key, value in self.projects.items()},
+                "findings": {key: value.to_dict() for key, value in self.findings.items()},
+                "entity_graph": {key: sorted(value) for key, value in self.entity_graph.items()},
+            }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "SharedMemory":

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from dataclasses import dataclass
 from time import perf_counter
 from typing import Any
@@ -31,6 +32,7 @@ class ModelGateway:
         default_model = default_model or _model_env("FAST") or codex_model_for_tier("FAST")
         self.default_model = default_model
         self.call_log: list[dict[str, Any]] = []
+        self._lock = threading.RLock()
 
     def select(self, *, agent_id: str, task_type: str) -> ModelDecision:
         if task_type == "supervisor_chat":
@@ -122,19 +124,27 @@ class ModelGateway:
             duration_ms=duration_ms,
         )
         token_usage = token_usage_summary(response.usage)
-        self.call_log.append(
-            {
-                "agent_id": agent_id,
-                "task_type": task_type,
-                "selected_model": decision.selected_model,
-                "reasoning_effort": decision.reasoning_effort,
-                "provider": response.provider,
-                "duration_ms": response.usage.get("duration_ms", duration_ms),
-                "token_usage": token_usage,
-                "usage": response.usage,
-            }
-        )
+        with self._lock:
+            self.call_log.append(
+                {
+                    "agent_id": agent_id,
+                    "task_type": task_type,
+                    "selected_model": decision.selected_model,
+                    "reasoning_effort": decision.reasoning_effort,
+                    "provider": response.provider,
+                    "duration_ms": response.usage.get("duration_ms", duration_ms),
+                    "token_usage": token_usage,
+                    "usage": response.usage,
+                }
+            )
         return response
+
+    def calls_after(self, start_index: int, *, agent_id: str | None = None) -> list[dict[str, Any]]:
+        with self._lock:
+            items = list(self.call_log[start_index:])
+        if agent_id is not None:
+            items = [item for item in items if item.get("agent_id") == agent_id]
+        return items
 
     def complete_json(
         self,

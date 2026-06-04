@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Callable
@@ -89,6 +91,7 @@ class ResearchRuntime:
         self.event_log: list[dict[str, Any]] = []
         self._room_started_at: dict[str, float] = {}
         self._room_llm_start_index: dict[str, int] = {}
+        self._emit_lock = threading.RLock()
         self.tool_gateway.set_event_callback(self._emit)
         self.agents = {
             "supervisor_agent": SupervisorAgent(model_gateway=self.model_gateway, tool_gateway=self.tool_gateway, spec=self.agent_specs.get("supervisor_agent")),
@@ -149,10 +152,7 @@ class ResearchRuntime:
             self._run_agent("narrative_agent", room)
             self._run_agent("discovery_agent", room)
             room.set_status(RuntimeState.WAITING_FOR_TOOL)
-            self._run_agent("social_kol_agent", room)
-            self._run_agent("contract_onchain_agent", room)
-            self._run_agent("product_tech_agent", room)
-            self._run_agent("funding_token_agent", room)
+            self._run_evidence_checks(room)
             room.set_status(RuntimeState.DELIBERATING)
             self._run_agent_council(room)
             room.set_status(RuntimeState.READY_FOR_REPORT)
@@ -278,7 +278,7 @@ class ResearchRuntime:
                 task_type=agent.task_type,
                 error=str(exc),
                 duration_ms=_elapsed_ms(started),
-                llm_usage=aggregate_llm_usage(self.model_gateway.call_log[llm_start_index:]),
+                llm_usage=self._agent_llm_usage(agent_id, llm_start_index),
             )
             raise
         finally:
@@ -294,9 +294,82 @@ class ResearchRuntime:
             messages=len(self.bus.messages),
             findings=len(self.memory.get_room_findings(room.room_id)),
             duration_ms=_elapsed_ms(started),
-            llm_usage=aggregate_llm_usage(self.model_gateway.call_log[llm_start_index:]),
+            llm_usage=self._agent_llm_usage(agent_id, llm_start_index),
         )
         self._emit_output_events(room, result)
+
+    def _run_evidence_checks(self, room: ResearchRoom) -> None:
+        group = self._active_parallel_group("evidence_checks")
+        if group is None or self.concurrency_policy.active.mode != "bounded_parallel_agent_group":
+            self._run_evidence_checks_sequential(room)
+            return
+
+        agent_ids = [agent_id for agent_id in group.agents if agent_id in room.agents]
+        max_parallel = max(1, min(self.concurrency_policy.active.max_parallel, len(agent_ids) or 1))
+        if max_parallel <= 1 or len(agent_ids) <= 1:
+            self._run_evidence_checks_sequential(room, agent_ids=agent_ids)
+            return
+
+        self._emit(
+            "parallel_group_start",
+            room_id=room.room_id,
+            group_id=group.group_id,
+            agents=agent_ids,
+            max_parallel=max_parallel,
+            after_agent=group.after_agent,
+            join_before=group.join_before,
+            summary=f"Running {len(agent_ids)} evidence-check agents in parallel.",
+        )
+        failures: list[tuple[str, str]] = []
+        with ThreadPoolExecutor(max_workers=max_parallel, thread_name_prefix="jimmoria-evidence") as executor:
+            futures = {
+                executor.submit(self._run_agent, agent_id, room): agent_id
+                for agent_id in agent_ids
+            }
+            for future in as_completed(futures):
+                agent_id = futures[future]
+                try:
+                    future.result()
+                except Exception as exc:
+                    failures.append((agent_id, str(exc)))
+
+        if failures:
+            self._emit(
+                "parallel_group_failed",
+                room_id=room.room_id,
+                group_id=group.group_id,
+                agents=agent_ids,
+                failures=[{"agent_id": agent_id, "error": error} for agent_id, error in failures],
+                summary=f"{len(failures)} parallel evidence-check agent(s) failed.",
+            )
+            failed = "; ".join(f"{agent_id}: {error}" for agent_id, error in failures)
+            raise RuntimeError(f"Parallel evidence checks failed: {failed}")
+
+        self._emit(
+            "parallel_group_done",
+            room_id=room.room_id,
+            group_id=group.group_id,
+            agents=agent_ids,
+            max_parallel=max_parallel,
+            summary=f"Parallel evidence checks completed for {len(agent_ids)} agents.",
+            messages=len(self.bus.messages),
+            findings=len(self.memory.get_room_findings(room.room_id)),
+        )
+
+    def _run_evidence_checks_sequential(self, room: ResearchRoom, *, agent_ids: list[str] | None = None) -> None:
+        for agent_id in agent_ids or [
+            "social_kol_agent",
+            "contract_onchain_agent",
+            "product_tech_agent",
+            "funding_token_agent",
+        ]:
+            self._run_agent(agent_id, room)
+
+    def _active_parallel_group(self, group_id: str) -> Any | None:
+        for group in self.concurrency_policy.active.parallel_groups:
+            if group.group_id == group_id:
+                return group
+        return None
 
     def _run_agent_council(self, room: ResearchRoom) -> None:
         participants = [agent_id for agent_id in COUNCIL_AGENTS if agent_id in room.agents]
@@ -439,15 +512,16 @@ class ResearchRuntime:
         room.report_draft = updated
 
     def _emit(self, event_type: str, **payload: Any) -> None:
-        event = {
-            "seq": len(self.event_log) + 1,
-            "type": event_type,
-            "timestamp": utc_now(),
-            **payload,
-        }
-        self.event_log.append(event)
-        if self.event_handler is not None:
-            self.event_handler(event)
+        with self._emit_lock:
+            event = {
+                "seq": len(self.event_log) + 1,
+                "type": event_type,
+                "timestamp": utc_now(),
+                **payload,
+            }
+            self.event_log.append(event)
+            if self.event_handler is not None:
+                self.event_handler(event)
 
     def _emit_room_completed(self, room: ResearchRoom) -> None:
         quality = room.project_card.get("research_quality") if isinstance(room.project_card, dict) else {}
@@ -481,7 +555,10 @@ class ResearchRuntime:
 
     def _room_llm_usage(self, room_id: str) -> dict[str, Any]:
         start_index = self._room_llm_start_index.get(room_id, 0)
-        return aggregate_llm_usage(self.model_gateway.call_log[start_index:])
+        return aggregate_llm_usage(self.model_gateway.calls_after(start_index))
+
+    def _agent_llm_usage(self, agent_id: str, start_index: int) -> dict[str, Any]:
+        return aggregate_llm_usage(self.model_gateway.calls_after(start_index, agent_id=agent_id))
 
     def _room_metrics(self, room_id: str) -> dict[str, Any]:
         return {

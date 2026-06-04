@@ -352,7 +352,7 @@ DISCORD_BOT_TOKEN
 
 ## 9. Research Room Flow
 
-Current Phase 1 runtime is sequential.
+Current Phase 2 runtime is dependency-aware parallel.
 
 ```text
 1. Supervisor intake
@@ -360,17 +360,19 @@ Current Phase 1 runtime is sequential.
 3. Research Room creation
 4. Supervisor planning
 5. Ingestion
-6. Narrative
-7. Discovery
-8. Social/KOL
-9. Contract/On-chain
-10. Product/Tech
-11. Funding/Token
-12. Agent Council
-13. Report writing
-14. Supervisor final review
-15. Obsidian sync
-16. Run snapshot and replay events saved
+6. Social/KOL market-signal intake
+7. Narrative
+8. Discovery
+9. Parallel evidence_checks group
+   - Social/KOL candidate verification
+   - Contract/On-chain verification
+   - Product/Tech verification
+   - Funding/Token verification
+10. Agent Council joins specialist findings
+11. Report writing
+12. Supervisor final review
+13. Obsidian sync
+14. Run snapshot and replay events saved
 ```
 
 ## 10. Concurrency Roadmap
@@ -379,8 +381,8 @@ Current Phase 1 runtime is sequential.
 
 | Phase | Status | Mode | Description |
 |---|---|---|---|
-| Phase 1 | active | sequential | Whole Research Room runs sequentially for stability |
-| Phase 2 | planned | bounded parallel group | After Discovery, Social / Contract / Product / Funding evidence checks run together |
+| Phase 1 | stable baseline | sequential | Whole Research Room runs sequentially for fallback stability |
+| Phase 2 | active | bounded parallel group | After Discovery, Social / Contract / Product / Funding evidence checks run together |
 | Phase 3 | planned | background workers | X, GitHub, Docs, DEX, RSS, RootData, public web monitors run in parallel |
 | Phase 4 | planned | room worker pool | Candidate A/B/C get separate Research Rooms, then summaries are merged |
 
@@ -511,7 +513,7 @@ Internal Supervisor final review, agent council notes, tool payloads, raw LLM JS
 
 Project research now treats X/Twitter, KOL posts, public threads, and related articles as the first market-signal layer. The official site, docs, GitHub, token metadata, and chain/on-chain checks are the verification layer.
 
-The Phase 1 sequential room now behaves like this:
+The Phase 2 room now behaves like this:
 
 ```text
 Supervisor plan
@@ -525,10 +527,11 @@ Supervisor plan
    - related article/public web mentions
 -> Narrative map
 -> Discovery uses the social seed plus web/GitHub/market evidence
--> Candidate-specific Social/KOL verification
--> Contract/On-chain verification
--> Product/Site/Docs/GitHub verification
--> Funding/Token opportunity check
+-> Parallel evidence_checks group
+   - Candidate-specific Social/KOL verification
+   - Contract/On-chain verification
+   - Product/Site/Docs/GitHub verification
+   - Funding/Token opportunity check
 -> Agent Council
 -> Report
 -> Obsidian sync
@@ -694,7 +697,7 @@ room.json.forked_from          source room, source seq, created_at
 web payload.event_cursor       last_seq and resume hint
 ```
 
-This makes the current Phase 1 sequential runtime easier to replay, debug, and later upgrade into Phase 2/3/4 parallel execution without losing the audit trail.
+This makes the current Phase 2 runtime easier to replay and debug while preserving the audit trail needed for Phase 3/4 parallel execution.
 
 ## 13. Tests
 
@@ -717,7 +720,7 @@ Important test coverage:
 
 ## 14. Current Limits
 
-- Phase 1 is still sequential by design.
+- Phase 2 parallelizes only the evidence_checks group; Supervisor, ingestion, seed social intake, narrative, discovery, council, report, final review, and Obsidian sync remain ordered by design.
 - X/RootData/Explorer/RPC need optional secrets for live API results.
 - RSS, DefiLlama, Snapshot, GitHub activity, CoinGecko, DEX Screener, token metadata, DEX pair lookup, public web search, website/docs crawling, and airdrop hint search are implemented as public-web/read-only connectors.
 - Advanced monitor workers are planned; the connector layer now has RSS support ready for them.
@@ -726,15 +729,14 @@ Important test coverage:
 
 ## 15. Next Development Order
 
-1. Keep Phase 1 stable with web-only public research stack.
+1. Keep Phase 2 stable with bounded parallel evidence checks.
 2. Improve official-source extraction and identity validation.
 3. Add stronger project identity collision checks.
 4. Improve X/KOL handling without relying on private chat channels; add better KOL ranking, repeated-mention detection, and article/thread clustering.
-5. Implement Phase 2 parallel evidence checks.
-6. Implement Phase 3 public web/RSS/GitHub/docs/DEX monitor workers.
-7. Expand web dashboard replay and multi-room board.
-8. Add Phase 4 parallel Research Rooms for candidate fanout.
+5. Implement Phase 3 public web/RSS/GitHub/docs/DEX monitor workers.
+6. Expand web dashboard replay and multi-room board.
+7. Add Phase 4 parallel Research Rooms for candidate fanout.
 
 ## 16. One-Line Summary
 
-JIMMORIA is currently a Codex-first, public-web-first multi-agent crypto research company with Supervisor orchestration, controlled P2P collaboration, shared memory, read-only ToolGateway, Markdown/Obsidian outputs, and a Phase 1 sequential runtime preparing for staged parallelization.
+JIMMORIA is currently a Codex-first, public-web-first multi-agent crypto research company with Supervisor orchestration, controlled P2P collaboration, shared memory, read-only ToolGateway, Markdown/Obsidian outputs, and Phase 2 bounded parallel evidence checks.

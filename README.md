@@ -209,15 +209,15 @@ vision_analyze        future external vision connector
 Current active phase:
 
 ```text
-Phase 1: sequential_room
-Run the whole Research Room sequentially until every agent path is stable.
+Phase 2: parallel_evidence_checks
+Run the dependency-heavy front half sequentially, then run Social / Contract / Product / Funding evidence checks together.
 ```
 
 Planned:
 
 ```text
-Phase 2: parallel_evidence_checks
-After social-first Discovery, run candidate Social / Contract / Product / Funding evidence checks together.
+Phase 1: sequential_room
+Kept as the stable baseline and fallback policy.
 
 Phase 3: parallel_24h_monitoring
 Run public web, X, GitHub, Docs, DEX, RSS, RootData monitor workers in parallel.

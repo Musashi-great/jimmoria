@@ -609,6 +609,65 @@ class JimmoriaConsole:
             )
             return
 
+        if event_type == "parallel_group_start":
+            agents = event.get("agents", [])
+            agent_count = len(agents) if isinstance(agents, list) else 0
+            if self.use_stream_events():
+                self.print_event_line(
+                    "Parallel",
+                    f"START {event.get('group_id')} | agents {agent_count} | max {event.get('max_parallel')} | {event.get('summary')}",
+                )
+                return
+            self.block(
+                "Parallel agent group started",
+                [
+                    f"Group: {event.get('group_id')}",
+                    f"Agents: {agent_count}",
+                    f"Max parallel: {event.get('max_parallel')}",
+                    str(event.get("summary") or ""),
+                ],
+            )
+            return
+
+        if event_type == "parallel_group_done":
+            agents = event.get("agents", [])
+            agent_count = len(agents) if isinstance(agents, list) else 0
+            if self.use_stream_events():
+                self.print_event_line(
+                    "Parallel",
+                    f"DONE {event.get('group_id')} | agents {agent_count} | msg {event.get('messages')} / findings {event.get('findings')}",
+                )
+                return
+            self.block(
+                "Parallel agent group finished",
+                [
+                    f"Group: {event.get('group_id')}",
+                    f"Agents: {agent_count}",
+                    f"Messages: {event.get('messages')}",
+                    f"Findings: {event.get('findings')}",
+                ],
+            )
+            return
+
+        if event_type == "parallel_group_failed":
+            failures = event.get("failures", [])
+            failure_count = len(failures) if isinstance(failures, list) else 0
+            if self.use_stream_events():
+                self.print_event_line(
+                    "Parallel",
+                    f"FAIL {event.get('group_id')} | failures {failure_count} | {event.get('summary')}",
+                )
+                return
+            self.block(
+                "Parallel agent group failed",
+                [
+                    f"Group: {event.get('group_id')}",
+                    f"Failures: {failure_count}",
+                    str(event.get("summary") or ""),
+                ],
+            )
+            return
+
         if event_type == "deliberation_start":
             participants = event.get("participants", [])
             count = len(participants) if isinstance(participants, list) else 0

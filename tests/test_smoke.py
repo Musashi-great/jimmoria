@@ -1766,8 +1766,9 @@ class SmokeTest(unittest.TestCase):
         assert research is not None
         assert source_only is not None
         self.assertEqual(loaded_research.process_id, research.process_id)
-        self.assertEqual(research.process_type, "sequential_controlled_p2p")
-        self.assertEqual(research.execution_strategy["current_phase"], 1)
+        self.assertEqual(research.process_type, "controlled_p2p_with_parallel_evidence_checks")
+        self.assertEqual(research.execution_strategy["current_phase"], 2)
+        self.assertEqual(research.execution_strategy["current_mode"], "bounded_parallel_agent_group")
         self.assertIn("phase_2", research.execution_strategy)
         self.assertEqual(research.agent_ids[0], "supervisor_agent")
         self.assertEqual(research.agent_ids[-1], "obsidian_curator_agent")
@@ -1787,11 +1788,12 @@ class SmokeTest(unittest.TestCase):
     def test_concurrency_policy_loads_phase_roadmap(self) -> None:
         policy = load_concurrency_policy()
 
-        self.assertEqual(policy.active.phase, 1)
-        self.assertEqual(policy.active.mode, "sequential")
-        self.assertEqual(policy.active.max_parallel, 1)
+        self.assertEqual(policy.active.phase, 2)
+        self.assertEqual(policy.active.mode, "bounded_parallel_agent_group")
+        self.assertEqual(policy.active.max_parallel, 4)
         self.assertEqual(len(policy.phases), 4)
         phase_two = [phase for phase in policy.phases if phase.phase == 2][0]
+        self.assertEqual(phase_two.status, "active")
         self.assertEqual(phase_two.mode, "bounded_parallel_agent_group")
         self.assertEqual(phase_two.max_parallel, 4)
         self.assertEqual(phase_two.parallel_groups[0].group_id, "evidence_checks")
@@ -1811,8 +1813,38 @@ class SmokeTest(unittest.TestCase):
             room_created = [event for event in runtime.event_log if event["type"] == "room_created"][0]
 
         self.assertEqual(result.room.status, "completed")
-        self.assertEqual(room_created["concurrency"]["active_phase"]["phase"], 1)
-        self.assertEqual(room_created["concurrency"]["active_phase"]["mode"], "sequential")
+        self.assertEqual(room_created["concurrency"]["active_phase"]["phase"], 2)
+        self.assertEqual(room_created["concurrency"]["active_phase"]["mode"], "bounded_parallel_agent_group")
+
+    def test_runtime_runs_evidence_agents_as_parallel_group(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch.dict("os.environ", {**_offline_no_secret_env(), "JIMMORIA_SKIP_EXTERNAL_SEARCH": "1"}, clear=False):
+                runtime = ResearchRuntime()
+                result = runtime.run_article_research(
+                    title="Parallel Evidence Check",
+                    content="3Jane crypto credit project report",
+                    vault_dir=root / "vault",
+                    reports_dir=root / "reports",
+                    memory_path=root / "memory.json",
+                )
+
+            event_types = [event["type"] for event in runtime.event_log]
+            group_start = [event for event in runtime.event_log if event["type"] == "parallel_group_start"][0]
+            group_done = [event for event in runtime.event_log if event["type"] == "parallel_group_done"][0]
+
+        self.assertEqual(result.room.status, "completed")
+        self.assertIn("parallel_group_start", event_types)
+        self.assertIn("parallel_group_done", event_types)
+        self.assertEqual(group_start["group_id"], "evidence_checks")
+        self.assertEqual(group_start["max_parallel"], 4)
+        self.assertEqual(set(group_start["agents"]), {
+            "social_kol_agent",
+            "contract_onchain_agent",
+            "product_tech_agent",
+            "funding_token_agent",
+        })
+        self.assertEqual(group_done["group_id"], "evidence_checks")
 
     def test_process_specs_load_when_cli_runs_outside_project_root(self) -> None:
         original_cwd = Path.cwd()

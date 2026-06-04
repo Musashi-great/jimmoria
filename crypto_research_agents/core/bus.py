@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from collections.abc import Iterable
 from typing import Any
 
@@ -11,13 +12,16 @@ class CollaborationBus:
 
     def __init__(self) -> None:
         self._messages: list[AgentMessage] = []
+        self._lock = threading.RLock()
 
     @property
     def messages(self) -> tuple[AgentMessage, ...]:
-        return tuple(self._messages)
+        with self._lock:
+            return tuple(self._messages)
 
     def publish(self, message: AgentMessage) -> AgentMessage:
-        self._messages.append(message)
+        with self._lock:
+            self._messages.append(message)
         return message
 
     def request(
@@ -120,7 +124,8 @@ class CollaborationBus:
         to_agent: str | None = None,
         message_type: MessageType | None = None,
     ) -> list[AgentMessage]:
-        messages = self._messages
+        with self._lock:
+            messages = list(self._messages)
         if room_id is not None:
             messages = [message for message in messages if message.room_id == room_id]
         if to_agent is not None:
@@ -130,7 +135,8 @@ class CollaborationBus:
         return messages
 
     def to_list(self) -> list[dict[str, Any]]:
-        return [message.to_dict() for message in self._messages]
+        with self._lock:
+            return [message.to_dict() for message in self._messages]
 
     @classmethod
     def from_list(cls, items: list[dict[str, Any]]) -> "CollaborationBus":

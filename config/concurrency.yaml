@@ -1,7 +1,7 @@
 {
   "policy_version": "0.1",
-  "active_phase": 1,
-  "default_max_parallel": 1,
+  "active_phase": 2,
+  "default_max_parallel": 4,
   "safety": {
     "shared_memory_writes": "serialized",
     "report_writing": "single_writer",
@@ -12,7 +12,7 @@
     {
       "phase": 1,
       "name": "sequential_room",
-      "status": "active",
+      "status": "stable_baseline",
       "mode": "sequential",
       "description": "Run the whole Research Room sequentially until every agent path is stable.",
       "max_parallel": 1,
@@ -21,7 +21,7 @@
     {
       "phase": 2,
       "name": "parallel_evidence_checks",
-      "status": "planned",
+      "status": "active",
       "mode": "bounded_parallel_agent_group",
       "description": "After social-first discovery, re-run candidate-specific Social together with Contract, Product, and Funding evidence checks at the same time.",
       "max_parallel": 4,

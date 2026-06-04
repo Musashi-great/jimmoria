@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable, Mapping
 from time import perf_counter
 from typing import Any
@@ -40,19 +41,24 @@ class ToolGateway:
         self._tools: dict[str, ToolCallable] = {}
         self.audit_log: list[dict[str, Any]] = []
         self.event_callback = event_callback
+        self._lock = threading.RLock()
 
     def register(self, tool_name: str, func: ToolCallable) -> None:
-        self._tools[tool_name] = func
+        with self._lock:
+            self._tools[tool_name] = func
 
     def set_event_callback(self, callback: EventCallback | None) -> None:
-        self.event_callback = callback
+        with self._lock:
+            self.event_callback = callback
 
     @property
     def registered_tools(self) -> set[str]:
-        return set(self._tools)
+        with self._lock:
+            return set(self._tools)
 
     def has_tool(self, tool_name: str) -> bool:
-        return tool_name in self._tools
+        with self._lock:
+            return tool_name in self._tools
 
     def call(
         self,
@@ -91,7 +97,8 @@ class ToolGateway:
             )
             raise PermissionError(f"{agent_id} is not allowed to call {tool_name}")
 
-        tool = self._tools.get(tool_name)
+        with self._lock:
+            tool = self._tools.get(tool_name)
         if tool is None:
             result = {
                 "status": "unconfigured",
@@ -184,7 +191,8 @@ class ToolGateway:
             latency_ms=latency_ms,
             result=_sanitize_for_log(result),
         )
-        self.audit_log.append(record.to_dict())
+        with self._lock:
+            self.audit_log.append(record.to_dict())
 
     def _emit_tool_event(
         self,
@@ -198,7 +206,9 @@ class ToolGateway:
         status: str | None = None,
         message: str | None = None,
     ) -> None:
-        if self.event_callback is None:
+        with self._lock:
+            callback = self.event_callback
+        if callback is None:
             return
         payload: dict[str, Any] = {
             "agent_id": agent_id,
@@ -212,7 +222,7 @@ class ToolGateway:
             payload["status"] = status
         if message:
             payload["summary"] = message
-        self.event_callback(event_type, **payload)
+        callback(event_type, **payload)
 
 
 def _elapsed_ms(started: float) -> int:
