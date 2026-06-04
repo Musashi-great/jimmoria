@@ -147,6 +147,8 @@ def build_run_payload(
     report_path = Path(str(room.get("output_paths", {}).get("report") or ""))
     report_exists = report_path.exists()
     report_preview = _read_text_preview(report_path) if report_exists else ""
+    project_card = room.get("project_card") if isinstance(room.get("project_card"), dict) else {}
+    runtime_metrics = project_card.get("runtime_metrics") if isinstance(project_card, dict) else {}
 
     return {
         "room": room,
@@ -162,6 +164,7 @@ def build_run_payload(
             "llm_calls": len(llm_log),
             "findings": len(room.get("shared_findings", [])),
         },
+        "runtime_metrics": runtime_metrics if isinstance(runtime_metrics, dict) else {},
         "event_cursor": {
             "last_seq": max((int(event.get("seq", 0)) for event in events), default=0),
             "resume_hint": "Use events --after-seq <last_seq> to catch up without replaying the whole room.",

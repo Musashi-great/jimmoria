@@ -64,6 +64,7 @@ class JimmoriaConsole:
         self.runtime_room_running = False
         self.runtime_dock_lines = 0
         self.runtime_dock_frame = 0
+        self.last_runtime_metrics: dict[str, object] = {}
 
     def print_intro(self) -> None:
         print_jimmoria_logo(self.width)
@@ -453,7 +454,7 @@ class JimmoriaConsole:
                 summary = self.compact_text(str(event.get("summary", "")), 76)
                 self.print_event_line(
                     "Agent",
-                    f"DONE {agent_id} | {summary} | msg {event.get('messages')} / findings {event.get('findings')}",
+                    f"DONE {agent_id} | {summary} | msg {event.get('messages')} / findings {event.get('findings')}{self.event_metrics_suffix(event)}",
                 )
                 return
             label = self.agent_label(agent_id)
@@ -465,6 +466,7 @@ class JimmoriaConsole:
                     f"Finished: {summary}",
                     f"Messages: {event.get('messages')}",
                     f"Findings: {event.get('findings')}",
+                    *self.event_metric_lines(event),
                 ],
             )
             return
@@ -475,7 +477,7 @@ class JimmoriaConsole:
             self.agent_activity[agent_id] = f"Failed: {event.get('error')}"
             if self.use_stream_events():
                 error = self.compact_text(str(event.get("error", "")), 82)
-                self.print_event_line("Agent", f"FAIL {agent_id} | {error}")
+                self.print_event_line("Agent", f"FAIL {agent_id} | {error}{self.event_metrics_suffix(event)}")
                 return
             label = self.agent_label(agent_id)
             self.block(
@@ -484,6 +486,7 @@ class JimmoriaConsole:
                     f"State: {self.state_label('failed')}",
                     f"Task type: {event.get('task_type')}",
                     f"Stopped: {event.get('error')}",
+                    *self.event_metric_lines(event),
                 ],
             )
             self.print_agent_state()
@@ -583,11 +586,15 @@ class JimmoriaConsole:
         if event_type == "room_completed":
             quality_status = str(event.get("research_quality_status") or "")
             quality_suffix = f" | quality {quality_status}" if quality_status else ""
+            self.last_runtime_metrics = {
+                "duration_ms": event.get("duration_ms"),
+                "llm_usage": event.get("llm_usage"),
+            }
             if self.use_stream_events():
                 self.runtime_room_running = False
                 self.print_event_line(
                     "Room",
-                    f"DONE {event.get('room_id')} | status {event.get('status')}{quality_suffix} | msg {event.get('messages')} / findings {event.get('findings')}",
+                    f"DONE {event.get('room_id')} | status {event.get('status')}{quality_suffix} | msg {event.get('messages')} / findings {event.get('findings')}{self.event_metrics_suffix(event)}",
                 )
                 return
             lines = [
@@ -595,6 +602,7 @@ class JimmoriaConsole:
                 f"Status: {event.get('status')}",
                 f"Messages: {event.get('messages')}",
                 f"Findings: {event.get('findings')}",
+                *self.event_metric_lines(event),
             ]
             if quality_status:
                 lines.append(f"Research quality: {quality_status}")
@@ -603,10 +611,14 @@ class JimmoriaConsole:
             return
 
         if event_type == "room_failed":
+            self.last_runtime_metrics = {
+                "duration_ms": event.get("duration_ms"),
+                "llm_usage": event.get("llm_usage"),
+            }
             if self.use_stream_events():
                 self.runtime_room_running = False
                 reason = self.compact_text(str(event.get("summary", "")), 86)
-                self.print_event_line("Room", f"FAIL {event.get('room_id')} | {reason}")
+                self.print_event_line("Room", f"FAIL {event.get('room_id')} | {reason}{self.event_metrics_suffix(event)}")
                 return
             self.block(
                 "JIMMORIA room failed",
@@ -614,6 +626,7 @@ class JimmoriaConsole:
                     f"Room: {event.get('room_id')}",
                     f"Status: {event.get('status')}",
                     f"Reason: {event.get('summary')}",
+                    *self.event_metric_lines(event),
                 ],
             )
             self.print_agent_state()
@@ -631,6 +644,9 @@ class JimmoriaConsole:
             f"Messages: {len(bus.messages)}",
             f"Findings: {len(memory.get_room_findings(room.room_id))}",
         ]
+        runtime_metrics = room.project_card.get("runtime_metrics") if isinstance(room.project_card, dict) else {}
+        if isinstance(runtime_metrics, dict):
+            lines.extend(self.runtime_metric_lines(runtime_metrics))
         quality = room.project_card.get("research_quality") if isinstance(room.project_card, dict) else {}
         quality_status = ""
         if isinstance(quality, dict) and quality.get("status"):
@@ -696,6 +712,9 @@ class JimmoriaConsole:
         unconfigured = sum(1 for item in audit if item.get("status") == "unconfigured")
         output_paths = room.get("output_paths") if isinstance(room.get("output_paths"), dict) else {}
         assert isinstance(output_paths, dict)
+        project_card = room.get("project_card") if isinstance(room.get("project_card"), dict) else {}
+        runtime_metrics = project_card.get("runtime_metrics") if isinstance(project_card, dict) else {}
+        metric_lines = self.runtime_metric_lines(runtime_metrics) if isinstance(runtime_metrics, dict) else []
         self.block(
             "Latest run",
             [
@@ -704,6 +723,7 @@ class JimmoriaConsole:
                 f"Status: {room.get('status')}",
                 f"Messages: {len(messages)}",
                 f"Events: {len(events)}",
+                *metric_lines,
                 f"Unconfigured tool calls: {unconfigured}",
                 f"Report: {output_paths.get('report', '')}",
                 f"Evidence packet: {output_paths.get('evidence_packet', '')}",
@@ -907,6 +927,38 @@ class JimmoriaConsole:
                 summary,
             ],
         )
+
+    def event_metrics_suffix(self, event: dict[str, object]) -> str:
+        parts = self.event_metric_parts(event)
+        return " | " + " | ".join(parts) if parts else ""
+
+    def event_metric_lines(self, event: dict[str, object]) -> list[str]:
+        parts = self.event_metric_parts(event)
+        return [f"Metrics: {' | '.join(parts)}"] if parts else []
+
+    def event_metric_parts(self, event: dict[str, object]) -> list[str]:
+        parts: list[str] = []
+        duration = format_duration_ms(event.get("duration_ms"))
+        if duration:
+            parts.append(f"time {duration}")
+        usage = event.get("llm_usage")
+        if isinstance(usage, dict):
+            usage_text = format_llm_usage(usage)
+            if usage_text:
+                parts.append(usage_text)
+        return parts
+
+    def runtime_metric_lines(self, metrics: dict[str, object]) -> list[str]:
+        lines: list[str] = []
+        duration = format_duration_ms(metrics.get("duration_ms"))
+        if duration:
+            lines.append(f"Runtime: {duration}")
+        usage = metrics.get("llm_usage")
+        if isinstance(usage, dict):
+            usage_text = format_llm_usage(usage)
+            if usage_text:
+                lines.append(f"LLM: {usage_text}")
+        return lines
 
     def state_label(self, state: str) -> str:
         labels = {
@@ -1312,3 +1364,47 @@ def visible_len(text: str) -> int:
             continue
         length += 1
     return length
+
+
+def format_duration_ms(value: object) -> str:
+    try:
+        duration_ms = int(value or 0)
+    except (TypeError, ValueError):
+        return ""
+    if duration_ms <= 0:
+        return ""
+    if duration_ms < 1000:
+        return f"{duration_ms}ms"
+    seconds = duration_ms / 1000
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    minutes = int(seconds // 60)
+    rest = int(seconds % 60)
+    return f"{minutes}m {rest}s"
+
+
+def format_llm_usage(usage: dict[str, object]) -> str:
+    calls = _safe_int(usage.get("calls"))
+    total_tokens = _safe_int(usage.get("total_tokens"))
+    estimated = bool(usage.get("estimated"))
+    if calls <= 0 and total_tokens <= 0:
+        return ""
+    call_text = f"{calls} call" + ("" if calls == 1 else "s")
+    token_text = format_token_count(total_tokens, estimated=estimated) if total_tokens else "tokens n/a"
+    return f"llm {call_text} / {token_text}"
+
+
+def format_token_count(total_tokens: int, *, estimated: bool = False) -> str:
+    prefix = "~" if estimated else ""
+    if total_tokens >= 1_000_000:
+        return f"{prefix}{total_tokens / 1_000_000:.1f}m tokens"
+    if total_tokens >= 1000:
+        return f"{prefix}{total_tokens / 1000:.1f}k tokens"
+    return f"{prefix}{total_tokens} tokens"
+
+
+def _safe_int(value: object) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0

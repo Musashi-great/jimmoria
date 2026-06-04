@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from time import perf_counter
 from typing import Any
 
 from .codex_models import codex_model_for_tier, codex_model_from_env_value
 from .llm_provider import LLMProvider, LLMRequest, LLMResponse, parse_json_response, provider_from_env
+from .usage import enrich_usage_with_estimates, token_usage_summary
 
 
 @dataclass(slots=True)
@@ -109,7 +111,17 @@ class ModelGateway:
             response_format=response_format,
             reasoning_effort=decision.reasoning_effort,
         )
+        started = perf_counter()
         response = self.provider.complete(request)
+        duration_ms = int((perf_counter() - started) * 1000)
+        response.usage = enrich_usage_with_estimates(
+            response.usage,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            response_text=response.text,
+            duration_ms=duration_ms,
+        )
+        token_usage = token_usage_summary(response.usage)
         self.call_log.append(
             {
                 "agent_id": agent_id,
@@ -117,6 +129,8 @@ class ModelGateway:
                 "selected_model": decision.selected_model,
                 "reasoning_effort": decision.reasoning_effort,
                 "provider": response.provider,
+                "duration_ms": response.usage.get("duration_ms", duration_ms),
+                "token_usage": token_usage,
                 "usage": response.usage,
             }
         )

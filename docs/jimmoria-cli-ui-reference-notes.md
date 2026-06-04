@@ -26,6 +26,7 @@ JIMMORIA의 현재 CLI는 full-screen TUI가 아니라 line-oriented CLI다. 따
 - 제출된 문장은 큰 `You` 패널로 반복하지 않고 `You > ...` 로그로 위에 남긴다.
 - Supervisor는 바로 `Supervisor > ...` 진행 로그를 남긴 뒤 답변하거나 Research Room을 연다.
 - Research Room이 열리면 기본적으로 `Room >`, `Board >`, `Agent >`, `Tool >`, `Output >` compact stream이 이어진다.
+- Compact runtime logs include elapsed time and LLM usage, for example `time 1.2s | llm 2 calls / ~4.2k tokens`.
 - Research Room 실행 중에도 하단 dock을 유지한다. 새 이벤트가 출력될 때는 이전 dock을 지우고 이벤트를 찍은 뒤 다시 dock을 그려, 사용자가 계속 같은 회사 채팅창 안에 있는 느낌을 준다.
 - Research Room 실행 중에는 실제 터미널 커서를 숨기고, dock 내부의 `> working...` 점만 blink 처리한다. 바깥 커서가 박스 밖에서 깜빡이면 안 된다.
 - 큰 `Live agent board`와 agent work card는 `/board` 또는 `JIMMORIA_EVENT_STYLE=cards`에서 사용한다.
@@ -142,6 +143,5 @@ REPORT    whether a report artifact exists
 - Session tabs: current room, previous room, source-only room, Daily Radar room.
 - Streaming Supervisor replies: live model text stream before final card.
 - Tool timeline: each connector call as a collapsible event.
-- Cost/token meter: provider-level call count, token estimate, latency.
 - Replay mode: `events.json`를 사용해 Research Room 진행을 다시 재생.
 - Visual web dashboard: ChatDev-style workflow canvas + agent cards + evidence links.

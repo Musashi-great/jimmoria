@@ -699,6 +699,12 @@ class SmokeTest(unittest.TestCase):
                     "summary": "Source stored and summarized.",
                     "messages": 2,
                     "findings": 3,
+                    "duration_ms": 1234,
+                    "llm_usage": {
+                        "calls": 2,
+                        "total_tokens": 4200,
+                        "estimated": True,
+                    },
                 }
             )
 
@@ -707,6 +713,9 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("Board > 2 wait/0 done", text)
         self.assertIn("Agent > RUN ingestion_agent", text)
         self.assertIn("Agent > DONE ingestion_agent", text)
+        self.assertIn("time 1.2s", text)
+        self.assertIn("llm 2", text)
+        self.assertIn("calls / ~4.2k tokens", text)
         self.assertNotIn("JIMMORIA opens a Research Room", text)
         self.assertNotIn("Live agent board", text)
 
@@ -989,6 +998,15 @@ class SmokeTest(unittest.TestCase):
             self.assertIn("final_review_start", event_types)
             self.assertIn("final_review_done", event_types)
             self.assertIn("orchestration_plan", event_types)
+            agent_done_events = [event for event in events if event["type"] == "agent_done"]
+            self.assertTrue(agent_done_events)
+            self.assertTrue(all("duration_ms" in event for event in agent_done_events))
+            self.assertTrue(all("llm_usage" in event for event in agent_done_events))
+            room_done = next(event for event in events if event["type"] == "room_completed")
+            self.assertIn("duration_ms", room_done)
+            self.assertIn("llm_usage", room_done)
+            self.assertGreaterEqual(room_done["llm_usage"]["calls"], 10)
+            self.assertGreater(room_done["llm_usage"]["total_tokens"], 0)
             agent_start_order = [
                 event.get("agent_id")
                 for event in events
@@ -1024,6 +1042,11 @@ class SmokeTest(unittest.TestCase):
             self.assertIn("agent_council", [item["checkpoint"] for item in orchestration_plan["coordination_checkpoints"]])
             self.assertGreaterEqual(len(runtime.model_gateway.call_log), 10)
             llm_log = json.loads((root / "runs" / result.room.room_id / "llm_call_log.json").read_text(encoding="utf-8"))
+            self.assertTrue(all("duration_ms" in entry for entry in llm_log))
+            self.assertTrue(all("token_usage" in entry for entry in llm_log))
+            self.assertTrue(all(entry["token_usage"]["total_tokens"] > 0 for entry in llm_log))
+            self.assertIn("runtime_metrics", result.room.project_card)
+            self.assertGreaterEqual(result.room.project_card["runtime_metrics"]["llm_usage"]["calls"], 10)
             llm_agents = {entry["agent_id"] for entry in llm_log}
             self.assertTrue(
                 {

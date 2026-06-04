@@ -293,6 +293,7 @@ JIMMORIA does not depend on Google's AX runtime, but it now borrows the parts th
 
 - a single Supervisor/Runtime path acts as the controller for each room
 - every runtime event gets a stable `seq`
+- agent and room events include `duration_ms` plus LLM call/token usage
 - `events.json` can be replayed from a cursor instead of reading the whole room again
 - a saved room can be forked from a checkpoint for alternate follow-up work
 - the web dashboard shows the latest event cursor as `last_seq`

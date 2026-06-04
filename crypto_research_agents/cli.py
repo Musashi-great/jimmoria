@@ -10,7 +10,7 @@ from pathlib import Path
 
 from crypto_research_agents import APP_NAME, __version__
 from crypto_research_agents.connectors import register_default_connectors
-from crypto_research_agents.console import JimmoriaConsole
+from crypto_research_agents.console import JimmoriaConsole, format_duration_ms, format_llm_usage
 from crypto_research_agents.runtime import ResearchRuntime
 from crypto_research_agents.runtime import DEFAULT_AGENTS
 from crypto_research_agents.core.capabilities import collect_capabilities
@@ -1810,8 +1810,14 @@ def make_event_printer() -> object:
             state[agent_id] = "done"
             print(
                 f"OK {agent_id} done | messages={event.get('messages')} "
-                f"findings={event.get('findings')} | {event.get('summary')}"
+                f"findings={event.get('findings')}{event_metric_suffix(event)} | {event.get('summary')}"
             )
+            return
+
+        if event_type == "agent_failed":
+            agent_id = str(event.get("agent_id"))
+            state[agent_id] = "failed"
+            print(f"FAIL {agent_id} | {event.get('error')}{event_metric_suffix(event)}")
             return
 
         if event_type in {"tool_start", "tool_done", "tool_failed", "tool_denied", "tool_unconfigured"}:
@@ -1829,6 +1835,7 @@ def make_event_printer() -> object:
                     f"Status: {event.get('status')}",
                     f"Messages: {event.get('messages')}",
                     f"Findings: {event.get('findings')}",
+                    *event_metric_lines(event),
                 ]
             )
             return
@@ -1839,10 +1846,34 @@ def make_event_printer() -> object:
                     f"Failed: {event.get('room_id')}",
                     f"Status: {event.get('status')}",
                     f"Reason: {event.get('summary')}",
+                    *event_metric_lines(event),
                 ]
             )
 
     return handle
+
+
+def event_metric_suffix(event: dict[str, object]) -> str:
+    parts = event_metric_parts(event)
+    return " | " + " | ".join(parts) if parts else ""
+
+
+def event_metric_lines(event: dict[str, object]) -> list[str]:
+    parts = event_metric_parts(event)
+    return [f"Metrics: {' | '.join(parts)}"] if parts else []
+
+
+def event_metric_parts(event: dict[str, object]) -> list[str]:
+    parts: list[str] = []
+    duration = format_duration_ms(event.get("duration_ms"))
+    if duration:
+        parts.append(f"time {duration}")
+    usage = event.get("llm_usage")
+    if isinstance(usage, dict):
+        usage_text = format_llm_usage(usage)
+        if usage_text:
+            parts.append(usage_text)
+    return parts
 
 
 def print_box(lines: list[str]) -> None:

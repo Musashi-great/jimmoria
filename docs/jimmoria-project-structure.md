@@ -147,6 +147,7 @@ flowchart LR
 | Shared Memory | `core/memory.py` | sources, candidates, findings, entity graph |
 | Tool Gateway | `core/tool_gateway.py` | tool 권한, connector 호출, audit log |
 | Model Gateway | `core/model_gateway.py` | task type별 Codex model route, pro reasoning effort |
+| Usage Meter | `core/usage.py` | LLM duration/token usage extraction, fallback estimation, room/agent aggregation |
 | Concurrency Policy | `core/concurrency.py`, `config/concurrency.yaml` | Phase 1-4 병렬화 정책 |
 | Storage | `storage/` | run snapshot, reports, vault notes |
 | Web Dashboard | `web/` | 로컬 구조/런타임 시각화 |
@@ -380,6 +381,32 @@ vault/20_Sources/*.md
 vault/30_Narratives/*.md
 vault/50_Reports/*.md
 ```
+
+### Runtime Telemetry
+
+Each LLM call now records:
+
+```text
+duration_ms
+token_usage.input_tokens
+token_usage.output_tokens
+token_usage.total_tokens
+token_usage.estimated
+```
+
+If the provider exposes real token usage, JIMMORIA records it. If the provider does not expose usage, such as some Codex CLI runs, JIMMORIA stores an estimated token count and marks it with `estimated: true`.
+
+The runtime aggregates this data into:
+
+```text
+events.json agent_done[].duration_ms
+events.json agent_done[].llm_usage
+events.json room_completed.duration_ms
+events.json room_completed.llm_usage
+room.json project_card.runtime_metrics
+```
+
+The CLI compact stream renders these as `time 1.2s | llm 2 calls / ~4.2k tokens`. The `~` prefix means estimated tokens.
 
 Workflow artifact runs also write:
 

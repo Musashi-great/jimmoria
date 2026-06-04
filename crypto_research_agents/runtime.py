@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from time import perf_counter
 from typing import Any, Callable
 
 from crypto_research_agents.agents import (
@@ -29,6 +30,7 @@ from crypto_research_agents.core.room import ResearchRoom
 from crypto_research_agents.core.runtime_state import RuntimeState
 from crypto_research_agents.core.time import utc_now
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
+from crypto_research_agents.core.usage import aggregate_llm_usage
 from crypto_research_agents.storage.json_store import save_memory
 from crypto_research_agents.storage.paths import resolve_project_path
 from crypto_research_agents.storage.run_store import save_run_snapshot
@@ -85,6 +87,8 @@ class ResearchRuntime:
         self.tool_gateway = ToolGateway(default_policy(self.agent_specs))
         register_default_connectors(self.tool_gateway)
         self.event_log: list[dict[str, Any]] = []
+        self._room_started_at: dict[str, float] = {}
+        self._room_llm_start_index: dict[str, int] = {}
         self.tool_gateway.set_event_callback(self._emit)
         self.agents = {
             "supervisor_agent": SupervisorAgent(model_gateway=self.model_gateway, tool_gateway=self.tool_gateway, spec=self.agent_specs.get("supervisor_agent")),
@@ -118,6 +122,7 @@ class ResearchRuntime:
             goals=process.goals,
             agents=process.agent_ids,
         )
+        self._mark_room_started(room)
         room.set_status(RuntimeState.ASSIGNED)
         self._emit(
             "room_created",
@@ -170,12 +175,15 @@ class ResearchRuntime:
             self._run_agent("obsidian_curator_agent", room, vault_dir=vault_dir)
         except Exception as exc:
             room.set_status(RuntimeState.FAILED)
+            room.project_card["runtime_metrics"] = self._room_metrics(room.room_id)
             self._emit(
                 "room_failed",
                 room_id=room.room_id,
                 topic=room.topic,
                 status=room.status,
                 summary=str(exc),
+                duration_ms=self._room_duration_ms(room.room_id),
+                llm_usage=self._room_llm_usage(room.room_id),
             )
             self._save_run(room, memory_path)
             raise
@@ -202,6 +210,7 @@ class ResearchRuntime:
             goals=process.goals,
             agents=process.agent_ids,
         )
+        self._mark_room_started(room)
         room.set_status(RuntimeState.ASSIGNED)
         self._emit(
             "room_created",
@@ -228,12 +237,15 @@ class ResearchRuntime:
             self._run_agent("obsidian_curator_agent", room, vault_dir=vault_dir)
         except Exception as exc:
             room.set_status(RuntimeState.FAILED)
+            room.project_card["runtime_metrics"] = self._room_metrics(room.room_id)
             self._emit(
                 "room_failed",
                 room_id=room.room_id,
                 topic=room.topic,
                 status=room.status,
                 summary=str(exc),
+                duration_ms=self._room_duration_ms(room.room_id),
+                llm_usage=self._room_llm_usage(room.room_id),
             )
             self._save_run(room, memory_path)
             raise
@@ -245,6 +257,8 @@ class ResearchRuntime:
 
     def _run_agent(self, agent_id: str, room: ResearchRoom, **kwargs: object) -> None:
         agent = self.agents[agent_id]
+        started = perf_counter()
+        llm_start_index = len(self.model_gateway.call_log)
         self._emit(
             "agent_start",
             room_id=room.room_id,
@@ -263,6 +277,8 @@ class ResearchRuntime:
                 agent_name=agent.name,
                 task_type=agent.task_type,
                 error=str(exc),
+                duration_ms=_elapsed_ms(started),
+                llm_usage=aggregate_llm_usage(self.model_gateway.call_log[llm_start_index:]),
             )
             raise
         finally:
@@ -277,6 +293,8 @@ class ResearchRuntime:
             summary=result.summary,
             messages=len(self.bus.messages),
             findings=len(self.memory.get_room_findings(room.room_id)),
+            duration_ms=_elapsed_ms(started),
+            llm_usage=aggregate_llm_usage(self.model_gateway.call_log[llm_start_index:]),
         )
         self._emit_output_events(room, result)
 
@@ -435,6 +453,8 @@ class ResearchRuntime:
         quality = room.project_card.get("research_quality") if isinstance(room.project_card, dict) else {}
         if not isinstance(quality, dict):
             quality = {}
+        runtime_metrics = self._room_metrics(room.room_id)
+        room.project_card["runtime_metrics"] = runtime_metrics
         self._emit(
             "room_completed",
             room_id=room.room_id,
@@ -445,7 +465,29 @@ class ResearchRuntime:
             output_paths=room.output_paths,
             messages=len(self.bus.messages),
             findings=len(self.memory.get_room_findings(room.room_id)),
+            duration_ms=runtime_metrics["duration_ms"],
+            llm_usage=runtime_metrics["llm_usage"],
         )
+
+    def _mark_room_started(self, room: ResearchRoom) -> None:
+        self._room_started_at[room.room_id] = perf_counter()
+        self._room_llm_start_index[room.room_id] = len(self.model_gateway.call_log)
+
+    def _room_duration_ms(self, room_id: str) -> int:
+        started = self._room_started_at.get(room_id)
+        if started is None:
+            return 0
+        return _elapsed_ms(started)
+
+    def _room_llm_usage(self, room_id: str) -> dict[str, Any]:
+        start_index = self._room_llm_start_index.get(room_id, 0)
+        return aggregate_llm_usage(self.model_gateway.call_log[start_index:])
+
+    def _room_metrics(self, room_id: str) -> dict[str, Any]:
+        return {
+            "duration_ms": self._room_duration_ms(room_id),
+            "llm_usage": self._room_llm_usage(room_id),
+        }
 
     def _emit_output_events(self, room: ResearchRoom, result: Any) -> None:
         data = result.data if isinstance(getattr(result, "data", None), dict) else {}
@@ -514,6 +556,10 @@ class ResearchRuntime:
             event_log=self.event_log,
             root_dir=Path(memory_path).parent / "runs",
         )
+
+
+def _elapsed_ms(started: float) -> int:
+    return int((perf_counter() - started) * 1000)
 
 
 def default_policy(agent_specs: AgentSpecRegistry | None = None) -> PolicyEngine:
