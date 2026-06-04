@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import subprocess
 import tempfile
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -178,6 +181,73 @@ class CodexSdkProvider:
         )
 
 
+class GrokProvider:
+    """LLM provider for the xAI Grok OpenAI-compatible API."""
+
+    provider_name = "grok"
+
+    def __init__(
+        self,
+        *,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        api_mode: str | None = None,
+    ) -> None:
+        token, source = (api_key, "constructor") if api_key else _grok_bearer_token()
+        self.api_key = token or ""
+        self.auth_source = source
+        self.base_url = (base_url or os.getenv("GROK_BASE_URL") or os.getenv("XAI_BASE_URL") or "https://api.x.ai/v1").rstrip("/")
+        self.api_mode = (api_mode or os.getenv("GROK_API_MODE") or "responses").strip().lower()
+        self.timeout = float(os.getenv("GROK_API_TIMEOUT") or os.getenv("XAI_API_TIMEOUT") or "360")
+
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.api_key)
+
+    def complete(self, request: LLMRequest) -> LLMResponse:
+        if not self.api_key:
+            raise RuntimeError(
+                "Grok provider is missing a bearer token. Set XAI_API_KEY, GROK_API_KEY, "
+                "GROK_OAUTH_TOKEN, XAI_OAUTH_TOKEN, GROK_OAUTH_TOKEN_FILE, or "
+                "GROK_OAUTH_TOKEN_COMMAND."
+            )
+
+        if self.api_mode in {"chat", "chat_completions", "chat-completions"}:
+            endpoint = f"{self.base_url}/chat/completions"
+            payload = _grok_chat_payload(request)
+        else:
+            endpoint = f"{self.base_url}/responses"
+            payload = _grok_responses_payload(request)
+
+        raw = _post_json(
+            endpoint,
+            payload,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            timeout=self.timeout,
+        )
+        text = _extract_openai_compatible_text(raw)
+        usage = raw.get("usage") if isinstance(raw.get("usage"), dict) else {}
+        usage = {
+            **usage,
+            "mode": "grok",
+            "api_mode": self.api_mode,
+            "base_url": self.base_url,
+            "auth_source": self.auth_source,
+            "reasoning_effort": request.reasoning_effort,
+            "xai_reasoning_effort": _grok_reasoning_effort(request),
+        }
+        return LLMResponse(
+            text=text.strip(),
+            model=request.model,
+            provider=self.provider_name,
+            usage=usage,
+            raw=raw,
+        )
+
+
 def provider_from_env() -> LLMProvider:
     provider = os.getenv("LLM_PROVIDER", "").strip().lower()
     if provider in {"offline", "fallback", "none"}:
@@ -186,7 +256,16 @@ def provider_from_env() -> LLMProvider:
         return CodexCliProvider()
     if provider in {"codex_sdk", "codex", "sdk"}:
         return CodexSdkProvider()
+    if provider in {"grok", "xai", "grok_oauth", "xai_oauth"}:
+        return GrokProvider()
     return OfflineLLMProvider()
+
+
+def grok_auth_status() -> str:
+    token, source = _grok_bearer_token()
+    if token:
+        return f"Grok/xAI bearer token from {source}"
+    return "missing Grok/xAI token; set XAI_API_KEY, GROK_API_KEY, or GROK_OAUTH_TOKEN"
 
 
 def codex_sdk_available() -> bool:
@@ -355,6 +434,163 @@ def _is_real_model_name(model: str) -> bool:
         "embedding_model",
     }
     return bool(model and model not in placeholders)
+
+
+def _grok_bearer_token() -> tuple[str | None, str]:
+    for name in ["GROK_OAUTH_TOKEN", "XAI_OAUTH_TOKEN", "GROK_API_KEY", "XAI_API_KEY"]:
+        value = os.getenv(name)
+        if value:
+            return value.strip(), name
+
+    for name in ["GROK_OAUTH_TOKEN_FILE", "XAI_OAUTH_TOKEN_FILE", "GROK_TOKEN_FILE", "XAI_TOKEN_FILE"]:
+        path = os.getenv(name)
+        if not path:
+            continue
+        try:
+            value = Path(path).expanduser().read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if value:
+            return value, name
+
+    for name in ["GROK_OAUTH_TOKEN_COMMAND", "XAI_OAUTH_TOKEN_COMMAND", "GROK_TOKEN_COMMAND", "XAI_TOKEN_COMMAND"]:
+        command = os.getenv(name)
+        if not command:
+            continue
+        try:
+            completed = subprocess.run(
+                shlex.split(command, posix=os.name != "nt"),
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if completed.returncode == 0:
+            value = completed.stdout.strip()
+            if value:
+                return value, name
+    return None, "missing"
+
+
+def _grok_responses_payload(request: LLMRequest) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "model": request.model,
+        "input": [
+            {"role": "system", "content": request.system_prompt},
+            {"role": "user", "content": request.user_prompt},
+        ],
+        "store": False,
+    }
+    if request.max_tokens:
+        payload["max_output_tokens"] = request.max_tokens
+    reasoning_effort = _grok_reasoning_effort(request)
+    if reasoning_effort:
+        payload["reasoning"] = {"effort": reasoning_effort}
+    if request.response_format == "json":
+        payload["text"] = {"format": {"type": "json_object"}}
+    return payload
+
+
+def _grok_chat_payload(request: LLMRequest) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "model": request.model,
+        "messages": [
+            {"role": "system", "content": request.system_prompt},
+            {"role": "user", "content": request.user_prompt},
+        ],
+        "temperature": request.temperature,
+    }
+    if request.max_tokens:
+        payload["max_tokens"] = request.max_tokens
+    reasoning_effort = _grok_reasoning_effort(request)
+    if reasoning_effort:
+        payload["reasoning_effort"] = reasoning_effort
+    if request.response_format == "json":
+        payload["response_format"] = {"type": "json_object"}
+    return payload
+
+
+def _grok_reasoning_effort(request: LLMRequest) -> str | None:
+    model = request.model.lower()
+    if "grok-4.20" in model and "multi-agent" not in model:
+        return None
+    normalized = (request.reasoning_effort or "standard").strip().lower().replace("-", "_")
+    if "multi-agent" in model:
+        if normalized in {"pro", "xhigh", "extra_high", "max", "maximum"}:
+            return "xhigh"
+        if normalized in {"high", "deep"}:
+            return "high"
+        return "medium"
+    if normalized in {"pro", "xhigh", "extra_high", "max", "maximum", "high", "deep"}:
+        return "high"
+    if normalized in {"fast", "low"}:
+        return "low"
+    return "medium"
+
+
+def _post_json(url: str, payload: dict[str, Any], *, headers: dict[str, str], timeout: float) -> dict[str, Any]:
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            body = response.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Grok provider failed: HTTP {exc.code}: {body}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Grok provider failed: {exc}") from exc
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Grok provider returned non-JSON response: {body[:500]}") from exc
+    if not isinstance(data, dict):
+        raise RuntimeError("Grok provider returned an unexpected response shape.")
+    return data
+
+
+def _extract_openai_compatible_text(raw: dict[str, Any]) -> str:
+    output_text = raw.get("output_text")
+    if isinstance(output_text, str):
+        return output_text
+
+    output = raw.get("output")
+    if isinstance(output, list):
+        parts: list[str] = []
+        for item in output:
+            if not isinstance(item, dict):
+                continue
+            content = item.get("content")
+            if isinstance(content, list):
+                for content_item in content:
+                    if not isinstance(content_item, dict):
+                        continue
+                    text = content_item.get("text")
+                    if isinstance(text, str):
+                        parts.append(text)
+                    elif isinstance(content_item.get("output_text"), str):
+                        parts.append(str(content_item["output_text"]))
+            elif isinstance(content, str):
+                parts.append(content)
+        if parts:
+            return "\n".join(parts)
+
+    choices = raw.get("choices")
+    if isinstance(choices, list) and choices:
+        first = choices[0]
+        if isinstance(first, dict):
+            message = first.get("message")
+            if isinstance(message, dict) and isinstance(message.get("content"), str):
+                return message["content"]
+            if isinstance(first.get("text"), str):
+                return first["text"]
+
+    return json.dumps(raw, ensure_ascii=False)
 
 
 def parse_json_response(response: LLMResponse) -> dict[str, Any]:

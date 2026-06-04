@@ -1,12 +1,16 @@
 {
-  "provider": "codex_only",
+  "provider": "codex_or_grok",
   "official_docs": {
     "codex_sdk": "https://developers.openai.com/codex/sdk",
-    "codex_models": "https://developers.openai.com/codex/models"
+    "codex_models": "https://developers.openai.com/codex/models",
+    "xai_rest_api": "https://docs.x.ai/developers/rest-api-reference",
+    "xai_models": "https://docs.x.ai/docs/models/",
+    "xai_reasoning": "https://docs.x.ai/developers/model-capabilities/text/reasoning"
   },
   "runtime_order": [
     "codex_sdk",
     "codex_cli",
+    "grok",
     "offline_diagnostic_fallback"
   ],
   "env": {
@@ -16,36 +20,73 @@
     "codex_sdk_cwd": "CODEX_SDK_CWD",
     "codex_cli_command": "CODEX_CLI_COMMAND",
     "codex_cli_timeout": "CODEX_CLI_TIMEOUT",
-    "fast_chat_model": "CODEX_MODEL_FAST_CHAT",
-    "fast_model": "CODEX_MODEL_FAST",
-    "reasoning_model": "CODEX_MODEL_REASONING",
-    "writing_model": "CODEX_MODEL_WRITING",
-    "strong_model": "CODEX_MODEL_STRONG",
+    "codex_fast_chat_model": "CODEX_MODEL_FAST_CHAT",
+    "codex_fast_model": "CODEX_MODEL_FAST",
+    "codex_reasoning_model": "CODEX_MODEL_REASONING",
+    "codex_writing_model": "CODEX_MODEL_WRITING",
+    "codex_strong_model": "CODEX_MODEL_STRONG",
     "legacy_cli_fast_chat_model": "CODEX_CLI_MODEL_FAST_CHAT",
     "legacy_cli_fast_model": "CODEX_CLI_MODEL_FAST",
     "legacy_cli_reasoning_model": "CODEX_CLI_MODEL_REASONING",
     "legacy_cli_writing_model": "CODEX_CLI_MODEL_WRITING",
-    "legacy_cli_strong_model": "CODEX_CLI_MODEL_STRONG"
+    "legacy_cli_strong_model": "CODEX_CLI_MODEL_STRONG",
+    "grok_api_key": "GROK_API_KEY",
+    "xai_api_key": "XAI_API_KEY",
+    "grok_oauth_token": "GROK_OAUTH_TOKEN",
+    "xai_oauth_token": "XAI_OAUTH_TOKEN",
+    "grok_oauth_token_file": "GROK_OAUTH_TOKEN_FILE",
+    "xai_oauth_token_file": "XAI_OAUTH_TOKEN_FILE",
+    "grok_oauth_token_command": "GROK_OAUTH_TOKEN_COMMAND",
+    "xai_oauth_token_command": "XAI_OAUTH_TOKEN_COMMAND",
+    "grok_base_url": "GROK_BASE_URL",
+    "xai_base_url": "XAI_BASE_URL",
+    "grok_api_mode": "GROK_API_MODE",
+    "grok_fast_chat_model": "GROK_MODEL_FAST_CHAT",
+    "grok_fast_model": "GROK_MODEL_FAST",
+    "grok_reasoning_model": "GROK_MODEL_REASONING",
+    "grok_writing_model": "GROK_MODEL_WRITING",
+    "grok_strong_model": "GROK_MODEL_STRONG"
   },
-  "supported_models": [
-    "gpt-5.5",
-    "gpt-5.4",
-    "gpt-5.4-mini",
-    "gpt-5.3-codex",
-    "gpt-5.3-codex-spark"
-  ],
+  "supported_models": {
+    "codex": [
+      "gpt-5.5",
+      "gpt-5.4",
+      "gpt-5.4-mini",
+      "gpt-5.3-codex",
+      "gpt-5.3-codex-spark"
+    ],
+    "grok": [
+      "grok-4.3",
+      "grok-4.3-latest",
+      "grok-latest",
+      "grok-4.20",
+      "grok-4.20-reasoning",
+      "grok-4.20-multi-agent"
+    ]
+  },
   "defaults": {
-    "fast_chat_model": "gpt-5.4-mini",
-    "fast_model": "gpt-5.4-mini",
-    "reasoning_model": "gpt-5.5",
-    "writing_model": "gpt-5.5",
-    "strong_model": "gpt-5.5",
+    "codex": {
+      "fast_chat_model": "gpt-5.4-mini",
+      "fast_model": "gpt-5.4-mini",
+      "reasoning_model": "gpt-5.5",
+      "writing_model": "gpt-5.5",
+      "strong_model": "gpt-5.5"
+    },
+    "grok": {
+      "fast_chat_model": "grok-4.3",
+      "fast_model": "grok-4.3",
+      "reasoning_model": "grok-4.3",
+      "writing_model": "grok-4.3",
+      "strong_model": "grok-4.3"
+    },
     "reasoning_effort": "pro"
   },
   "reasoning_effort": {
     "default": "pro",
     "codex_cli_config_key": "model_reasoning_effort",
     "codex_cli_pro_value": "xhigh",
+    "grok_responses_key": "reasoning.effort",
+    "grok_pro_value": "high",
     "applies_to": [
       "supervision",
       "source_ingestion",
@@ -80,9 +121,10 @@
     "behavior": "deterministic local extraction and summarization for tests only"
   },
   "notes": [
-    "Supported model ids are fixed to the official Codex model list above.",
-    "JIMMORIA does not expose OpenAI API-key or OAuth bearer-token setup as model providers.",
-    "Use codex_sdk when openai-codex is installed; use codex_cli when relying on a local Codex login.",
-    "Codex SDK calls default to Sandbox.read_only, ApprovalMode.deny_all, ephemeral threads, and the JIMMORIA project root as cwd."
+    "Codex remains the recommended default because it can reuse the local ChatGPT/Codex login.",
+    "Grok/xAI is available through the OpenAI-compatible xAI API at https://api.x.ai/v1.",
+    "Official xAI API documentation describes bearer API-key auth. JIMMORIA also accepts OAuth-style bearer token env/file/command sources for operator workflows.",
+    "Raw Grok/XAI bearer tokens are not persisted in data/model_settings.json; only file paths, commands, base URL, API mode, and model route preferences are saved.",
+    "Grok defaults to the Responses API so reasoning.effort can be mapped from JIMMORIA pro/high/standard/fast effort levels."
   ]
 }

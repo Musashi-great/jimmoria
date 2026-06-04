@@ -2195,6 +2195,65 @@ class SmokeTest(unittest.TestCase):
 
         self.assertEqual(provider.provider_name, "codex_cli")
 
+    def test_grok_provider_can_be_selected_with_bearer_token(self) -> None:
+        with patch.dict("os.environ", {"LLM_PROVIDER": "grok", "XAI_API_KEY": "xai-test"}, clear=True):
+            provider = provider_from_env()
+
+        self.assertEqual(provider.provider_name, "grok")
+        self.assertTrue(getattr(provider, "is_configured", False))
+
+    def test_grok_provider_calls_xai_responses_api(self) -> None:
+        seen: dict[str, object] = {}
+
+        class FakeHTTPResponse:
+            def __enter__(self) -> "FakeHTTPResponse":
+                return self
+
+            def __exit__(self, *_args: object) -> None:
+                return None
+
+            def read(self) -> bytes:
+                return json.dumps(
+                    {
+                        "output_text": '{"summary": "ok"}',
+                        "usage": {"input_tokens": 5, "output_tokens": 3},
+                    }
+                ).encode("utf-8")
+
+        def fake_urlopen(request: object, timeout: float) -> FakeHTTPResponse:
+            seen["timeout"] = timeout
+            seen["url"] = getattr(request, "full_url")
+            seen["authorization"] = request.get_header("Authorization")  # type: ignore[attr-defined]
+            seen["payload"] = json.loads(request.data.decode("utf-8"))  # type: ignore[attr-defined]
+            return FakeHTTPResponse()
+
+        request = LLMRequest(
+            agent_id="report_agent",
+            task_type="final_synthesis",
+            model="grok-4.3",
+            system_prompt="Write JSON.",
+            user_prompt="3jane report",
+            max_tokens=500,
+            temperature=0.2,
+            response_format="json",
+            reasoning_effort="pro",
+        )
+
+        with patch.dict("os.environ", {"LLM_PROVIDER": "grok", "XAI_API_KEY": "xai-test"}, clear=True):
+            with patch("crypto_research_agents.core.llm_provider.urllib.request.urlopen", side_effect=fake_urlopen):
+                response = provider_from_env().complete(request)
+
+        payload = seen["payload"]
+        assert isinstance(payload, dict)
+        self.assertEqual(seen["url"], "https://api.x.ai/v1/responses")
+        self.assertEqual(seen["authorization"], "Bearer xai-test")
+        self.assertEqual(payload["model"], "grok-4.3")
+        self.assertEqual(payload["reasoning"], {"effort": "high"})
+        self.assertEqual(payload["text"], {"format": {"type": "json_object"}})
+        self.assertEqual(response.text, '{"summary": "ok"}')
+        self.assertEqual(response.provider, "grok")
+        self.assertEqual(response.usage["xai_reasoning_effort"], "high")
+
     def test_codex_cli_provider_uses_supported_exec_flags(self) -> None:
         help_text = """
 Usage: codex exec [OPTIONS] [PROMPT]
@@ -2254,7 +2313,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
         with TemporaryDirectory() as tmp:
             settings_path = str(Path(tmp) / "model_settings.json")
             with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path}, clear=True):
-                with patch("builtins.input", return_value="3"):
+                with patch("builtins.input", return_value="4"):
                     with redirect_stdout(output):
                         configure_model_panel()
                 self.assertEqual(os.environ["LLM_PROVIDER"], "offline")
@@ -2264,6 +2323,27 @@ Usage: codex exec [OPTIONS] [PROMPT]
         text = output.getvalue()
         self.assertIn("[Model Setup]", text)
         self.assertIn("[Offline diagnostic fallback]", text)
+
+    def test_model_setup_grok_choice_saves_provider_without_raw_token(self) -> None:
+        output = StringIO()
+        with TemporaryDirectory() as tmp:
+            settings_path = str(Path(tmp) / "model_settings.json")
+            with patch.dict(
+                "os.environ",
+                {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path, "GROK_OAUTH_TOKEN": "session-secret"},
+                clear=True,
+            ):
+                with patch("builtins.input", side_effect=["3", "1", ""]):
+                    with redirect_stdout(output):
+                        configure_model_panel()
+                self.assertEqual(os.environ["LLM_PROVIDER"], "grok")
+                settings = json.loads(Path(settings_path).read_text(encoding="utf-8"))
+                self.assertEqual(settings["LLM_PROVIDER"], "grok")
+                self.assertNotIn("GROK_OAUTH_TOKEN", settings)
+
+        text = output.getvalue()
+        self.assertIn("[Grok / xAI]", text)
+        self.assertIn("Supported models are fixed to the Grok/xAI model list.", text)
 
     def test_codex_setup_can_use_default_model_routes_without_model_names(self) -> None:
         output = StringIO()
@@ -2422,6 +2502,26 @@ Usage: codex exec [OPTIONS] [PROMPT]
 
         self.assertEqual(gateway.default_model, "gpt-5.5")
 
+    def test_grok_model_env_routes_reasoning_work(self) -> None:
+        class FakeGrokProvider:
+            provider_name = "grok"
+
+            def complete(self, request: LLMRequest) -> LLMResponse:
+                return LLMResponse(text="ok", model=request.model, provider=self.provider_name, usage={})
+
+        with patch.dict(
+            "os.environ",
+            {"GROK_MODEL_REASONING": "grok-4.20-multi-agent"},
+            clear=True,
+        ):
+            gateway = ModelGateway(provider=FakeGrokProvider())
+            reasoning = gateway.select(agent_id="discovery_agent", task_type="candidate_discovery")
+            writing = gateway.select(agent_id="report_agent", task_type="final_synthesis")
+
+        self.assertEqual(gateway.default_model, "grok-4.3")
+        self.assertEqual(reasoning.selected_model, "grok-4.20-multi-agent")
+        self.assertEqual(writing.selected_model, "grok-4.3")
+
     def test_parse_json_response_accepts_fenced_or_prefaced_json(self) -> None:
         fenced = LLMResponse(
             text='```json\n{"summary": "ok", "confidence": 0.8}\n```',
@@ -2524,9 +2624,11 @@ Usage: codex exec [OPTIONS] [PROMPT]
     def test_model_router_contains_supervisor_chat_route(self) -> None:
         router = json.loads(Path("config/models/model_router.yaml").read_text(encoding="utf-8"))
 
-        self.assertEqual(router["provider"], "codex_only")
-        self.assertIn("gpt-5.5", router["supported_models"])
+        self.assertEqual(router["provider"], "codex_or_grok")
+        self.assertIn("gpt-5.5", router["supported_models"]["codex"])
+        self.assertIn("grok-4.3", router["supported_models"]["grok"])
         self.assertIn("codex_sdk", router["runtime_order"])
+        self.assertIn("grok", router["runtime_order"])
         self.assertEqual(router["routes"]["supervisor_chat"], "fast_chat_model")
         for task_type in [
             "supervision",
@@ -2540,9 +2642,10 @@ Usage: codex exec [OPTIONS] [PROMPT]
             "obsidian_sync",
         ]:
             self.assertEqual(router["routes"][task_type], "reasoning_model")
-        self.assertEqual(router["defaults"]["reasoning_model"], "gpt-5.5")
-        self.assertEqual(router["defaults"]["writing_model"], "gpt-5.5")
-        self.assertEqual(router["defaults"]["fast_chat_model"], "gpt-5.4-mini")
+        self.assertEqual(router["defaults"]["codex"]["reasoning_model"], "gpt-5.5")
+        self.assertEqual(router["defaults"]["codex"]["writing_model"], "gpt-5.5")
+        self.assertEqual(router["defaults"]["codex"]["fast_chat_model"], "gpt-5.4-mini")
+        self.assertEqual(router["defaults"]["grok"]["reasoning_model"], "grok-4.3")
         self.assertEqual(router["defaults"]["reasoning_effort"], "pro")
         self.assertEqual(router["routes"]["source_ingestion"], "reasoning_model")
         self.assertEqual(router["reasoning_effort"]["codex_cli_pro_value"], "xhigh")

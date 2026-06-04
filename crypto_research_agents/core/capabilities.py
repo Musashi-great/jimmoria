@@ -7,7 +7,7 @@ from typing import Any
 
 from .agent_spec import AgentSpecRegistry
 from .concurrency import load_concurrency_policy
-from .llm_provider import codex_sdk_available, provider_from_env
+from .llm_provider import codex_sdk_available, grok_auth_status, provider_from_env
 from .model_gateway import ModelGateway
 from .tool_gateway import ToolGateway
 from .profile import WorkerProfileRegistry
@@ -74,7 +74,7 @@ def collect_capabilities(
         ),
         CapabilityStatus(
             "LLM provider",
-            "configured" if provider.provider_name != "offline_fallback" else "fallback",
+            _llm_provider_status(provider),
             provider.provider_name,
         ),
         _agent_llm_routing_status(provider),
@@ -87,6 +87,11 @@ def collect_capabilities(
             "Codex CLI",
             "configured" if shutil.which("codex") else "missing",
             "codex command found on PATH" if shutil.which("codex") else "install Codex CLI or use the SDK package runtime",
+        ),
+        CapabilityStatus(
+            "Grok/xAI API",
+            _grok_capability_status(),
+            grok_auth_status(),
         ),
         CapabilityStatus(
             "Tool registry",
@@ -167,6 +172,18 @@ def _agent_llm_routing_status(provider: Any) -> CapabilityStatus:
             f"source={source}, reasoning={reasoning}, writing={writing}"
         ),
     )
+
+
+def _llm_provider_status(provider: Any) -> str:
+    if provider.provider_name == "offline_fallback":
+        return "fallback"
+    if getattr(provider, "provider_name", "") == "grok" and not getattr(provider, "is_configured", False):
+        return "missing"
+    return "configured"
+
+
+def _grok_capability_status() -> str:
+    return "configured" if "bearer token from" in grok_auth_status().lower() else "missing"
 
 
 def _agent_spec_status(agent_spec_dir: str | Path) -> CapabilityStatus:

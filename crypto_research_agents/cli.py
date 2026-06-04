@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import os
 import shutil
@@ -33,7 +34,12 @@ from crypto_research_agents.core.codex_models import (
     model_by_index,
     supported_codex_model_lines,
 )
-from crypto_research_agents.core.llm_provider import codex_sdk_available
+from crypto_research_agents.core.grok_models import (
+    SUPPORTED_GROK_MODEL_IDS,
+    grok_model_by_index,
+    supported_grok_model_lines,
+)
+from crypto_research_agents.core.llm_provider import codex_sdk_available, grok_auth_status
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 from crypto_research_agents.core.playbook import ResearchPlaybookRegistry
 from crypto_research_agents.core.profile import WorkerProfileRegistry
@@ -85,6 +91,23 @@ MODEL_SETTING_ENV_NAMES = [
     "CODEX_CLI_MODEL_REASONING",
     "CODEX_CLI_MODEL_WRITING",
     "CODEX_CLI_MODEL_STRONG",
+    "GROK_BASE_URL",
+    "XAI_BASE_URL",
+    "GROK_API_MODE",
+    "GROK_OAUTH_TOKEN_FILE",
+    "XAI_OAUTH_TOKEN_FILE",
+    "GROK_OAUTH_TOKEN_COMMAND",
+    "XAI_OAUTH_TOKEN_COMMAND",
+    "GROK_MODEL_FAST_CHAT",
+    "GROK_MODEL_FAST",
+    "GROK_MODEL_REASONING",
+    "GROK_MODEL_WRITING",
+    "GROK_MODEL_STRONG",
+    "XAI_MODEL_FAST_CHAT",
+    "XAI_MODEL_FAST",
+    "XAI_MODEL_REASONING",
+    "XAI_MODEL_WRITING",
+    "XAI_MODEL_STRONG",
 ]
 
 
@@ -1414,7 +1437,7 @@ def doctor_command(args: argparse.Namespace | None = None) -> None:
             "Report writer",
             "Obsidian vault writer",
         },
-        "Models": {"LLM provider", "Agent LLM routing", "Codex SDK package", "Codex CLI"},
+        "Models": {"LLM provider", "Agent LLM routing", "Codex SDK package", "Codex CLI", "Grok/xAI API"},
         "Operations": {
             "Tool registry",
             "Concurrency phase",
@@ -1479,11 +1502,12 @@ def configure_model_panel(*, clear_before: bool = True) -> None:
             "",
             "1. Codex SDK / local app-server (Recommended)",
             "2. Codex CLI exec",
-            "3. Offline diagnostic fallback",
+            "3. Grok / xAI API bearer token",
+            "4. Offline diagnostic fallback",
             "Enter. Keep current",
         ]
     )
-    choice = input("Choose provider [1/2/3/Enter]: ").strip().lower()
+    choice = input("Choose provider [1/2/3/4/Enter]: ").strip().lower()
     if not choice:
         clear_screen()
         print_current_model_config()
@@ -1499,7 +1523,12 @@ def configure_model_panel(*, clear_before: bool = True) -> None:
         print_current_model_config()
         return
 
-    if choice in {"3", "offline", "fallback"}:
+    if choice in {"3", "grok", "xai", "grok_oauth", "xai_oauth"}:
+        configure_grok()
+        print_current_model_config()
+        return
+
+    if choice in {"4", "offline", "fallback"}:
         configure_offline()
         print_current_model_config()
         return
@@ -1549,6 +1578,49 @@ def configure_codex_cli() -> None:
     save_model_settings()
 
 
+def configure_grok() -> None:
+    clear_legacy_model_session_env()
+    os.environ["LLM_PROVIDER"] = "grok"
+    clear_screen()
+    print_screen(
+        "Grok / xAI",
+        [
+            "JIMMORIA will call the xAI OpenAI-compatible API.",
+            "Official xAI auth is Authorization: Bearer <xAI API key>.",
+            "OAuth-style bearer token sources are accepted for compatibility.",
+            "",
+            "1. Use existing XAI_API_KEY / GROK_API_KEY env",
+            "2. Paste bearer token for this session only",
+            "3. Token file path",
+            "4. Command that prints bearer token",
+            "Enter. Continue with current Grok credential source",
+        ],
+    )
+    source_choice = input("Choose Grok credential source [1/2/3/4/Enter]: ").strip().lower()
+    if source_choice == "2":
+        token = getpass.getpass("Paste Grok/xAI bearer token (not saved): ").strip()
+        if token:
+            os.environ["GROK_OAUTH_TOKEN"] = token
+    elif source_choice == "3":
+        path = input("Token file path: ").strip()
+        if path:
+            os.environ["GROK_OAUTH_TOKEN_FILE"] = path
+    elif source_choice == "4":
+        command = input("Token command: ").strip()
+        if command:
+            os.environ["GROK_OAUTH_TOKEN_COMMAND"] = command
+
+    configure_model_routes(
+        prefix="GROK_MODEL",
+        provider_label="Grok/xAI",
+        default_description="Default: grok-4.3 for chat, reasoning, and writing.",
+        supported_model_ids=SUPPORTED_GROK_MODEL_IDS,
+        supported_model_lines=supported_grok_model_lines,
+        model_by_index_fn=grok_model_by_index,
+    )
+    save_model_settings()
+
+
 def configure_offline() -> None:
     os.environ["LLM_PROVIDER"] = "offline"
     clear_legacy_model_session_env()
@@ -1557,19 +1629,28 @@ def configure_offline() -> None:
     save_model_settings()
 
 
-def configure_model_routes(prefix: str) -> None:
+def configure_model_routes(
+    prefix: str,
+    *,
+    provider_label: str = "Codex",
+    default_description: str = "Default: GPT-5.5 for reasoning/writing, GPT-5.4-mini for chat/extraction.",
+    supported_model_ids: tuple[str, ...] = SUPPORTED_CODEX_MODEL_IDS,
+    supported_model_lines: object = supported_codex_model_lines,
+    model_by_index_fn: object = model_by_index,
+) -> None:
     clear_screen()
+    model_lines = supported_model_lines() if callable(supported_model_lines) else []
     print_screen(
         "Model Routes",
         [
             f"Provider: {os.getenv('LLM_PROVIDER') or 'offline_fallback'}",
-            "Supported models are fixed to the Codex model list.",
-            "Default: GPT-5.5 for reasoning/writing, GPT-5.4-mini for chat/extraction.",
+            f"Supported models are fixed to the {provider_label} model list.",
+            default_description,
             "",
             "1. Use provider default for every agent (Recommended)",
             "2. Keep current routes",
-            "3. Pick one supported Codex model for every route",
-            "4. Pick supported Codex model per route",
+            f"3. Pick one supported {provider_label} model for every route",
+            f"4. Pick supported {provider_label} model per route",
             "Enter. Use provider default",
         ],
     )
@@ -1590,44 +1671,60 @@ def configure_model_routes(prefix: str) -> None:
         print_screen(
             "Custom Model",
             [
-                "Choose from the supported Codex model list.",
+                f"Choose from the supported {provider_label} model list.",
                 "Press Enter to fall back to provider default.",
                 "",
-                *supported_codex_model_lines(),
+                *model_lines,
             ],
         )
         selected = input("Model number or id for every route: ").strip()
-        model = model_by_index(selected) or selected
+        model = model_by_index_fn(selected) if callable(model_by_index_fn) else None
+        model = model or selected
         clear_model_route_env(prefix)
-        if model and model in SUPPORTED_CODEX_MODEL_IDS:
+        if model and (model in supported_model_ids or (provider_label.startswith("Grok") and model.startswith("grok-"))):
             for tier, _label in MODEL_ROUTE_TIERS:
                 os.environ[f"{prefix}_{tier}"] = model
         return
 
     if choice in {"4", "advanced"}:
-        configure_model_routes_advanced(prefix)
+        configure_model_routes_advanced(
+            prefix,
+            provider_label=provider_label,
+            supported_model_ids=supported_model_ids,
+            supported_model_lines=supported_model_lines,
+            model_by_index_fn=model_by_index_fn,
+        )
         return
 
     clear_screen()
     print_screen("Model Routes", ["Unknown choice. Keeping current model routes."])
 
 
-def configure_model_routes_advanced(prefix: str) -> None:
+def configure_model_routes_advanced(
+    prefix: str,
+    *,
+    provider_label: str = "Codex",
+    supported_model_ids: tuple[str, ...] = SUPPORTED_CODEX_MODEL_IDS,
+    supported_model_lines: object = supported_codex_model_lines,
+    model_by_index_fn: object = model_by_index,
+) -> None:
     clear_screen()
+    model_lines = supported_model_lines() if callable(supported_model_lines) else []
     print_screen(
         "Advanced Routes",
         [
-            "Choose exact Codex model ids from the supported list.",
+            f"Choose exact {provider_label} model ids from the supported list.",
             "Press Enter on each route to keep its current value.",
             "",
-            *supported_codex_model_lines(),
+            *model_lines,
         ],
     )
     for tier, label in MODEL_ROUTE_TIERS:
         env_name = f"{prefix}_{tier}"
         value = input_with_default(f"{env_name} ({label})", os.getenv(env_name, ""))
-        selected = model_by_index(value) or value
-        if selected and selected in SUPPORTED_CODEX_MODEL_IDS:
+        selected = model_by_index_fn(value) if callable(model_by_index_fn) else None
+        selected = selected or value
+        if selected and (selected in supported_model_ids or (provider_label.startswith("Grok") and selected.startswith("grok-"))):
             os.environ[env_name] = selected
 
 
@@ -1672,8 +1769,15 @@ def print_current_model_config() -> None:
         token_source = "Codex SDK app-server" + (" available" if codex_sdk_available() else " package not installed")
     elif provider == "codex_cli":
         token_source = codex_login_status()
+    elif provider in {"grok", "xai", "grok_oauth", "xai_oauth"}:
+        token_source = grok_auth_status()
     else:
         token_source = "offline diagnostic fallback"
+    supported_models = (
+        ", ".join(SUPPORTED_GROK_MODEL_IDS)
+        if provider in {"grok", "xai", "grok_oauth", "xai_oauth"}
+        else ", ".join(SUPPORTED_CODEX_MODEL_IDS)
+    )
 
     print_screen(
         "Model Config",
@@ -1684,7 +1788,7 @@ def print_current_model_config() -> None:
             f"Writing model: {writing_decision.selected_model}",
             f"Reasoning effort: {reasoning_decision.reasoning_effort}",
             f"Credential: {token_source}",
-            f"Supported Codex models: {', '.join(SUPPORTED_CODEX_MODEL_IDS)}",
+            f"Supported models: {supported_models}",
         ]
     )
 

@@ -7,6 +7,7 @@ from time import perf_counter
 from typing import Any
 
 from .codex_models import codex_model_for_tier, codex_model_from_env_value
+from .grok_models import grok_model_for_tier, grok_model_from_env_value
 from .llm_provider import LLMProvider, LLMRequest, LLMResponse, parse_json_response, provider_from_env
 from .usage import enrich_usage_with_estimates, token_usage_summary
 
@@ -29,7 +30,11 @@ class ModelGateway:
         provider: LLMProvider | None = None,
     ) -> None:
         self.provider = provider or provider_from_env()
-        default_model = default_model or _model_env("FAST") or codex_model_for_tier("FAST")
+        self.provider_family = _provider_family(self.provider)
+        default_model = default_model or _model_env("FAST", provider_family=self.provider_family) or _default_model_for_tier(
+            "FAST",
+            provider_family=self.provider_family,
+        )
         self.default_model = default_model
         self.call_log: list[dict[str, Any]] = []
         self._lock = threading.RLock()
@@ -37,10 +42,10 @@ class ModelGateway:
     def select(self, *, agent_id: str, task_type: str) -> ModelDecision:
         if task_type == "supervisor_chat":
             return ModelDecision(
-                selected_model=_model_env("FAST_CHAT")
-                or _model_env("FAST")
-                or _model_env("STRONG")
-                or codex_model_for_tier("FAST_CHAT"),
+                selected_model=_model_env("FAST_CHAT", provider_family=self.provider_family)
+                or _model_env("FAST", provider_family=self.provider_family)
+                or _model_env("STRONG", provider_family=self.provider_family)
+                or _default_model_for_tier("FAST_CHAT", provider_family=self.provider_family),
                 reason=f"{agent_id} requested front-door conversation",
                 max_tokens=1200,
                 temperature=0.45,
@@ -48,9 +53,9 @@ class ModelGateway:
             )
         if task_type in {"report_writing", "final_synthesis"}:
             return ModelDecision(
-                selected_model=_model_env("WRITING")
-                or _model_env("STRONG")
-                or codex_model_for_tier("WRITING"),
+                selected_model=_model_env("WRITING", provider_family=self.provider_family)
+                or _model_env("STRONG", provider_family=self.provider_family)
+                or _default_model_for_tier("WRITING", provider_family=self.provider_family),
                 reason=f"{agent_id} requested synthesis/report work",
                 max_tokens=9000,
                 temperature=0.2,
@@ -68,9 +73,9 @@ class ModelGateway:
             "obsidian_sync",
         }:
             return ModelDecision(
-                selected_model=_model_env("REASONING")
-                or _model_env("STRONG")
-                or codex_model_for_tier("REASONING"),
+                selected_model=_model_env("REASONING", provider_family=self.provider_family)
+                or _model_env("STRONG", provider_family=self.provider_family)
+                or _default_model_for_tier("REASONING", provider_family=self.provider_family),
                 reason=f"{agent_id} requested reasoning work",
                 max_tokens=8000,
                 temperature=0.2,
@@ -164,10 +169,33 @@ class ModelGateway:
         return parse_json_response(response)
 
 
-def _model_env(tier: str) -> str | None:
+def _model_env(tier: str, *, provider_family: str = "codex") -> str | None:
+    if provider_family == "grok":
+        return grok_model_from_env_value(
+            os.getenv(f"GROK_MODEL_{tier}")
+            or os.getenv(f"XAI_MODEL_{tier}")
+            or os.getenv("GROK_MODEL")
+            or os.getenv("XAI_MODEL"),
+        )
     return codex_model_from_env_value(
         os.getenv(f"CODEX_MODEL_{tier}") or os.getenv(f"CODEX_CLI_MODEL_{tier}"),
     )
+
+
+def _provider_family(provider: LLMProvider) -> str:
+    provider_name = getattr(provider, "provider_name", "").lower()
+    if provider_name in {"grok", "xai", "grok_oauth", "xai_oauth"}:
+        return "grok"
+    configured = os.getenv("LLM_PROVIDER", "").strip().lower()
+    if configured in {"grok", "xai", "grok_oauth", "xai_oauth"}:
+        return "grok"
+    return "codex"
+
+
+def _default_model_for_tier(tier: str, *, provider_family: str) -> str:
+    if provider_family == "grok":
+        return grok_model_for_tier(tier)
+    return codex_model_for_tier(tier)
 
 
 def _reasoning_effort(*, default: str) -> str:

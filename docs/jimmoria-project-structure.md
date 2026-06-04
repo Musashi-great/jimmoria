@@ -201,6 +201,38 @@ final_synthesis       gpt-5.5, pro reasoning
 
 `CODEX_REASONING_EFFORT=pro`는 ModelGateway에서 `reasoning_effort=pro`로 기록되고, Codex CLI provider는 `codex exec --config model_reasoning_effort="xhigh"`로 매핑한다. 이 값은 `data/runs/<room_id>/llm_call_log.json`에도 남아 나중에 어떤 작업이 어느 노력도로 실행됐는지 확인할 수 있다.
 
+### 5.2.1 Grok/xAI Provider
+
+JIMMORIA is Codex-first, but the model gateway can now route agents through Grok/xAI as a second live provider.
+
+```text
+Codex defaults
+  supervisor_chat       gpt-5.4-mini, standard by default
+  source_ingestion      gpt-5.5, pro reasoning
+  specialist agents     gpt-5.5, pro reasoning
+  report/final writing  gpt-5.5, pro reasoning
+
+Grok defaults
+  supervisor_chat       grok-4.3, standard by default
+  source_ingestion      grok-4.3, pro -> reasoning.effort high
+  specialist agents     grok-4.3, pro -> reasoning.effort high
+  report/final writing  grok-4.3, pro -> reasoning.effort high
+```
+
+Grok credential sources:
+
+```text
+XAI_API_KEY
+GROK_API_KEY
+GROK_OAUTH_TOKEN / XAI_OAUTH_TOKEN
+GROK_OAUTH_TOKEN_FILE / XAI_OAUTH_TOKEN_FILE
+GROK_OAUTH_TOKEN_COMMAND / XAI_OAUTH_TOKEN_COMMAND
+```
+
+Raw Grok/XAI bearer tokens are not saved in `data/model_settings.json`. Only file paths, commands, base URL, API mode, and model route preferences are persisted.
+
+`CODEX_REASONING_EFFORT=pro` remains the shared effort control. Codex CLI maps it to `model_reasoning_effort="xhigh"` where supported. Grok maps it to xAI Responses API `reasoning.effort="high"` for `grok-4.3`; `grok-4.20-multi-agent` maps pro to `xhigh`.
+
 ## 6. Supervisor Role
 
 Supervisor는 단순 라우터가 아니라 회사의 boss/orchestrator다.

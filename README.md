@@ -81,7 +81,7 @@ jimmoria demo
 
 ## Model Setup
 
-JIMMORIA is Codex-first.
+JIMMORIA is Codex-first, with optional Grok/xAI routing.
 
 Recommended provider:
 
@@ -97,13 +97,32 @@ python -m pip install -e ".[codex]"
 
 If Codex login already exists locally, JIMMORIA can reuse it. It stores provider/model preferences in `data/model_settings.json`, not raw tokens.
 
+Optional Grok/xAI provider:
+
+```powershell
+$env:LLM_PROVIDER = "grok"
+$env:XAI_API_KEY = "xai-..."
+jimmoria
+```
+
+OAuth-style bearer token sources are also accepted for operator workflows:
+
+```powershell
+$env:GROK_OAUTH_TOKEN = "..."
+$env:GROK_OAUTH_TOKEN_FILE = "C:\path\to\xai-token.txt"
+$env:GROK_OAUTH_TOKEN_COMMAND = "op read op://vault/xai/token"
+```
+
+The xAI API uses an OpenAI-compatible endpoint at `https://api.x.ai/v1`. JIMMORIA does not save raw Grok/XAI tokens in `data/model_settings.json`; it only saves route preferences, token file paths, or token commands.
+
 Default model routing:
 
 ```text
-Supervisor chat:        gpt-5.4-mini unless CODEX_REASONING_EFFORT overrides it
-Source ingestion:       gpt-5.5 + pro reasoning
-Specialist reasoning:   gpt-5.5 + pro reasoning
-Report synthesis:       gpt-5.5 + pro reasoning
+Codex supervisor chat:        gpt-5.4-mini
+Codex specialist reasoning:   gpt-5.5 + pro reasoning
+Grok supervisor chat:         grok-4.3
+Grok specialist reasoning:    grok-4.3 + high reasoning effort
+Report synthesis:             provider writing model + pro reasoning
 ```
 
 For Codex CLI, JIMMORIA maps `pro` to the local Codex config value `model_reasoning_effort="xhigh"` when the installed `codex exec` supports `--config`.
