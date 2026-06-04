@@ -6,6 +6,7 @@ from crypto_research_agents.agents.base import AgentResult, BaseAgent
 from crypto_research_agents.core.bus import CollaborationBus
 from crypto_research_agents.core.memory import SharedMemory
 from crypto_research_agents.core.message import MessageType
+from crypto_research_agents.core.project_profile import find_project_profile_in_text
 from crypto_research_agents.core.room import ResearchRoom
 
 
@@ -169,24 +170,8 @@ def _chainid(chain: str | None) -> str | None:
 
 def _official_address_registry(project_name: str, query: str) -> dict[str, Any]:
     text = f"{project_name} {query}".lower()
-    if "3jane" not in text:
-        return {}
-    return {
-        "source": "https://docs.3jane.xyz/developers/addresses",
-        "chain": "Ethereum Mainnet",
-        "contracts": {
-            "USD3": "0x056B269Eb1f75477a8666ae8C7fE01b64dD55eCc",
-            "sUSD3": "0xf689555121e529ff0463e191f9bd9d1e496164a7",
-            "MorphoCredit": "0xDe6e08ac208088cc62812Ba30608D852c6B0EcBc",
-            "ProtocolConfig": "0x6b276A2A7dd8b629adBA8A06AD6573d01C84f34E",
-            "JANE": "0x333333330522f64ee8d0b3039c460b41670e3404",
-            "RewardsDistributor": "0xaC6985D4dBcd89CCAD71DB9bf0309eaF57F064e8",
-        },
-        "permissions": {
-            "TimelockController": "0x1dCcD4628d48a50C1A7adEA3848bcC869f08f8C2",
-            "Multisig": "0x33333333Bd7045F1A601A1E289D7AB21036fB5EF",
-        },
-    }
+    profile = find_project_profile_in_text(text)
+    return dict(profile.address_registry) if profile and profile.address_registry else {}
 
 
 def _status_summary(statuses: Any) -> str:

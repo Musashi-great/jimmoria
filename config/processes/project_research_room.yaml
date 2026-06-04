@@ -115,24 +115,44 @@
       "output_channels": ["finding", "tool_audit"]
     },
     {
-      "task_id": "write_dossier",
-      "agent_id": "report_agent",
-      "phase": "synthesis",
+      "task_id": "agent_council_deliberation",
+      "agent_id": "supervisor_agent",
+      "phase": "deliberation",
       "requires": [
         "check_social_kol",
         "check_contract_onchain",
         "check_product_tech",
         "check_funding_token"
       ],
+      "description": "Merge specialist findings into a consensus before report writing. Separate confirmed facts, unresolved claims, blockers, and report direction.",
+      "expected_output": "Council consensus with specialist statements, blockers, confidence, and report direction.",
+      "output_channels": ["finding", "bus.handoff", "event"]
+    },
+    {
+      "task_id": "write_dossier",
+      "agent_id": "report_agent",
+      "phase": "synthesis",
+      "requires": [
+        "agent_council_deliberation"
+      ],
       "description": "Write the Korean project intelligence report for the client. It must explain the project, not the agent workflow. Conclusion first, then identity, product, narrative, social/KOL, founder, token value-capture, risks, score/stance, and sources.",
       "expected_output": "Markdown project intelligence dossier plus evidence packet with Identity, What changed, Product/Operator Evidence, Founder Dossier, On-chain/Market, Social Signal, Risks, Scores, AntSeed Peer Review, and Stance.",
       "output_channels": ["report", "evidence_packet", "finding"]
     },
     {
+      "task_id": "supervisor_final_review",
+      "agent_id": "supervisor_agent",
+      "phase": "final_review",
+      "requires": ["write_dossier"],
+      "description": "Final CEO/orchestrator review before delivery: check quality gate, claim coverage, score framing, missing evidence, and whether the report should be delivered as final report or diagnostic memo.",
+      "expected_output": "Final delivery decision with approved_for_delivery, delivery_mode, required follow-ups, and evidence gaps.",
+      "output_channels": ["finding", "event", "bus.update"]
+    },
+    {
       "task_id": "sync_obsidian",
       "agent_id": "obsidian_curator_agent",
       "phase": "knowledge_ops",
-      "requires": ["write_dossier"],
+      "requires": ["supervisor_final_review"],
       "description": "Save sources, candidates, narratives, reports, and evidence packet links into the local Obsidian-style vault.",
       "expected_output": "Vault notes and links for long-term memory.",
       "output_channels": ["obsidian.project", "obsidian.source", "obsidian.report"]

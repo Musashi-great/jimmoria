@@ -113,6 +113,8 @@ User request
 
 For ordinary conversation, configuration requests, source-only notes, or loose "research this" messages, the Supervisor answers directly and keeps the room closed. Ask for a report or dossier when you want the full multi-agent room.
 
+Project-specific seed evidence is kept outside agent code in `config/project_profiles/`. These profiles can hold aliases, official site/X/docs, search seeds, address registry hints, funding context, and article notes. Agents can use them as starting evidence, but the report still labels what is confirmed, partial, or unverified.
+
 ## Core Agents
 
 ```text
@@ -272,6 +274,8 @@ Completed project reports follow this shape:
 
 Agent execution logs, council discussion, tool payloads, raw LLM output, specialist coverage, and AntSeed-style peer review are kept in `data/runs/<room_id>/` and `data/evidence_packets/`. They are not part of the completed report body.
 
+Completed reports now include a claim-level evidence ledger. This separates major claims such as identity, product, social/KOL, funding/team, token/on-chain, GitHub activity, and live metrics so a report is not marked strong merely because it collected many URLs.
+
 If evidence is insufficient, the CLI prints a diagnostic preview instead of presenting it as a finished dossier.
 
 Reprint any saved report:
@@ -322,6 +326,7 @@ config/
   agents/                   Agent persona and policy specs
   tools/                    Tool registry
   toolsets.yaml             Agent toolset policy
+  project_profiles/         Project-specific evidence seeds outside code
   processes/                Research Room process specs
   concurrency.yaml          Phase 1-4 execution policy
 

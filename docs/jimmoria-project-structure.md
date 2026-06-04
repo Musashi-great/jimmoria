@@ -187,6 +187,59 @@ Supervisor는 단순 라우터가 아니라 회사의 boss/orchestrator다.
 - 목표, 우선순위, task plan 생성
 - 하위 agent에게 작업 배정
 - Agent Council 결과를 받아 최종 검토
+
+## 6.1 Project Evidence Profiles
+
+Project-specific seed evidence is stored outside agent code in:
+
+```text
+config/project_profiles/
+```
+
+The first profile is:
+
+```text
+config/project_profiles/3jane.yaml
+```
+
+A profile can contain:
+
+- aliases and display name
+- official website and official X
+- search queries
+- identity hint URLs
+- docs / whitepaper / GitHub / article references
+- address registry hints
+- funding context
+- article notes
+
+This reduces agent-code hardcoding. The profile is not treated as final truth; it is a seed packet. Reports still mark claims as `confirmed`, `partial`, or `unverified` through the claim-level evidence ledger.
+
+## 6.2 Claim-Level Evidence Ledger
+
+Reports now track key claims separately from raw URL count:
+
+```text
+identity
+product
+social_kol
+funding_team
+token_onchain
+github_activity
+live_metrics
+```
+
+Each claim stores:
+
+```text
+category
+claim
+verification_status
+source_ids
+confidence
+```
+
+The goal is to stop treating "12 URLs collected" as equivalent to "all important claims verified." A report can have enough URLs while still showing weak founder, GitHub activity, KOL, explorer, or live pool evidence.
 - 보고서가 충분한지, evidence가 부족한지 판단
 - 사용자에게 최종 응답 전달
 

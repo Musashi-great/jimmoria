@@ -20,7 +20,7 @@ from crypto_research_agents.agents.social_kol import (
     build_who_said_what,
     extract_handles_from_social_results,
 )
-from crypto_research_agents.agents.report import assess_report_quality
+from crypto_research_agents.agents.report import assess_report_quality, build_claim_evidence_ledger, diligence_score
 from crypto_research_agents.connectors import register_default_connectors
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
 from crypto_research_agents.cli import (
@@ -37,9 +37,10 @@ from crypto_research_agents.console import JimmoriaConsole, print_jimmoria_logo
 from crypto_research_agents.core.company_settings import CompanySettings
 from crypto_research_agents.core.concurrency import load_concurrency_policy
 from crypto_research_agents.core.llm_provider import CodexCliProvider, CodexSdkProvider, LLMRequest, LLMResponse, parse_json_response, provider_from_env
-from crypto_research_agents.core.memory import SharedMemory, SourceRecord
+from crypto_research_agents.core.memory import FindingRecord, ProjectCandidate, SharedMemory, SourceRecord
 from crypto_research_agents.core.model_gateway import ModelGateway
 from crypto_research_agents.core.process_spec import ProcessSpecRegistry, load_process_spec
+from crypto_research_agents.core.project_profile import find_project_profile
 from crypto_research_agents.core.dynamic_dispatch import DynamicCandidateDispatcher
 from crypto_research_agents.core.edge_conditions import evaluate_edge_condition
 from crypto_research_agents.core.quality_gate import review_report_quality
@@ -1378,6 +1379,63 @@ class SmokeTest(unittest.TestCase):
         self.assertGreaterEqual(len(candidates[0].metadata["evidence_urls"]), 3)
         self.assertEqual(quality.status, "research_complete")
 
+    def test_project_profile_supplies_3jane_seed_evidence(self) -> None:
+        profile = find_project_profile("3jane")
+
+        self.assertIsNotNone(profile)
+        assert profile is not None
+        self.assertEqual(profile.display_name, "3Jane Protocol")
+        self.assertEqual(profile.website, "https://www.3jane.xyz/")
+        self.assertEqual(profile.chain, "Ethereum")
+        self.assertTrue(any("credit based money market" in query for query in profile.search_queries))
+        self.assertIn("USD3", profile.address_registry["contracts"])
+        self.assertEqual(profile.funding["amount"], "$5.2M")
+
+    def test_claim_ledger_and_score_breakdown_are_separate_from_url_count(self) -> None:
+        project = ProjectCandidate(
+            name="3Jane Protocol",
+            website="https://www.3jane.xyz/",
+            chain="Ethereum",
+            token_status="usd3_yieldcoin_or_credit_asset_reported",
+            narratives=["Crypto Credit", "Undercollateralized Lending"],
+            score=80,
+            reason_found="Resolved from public profile evidence.",
+            sources=["src_test"],
+            metadata={
+                "candidate_origin": "live_source_backed",
+                "evidence_urls": [
+                    "https://www.3jane.xyz/",
+                    "https://docs.3jane.xyz/introduction",
+                    "https://x.com/3janexyz",
+                ],
+            },
+        )
+        quality = assess_report_quality([project])
+        source_log = [
+            {"label": "3Jane site", "url": "https://www.3jane.xyz/"},
+            {"label": "docs intro", "url": "https://docs.3jane.xyz/introduction"},
+            {"label": "official X", "url": "https://x.com/3janexyz"},
+        ]
+
+        ledger = build_claim_evidence_ledger(project, [], source_log)
+        score = diligence_score(project, [], quality, source_log)
+
+        self.assertEqual(
+            {item["category"] for item in ledger},
+            {
+                "identity",
+                "product",
+                "social_kol",
+                "funding_team",
+                "token_onchain",
+                "github_activity",
+                "live_metrics",
+            },
+        )
+        self.assertTrue(any(item["verification_status"] == "unverified" for item in ledger))
+        self.assertIn("evidence_confidence", score["breakdown"])
+        self.assertIn("social_momentum", score["breakdown"])
+
     def test_social_kol_queries_prioritize_x_kol_and_articles(self) -> None:
         queries = build_public_social_queries("3jane", "3jane report create")
 
@@ -1654,10 +1712,12 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("phase_2", research.execution_strategy)
         self.assertEqual(research.agent_ids[0], "supervisor_agent")
         self.assertEqual(research.agent_ids[-1], "obsidian_curator_agent")
-        self.assertEqual(len(research.tasks), 11)
+        self.assertEqual(len(research.tasks), 13)
         self.assertEqual(len(research.agent_ids), 10)
         self.assertEqual(research.agent_ids[2], "social_kol_agent")
         self.assertIn("market_signal_intake", {task.phase for task in research.tasks})
+        self.assertIn("deliberation", {task.phase for task in research.tasks})
+        self.assertIn("final_review", {task.phase for task in research.tasks})
         self.assertIn("representative_web3_project_diligence", research.playbooks)
         self.assertIn("dossier", research.task_for_agent("report_agent").expected_output.lower())
         self.assertIn("evidence packet", research.task_for_agent("report_agent").expected_output.lower())

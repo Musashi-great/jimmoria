@@ -9,6 +9,11 @@ from crypto_research_agents.agents.base import AgentResult, BaseAgent
 from crypto_research_agents.core.bus import CollaborationBus
 from crypto_research_agents.core.memory import ProjectCandidate, SharedMemory
 from crypto_research_agents.core.message import MessageType
+from crypto_research_agents.core.project_profile import (
+    find_project_profile,
+    find_project_profile_in_text,
+    profile_alias_match,
+)
 from crypto_research_agents.core.room import ResearchRoom
 from crypto_research_agents.core.source_quality import (
     is_generic_platform_url,
@@ -209,16 +214,15 @@ def build_web_queries(project_query: str, topic: str) -> list[str]:
         f"{project_query} blockchain github",
         f"{project_query} token whitepaper",
     ]
+    profile = find_project_profile(project_query)
+    if profile:
+        queries = [*profile.search_queries, *queries]
     lowered = topic.lower()
     if "pow" in lowered or "proof" in lowered or "작업증명" in topic:
         queries.insert(0, f"{project_query} Proof of Work crypto")
     if "pearl" in project_query.lower():
         queries.insert(0, "Pearl Research Labs PRL Proof of Useful Work")
         queries.insert(1, "site:pearlresearch.ai Pearl Research Labs")
-    if project_query.lower().strip() == "3jane":
-        queries.insert(0, "3Jane Protocol credit based money market")
-        queries.insert(1, "site:3jane.xyz 3Jane whitepaper")
-        queries.insert(2, "3Jane Protocol GitHub")
     return dedupe_strings(queries)[:4]
 
 
@@ -319,7 +323,10 @@ def build_candidates(narratives: list[str], source_ids: list[str]) -> list[Proje
 def extract_project_query(topic: str) -> str:
     english_tokens = re.findall(r"[A-Za-z0-9][A-Za-z0-9_.-]*", topic)
     if english_tokens:
-        known_identity_tokens = {"3jane", "pearl"}
+        profile_token = profile_alias_match(english_tokens)
+        if profile_token:
+            return profile_token
+        known_identity_tokens = {"pearl"}
         for token in english_tokens:
             if token.lower() in known_identity_tokens:
                 return token.lower()
@@ -420,9 +427,10 @@ def should_live_discover(topic: str, project_query: str) -> bool:
 
 
 def infer_project_name(project_query: str, evidence_text: str, coingecko_coins: list[Any]) -> str:
+    profile = find_project_profile(project_query)
+    if profile:
+        return profile.display_name
     lowered = evidence_text.lower()
-    if "3jane" in lowered or project_query.lower().strip() == "3jane":
-        return "3Jane Protocol"
     if "pearl research labs" in lowered or "proof-of-useful-work" in lowered or "proof of useful work" in lowered:
         return "Pearl Network"
     for coin in coingecko_coins:
@@ -469,10 +477,11 @@ def infer_token_status(evidence_text: str, coingecko_coins: list[Any], dex_pairs
 
 def infer_chain(evidence_text: str, dex_pairs: list[Any]) -> str | None:
     lowered = evidence_text.lower()
+    profile = find_project_profile_in_text(lowered)
+    if profile and profile.chain:
+        return profile.chain
     if "pearl network" in lowered or "l1 protocol" in lowered or "l1 blockchain" in lowered:
         return "Pearl L1"
-    if "3jane" in lowered and "ethereum" in lowered:
-        return "Ethereum"
     for pair in dex_pairs:
         if isinstance(pair, dict) and pair.get("chain"):
             return str(pair["chain"])
@@ -500,8 +509,9 @@ def score_live_candidate(
 
 def select_project_website(project_query: str, web_results: list[Any]) -> str | None:
     normalized = project_query.lower().strip()
-    if normalized == "3jane":
-        return "https://www.3jane.xyz/"
+    profile = find_project_profile(project_query)
+    if profile and profile.website:
+        return profile.website
     if normalized == "pearl":
         return "https://pearlresearch.ai/"
 
@@ -665,128 +675,9 @@ def is_low_signal_url(url: str) -> bool:
 
 def project_identity_hints(project_query: str) -> list[dict[str, Any]]:
     normalized = project_query.lower().strip()
-    if normalized == "3jane":
-        return [
-            {
-                "title": "3Jane official website",
-                "url": "https://www.3jane.xyz/",
-                "snippet": "3Jane is a global credit protocol for crypto-native credit and undercollateralized lending.",
-                "host": "www.3jane.xyz",
-                "source": "identity_hint",
-            },
-            {
-                "title": "3Jane Protocol whitepaper",
-                "url": "https://www.3jane.xyz/pdf/whitepaper.pdf",
-                "snippet": "3Jane Protocol whitepaper describes a credit-based money market on Ethereum and unsecured credit lines.",
-                "host": "www.3jane.xyz",
-                "source": "identity_hint",
-            },
-            {
-                "title": "3Jane docs introduction",
-                "url": "https://docs.3jane.xyz/introduction",
-                "snippet": "3Jane docs describe a peer-to-pool credit-based money market enabling unsecured lines of credit underwritten against verifiable proofs of crypto and bank assets, future cash flows, and credit scores.",
-                "host": "docs.3jane.xyz",
-                "source": "identity_hint",
-            },
-            {
-                "title": "3Jane docs suppliers",
-                "url": "https://docs.3jane.xyz/architecture/core-money-market/suppliers",
-                "snippet": "Supplier docs describe USDC deposits, USD3, sUSD3 first-loss exposure, lock periods, and how idle capital interacts with Aave and credit lines.",
-                "host": "docs.3jane.xyz",
-                "source": "identity_hint",
-            },
-            {
-                "title": "3Jane docs risks",
-                "url": "https://docs.3jane.xyz/risks",
-                "snippet": "Risk docs describe supplier risks including smart-contract risk, fraud risk, credit default risk, liquidity risk, oracle/rate-feed risk, and governance risk.",
-                "host": "docs.3jane.xyz",
-                "source": "identity_hint",
-            },
-            {
-                "title": "3Jane docs protocol global config",
-                "url": "https://docs.3jane.xyz/protocol-global-config",
-                "snippet": "Protocol config docs describe debt caps, LTV controls, tranche ratios, USD3/sUSD3 parameters, cooldowns, withdrawal windows, and markdown/default settings.",
-                "host": "docs.3jane.xyz",
-                "source": "identity_hint",
-            },
-            {
-                "title": "3Jane docs developer addresses",
-                "url": "https://docs.3jane.xyz/developers/addresses",
-                "snippet": "Developer docs list Ethereum mainnet addresses for USD3, sUSD3, MorphoCredit, ProtocolConfig, JANE, rewards distribution, and permission contracts.",
-                "host": "docs.3jane.xyz",
-                "source": "identity_hint",
-            },
-            {
-                "title": "GitHub - 3jane-protocol",
-                "url": "https://github.com/3jane-protocol",
-                "snippet": "3Jane Protocol public GitHub organization.",
-                "host": "github.com",
-                "source": "identity_hint",
-            },
-            {
-                "title": "3Jane official X profile",
-                "url": "https://x.com/3janexyz",
-                "snippet": "Official 3Jane X/Twitter profile used as the primary social source for announcements and market signal tracking.",
-                "host": "x.com",
-                "source": "identity_hint",
-            },
-            {
-                "title": "3Jane official seed round announcement",
-                "url": "https://x.com/3janexyz/status/1930264347441615188",
-                "snippet": "3Jane announced a $5.2M seed round led by Paradigm and positioned the protocol around crypto-native credit.",
-                "host": "x.com",
-                "source": "identity_hint",
-            },
-            {
-                "title": "Wintermute Ventures on backing 3Jane",
-                "url": "https://x.com/wmt_ventures/status/1930336436433367395",
-                "snippet": "Wintermute Ventures publicly said it backed 3Jane and @_yakovsky building the credit protocol.",
-                "host": "x.com",
-                "source": "identity_hint",
-            },
-            {
-                "title": "The Block: Paradigm leads 3Jane seed round",
-                "url": "https://www.theblock.co/post/356872/paradigm-leads-5-million-seed-round-in-crypto-credit-startup-3jane",
-                "snippet": "The Block reported Paradigm led a $5.2M seed round in 3Jane as the crypto credit startup emerged from stealth.",
-                "host": "theblock.co",
-                "source": "identity_hint",
-            },
-            {
-                "title": "Delphi Digital: Engineering Real Credit Onchain",
-                "url": "https://members.delphidigital.io/reports/engineering-real-credit-onchain-the-3jane-bet",
-                "snippet": "Delphi Digital analyzed 3Jane's attempt to reimagine undercollateralized lending onchain after earlier credit-market failures.",
-                "host": "members.delphidigital.io",
-                "source": "identity_hint",
-            },
-            {
-                "title": "3Jane official report: 3Jane is Evolving",
-                "url": "https://www.3jane.xyz/reports/3jane-is-evolving",
-                "snippet": "Official 3Jane report page used as a product and narrative update source.",
-                "host": "www.3jane.xyz",
-                "source": "identity_hint",
-            },
-            {
-                "title": "Leviathan: 3Jane lending protocol explained",
-                "url": "https://leviathannews.substack.com/p/3jane-lending-protocol-explained",
-                "snippet": "Public article explaining 3Jane's lending protocol and how crypto borrowing works.",
-                "host": "leviathannews.substack.com",
-                "source": "identity_hint",
-            },
-            {
-                "title": "DefiLlama 3Jane protocol profile",
-                "url": "https://defillama.com/protocol/3jane",
-                "snippet": "DefiLlama tracks 3Jane as a peer-to-pool credit-based money market with TVL, raise, and protocol metrics.",
-                "host": "defillama.com",
-                "source": "identity_hint",
-            },
-            {
-                "title": "ETH Daily: 3Jane Introduces A Credit Market Protocol",
-                "url": "https://ethdaily.io/603",
-                "snippet": "ETH Daily covered 3Jane's credit-based money market protocol, soft collateral, USD3, and beta/public release framing.",
-                "host": "ethdaily.io",
-                "source": "identity_hint",
-            },
-        ]
+    profile = find_project_profile(project_query)
+    if profile:
+        return [dict(item) for item in profile.identity_hints]
     if normalized != "pearl":
         return []
     return [

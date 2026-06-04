@@ -6,6 +6,7 @@ from crypto_research_agents.agents.base import AgentResult, BaseAgent
 from crypto_research_agents.core.bus import CollaborationBus
 from crypto_research_agents.core.memory import SharedMemory
 from crypto_research_agents.core.message import MessageType
+from crypto_research_agents.core.project_profile import find_project_profile_in_text
 from crypto_research_agents.core.room import ResearchRoom
 
 
@@ -132,21 +133,21 @@ def _token_opportunity(project_status: str, evidence_text: str) -> str:
 def _funding_profile(project_name: str, evidence_text: str, metadata: dict[str, Any]) -> dict[str, Any]:
     text = f"{project_name} {evidence_text}".lower()
     sources = _funding_sources(metadata)
-    if "3jane" in text:
+    profile = find_project_profile_in_text(text)
+    if profile and profile.funding:
+        funding = dict(profile.funding)
+        profile_sources = [
+            str(item.get("url"))
+            for item in profile.article_notes
+            if isinstance(item, dict) and item.get("url")
+        ]
         return {
-            "status": "seed_round_reported",
-            "amount": "$5.2M",
-            "stage": "seed",
-            "lead_investors": ["Paradigm"],
-            "investors": [
-                "Paradigm",
-                "Wintermute Ventures",
-                "Coinbase Ventures",
-                "Robot Ventures",
-                "Bodhi Ventures",
-                "Breed",
-            ],
-            "sources": sources,
+            "status": funding.get("status", "funding_reported"),
+            "amount": funding.get("amount", "unknown"),
+            "stage": funding.get("stage", "unknown"),
+            "lead_investors": funding.get("lead_investors", []),
+            "investors": funding.get("investors", []),
+            "sources": _dedupe([*sources, *profile_sources])[:8],
         }
     if any(keyword in text for keyword in ["seed round", "funding round", "raised $", "raises $"]):
         return {
@@ -187,6 +188,14 @@ def _funding_sources(metadata: dict[str, Any]) -> list[str]:
         if url not in deduped:
             deduped.append(url)
     return deduped[:8]
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    result: list[str] = []
+    for value in values:
+        if value and value not in result:
+            result.append(value)
+    return result
 
 
 def _note(evidence_text: str, tool_result: dict[str, Any], funding: dict[str, Any] | None = None) -> str:

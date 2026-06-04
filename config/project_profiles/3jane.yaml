@@ -1,0 +1,142 @@
+profile_id: 3jane
+display_name: 3Jane Protocol
+aliases:
+  - 3jane
+  - 3Jane
+  - 3Jane Protocol
+  - 3janexyz
+website: https://www.3jane.xyz/
+chain: Ethereum
+official_x: https://x.com/3janexyz
+search_queries:
+  - 3Jane Protocol credit based money market
+  - site:3jane.xyz 3Jane whitepaper
+  - 3Jane Protocol GitHub
+identity_hints:
+  - title: 3Jane official website
+    url: https://www.3jane.xyz/
+    snippet: 3Jane is a global credit protocol for crypto-native credit and undercollateralized lending.
+    host: www.3jane.xyz
+    source: project_profile
+  - title: 3Jane Protocol whitepaper
+    url: https://www.3jane.xyz/pdf/whitepaper.pdf
+    snippet: 3Jane Protocol whitepaper describes a credit-based money market on Ethereum and unsecured credit lines.
+    host: www.3jane.xyz
+    source: project_profile
+  - title: 3Jane docs introduction
+    url: https://docs.3jane.xyz/introduction
+    snippet: 3Jane docs describe a peer-to-pool credit-based money market for unsecured lines of credit.
+    host: docs.3jane.xyz
+    source: project_profile
+  - title: 3Jane docs suppliers
+    url: https://docs.3jane.xyz/architecture/core-money-market/suppliers
+    snippet: Supplier docs describe USDC deposits, USD3, sUSD3 first-loss exposure, lock periods, and credit-line liquidity.
+    host: docs.3jane.xyz
+    source: project_profile
+  - title: 3Jane docs risks
+    url: https://docs.3jane.xyz/risks
+    snippet: Risk docs describe smart-contract, fraud, credit default, liquidity, oracle/rate-feed, and governance risks.
+    host: docs.3jane.xyz
+    source: project_profile
+  - title: 3Jane docs protocol global config
+    url: https://docs.3jane.xyz/protocol-global-config
+    snippet: Protocol config docs describe debt caps, LTV controls, tranche ratios, USD3/sUSD3 parameters, cooldowns, withdrawal windows, and default settings.
+    host: docs.3jane.xyz
+    source: project_profile
+  - title: 3Jane docs developer addresses
+    url: https://docs.3jane.xyz/developers/addresses
+    snippet: Developer docs list Ethereum mainnet addresses for USD3, sUSD3, MorphoCredit, ProtocolConfig, JANE, rewards distribution, and permission contracts.
+    host: docs.3jane.xyz
+    source: project_profile
+  - title: GitHub - 3jane-protocol
+    url: https://github.com/3jane-protocol
+    snippet: 3Jane Protocol public GitHub organization.
+    host: github.com
+    source: project_profile
+  - title: 3Jane official X profile
+    url: https://x.com/3janexyz
+    snippet: Official 3Jane X/Twitter profile used as the primary social source for announcements and market signal tracking.
+    host: x.com
+    source: project_profile
+  - title: 3Jane official seed round announcement
+    url: https://x.com/3janexyz/status/1930264347441615188
+    snippet: 3Jane announced a $5.2M seed round led by Paradigm and positioned the protocol around crypto-native credit.
+    host: x.com
+    source: project_profile
+  - title: Wintermute Ventures on backing 3Jane
+    url: https://x.com/wmt_ventures/status/1930336436433367395
+    snippet: Wintermute Ventures publicly said it backed 3Jane and @_yakovsky building the credit protocol.
+    host: x.com
+    source: project_profile
+  - title: "The Block: Paradigm leads 3Jane seed round"
+    url: https://www.theblock.co/post/356872/paradigm-leads-5-million-seed-round-in-crypto-credit-startup-3jane
+    snippet: The Block reported Paradigm led a $5.2M seed round in 3Jane as the crypto credit startup emerged from stealth.
+    host: www.theblock.co
+    source: project_profile
+  - title: "Delphi Digital: Engineering Real Credit Onchain"
+    url: https://members.delphidigital.io/reports/engineering-real-credit-onchain-the-3jane-bet
+    snippet: Delphi frames 3Jane as a bet on real credit onchain after earlier CeFi/DeFi credit failures.
+    host: members.delphidigital.io
+    source: project_profile
+  - title: Leviathan 3Jane lending protocol explainer
+    url: https://leviathannews.substack.com/p/3jane-lending-protocol-explained
+    snippet: External explainer on 3Jane lending protocol and crypto borrowing mechanics.
+    host: leviathannews.substack.com
+    source: project_profile
+  - title: 3Jane official report - 3Jane is Evolving
+    url: https://www.3jane.xyz/reports/3jane-is-evolving
+    snippet: Official 3Jane report page used as a product, roadmap, and narrative update source.
+    host: www.3jane.xyz
+    source: project_profile
+  - title: DefiLlama 3Jane protocol profile
+    url: https://defillama.com/protocol/3jane
+    snippet: DefiLlama tracks 3Jane as a peer-to-pool credit-based money market with TVL, raise, and protocol metrics.
+    host: defillama.com
+    source: project_profile
+  - title: ETH Daily - 3Jane Introduces A Credit Market Protocol
+    url: https://ethdaily.io/603
+    snippet: ETH Daily covered 3Jane's credit-based money market protocol, soft collateral, USD3, and beta/public release framing.
+    host: ethdaily.io
+    source: project_profile
+address_registry:
+  source: https://docs.3jane.xyz/developers/addresses
+  chain: Ethereum Mainnet
+  contracts:
+    USD3: "0x056B269Eb1f75477a8666ae8C7fE01b64dD55eCc"
+    sUSD3: "0xf689555121e529ff0463e191f9bd9d1e496164a7"
+    MorphoCredit: "0xDe6e08ac208088cc62812Ba30608D852c6B0EcBc"
+    ProtocolConfig: "0x6b276A2A7dd8b629adBA8A06AD6573d01C84f34E"
+    JANE: "0x333333330522f64ee8d0b3039c460b41670e3404"
+    RewardsDistributor: "0xaC6985D4dBcd89CCAD71DB9bf0309eaF57F064e8"
+  permissions:
+    TimelockController: "0x1dCcD4628d48a50C1A7adEA3848bcC869f08f8C2"
+    Multisig: "0x33333333Bd7045F1A601A1E289D7AB21036fB5EF"
+funding:
+  status: seed_round_reported
+  amount: $5.2M
+  stage: seed
+  lead_investors:
+    - Paradigm
+  investors:
+    - Paradigm
+    - Wintermute Ventures
+    - Coinbase Ventures
+    - Robot Ventures
+    - Bodhi Ventures
+    - Breed
+article_notes:
+  - label: The Block
+    url: https://www.theblock.co/post/356872/paradigm-leads-5-million-seed-round-in-crypto-credit-startup-3jane
+    note: Paradigm led 3Jane's $5.2M seed round and the company emerged from stealth as a crypto credit startup.
+  - label: 3Jane official X
+    url: https://x.com/3janexyz/status/1930264347441615188
+    note: 3Jane's official account announced the seed round and its crypto-native credit positioning.
+  - label: Wintermute Ventures
+    url: https://x.com/wmt_ventures/status/1930336436433367395
+    note: Wintermute Ventures publicly backed 3Jane and referenced @_yakovsky.
+  - label: Delphi Digital
+    url: https://members.delphidigital.io/reports/engineering-real-credit-onchain-the-3jane-bet
+    note: Delphi frames 3Jane as an attempt to engineer real credit onchain after earlier credit failures.
+  - label: Leviathan
+    url: https://leviathannews.substack.com/p/3jane-lending-protocol-explained
+    note: External explainer showing how the market understands 3Jane as unsecured or undercollateralized lending.
