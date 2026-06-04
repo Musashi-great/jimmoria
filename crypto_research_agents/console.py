@@ -58,7 +58,8 @@ class JimmoriaConsole:
         self.agent_state: dict[str, str] = {}
         self.agent_activity: dict[str, str] = {}
         self.last_room_id = ""
-        self.width = min(shutil.get_terminal_size((100, 30)).columns, 110)
+        terminal_width = shutil.get_terminal_size((120, 30)).columns
+        self.width = max(72, min(terminal_width, 180))
         self.use_rich = RichConsole is not None and not os.getenv("JIMMORIA_PLAIN_LOGS")
         self.event_style = os.getenv("JIMMORIA_EVENT_STYLE", "stream").strip().lower() or "stream"
         self.runtime_room_running = False
@@ -272,6 +273,7 @@ class JimmoriaConsole:
         lines = [
             self.input_border_style(border),
             self.input_status_line_style(self.input_text_line(self.input_status_text())),
+            self.input_active_summary_line_style(),
             self.input_border_style(self.input_hint_line("Room running. Input returns when Supervisor finishes this room.")),
             self.input_divider_line_style(),
             self.input_board_title_line_style(),
@@ -311,7 +313,7 @@ class JimmoriaConsole:
 
     def input_box_width(self) -> int:
         available_width = max(32, self.width - 4)
-        return max(32, min(available_width, 100))
+        return max(32, min(available_width, 176))
 
     def input_border(self) -> str:
         return "+" + "-" * (self.input_box_width() - 2) + "+"
@@ -403,6 +405,50 @@ class JimmoriaConsole:
             f"{violet}|{reset} {muted}{visible_prefix}{reset}"
             f"{blink}{pink}{visible_dots}{reset}{padding}{violet}|{reset}"
         )
+
+    def input_active_summary_line_style(self) -> str:
+        line = self.input_text_line(self.runtime_active_summary())
+        if not supports_color():
+            return line
+        violet = "\033[38;2;211;95;255m"
+        pink = "\033[38;2;255;92;212m"
+        muted = "\033[38;2;160;132;188m"
+        reset = "\033[0m"
+        styled = line.replace("|", f"{violet}|{reset}", 2)
+        styled = styled.replace("Now:", f"{pink}Now:{reset}", 1)
+        styled = styled.replace("Waiting:", f"{muted}Waiting:{reset}", 1)
+        styled = styled.replace("Done:", f"{muted}Done:{reset}", 1)
+        return styled
+
+    def runtime_active_summary(self) -> str:
+        if not self.agent_state:
+            return "Now: idle | Waiting: next request"
+        running = [agent_id for agent_id in DEFAULT_AGENTS if self.agent_state.get(agent_id) == "running"]
+        queued = [agent_id for agent_id in DEFAULT_AGENTS if self.agent_state.get(agent_id) == "queued"]
+        done = [agent_id for agent_id in DEFAULT_AGENTS if self.agent_state.get(agent_id) == "done"]
+        failed = [agent_id for agent_id in DEFAULT_AGENTS if self.agent_state.get(agent_id) == "failed"]
+        if running:
+            active_parts = [
+                f"{agent_id} -> {self.compact_text(self.agent_activity.get(agent_id) or AGENT_ACTIVITY.get(agent_id, ''), 38)}"
+                for agent_id in running[:2]
+            ]
+            active = "; ".join(active_parts)
+        elif failed:
+            active = f"failed: {', '.join(failed[:2])}"
+        elif queued:
+            active = "standing by"
+        else:
+            active = "room wrap-up"
+        waiting = self.compact_agent_list(queued, limit=4)
+        done_text = f" | Done: {len(done)}" if done else ""
+        return f"Now: {active} | Waiting: {waiting or 'none'}{done_text}"
+
+    def compact_agent_list(self, agent_ids: list[str], *, limit: int = 4) -> str:
+        if not agent_ids:
+            return ""
+        shown = agent_ids[:limit]
+        suffix = f" +{len(agent_ids) - limit}" if len(agent_ids) > limit else ""
+        return ", ".join(shown) + suffix
 
     def input_board_title_line_style(self) -> str:
         line = self.input_text_line("Live agent board - current work")

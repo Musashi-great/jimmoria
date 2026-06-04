@@ -746,16 +746,67 @@ class SmokeTest(unittest.TestCase):
         clean = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", output.getvalue())
         self.assertIn("JIMMORIA HQ", clean)
         self.assertIn("Room running. Input returns when Supervisor finishes this room.", clean)
+        self.assertIn("Now: ingestion_agent -> Extracting source metadata", clean)
+        self.assertIn("Waiting: supervisor_agent", clean)
         self.assertIn("Live agent board - current work", clean)
         self.assertIn("STATE", clean)
         self.assertIn("CURRENT WORK", clean)
         self.assertIn("ingestion_agent", clean)
         self.assertIn("Now: Extracting source metadata", clean)
         self.assertIn("> working...", clean)
-        self.assertIn("\033[11A\033[11M", output.getvalue())
+        self.assertIn("\033[12A\033[12M", output.getvalue())
         self.assertIn("\033[?25l", output.getvalue())
         self.assertIn("\033[5m\033[38;2;255;92;212m...", output.getvalue())
-        self.assertEqual(console.runtime_dock_lines, 11)
+        self.assertEqual(console.runtime_dock_lines, 12)
+
+    def test_runtime_dock_shows_full_agent_board_for_research_room(self) -> None:
+        output = StringIO()
+        console = JimmoriaConsole()
+        console.width = 160
+
+        with patch("crypto_research_agents.console.supports_color", return_value=True):
+            with redirect_stdout(output):
+                console.handle_event(
+                    {
+                        "type": "room_created",
+                        "room_id": "room_test",
+                        "topic": "3jane report",
+                        "goals": ["Investigate the project."],
+                        "agents": [
+                            "supervisor_agent",
+                            "ingestion_agent",
+                            "social_kol_agent",
+                            "narrative_agent",
+                            "discovery_agent",
+                            "contract_onchain_agent",
+                            "product_tech_agent",
+                            "funding_token_agent",
+                            "report_agent",
+                            "obsidian_curator_agent",
+                        ],
+                    }
+                )
+                console.handle_event(
+                    {
+                        "type": "agent_start",
+                        "room_id": "room_test",
+                        "agent_id": "supervisor_agent",
+                        "task_type": "supervision",
+                    }
+                )
+
+        clean = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", output.getvalue())
+        self.assertIn("Now: supervisor_agent -> Planning direction", clean)
+        self.assertIn("Waiting: ingestion_agent, social_kol_agent, narrative_agent, discovery_agent +5", clean)
+        self.assertIn("STATE", clean)
+        self.assertIn("supervisor_agent", clean)
+        self.assertIn("ingestion_agent", clean)
+        self.assertIn("social_kol_agent", clean)
+        self.assertIn("contract_onchain_agent", clean)
+        self.assertIn("obsidian_curator_agent", clean)
+        self.assertIn("Now: Planning direction", clean)
+        self.assertIn("Waiting: Syncing vault notes", clean)
+        self.assertEqual(console.runtime_dock_lines, 20)
 
     def test_runtime_dock_updates_agent_work_from_tool_events(self) -> None:
         output = StringIO()

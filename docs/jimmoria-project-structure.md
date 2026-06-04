@@ -180,6 +180,22 @@ fixed runtime dock
 
 Tool event도 board를 갱신한다. 예를 들어 `discovery_agent`가 `web_search`를 호출하면 해당 row는 `Waiting: Resolving candidates`에서 `Now: Tool running: web_search - ...`로 바뀐다. Agent가 끝나면 `Finished: ...`로 바뀐다.
 
+Latest runtime dock behavior:
+
+```text
+JIMMORIA HQ status line
+Now: active_agent -> current work | Waiting: next agents
+Room running notice
+Live agent board - current work
+STATE  AGENT                         CURRENT WORK
+RUN    supervisor_agent              Now: Planning direction
+WAIT   ingestion_agent               Waiting: Extracting source metadata
+...
+> working...
+```
+
+The active summary line exists so the user can still see the current worker even if terminal scrollback or ANSI rendering hides part of the full board. The full board uses the current terminal width up to a wider cap, so long agent names such as `contract_onchain_agent` and `obsidian_curator_agent` remain visible during research rooms.
+
 ## 5.2 Model Routing
 
 JIMMORIA는 현재 Codex-only 모델 정책을 사용한다.
