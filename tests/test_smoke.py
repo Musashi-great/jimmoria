@@ -45,8 +45,10 @@ from crypto_research_agents.core.process_spec import ProcessSpecRegistry, load_p
 from crypto_research_agents.core.project_profile import find_project_profile
 from crypto_research_agents.core.dynamic_dispatch import DynamicCandidateDispatcher
 from crypto_research_agents.core.edge_conditions import evaluate_edge_condition
+from crypto_research_agents.core.hook_registry import HookRegistry, runtime_event_to_hook_event
 from crypto_research_agents.core.quality_gate import review_report_quality
 from crypto_research_agents.core.scheduler import CronRegistry
+from crypto_research_agents.core.skill_spec import SkillSpecRegistry
 from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
 from crypto_research_agents.core.supervisor_intake import decide_supervisor_intake
 from crypto_research_agents.core.capabilities import collect_capabilities
@@ -1146,6 +1148,11 @@ class SmokeTest(unittest.TestCase):
             self.assertIn("after_tool_call", hook_phases)
             self.assertIn("before_report", hook_phases)
             self.assertIn("after_report", hook_phases)
+            runtime_hook_events = {event.get("event") for event in runtime.hooks.events if "event" in event}
+            self.assertIn("agent:start", runtime_hook_events)
+            self.assertIn("tool:done", runtime_hook_events)
+            self.assertIn("report:before_render", runtime_hook_events)
+            self.assertIn("report:after_render", runtime_hook_events)
             self.assertIn(
                 "supervisor_orchestration",
                 runtime.agent_specs.get("supervisor_agent").skills,
@@ -3343,6 +3350,60 @@ Usage: codex exec [OPTIONS] [PROMPT]
 
         self.assertEqual([item.playbook_id for item in attached], ["base_token_identity_gate", "ticker_collision_review"])
         self.assertEqual(workflow.metadata["attached_playbooks"], ["base_token_identity_gate", "ticker_collision_review"])
+
+    def test_skill_spec_registry_loads_config_and_registry_entries(self) -> None:
+        registry = SkillSpecRegistry.load_dir("config/skills")
+
+        identity_gate = registry.get("identity_gate")
+        self.assertIsNotNone(identity_gate)
+        assert identity_gate is not None
+        self.assertIn("check_ticker_collision", identity_gate.steps)
+        self.assertIn("identity_status", identity_gate.required_output)
+
+        market_signal = registry.get("market_signal_intake_skill")
+        self.assertIsNotNone(market_signal)
+        assert market_signal is not None
+        self.assertEqual(market_signal.owner_agents, ["social_kol_agent"])
+        self.assertIn("build_who_said_what_rows", market_signal.steps)
+
+    def test_hook_registry_loads_common_hooks_and_manifest_dirs(self) -> None:
+        registry = HookRegistry.load_dir("config/hooks")
+
+        self.assertIsNotNone(registry.get("source_id_writer"))
+        self.assertIn(
+            "source_id_writer",
+            [hook.hook_id for hook in registry.hooks_for_event("tool:done")],
+        )
+        self.assertIn(
+            "claim_coverage_check",
+            [hook.hook_id for hook in registry.hooks_for_phase("before_report")],
+        )
+        self.assertEqual(runtime_event_to_hook_event("agent_start"), "agent:start")
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest_dir = root / "claim_coverage_check"
+            manifest_dir.mkdir()
+            (manifest_dir / "HOOK.yaml").write_text(
+                json.dumps(
+                    {
+                        "name": "claim_coverage_check",
+                        "description": "Check claims before final report render.",
+                        "events": ["report:before_render", "supervisor:final_review"],
+                        "blocking": False,
+                        "priority": 25,
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            custom = HookRegistry.load_dir(root)
+            hook = custom.get("claim_coverage_check")
+
+        self.assertIsNotNone(hook)
+        assert hook is not None
+        self.assertEqual(hook.priority, 25)
+        self.assertIn("report:before_render", hook.events)
 
     def test_profile_worker_allowed_tools(self) -> None:
         tool_registry = load_tool_registry()

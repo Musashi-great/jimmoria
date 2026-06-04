@@ -1,0 +1,8 @@
+{
+  "name": "source_id_writer",
+  "description": "Keep source IDs attached to tool outputs and findings so reports can cite content instead of logs.",
+  "events": ["tool:done", "finding:written", "source:written"],
+  "blocking": false,
+  "priority": 20,
+  "handler": "handler.py"
+}

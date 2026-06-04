@@ -1,0 +1,8 @@
+{
+  "name": "investment_advice_guard",
+  "description": "Prevent report output from becoming buy/sell/target advice while preserving research judgment.",
+  "events": ["report:after_render", "supervisor:final_review"],
+  "blocking": false,
+  "priority": 35,
+  "handler": "handler.py"
+}

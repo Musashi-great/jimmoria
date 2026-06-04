@@ -208,6 +208,26 @@ secondary   reusable sub-skills and repeated work patterns
 disabled    capabilities this agent must not use
 ```
 
+The runtime also has a lightweight SkillSpec registry:
+
+```text
+crypto_research_agents/core/skill_spec.py
+config/skills/*.yaml
+config/skills/skill_registry.yaml
+```
+
+This lets `skill_view` and the Supervisor read the same structured skill definitions instead of treating skills as loose prompt text.
+
+Hooks use the same idea. Agents still declare phase hooks in `config/agents/*.yaml`, while `config/hooks/` can now hold Hermes-style hook manifests:
+
+```text
+config/hooks/common_hooks.yaml
+config/hooks/<hook_name>/HOOK.yaml
+config/hooks/<hook_name>/handler.py
+```
+
+The current runtime records these hook events in the background. They are intended for source IDs, claim coverage, report guardrails, retention policy, and future web replay/validation.
+
 Hooks are runtime checkpoints that fire around agent execution, tool usage, and report writing. They appear as `agent_hook` events for future CLI/web replay.
 
 ```text

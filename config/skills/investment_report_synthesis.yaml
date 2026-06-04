@@ -20,5 +20,5 @@
     "source_links_support_content_not_replace_it",
     "no_investment_advice"
   ],
-  "required_output": ["representative_verdict", "executive_summary", "project_report", "risk_register", "stance", "evidence_packet"]
+  "required_output": ["representative_verdict", "executive_summary", "project_report", "unclear_points", "stance", "evidence_packet"]
 }

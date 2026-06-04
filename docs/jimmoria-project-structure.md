@@ -427,9 +427,13 @@ Skill files live in:
 config/skills/
 config/skills/skill_registry.yaml
 config/hooks/common_hooks.yaml
+config/hooks/<hook_name>/HOOK.yaml
+config/hooks/<hook_name>/handler.py
 ```
 
-These skill files are intentionally small and structured. Agents can read them through `skill_view`, and the Supervisor can use the same names when assigning tasks. The hook names are also stable handles for future real validator functions.
+These skill files are intentionally small and structured. Agents can read them through `skill_view`, and the Supervisor can use the same names when assigning tasks. `crypto_research_agents/core/skill_spec.py` loads both individual skill YAML files and `skill_registry.yaml` into a shared `SkillSpecRegistry`.
+
+Hooks are also registry-backed. `crypto_research_agents/core/hook_registry.py` loads the common phase hooks and any Hermes-style manifest directory with `HOOK.yaml`. The runtime maps internal events such as `agent_start`, `tool_done`, `report_written`, and `room_completed` into stable hook events such as `agent:start`, `tool:done`, `report:after_render`, and `room:completed`. The current handlers are non-blocking guardrail/checkpoint declarations; they are ready for stricter validation later.
 
 Social/KOL has two explicit skill modes:
 

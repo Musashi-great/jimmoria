@@ -1,0 +1,8 @@
+{
+  "name": "claim_coverage_check",
+  "description": "Check that report-level claims are backed by specialist findings and evidence IDs before final rendering.",
+  "events": ["report:before_render", "supervisor:final_review"],
+  "blocking": false,
+  "priority": 25,
+  "handler": "handler.py"
+}

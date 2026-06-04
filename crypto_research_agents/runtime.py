@@ -26,6 +26,7 @@ from crypto_research_agents.core.bus import CollaborationBus
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
 from crypto_research_agents.core.company_settings import company_settings_path_for, load_company_settings
 from crypto_research_agents.core.concurrency import ConcurrencyPolicy, load_concurrency_policy
+from crypto_research_agents.core.hook_registry import HookRegistry, runtime_event_to_hook_event
 from crypto_research_agents.core.hooks import HookEngine
 from crypto_research_agents.core.memory import FindingRecord, ProjectCandidate, SharedMemory, SourceRecord
 from crypto_research_agents.core.model_gateway import ModelGateway
@@ -94,13 +95,14 @@ class ResearchRuntime:
     ) -> None:
         self.memory = memory or SharedMemory()
         self.bus = CollaborationBus()
-        self.hooks = HookEngine()
         self.model_gateway = ModelGateway()
         self.agent_specs = AgentSpecRegistry.load_dir(resolve_project_path(agent_spec_dir))
         self.process_spec_dir = resolve_project_path(process_spec_dir)
         self.concurrency_policy: ConcurrencyPolicy = load_concurrency_policy(concurrency_policy_path)
         self.tool_gateway = ToolGateway(default_policy(self.agent_specs))
         register_default_connectors(self.tool_gateway)
+        self.hook_registry = HookRegistry.load_dir("config/hooks")
+        self.hooks = HookEngine(self.hook_registry)
         self.event_log: list[dict[str, Any]] = []
         self._room_started_at: dict[str, float] = {}
         self._room_llm_start_index: dict[str, int] = {}
@@ -280,6 +282,7 @@ class ResearchRuntime:
         )
         self._run_agent_spec_hooks(agent_id, "before_run", room_id=room.room_id, task_type=agent.task_type)
         if agent_id == "report_agent":
+            self.hooks.emit("report:before_render", agent_id=agent_id, room_id=room.room_id, task_type=agent.task_type)
             self._run_agent_spec_hooks(agent_id, "before_report", room_id=room.room_id, task_type=agent.task_type)
         if start_barrier is not None and hasattr(start_barrier, "wait"):
             try:
@@ -686,6 +689,11 @@ class ResearchRuntime:
             self.event_log.append(event)
             if self.event_handler is not None:
                 self.event_handler(event)
+        self.hooks.emit(
+            runtime_event_to_hook_event(event_type),
+            runtime_event_type=event_type,
+            **payload,
+        )
         if event_type in {"tool_done", "tool_failed", "tool_denied", "tool_unconfigured"}:
             self._run_agent_spec_hooks(
                 str(payload.get("agent_id") or ""),

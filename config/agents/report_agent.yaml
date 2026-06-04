@@ -25,7 +25,7 @@
     ]
   },
   "scope": {
-    "owns": ["project_intelligence_report", "candidate_dossier", "evidence_packet", "risk_register", "source_appendix"],
+    "owns": ["project_intelligence_report", "candidate_dossier", "evidence_packet", "unclear_points", "source_appendix"],
     "does_not_own": ["new external data collection", "investment advice", "secret handling"]
   },
   "role": {
@@ -97,7 +97,7 @@
       "product_protocol_mechanics",
       "founder_dossier",
       "token_value_capture",
-      "risk_register",
+      "unclear_points",
       "score_and_stance",
       "evidence_packet",
       "sources"
@@ -132,7 +132,7 @@
       "founder_dossier",
       "token_chain_value_capture",
       "traction_social_funding_signals",
-      "risk_register",
+      "unclear_points",
       "score_and_stance",
       "antseed_peer_review",
       "evidence_packet",
