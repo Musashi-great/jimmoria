@@ -746,11 +746,47 @@ class SmokeTest(unittest.TestCase):
         clean = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", output.getvalue())
         self.assertIn("JIMMORIA HQ", clean)
         self.assertIn("Room running. Input returns when Supervisor finishes this room.", clean)
+        self.assertIn("Live agent board - current work", clean)
+        self.assertIn("STATE", clean)
+        self.assertIn("CURRENT WORK", clean)
+        self.assertIn("ingestion_agent", clean)
+        self.assertIn("Now: Extracting source metadata", clean)
         self.assertIn("> working...", clean)
-        self.assertIn("\033[5A\033[5M", output.getvalue())
+        self.assertIn("\033[11A\033[11M", output.getvalue())
         self.assertIn("\033[?25l", output.getvalue())
         self.assertIn("\033[5m\033[38;2;255;92;212m...", output.getvalue())
-        self.assertEqual(console.runtime_dock_lines, 5)
+        self.assertEqual(console.runtime_dock_lines, 11)
+
+    def test_runtime_dock_updates_agent_work_from_tool_events(self) -> None:
+        output = StringIO()
+        console = JimmoriaConsole()
+
+        with patch("crypto_research_agents.console.supports_color", return_value=True):
+            with redirect_stdout(output):
+                console.handle_event(
+                    {
+                        "type": "room_created",
+                        "room_id": "room_test",
+                        "topic": "pearl pow project",
+                        "goals": ["Investigate the project."],
+                        "agents": ["discovery_agent"],
+                    }
+                )
+                console.handle_event(
+                    {
+                        "type": "tool_start",
+                        "room_id": "room_test",
+                        "agent_id": "discovery_agent",
+                        "tool_name": "web_search",
+                        "input_preview": "pearl crypto project official",
+                    }
+                )
+
+        clean = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", output.getvalue())
+        self.assertIn("Live agent board - current work", clean)
+        self.assertIn("discovery_agent", clean)
+        self.assertIn("Now: Tool running: web_search - pearl crypto project", clean)
+        self.assertEqual(console.agent_state["discovery_agent"], "running")
 
     def test_runtime_stream_clears_input_dock_when_room_finishes(self) -> None:
         output = StringIO()

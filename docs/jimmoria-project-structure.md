@@ -140,7 +140,7 @@ flowchart LR
 | Layer | File | Role |
 |---|---|---|
 | CLI | `crypto_research_agents/cli.py` | 명령어, 채팅 루프, Supervisor intake |
-| Console | `crypto_research_agents/console.py` | 터미널 UI, 로고, 입력 dock, 로그 표시 |
+| Console | `crypto_research_agents/console.py` | 터미널 UI, 로고, 입력 dock, 로그 표시, live agent board |
 | Runtime | `crypto_research_agents/runtime.py` | Research Room 생성과 agent 실행 |
 | Research Room | `core/room.py` | 한 개 리서치 작업 단위 |
 | Collaboration Bus | `core/bus.py` | 요청, 응답, handoff, update 기록 |
@@ -152,7 +152,35 @@ flowchart LR
 | Storage | `storage/` | run snapshot, reports, vault notes |
 | Web Dashboard | `web/` | 로컬 구조/런타임 시각화 |
 
-## 5.1 Model Routing
+## 5.1 CLI Runtime TUI Dock
+
+`crypto_research_agents/console.py`는 Research Room 실행 중 lightweight TUI dock을 계속 유지한다.
+
+화면 모델은 다음과 같다.
+
+```text
+scrolling transcript
+  You > ...
+  Supervisor > ...
+  Room > ...
+  Agent > ...
+  Tool > ...
+  Output > ...
+
+fixed runtime dock
+  JIMMORIA HQ status line
+  room/provider/agent progress
+  Live agent board - current work
+  each agent state: WAIT / RUN / DONE / FAIL
+  each agent activity: current assignment or latest tool call
+  locked input line with blinking working dots
+```
+
+이 dock은 runtime event가 들어올 때마다 다시 그려진다. 새 이벤트 로그를 찍기 전에 이전 dock을 ANSI cursor movement로 지우고, 로그를 출력한 뒤, 최신 agent state로 dock을 다시 그린다. 그래서 터미널 scrollback은 유지하면서도 아래쪽 status/input 영역은 고정된 TUI처럼 보인다.
+
+Tool event도 board를 갱신한다. 예를 들어 `discovery_agent`가 `web_search`를 호출하면 해당 row는 `Waiting: Resolving candidates`에서 `Now: Tool running: web_search - ...`로 바뀐다. Agent가 끝나면 `Finished: ...`로 바뀐다.
+
+## 5.2 Model Routing
 
 JIMMORIA는 현재 Codex-only 모델 정책을 사용한다.
 

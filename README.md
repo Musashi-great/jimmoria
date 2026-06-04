@@ -42,6 +42,25 @@ Start the company:
 jimmoria
 ```
 
+The CLI runs as a chat-style Research HQ. During a Research Room, logs keep flowing upward while a fixed runtime dock stays at the bottom:
+
+```text
+--------------------------------------------------------------------------------+
+| JIMMORIA HQ | Supervisor channel | provider: codex_cli | room: room_x | ...    |
+| Room running. Input returns when Supervisor finishes this room.                 |
+|--------------------------------------------------------------------------------|
+| Live agent board - current work                                                |
+| STATE  AGENT                        CURRENT WORK                               |
+| RUN    discovery_agent              Now: Tool running: web_search - ...        |
+| WAIT   product_tech_agent           Waiting: Checking docs/GitHub              |
+| DONE   supervisor_agent             Finished: Research room initialized        |
+|--------------------------------------------------------------------------------|
+| > working...                                                                   |
++--------------------------------------------------------------------------------+
+```
+
+That dock is the lightweight TUI layer: it keeps the current room, provider, agent progress, and each agent's active job visible while detailed `Room >`, `Agent >`, `Tool >`, and `Output >` logs stream above it.
+
 Open the local web dashboard:
 
 ```powershell

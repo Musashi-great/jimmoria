@@ -1,5 +1,21 @@
 # JIMMORIA CLI UI Reference Notes
 
+## Runtime Dock Update
+
+The current CLI uses a lightweight TUI dock during Research Room execution.
+
+Behavior:
+
+- Logs continue to scroll upward as compact lines: `Room >`, `Agent >`, `Tool >`, `Output >`.
+- The old bottom input dock is expanded into a fixed runtime panel.
+- The panel contains `JIMMORIA HQ`, provider, room id, aggregate agent progress, and a `Live agent board - current work` table.
+- Each agent row shows `WAIT`, `RUN`, `DONE`, or `FAIL`.
+- Each agent row shows the current assignment or the latest tool action.
+- Tool events update the fixed board in addition to the scrolling log.
+- The `> working...` line stays inside the panel, and only the dots blink.
+
+This keeps the CLI usable like a terminal chat while making it clear which agent is currently doing what.
+
 이 문서는 JIMMORIA의 CLI/UI를 개선할 때 참고한 멀티에이전트/zero-human-company 계열 오픈소스와 제품 패턴을 정리한다. 에이전트 내부 구조는 이미 JIMMORIA에 맞게 구성되어 있으므로, 이 문서의 초점은 입력창, 상태 표시, 세션 가시성, Supervisor와 사용자 사이의 대화 경험이다.
 
 ## Reference Patterns

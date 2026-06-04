@@ -269,12 +269,25 @@ class JimmoriaConsole:
         self.hide_cursor()
         self.runtime_dock_frame += 1
         border = self.input_border()
-        print(self.input_border_style(border))
-        print(self.input_status_line_style(self.input_text_line(self.input_status_text())))
-        print(self.input_border_style(self.input_hint_line("Room running. Input returns when Supervisor finishes this room.")))
-        print(self.input_locked_line_style())
-        print(self.input_border_style(border))
-        self.runtime_dock_lines = 5
+        lines = [
+            self.input_border_style(border),
+            self.input_status_line_style(self.input_text_line(self.input_status_text())),
+            self.input_border_style(self.input_hint_line("Room running. Input returns when Supervisor finishes this room.")),
+            self.input_divider_line_style(),
+            self.input_board_title_line_style(),
+            self.input_board_header_line_style(),
+        ]
+        lines.extend(self.runtime_agent_board_lines())
+        lines.extend(
+            [
+                self.input_divider_line_style(),
+                self.input_locked_line_style(),
+                self.input_border_style(border),
+            ]
+        )
+        for line in lines:
+            print(line)
+        self.runtime_dock_lines = len(lines)
 
     def hide_cursor(self) -> None:
         if supports_color():
@@ -310,6 +323,9 @@ class JimmoriaConsole:
 
     def input_hint_line(self, text: str) -> str:
         return self.input_text_line(text)
+
+    def input_divider_line(self) -> str:
+        return "|" + "-" * (self.input_box_width() - 2) + "|"
 
     def input_edit_line(self) -> str:
         inner_width = self.input_box_width() - 4
@@ -348,6 +364,9 @@ class JimmoriaConsole:
             return text
         return f"\033[38;2;211;95;255m{text}\033[0m"
 
+    def input_divider_line_style(self) -> str:
+        return self.input_border_style(self.input_divider_line())
+
     def input_status_line_style(self, text: str) -> str:
         if not supports_color():
             return text
@@ -384,6 +403,74 @@ class JimmoriaConsole:
             f"{violet}|{reset} {muted}{visible_prefix}{reset}"
             f"{blink}{pink}{visible_dots}{reset}{padding}{violet}|{reset}"
         )
+
+    def input_board_title_line_style(self) -> str:
+        line = self.input_text_line("Live agent board - current work")
+        if not supports_color():
+            return line
+        pink = "\033[38;2;255;92;212m"
+        violet = "\033[38;2;211;95;255m"
+        reset = "\033[0m"
+        return line.replace("|", f"{violet}|{reset}", 2).replace(
+            "Live agent board",
+            f"{pink}Live agent board{reset}",
+            1,
+        )
+
+    def input_board_header_line_style(self) -> str:
+        line = self.input_text_line(f"{'STATE':<6} {'AGENT':<28} CURRENT WORK")
+        if not supports_color():
+            return line
+        violet = "\033[38;2;211;95;255m"
+        muted = "\033[38;2;160;132;188m"
+        reset = "\033[0m"
+        return line.replace("|", f"{violet}|{reset}", 2).replace(
+            "STATE",
+            f"{muted}STATE{reset}",
+            1,
+        ).replace(
+            "AGENT",
+            f"{muted}AGENT{reset}",
+            1,
+        ).replace(
+            "CURRENT WORK",
+            f"{muted}CURRENT WORK{reset}",
+            1,
+        )
+
+    def runtime_agent_board_lines(self) -> list[str]:
+        if not self.agent_state:
+            return [self.input_text_line("IDLE   no active room              Waiting for your next request")]
+
+        lines: list[str] = []
+        for agent_id in DEFAULT_AGENTS:
+            if agent_id not in self.agent_state:
+                continue
+            state = self.agent_state[agent_id]
+            activity = self.agent_activity.get(agent_id) or AGENT_ACTIVITY.get(agent_id, "")
+            label = self.state_label(state)
+            row = f"{label:<6} {agent_id:<28} {self.activity_label(state, activity)}"
+            lines.append(self.runtime_agent_board_line_style(self.input_text_line(row), state))
+        return lines
+
+    def runtime_agent_board_line_style(self, line: str, state: str) -> str:
+        if not supports_color():
+            return line
+        violet = "\033[38;2;211;95;255m"
+        running = "\033[38;2;255;210;245m"
+        done = "\033[38;2;120;255;190m"
+        failed = "\033[38;2;255;92;120m"
+        waiting = "\033[38;2;160;132;188m"
+        reset = "\033[0m"
+        state_style = {
+            "running": running,
+            "done": done,
+            "failed": failed,
+            "queued": waiting,
+        }.get(state, "\033[38;2;230;214;255m")
+        styled = line.replace("|", f"{violet}|{reset}", 2)
+        label = self.state_label(state)
+        return styled.replace(label, f"{state_style}{label}{reset}", 1)
 
     def input_cursor_sequence(self) -> str:
         return "\033[2A\033[4C"
@@ -493,6 +580,7 @@ class JimmoriaConsole:
             return
 
         if event_type in {"tool_start", "tool_done", "tool_failed", "tool_denied", "tool_unconfigured"}:
+            self.update_tool_activity(event_type, event)
             self.print_tool_event(event_type, event)
             return
 
@@ -904,6 +992,23 @@ class JimmoriaConsole:
         if event.get("input_preview") and event_type == "tool_start":
             lines.append(f"Input: {event.get('input_preview')}")
         self.block("Tool activity", lines)
+
+    def update_tool_activity(self, event_type: str, event: dict[str, object]) -> None:
+        agent_id = str(event.get("agent_id") or "")
+        if not agent_id:
+            return
+        tool_name = str(event.get("tool_name") or "tool")
+        marker = {
+            "tool_start": "Tool running",
+            "tool_done": "Tool done",
+            "tool_failed": "Tool failed",
+            "tool_denied": "Tool denied",
+            "tool_unconfigured": "Tool waiting",
+        }.get(event_type, "Tool")
+        detail = str(event.get("summary") or event.get("input_preview") or tool_name)
+        self.agent_activity[agent_id] = f"{marker}: {tool_name} - {detail}"
+        if self.agent_state.get(agent_id) not in {"done", "failed"}:
+            self.agent_state[agent_id] = "running"
 
     def print_output_event(self, event_type: str, event: dict[str, object]) -> None:
         labels = {
