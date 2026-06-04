@@ -1,0 +1,20 @@
+{
+  "skill_id": "tool_policy_guardrail",
+  "description": "Protect credentials, enforce agent tool permissions, write audit logs, and keep all research tooling read-only unless explicitly allowed.",
+  "steps": [
+    "load_agent_tool_policy",
+    "check_permission",
+    "scan_inputs_for_secrets",
+    "apply_rate_limit_policy",
+    "run_read_only_boundary",
+    "write_audit_log",
+    "redact_sensitive_outputs"
+  ],
+  "quality_gates": [
+    "no_secret_leak",
+    "permission_check_passed",
+    "read_only_boundary",
+    "audit_log_written"
+  ],
+  "required_output": ["decision", "reason", "audit_log_id", "redactions"]
+}

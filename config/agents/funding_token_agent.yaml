@@ -37,6 +37,7 @@
     "write": ["funding_findings", "pre_token_db"],
     "no_access": ["oauth_tokens"]
   },
+  "skills": ["funding_token_diligence", "identity_gate"],
   "tools": {
     "allow": [
       "check_airdrop_points",
@@ -56,6 +57,13 @@
       "check_tge_status"
     ],
     "deny": ["telegram_send_message", "x_post_tweet"]
+  },
+  "hooks": {
+    "before_run": ["load_token_value_capture_skill", "airdrop_no_promise_guard"],
+    "before_tool": ["funding_source_reputation_check", "token_claim_scope_check"],
+    "after_tool": ["separate_confirmed_hint_unknown", "normalize_value_capture_claims"],
+    "quality_gate": ["no_airdrop_promise", "live_vs_roadmap_required"],
+    "after_run": ["write_funding_token_finding", "handoff_token_thesis_to_report"]
   },
   "output_schema": {
     "type": "funding_token_signal",

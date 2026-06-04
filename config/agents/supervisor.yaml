@@ -73,6 +73,7 @@
     "write": ["research_rooms", "agent_tasks", "company_settings", "conversation_state"],
     "no_access": ["oauth_tokens", "provider_api_keys"]
   },
+  "skills": ["supervisor_orchestration", "project_research", "identity_gate"],
   "tools": {
     "allow": [
       "classify_client_request",
@@ -94,6 +95,13 @@
     ],
     "allowed_toolsets": ["supervisor_office", "operator_research_bridge"],
     "deny": ["x_post_tweet", "telegram_delete_message", "wallet_sign"]
+  },
+  "hooks": {
+    "before_run": ["load_company_context", "classify_client_intent", "load_project_research_playbook"],
+    "before_tool": ["permission_check", "redact_sensitive_inputs"],
+    "after_tool": ["record_orchestration_action", "update_task_status"],
+    "quality_gate": ["confirm_room_needed", "verify_specialist_assignment"],
+    "after_run": ["handoff_plan_to_research_room", "persist_supervisor_decision"]
   },
   "output_schema": {
     "type": "supervision_plan",

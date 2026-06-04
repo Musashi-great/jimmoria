@@ -1,0 +1,20 @@
+{
+  "skill_id": "obsidian_memory_sync",
+  "description": "Sync reports, sources, projects, narratives, and findings into an Obsidian-style vault without adding new research claims.",
+  "steps": [
+    "dedupe_note_paths",
+    "write_source_notes",
+    "write_project_notes",
+    "write_narrative_notes",
+    "write_report_note",
+    "validate_frontmatter",
+    "create_backlinks"
+  ],
+  "quality_gates": [
+    "vault_path_safety_check",
+    "frontmatter_valid",
+    "no_new_research_claims",
+    "source_links_preserved"
+  ],
+  "required_output": ["paths", "note_count", "vault_summary"]
+}

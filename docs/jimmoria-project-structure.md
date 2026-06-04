@@ -381,6 +381,49 @@ The goal is to stop treating "12 URLs collected" as equivalent to "all important
 | `obsidian_curator_agent` | Knowledge curator | vault note 생성 |
 | `monitor_24h_agent` | Planned watcher | public web/X/GitHub/docs/RSS/DEX/RootData signal queue 예정 |
 
+## 7.1 Agent Skills And Runtime Hooks
+
+Each agent spec in `config/agents/*.yaml` now declares two extra operating contracts:
+
+- `skills`: local playbooks the agent is expected to use.
+- `hooks`: runtime checkpoints that fire before/after work and tool calls.
+
+The runtime emits these checkpoints as `agent_hook` events. That gives the future web/TUI visualizer a clean trace of which playbook and quality gate each agent passed without showing raw tool logs to the user.
+
+| Agent | Skills | Key Quality Hooks |
+|---|---|---|
+| `supervisor_agent` | `supervisor_orchestration`, `project_research`, `identity_gate` | `confirm_room_needed`, `verify_specialist_assignment` |
+| `ingestion_agent` | `article_ingestion`, `source_evidence_intake` | `source_id_required`, `no_claim_invention` |
+| `social_kol_agent` | `social_signal_intake`, `project_research` | `official_handle_or_unknown`, `no_hype_as_fact` |
+| `narrative_agent` | `narrative_mapping`, `project_research` | `avoid_shallow_tags`, `require_thesis_reason` |
+| `discovery_agent` | `early_token_discovery`, `identity_gate`, `project_research` | `identity_gate_required`, `candidate_origin_required` |
+| `contract_onchain_agent` | `identity_gate`, `onchain_token_verification` | `official_contract_or_unknown`, `ticker_collision_checked` |
+| `product_tech_agent` | `product_tech_diligence`, `identity_gate` | `product_claim_requires_source`, `github_generic_link_filter` |
+| `funding_token_agent` | `funding_token_diligence`, `identity_gate` | `no_airdrop_promise`, `live_vs_roadmap_required` |
+| `report_agent` | `investment_report_synthesis`, `project_research`, `identity_gate` | `claim_evidence_check`, `no_agent_log_in_final`, `korean_first_output` |
+| `obsidian_curator_agent` | `obsidian_memory_sync` | `no_new_research_claims`, `source_links_preserved` |
+| `monitor_24h_agent` | `social_signal_intake`, `early_token_discovery` | `signal_url_required`, `candidate_not_final_judgment` |
+| `memory_retrieval_agent` | `obsidian_memory_sync`, `narrative_mapping` | `source_id_or_report_path_required`, `no_memory_overclaim` |
+| `tool_policy_agent` | `tool_policy_guardrail` | `no_secret_leak`, `read_only_boundary` |
+
+Hook phases:
+
+```text
+before_run     load context, skill, profile, and prior memory
+before_tool    check permissions, public-source scope, and read-only boundaries
+after_tool     normalize evidence, dedupe, and record audit-friendly traces
+quality_gate   reject missing identity, unsupported claims, hype, or agent-log output
+after_run      hand off verified findings to the next company step
+```
+
+Skill files live in:
+
+```text
+config/skills/
+```
+
+These skill files are intentionally small and structured. Agents can read them through `skill_view`, and the Supervisor can use the same names when assigning tasks. The hook names are also stable handles for future real validator functions.
+
 ## 8. Tool Policy
 
 도구 정책은 `config/toolsets.yaml`과 `config/tools/tool_registry.yaml`에 정의된다.

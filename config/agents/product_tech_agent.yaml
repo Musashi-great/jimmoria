@@ -37,6 +37,7 @@
     "write": ["product_findings"],
     "no_access": ["oauth_tokens"]
   },
+  "skills": ["product_tech_diligence", "identity_gate"],
   "tools": {
     "allow": [
       "crawl_website",
@@ -62,6 +63,13 @@
       "monitor_github_activity"
     ],
     "deny": ["github_write", "telegram_send_message"]
+  },
+  "hooks": {
+    "before_run": ["load_product_tech_skill", "reject_generic_platform_links"],
+    "before_tool": ["official_site_docs_priority", "read_only_repo_guard"],
+    "after_tool": ["extract_product_mechanics", "classify_product_stage"],
+    "quality_gate": ["product_claim_requires_source", "github_generic_link_filter"],
+    "after_run": ["write_product_finding", "handoff_product_mechanics_to_report"]
   },
   "output_schema": {
     "type": "product_tech_signal",

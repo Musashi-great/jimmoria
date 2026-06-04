@@ -37,6 +37,7 @@
     "write": ["projects", "watchlist", "candidate_findings"],
     "no_access": ["oauth_tokens"]
   },
+  "skills": ["early_token_discovery", "identity_gate", "project_research"],
   "tools": {
     "allow": [
       "find_similar_projects",
@@ -59,6 +60,13 @@
       "vector_search"
     ],
     "deny": ["telegram_send_message", "x_post_tweet"]
+  },
+  "hooks": {
+    "before_run": ["load_early_discovery_skill", "load_identity_gate", "seed_previous_report_context"],
+    "before_tool": ["search_query_scope_check", "ticker_collision_guard"],
+    "after_tool": ["dedupe_candidates", "classify_source_backing"],
+    "quality_gate": ["identity_gate_required", "candidate_origin_required"],
+    "after_run": ["dispatch_specialist_verification", "update_watchlist"]
   },
   "output_schema": {
     "type": "candidate_discovery",

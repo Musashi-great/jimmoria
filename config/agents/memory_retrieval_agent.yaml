@@ -30,6 +30,7 @@
     "write": ["retrieval_findings"],
     "no_access": ["oauth_tokens"]
   },
+  "skills": ["obsidian_memory_sync", "narrative_mapping"],
   "tools": {
     "allow": [
       "vector_search",
@@ -44,6 +45,13 @@
       "dedupe_entity"
     ],
     "deny": ["write_note", "telegram_send_message", "x_post_tweet"]
+  },
+  "hooks": {
+    "before_run": ["query_normalization", "memory_scope_guard"],
+    "before_tool": ["retrieval_permission_check"],
+    "after_tool": ["dedupe_memory_hits", "rank_memory_relevance"],
+    "quality_gate": ["source_id_or_report_path_required", "no_memory_overclaim"],
+    "after_run": ["write_retrieval_finding"]
   },
   "output_schema": {
     "type": "memory_retrieval_result",

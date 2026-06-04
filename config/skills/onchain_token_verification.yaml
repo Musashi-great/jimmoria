@@ -1,0 +1,19 @@
+{
+  "skill_id": "onchain_token_verification",
+  "description": "Verify chain, contract, token, DEX, explorer, holder, supply, and security facts only from official or reputable read-only sources.",
+  "steps": [
+    "require_identity_gate_context",
+    "check_official_contract_sources",
+    "query_explorer_or_dex_when_identifier_exists",
+    "classify_token_status",
+    "separate_market_background_from_fatal_risk",
+    "record_unknowns"
+  ],
+  "quality_gates": [
+    "official_contract_or_unknown",
+    "read_only_chain_access",
+    "no_security_audit_claim_without_source",
+    "lp_holder_liquidity_background_unless_fatal"
+  ],
+  "required_output": ["chain", "token_status", "contract_address", "dex_pair", "security_notes", "sources"]
+}

@@ -30,6 +30,7 @@
     "write": ["audit_log"],
     "no_access": ["agent_prompts"]
   },
+  "skills": ["tool_policy_guardrail"],
   "tools": {
     "allow": [
       "permission_check",
@@ -42,6 +43,13 @@
       "request_human_approval"
     ],
     "deny": ["x_post_tweet", "telegram_send_message"]
+  },
+  "hooks": {
+    "before_run": ["load_tool_policy_guardrail"],
+    "before_tool": ["permission_check", "secret_scan"],
+    "after_tool": ["audit_log_write", "pii_redact"],
+    "quality_gate": ["no_secret_leak", "read_only_boundary"],
+    "after_run": ["write_policy_decision"]
   },
   "output_schema": {
     "type": "tool_policy_decision",

@@ -1,0 +1,20 @@
+{
+  "skill_id": "source_evidence_intake",
+  "description": "Preserve incoming user sources and public web evidence as reusable source records without inventing claims.",
+  "steps": [
+    "dedupe_source",
+    "capture_raw_text_or_url",
+    "extract_title_author_date",
+    "extract_entities_keywords_and_links",
+    "summarize_source_claims",
+    "mark_unknown_metadata",
+    "write_source_record"
+  ],
+  "quality_gates": [
+    "source_id_required",
+    "raw_source_preserved",
+    "no_claim_invention",
+    "metadata_unknown_when_missing"
+  ],
+  "required_output": ["source_id", "source_type", "summary", "entities", "keywords", "urls"]
+}

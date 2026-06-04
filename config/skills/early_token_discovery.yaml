@@ -1,0 +1,20 @@
+{
+  "skill_id": "early_token_discovery",
+  "description": "Resolve early project candidates from social, public web, RootData, GitHub, DEX, and narrative signals without treating the trigger as final truth.",
+  "steps": [
+    "load_identity_gate",
+    "use_social_seed_first",
+    "search_public_web_and_articles",
+    "search_project_and_token_infrastructure",
+    "dedupe_candidates",
+    "classify_candidate_origin",
+    "send_verification_tasks_to_specialists"
+  ],
+  "quality_gates": [
+    "candidate_origin_required",
+    "source_backing_required",
+    "placeholder_candidates_flagged",
+    "no_final_judgment_from_discovery"
+  ],
+  "required_output": ["candidates", "reason_found", "candidate_origin", "source_backing", "verification_requests"]
+}

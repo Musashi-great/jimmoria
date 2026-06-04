@@ -278,6 +278,7 @@ class ResearchRuntime:
             agent_name=agent.name,
             task_type=agent.task_type,
         )
+        self._run_agent_spec_hooks(agent_id, "before_run", room_id=room.room_id, task_type=agent.task_type)
         if start_barrier is not None and hasattr(start_barrier, "wait"):
             try:
                 start_barrier.wait(timeout=10)
@@ -300,6 +301,13 @@ class ResearchRuntime:
             raise
         finally:
             self.hooks.run("after_run", agent_id=agent_id, room_id=room.room_id)
+        self._run_agent_spec_hooks(
+            agent_id,
+            "quality_gate",
+            room_id=room.room_id,
+            task_type=agent.task_type,
+            result_summary=result.summary,
+        )
         self._emit_orchestration_plan_event(room, result)
         self._emit(
             "agent_done",
@@ -314,6 +322,13 @@ class ResearchRuntime:
             llm_usage=self._agent_llm_usage(agent_id, llm_start_index),
         )
         self._emit_output_events(room, result)
+        self._run_agent_spec_hooks(
+            agent_id,
+            "after_run",
+            room_id=room.room_id,
+            task_type=agent.task_type,
+            result_summary=result.summary,
+        )
 
     def _seed_parallel_room_context(self, room: ResearchRoom, *, title: str, content: str, url: str | None) -> None:
         project_query = extract_project_query(room.topic)
@@ -644,6 +659,13 @@ class ResearchRuntime:
         room.report_draft = updated
 
     def _emit(self, event_type: str, **payload: Any) -> None:
+        if event_type == "tool_start":
+            self._run_agent_spec_hooks(
+                str(payload.get("agent_id") or ""),
+                "before_tool",
+                room_id=str(payload.get("room_id") or ""),
+                tool_name=str(payload.get("tool_name") or ""),
+            )
         with self._emit_lock:
             event = {
                 "seq": len(self.event_log) + 1,
@@ -654,6 +676,35 @@ class ResearchRuntime:
             self.event_log.append(event)
             if self.event_handler is not None:
                 self.event_handler(event)
+        if event_type in {"tool_done", "tool_failed", "tool_denied", "tool_unconfigured"}:
+            self._run_agent_spec_hooks(
+                str(payload.get("agent_id") or ""),
+                "after_tool",
+                room_id=str(payload.get("room_id") or ""),
+                tool_name=str(payload.get("tool_name") or ""),
+                tool_status=str(payload.get("status") or event_type.replace("tool_", "")),
+            )
+
+    def _run_agent_spec_hooks(self, agent_id: str, phase: str, **payload: Any) -> None:
+        if not agent_id:
+            return
+        spec = self.agent_specs.get(agent_id)
+        if spec is None:
+            return
+        hook_names = spec.hooks.get(phase, [])
+        for hook_name in hook_names:
+            hook_payload = {
+                "agent_id": agent_id,
+                "hook_phase": phase,
+                **payload,
+            }
+            self.hooks.run(hook_name, **hook_payload)
+            self._emit(
+                "agent_hook",
+                hook_name=hook_name,
+                **hook_payload,
+                summary=f"{agent_id} hook {phase}:{hook_name}",
+            )
 
     def _emit_room_completed(self, room: ResearchRoom) -> None:
         quality = room.project_card.get("research_quality") if isinstance(room.project_card, dict) else {}

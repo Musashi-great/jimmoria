@@ -195,6 +195,35 @@ report_agent              Turns findings into a human-readable dossier
 obsidian_curator_agent    Saves projects, sources, narratives, and reports
 ```
 
+## Agent Skills And Hooks
+
+Each agent now has explicit `skills` and runtime `hooks` in `config/agents/*.yaml`.
+
+Skills are local playbooks in `config/skills/`. They define the workflow an agent owns. Hooks are runtime checkpoints that fire around agent execution and tool usage, then appear as `agent_hook` events for future CLI/web replay.
+
+```text
+supervisor_agent          supervisor_orchestration, project_research, identity_gate
+ingestion_agent           article_ingestion, source_evidence_intake
+social_kol_agent          social_signal_intake, project_research
+narrative_agent           narrative_mapping, project_research
+discovery_agent           early_token_discovery, identity_gate, project_research
+contract_onchain_agent    identity_gate, onchain_token_verification
+product_tech_agent        product_tech_diligence, identity_gate
+funding_token_agent       funding_token_diligence, identity_gate
+report_agent              investment_report_synthesis, project_research, identity_gate
+obsidian_curator_agent    obsidian_memory_sync
+```
+
+Hook phases:
+
+```text
+before_run     prepare context and load the right playbook
+before_tool    check permission, source scope, and read-only boundaries
+after_tool     normalize evidence and write audit-friendly traces
+quality_gate   verify the agent output is usable for the final report
+after_run      hand off findings to the next company step
+```
+
 ## Tool Status
 
 Works without secrets:

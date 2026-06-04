@@ -1,0 +1,19 @@
+{
+  "skill_id": "funding_token_diligence",
+  "description": "Classify funding, founders, points, airdrop hints, token status, and value-capture without promising upside or rewards.",
+  "steps": [
+    "search_founder_and_funding_sources",
+    "classify_funding_confirmed_hint_unknown",
+    "check_points_or_airdrop_hints",
+    "separate_live_token_mechanics_from_roadmap",
+    "explain_who_pays_who_earns_and_why_token_may_be_needed",
+    "record_token_value_capture_unknowns"
+  ],
+  "quality_gates": [
+    "no_airdrop_promise",
+    "funding_source_quality_labeled",
+    "live_vs_roadmap_required",
+    "no_buy_sell_target_language"
+  ],
+  "required_output": ["founders", "funding_status", "points_status", "token_value_capture", "risks", "sources"]
+}

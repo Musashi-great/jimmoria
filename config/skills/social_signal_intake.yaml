@@ -1,0 +1,21 @@
+{
+  "skill_id": "social_signal_intake",
+  "description": "Use public web and X/Twitter-facing evidence as the first market signal layer, then normalize who said what and how strong the signal is.",
+  "steps": [
+    "load_xurl_or_public_web_fallback",
+    "find_official_x_candidates",
+    "search_project_posts_threads_and_articles",
+    "map_kol_and_builder_mentions",
+    "separate_official_posts_from_third_party_posts",
+    "normalize_who_said_what",
+    "score_social_confidence",
+    "handoff_social_seed_to_discovery"
+  ],
+  "quality_gates": [
+    "official_handle_or_unknown",
+    "speaker_url_required_when_available",
+    "social_buzz_is_not_final_truth",
+    "telegram_discord_out_of_scope"
+  ],
+  "required_output": ["official_x", "who_said_what", "kol_map", "article_mentions", "social_confidence"]
+}

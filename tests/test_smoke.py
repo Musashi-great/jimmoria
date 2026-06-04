@@ -1124,6 +1124,7 @@ class SmokeTest(unittest.TestCase):
             self.assertGreaterEqual(len(events), 10)
             self.assertEqual(events[0]["type"], "room_created")
             event_types = {event["type"] for event in events}
+            self.assertIn("agent_hook", event_types)
             self.assertIn("tool_start", event_types)
             self.assertIn("tool_done", event_types)
             self.assertIn("finding_saved", event_types)
@@ -1134,6 +1135,18 @@ class SmokeTest(unittest.TestCase):
             self.assertIn("final_review_start", event_types)
             self.assertIn("final_review_done", event_types)
             self.assertIn("orchestration_plan", event_types)
+            hook_events = [event for event in events if event["type"] == "agent_hook"]
+            self.assertTrue(hook_events)
+            hook_phases = {event.get("hook_phase") for event in hook_events}
+            self.assertIn("before_run", hook_phases)
+            self.assertIn("quality_gate", hook_phases)
+            self.assertIn("after_run", hook_phases)
+            self.assertIn("before_tool", hook_phases)
+            self.assertIn("after_tool", hook_phases)
+            self.assertIn(
+                "supervisor_orchestration",
+                runtime.agent_specs.get("supervisor_agent").skills,
+            )
             agent_done_events = [event for event in events if event["type"] == "agent_done"]
             self.assertTrue(agent_done_events)
             self.assertTrue(all("duration_ms" in event for event in agent_done_events))
@@ -1939,6 +1952,16 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(social.persona_name, "The Signal Listener")
         self.assertIn("public web and X", social.mission.primary_goal)
         self.assertIn("browser_snapshot", social.tools.allow)
+        self.assertIn("social_signal_intake", social.skills)
+        self.assertIn("prepare_who_said_what_schema", social.hooks["before_run"])
+        self.assertIn("no_hype_as_fact", social.hooks["quality_gate"])
+
+        discovery = registry.get("discovery_agent")
+        self.assertIsNotNone(discovery)
+        assert discovery is not None
+        self.assertIn("early_token_discovery", discovery.skills)
+        self.assertIn("identity_gate", discovery.skills)
+        self.assertIn("candidate_origin_required", discovery.hooks["quality_gate"])
 
         supervisor = registry.get("supervisor_agent")
         self.assertIsNotNone(supervisor)
@@ -1947,6 +1970,12 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("company_settings", supervisor.memory_scope.write)
         self.assertIn("skill_view", supervisor.tools.allow)
         self.assertIn("multi_tool_use.parallel", supervisor.tools.allow)
+        self.assertIn("supervisor_orchestration", supervisor.skills)
+        self.assertIn("classify_client_intent", supervisor.hooks["before_run"])
+        self.assertIn("verify_specialist_assignment", supervisor.hooks["quality_gate"])
+        supervisor_prompt = supervisor.system_prompt()
+        self.assertIn("Skills/playbooks: supervisor_orchestration", supervisor_prompt)
+        self.assertIn("Runtime hooks:", supervisor_prompt)
 
         product = registry.get("product_tech_agent")
         self.assertIsNotNone(product)
@@ -1954,11 +1983,16 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("github_search_repos", product.tools.allow)
         self.assertIn("search_files", product.tools.allow)
         self.assertIn("browser_console", product.tools.allow)
+        self.assertIn("product_tech_diligence", product.skills)
+        self.assertIn("product_claim_requires_source", product.hooks["quality_gate"])
 
         report = registry.get("report_agent")
         self.assertIsNotNone(report)
         assert report is not None
         self.assertEqual(report.output_schema.type, "project_intelligence_report")
+        self.assertIn("investment_report_synthesis", report.skills)
+        self.assertIn("claim_evidence_check", report.hooks["quality_gate"])
+        self.assertIn("no_agent_log_in_final", report.hooks["quality_gate"])
         self.assertIn("Korean-first investment-style project report", report.mission.primary_goal)
         self.assertTrue(any("client comprehension" in item for item in report.must_follow))
         self.assertTrue(any("project intelligence report" in item for item in report.must_not))
@@ -1972,6 +2006,8 @@ class SmokeTest(unittest.TestCase):
         assert funding is not None
         self.assertIn("rootdata_get_project", funding.tools.allow)
         self.assertIn("browser_snapshot", funding.tools.allow)
+        self.assertIn("funding_token_diligence", funding.skills)
+        self.assertIn("no_airdrop_promise", funding.hooks["quality_gate"])
 
     def test_process_specs_load_research_and_ingestion_rooms(self) -> None:
         registry = ProcessSpecRegistry.load_dir("config/processes")

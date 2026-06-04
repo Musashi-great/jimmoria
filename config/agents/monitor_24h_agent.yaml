@@ -34,6 +34,7 @@
     "write": ["signal_queue"],
     "no_access": ["oauth_tokens"]
   },
+  "skills": ["social_signal_intake", "early_token_discovery"],
   "tools": {
     "allow": [
       "monitor_x_list",
@@ -51,6 +52,13 @@
       "push_signal_queue"
     ],
     "deny": ["telegram_send_message", "x_post_tweet"]
+  },
+  "hooks": {
+    "before_run": ["schedule_window_check", "load_monitor_sources", "public_web_only_scope"],
+    "before_tool": ["rate_limit_check", "source_scope_check"],
+    "after_tool": ["signal_dedupe", "normalize_signal"],
+    "quality_gate": ["signal_url_required", "candidate_not_final_judgment"],
+    "after_run": ["push_signal_queue", "notify_supervisor_if_urgent"]
   },
   "output_schema": {
     "type": "market_signal",

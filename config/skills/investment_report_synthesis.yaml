@@ -1,0 +1,24 @@
+{
+  "skill_id": "investment_report_synthesis",
+  "description": "Write the client-facing Korean investment-style project intelligence report from specialist evidence, not from raw logs.",
+  "steps": [
+    "read_all_specialist_findings",
+    "run_claim_evidence_check",
+    "put_conclusion_first",
+    "explain_project_identity_and_product",
+    "summarize_social_kol_and_article_signal_content",
+    "explain_narrative_and_market_problem",
+    "summarize_founders_funding_token_and_risks",
+    "score_top_watch_operator_exclude",
+    "write_evidence_packet_separately",
+    "remove_agent_logs_from_final_body"
+  ],
+  "quality_gates": [
+    "korean_first_output",
+    "claim_evidence_check",
+    "no_agent_log_in_final",
+    "source_links_support_content_not_replace_it",
+    "no_investment_advice"
+  ],
+  "required_output": ["representative_verdict", "executive_summary", "project_report", "risk_register", "stance", "evidence_packet"]
+}

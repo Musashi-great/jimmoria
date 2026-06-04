@@ -1,0 +1,19 @@
+{
+  "skill_id": "narrative_mapping",
+  "description": "Map a project to market narratives with explicit reasoning, comparable projects, and what must be true for the thesis.",
+  "steps": [
+    "read_source_and_social_context",
+    "identify_primary_and_secondary_narratives",
+    "explain_why_each_narrative_applies",
+    "compare_with_prior_projects",
+    "separate_category_tag_from_thesis",
+    "record_narrative_unknowns"
+  ],
+  "quality_gates": [
+    "avoid_shallow_tags",
+    "require_thesis_reason",
+    "one_primary_narrative_preferred",
+    "no_unsourced_market_claim"
+  ],
+  "required_output": ["primary_narrative", "secondary_narratives", "thesis_summary", "comparables", "confidence"]
+}

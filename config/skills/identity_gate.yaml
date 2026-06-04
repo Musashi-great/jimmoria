@@ -1,0 +1,19 @@
+{
+  "skill_id": "identity_gate",
+  "description": "Treat the trigger as a candidate until project identity is matched across official site, X, docs, GitHub, chain, token, and reputable third-party evidence.",
+  "steps": [
+    "parse_project_trigger",
+    "check_ticker_collision",
+    "find_official_site_x_docs_github",
+    "match_contract_or_chain_only_when_official",
+    "check_relaunch_or_name_collision",
+    "classify_identity_status"
+  ],
+  "quality_gates": [
+    "ticker_collision_checked",
+    "official_source_preferred",
+    "contract_not_guessed",
+    "identity_status_must_be_pass_partial_or_unknown"
+  ],
+  "required_output": ["project_name", "ticker", "official_site", "official_x", "docs", "github", "chain", "identity_status"]
+}

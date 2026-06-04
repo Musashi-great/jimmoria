@@ -1,0 +1,19 @@
+{
+  "skill_id": "product_tech_diligence",
+  "description": "Explain the actual product, protocol mechanics, live app status, docs, GitHub, SDK/API, and operator evidence.",
+  "steps": [
+    "prioritize_official_site_docs_app",
+    "extract_product_mechanics",
+    "classify_live_beta_testnet_waitlist_unknown",
+    "inspect_github_or_package_activity",
+    "filter_generic_platform_links",
+    "compare_marketing_claims_to_live_evidence"
+  ],
+  "quality_gates": [
+    "product_claim_requires_source",
+    "generic_github_links_rejected",
+    "live_vs_roadmap_separated",
+    "project_mechanics_explained_in_plain_language"
+  ],
+  "required_output": ["product_summary", "product_stage", "docs_status", "github_status", "live_infra", "sources"]
+}

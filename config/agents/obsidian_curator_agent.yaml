@@ -37,6 +37,7 @@
     "write": ["obsidian_notes"],
     "no_access": ["oauth_tokens"]
   },
+  "skills": ["obsidian_memory_sync"],
   "tools": {
     "allow": [
       "read_note",
@@ -51,6 +52,13 @@
       "sync_watchlist"
     ],
     "deny": ["telegram_send_message", "x_post_tweet"]
+  },
+  "hooks": {
+    "before_run": ["load_obsidian_sync_skill", "dedupe_note_paths"],
+    "before_tool": ["vault_path_safety_check"],
+    "after_tool": ["validate_frontmatter", "create_backlinks"],
+    "quality_gate": ["no_new_research_claims", "source_links_preserved"],
+    "after_run": ["write_vault_sync_summary"]
   },
   "output_schema": {
     "type": "obsidian_sync",

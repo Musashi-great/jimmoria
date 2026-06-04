@@ -79,6 +79,7 @@ class AgentSpec:
     scope: ScopeSpec = field(default_factory=ScopeSpec)
     model_policy: ModelPolicy = field(default_factory=ModelPolicy)
     memory_scope: MemoryScope = field(default_factory=MemoryScope)
+    skills: list[str] = field(default_factory=list)
     tools: ToolPolicy = field(default_factory=ToolPolicy)
     hooks: dict[str, list[str]] = field(default_factory=dict)
     output_schema: OutputSchema | None = None
@@ -101,6 +102,7 @@ class AgentSpec:
             scope=ScopeSpec(**data.get("scope", {})),
             model_policy=ModelPolicy(**data.get("model_policy", {})),
             memory_scope=MemoryScope(**data.get("memory_scope", {})),
+            skills=list(data.get("skills", [])),
             tools=ToolPolicy(**data.get("tools", {})),
             hooks=data.get("hooks", {}),
             output_schema=OutputSchema(**output_schema) if output_schema else None,
@@ -127,6 +129,12 @@ class AgentSpec:
             lines.append("You do not own: " + ", ".join(self.scope.does_not_own))
         if self.personality.tone:
             lines.append("Tone: " + ", ".join(self.personality.tone))
+        if self.skills:
+            lines.append("Skills/playbooks: " + ", ".join(self.skills))
+        if self.hooks:
+            lines.append("Runtime hooks:")
+            for hook_phase, hook_names in self.hooks.items():
+                lines.append(f"- {hook_phase}: " + ", ".join(hook_names))
         if self.must_follow:
             lines.append("Must follow:")
             lines.extend(f"- {item}" for item in self.must_follow)

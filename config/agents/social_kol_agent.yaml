@@ -47,6 +47,7 @@
     "write": ["kol_mentions", "social_findings"],
     "no_access": ["oauth_tokens", "billing", "user_private_notes"]
   },
+  "skills": ["social_signal_intake", "project_research"],
   "tools": {
     "allow": [
       "x_search_posts",
@@ -68,6 +69,13 @@
       "update_kol_profile"
     ],
     "deny": ["x_post_tweet", "telegram_send_message", "wallet_sign", "delete_source"]
+  },
+  "hooks": {
+    "before_run": ["load_social_signal_skill", "public_web_only_scope", "prepare_who_said_what_schema"],
+    "before_tool": ["x_public_source_guard", "redact_sensitive_inputs"],
+    "after_tool": ["normalize_who_said_what", "label_social_confidence"],
+    "quality_gate": ["official_handle_or_unknown", "no_hype_as_fact"],
+    "after_run": ["handoff_social_seed_to_discovery", "write_social_finding"]
   },
   "output_schema": {
     "type": "social_finding",

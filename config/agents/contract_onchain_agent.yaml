@@ -38,6 +38,7 @@
     "write": ["contract_db", "contract_findings"],
     "no_access": ["oauth_tokens"]
   },
+  "skills": ["identity_gate", "onchain_token_verification"],
   "tools": {
     "allow": [
       "resolve_chain",
@@ -62,6 +63,13 @@
       "thegraph_query_subgraph"
     ],
     "deny": ["wallet_sign", "contract_write", "telegram_send_message"]
+  },
+  "hooks": {
+    "before_run": ["identity_gate_required", "no_contract_guessing"],
+    "before_tool": ["official_source_priority", "read_only_chain_guard"],
+    "after_tool": ["normalize_chain_evidence", "redact_sensitive_inputs"],
+    "quality_gate": ["official_contract_or_unknown", "ticker_collision_checked"],
+    "after_run": ["write_onchain_finding", "handoff_token_status_to_report"]
   },
   "output_schema": {
     "type": "contract_token_info",

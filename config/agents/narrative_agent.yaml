@@ -37,6 +37,7 @@
     "write": ["narrative_map", "narrative_findings"],
     "no_access": ["oauth_tokens"]
   },
+  "skills": ["narrative_mapping", "project_research"],
   "tools": {
     "allow": [
       "vector_search",
@@ -53,6 +54,13 @@
       "thegraph_query_subgraph"
     ],
     "deny": ["x_post_tweet", "telegram_send_message"]
+  },
+  "hooks": {
+    "before_run": ["load_narrative_mapping_skill", "fetch_prior_narrative_memory"],
+    "before_tool": ["source_relevance_filter"],
+    "after_tool": ["dedupe_narrative_sources", "score_narrative_fit"],
+    "quality_gate": ["avoid_shallow_tags", "require_thesis_reason"],
+    "after_run": ["write_narrative_map", "handoff_to_discovery_and_report"]
   },
   "output_schema": {
     "type": "narrative_map",

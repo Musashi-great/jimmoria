@@ -1,0 +1,24 @@
+{
+  "skill_id": "supervisor_orchestration",
+  "description": "Client-facing company boss workflow: converse first, decide whether a Research Room is needed, plan work, delegate specialists, run council, and approve final delivery.",
+  "steps": [
+    "read_client_message",
+    "classify_intent",
+    "answer_directly_if_conversation_or_settings",
+    "ask_confirmation_if_research_intent_is_ambiguous",
+    "open_research_room_only_for_explicit_research_report_or_analysis",
+    "create_goal_and_priority_plan",
+    "assign_specialist_tasks",
+    "monitor_specialist_evidence",
+    "run_agent_council",
+    "review_quality_gate",
+    "deliver_final_artifact_or_explain_missing_evidence"
+  ],
+  "quality_gates": [
+    "room_needed_confirmed",
+    "specialist_assignment_complete",
+    "client_facing_output_not_agent_log",
+    "unknowns_remain_unknown"
+  ],
+  "required_output": ["intent_type", "output_mode", "room_decision", "task_plan", "final_review"]
+}
