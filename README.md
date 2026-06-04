@@ -81,12 +81,12 @@ jimmoria demo
 
 ## Model Setup
 
-JIMMORIA can run Codex-only, Grok-only, or Codex+Grok hybrid routing. The recommended production setup is hybrid: Codex keeps orchestration/final writing stable, while Grok is used for social/narrative/candidate discovery work.
+JIMMORIA can run Codex-only, Grok-only, or Codex+Grok hybrid routing. The recommended production setup is hybrid: Codex keeps orchestration/final writing stable, while Grok/xAI is used for social, narrative, and candidate-discovery work.
 
 Recommended provider:
 
 ```text
-Codex SDK / local app-server
+Codex + Grok role routing
 ```
 
 Install Codex SDK support:
@@ -119,6 +119,8 @@ $env:GROK_OAUTH_TOKEN_COMMAND = "op read op://vault/xai/token"
 
 The xAI API uses an OpenAI-compatible endpoint at `https://api.x.ai/v1`. JIMMORIA does not save raw Grok/XAI tokens in `data/model_settings.json`; it only saves provider/model preferences, token file paths, or token commands. With `LLM_PROVIDER=xai_oauth`, Hermes OAuth is preferred over `XAI_API_KEY`. With `LLM_PROVIDER=grok`, API key/env sources are preferred and Hermes OAuth is used as a fallback.
 
+Important: `xai_oauth` is a Grok credential mode. For role-based company routing, use `LLM_PROVIDER=codex_grok`; JIMMORIA will still use Hermes xAI OAuth for the Grok side.
+
 Hybrid Codex + Grok mode:
 
 ```powershell
@@ -129,16 +131,16 @@ jimmoria
 Default hybrid routing:
 
 ```text
-Codex: supervisor chat, ingestion, contract/product/funding checks, report writing, final review
-Grok:  X/KOL social synthesis, narrative mapping, candidate discovery
+Codex: supervisor, ingestion, contract/on-chain, product/tech, funding/token, report, Obsidian
+Grok:  social/KOL, narrative, discovery
 ```
 
 Optional overrides:
 
 ```powershell
 $env:JIMMORIA_CODEX_PROVIDER = "codex_cli"   # or codex_sdk
-$env:JIMMORIA_GROK_TASKS = "candidate_discovery,narrative_reasoning,social_summary"
-$env:JIMMORIA_GROK_AGENTS = "social_kol_agent"
+$env:JIMMORIA_AGENT_PROVIDER_SOCIAL_KOL_AGENT = "grok"
+$env:JIMMORIA_AGENT_PROVIDER_REPORT_AGENT = "codex"
 ```
 
 Default model routing:

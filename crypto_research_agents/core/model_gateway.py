@@ -128,6 +128,12 @@ class ModelGateway:
     def provider_family_for_task(self, *, agent_id: str, task_type: str) -> str:
         if self.provider_mode != "codex_grok":
             return self.provider_family
+        override = _agent_provider_override(agent_id)
+        if override:
+            return override
+        agent_family = _hybrid_agent_provider_families().get(agent_id)
+        if agent_family:
+            return agent_family
         if task_type in _grok_task_types() or agent_id in _grok_agent_ids():
             return "grok"
         return "codex"
@@ -257,9 +263,11 @@ _HYBRID_PROVIDER_NAMES = {
 
 
 def _hybrid_providers_from_env() -> dict[str, LLMProvider]:
+    grok_auth = os.getenv("JIMMORIA_GROK_AUTH_PROVIDER", "xai_oauth").strip().lower().replace("-", "_")
+    prefer_hermes_oauth = grok_auth in {"", "xai_oauth", "grok_oauth", "hermes", "oauth", "hermes_xai_oauth"}
     return {
         "codex": _codex_provider_from_env(),
-        "grok": GrokProvider(prefer_hermes_oauth=True),
+        "grok": GrokProvider(prefer_hermes_oauth=prefer_hermes_oauth),
     }
 
 
@@ -295,6 +303,42 @@ def _grok_agent_ids() -> set[str]:
     return {
         "social_kol_agent",
     }
+
+
+def _hybrid_agent_provider_families() -> dict[str, str]:
+    """Default role-based provider split for the research company."""
+
+    return {
+        "supervisor_agent": "codex",
+        "ingestion_agent": "codex",
+        "narrative_agent": "grok",
+        "discovery_agent": "grok",
+        "social_kol_agent": "grok",
+        "contract_onchain_agent": "codex",
+        "product_tech_agent": "codex",
+        "funding_token_agent": "codex",
+        "report_agent": "codex",
+        "obsidian_curator_agent": "codex",
+    }
+
+
+def _agent_provider_override(agent_id: str) -> str | None:
+    normalized_agent = "".join(ch if ch.isalnum() else "_" for ch in agent_id).upper()
+    raw = (
+        os.getenv(f"JIMMORIA_AGENT_PROVIDER_{normalized_agent}")
+        or os.getenv(f"JIMMORIA_PROVIDER_{normalized_agent}")
+        or ""
+    ).strip()
+    return _normalize_provider_family(raw)
+
+
+def _normalize_provider_family(raw: str) -> str | None:
+    normalized = raw.strip().lower().replace("-", "_")
+    if normalized in {"codex", "codex_cli", "codex_sdk", "openai_codex"}:
+        return "codex"
+    if normalized in {"grok", "xai", "xai_oauth", "grok_oauth", "xai_api", "grok_api"}:
+        return "grok"
+    return None
 
 
 def _default_model_for_tier(tier: str, *, provider_family: str) -> str:

@@ -2579,13 +2579,15 @@ Usage: codex exec [OPTIONS] [PROMPT]
                     with redirect_stdout(output):
                         configure_model_panel()
                 self.assertEqual(os.environ["LLM_PROVIDER"], "codex_grok")
+                self.assertEqual(os.environ["JIMMORIA_GROK_AUTH_PROVIDER"], "xai_oauth")
                 settings = json.loads(Path(settings_path).read_text(encoding="utf-8"))
                 self.assertEqual(settings["LLM_PROVIDER"], "codex_grok")
+                self.assertEqual(settings["JIMMORIA_GROK_AUTH_PROVIDER"], "xai_oauth")
                 self.assertNotIn("GROK_OAUTH_TOKEN", settings)
 
         text = output.getvalue()
         self.assertIn("[Codex + Grok hybrid]", text)
-        self.assertIn("Grok handles: X/KOL social synthesis, narrative mapping, candidate discovery.", text)
+        self.assertIn("Grok agents: Social/KOL, Narrative, Discovery.", text)
 
     def test_model_setup_grok_choice_saves_provider_without_raw_token(self) -> None:
         output = StringIO()
@@ -2828,7 +2830,15 @@ Usage: codex exec [OPTIONS] [PROMPT]
         with patch.dict("os.environ", {"LLM_PROVIDER": "codex_grok"}, clear=True):
             gateway = ModelGateway(providers={"codex": codex, "grok": grok})
             discovery_decision = gateway.select(agent_id="discovery_agent", task_type="candidate_discovery")
+            narrative_decision = gateway.select(agent_id="narrative_agent", task_type="narrative_reasoning")
+            social_decision = gateway.select(agent_id="social_kol_agent", task_type="social_summary")
+            supervisor_decision = gateway.select(agent_id="supervisor_agent", task_type="supervisor_chat")
+            ingestion_decision = gateway.select(agent_id="ingestion_agent", task_type="source_ingestion")
+            contract_decision = gateway.select(agent_id="contract_onchain_agent", task_type="contract_info")
+            product_decision = gateway.select(agent_id="product_tech_agent", task_type="product_docs")
+            funding_decision = gateway.select(agent_id="funding_token_agent", task_type="funding_token")
             report_decision = gateway.select(agent_id="report_agent", task_type="final_synthesis")
+            obsidian_decision = gateway.select(agent_id="obsidian_curator_agent", task_type="obsidian_sync")
             social = gateway.complete(
                 agent_id="social_kol_agent",
                 task_type="social_summary",
@@ -2844,8 +2854,16 @@ Usage: codex exec [OPTIONS] [PROMPT]
 
         self.assertEqual(gateway.provider_name, "codex_grok")
         self.assertEqual(discovery_decision.provider_family, "grok")
+        self.assertEqual(narrative_decision.provider_family, "grok")
+        self.assertEqual(social_decision.provider_family, "grok")
+        self.assertEqual(supervisor_decision.provider_family, "codex")
+        self.assertEqual(ingestion_decision.provider_family, "codex")
+        self.assertEqual(contract_decision.provider_family, "codex")
+        self.assertEqual(product_decision.provider_family, "codex")
+        self.assertEqual(funding_decision.provider_family, "codex")
         self.assertEqual(discovery_decision.selected_model, "grok-4.3")
         self.assertEqual(report_decision.provider_family, "codex")
+        self.assertEqual(obsidian_decision.provider_family, "codex")
         self.assertEqual(report_decision.selected_model, "gpt-5.5")
         self.assertEqual(social.provider, "grok")
         self.assertEqual(report.provider, "codex_cli")
@@ -2853,6 +2871,67 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(len(codex.requests), 1)
         self.assertEqual(gateway.call_log[0]["provider_family"], "grok")
         self.assertEqual(gateway.call_log[1]["provider_family"], "codex")
+
+    def test_codex_grok_hybrid_agent_override_can_route_one_worker(self) -> None:
+        class FakeProvider:
+            def __init__(self, provider_name: str) -> None:
+                self.provider_name = provider_name
+
+            def complete(self, request: LLMRequest) -> LLMResponse:
+                return LLMResponse(text="ok", model=request.model, provider=self.provider_name, usage={})
+
+        with patch.dict(
+            "os.environ",
+            {
+                "LLM_PROVIDER": "codex_grok",
+                "JIMMORIA_AGENT_PROVIDER_FUNDING_TOKEN_AGENT": "xai",
+            },
+            clear=True,
+        ):
+            gateway = ModelGateway(
+                providers={
+                    "codex": FakeProvider("codex_cli"),
+                    "grok": FakeProvider("grok"),
+                }
+            )
+            funding = gateway.select(agent_id="funding_token_agent", task_type="funding_token")
+            report = gateway.select(agent_id="report_agent", task_type="final_synthesis")
+
+        self.assertEqual(funding.provider_family, "grok")
+        self.assertEqual(report.provider_family, "codex")
+
+    def test_codex_grok_hybrid_grok_auth_provider_controls_oauth_priority(self) -> None:
+        class FakeProvider:
+            def __init__(self, provider_name: str, *, prefer_hermes_oauth: bool | None = None) -> None:
+                self.provider_name = provider_name
+                self.prefer_hermes_oauth = prefer_hermes_oauth
+
+            def complete(self, request: LLMRequest) -> LLMResponse:
+                return LLMResponse(text="ok", model=request.model, provider=self.provider_name, usage={})
+
+        seen: dict[str, object] = {}
+
+        def fake_grok_provider(*, prefer_hermes_oauth: bool) -> FakeProvider:
+            seen["prefer_hermes_oauth"] = prefer_hermes_oauth
+            return FakeProvider("grok", prefer_hermes_oauth=prefer_hermes_oauth)
+
+        with patch.dict(
+            "os.environ",
+            {
+                "LLM_PROVIDER": "codex_grok",
+                "JIMMORIA_GROK_AUTH_PROVIDER": "api_key",
+            },
+            clear=True,
+        ):
+            with patch(
+                "crypto_research_agents.core.model_gateway._codex_provider_from_env",
+                return_value=FakeProvider("codex_cli"),
+            ):
+                with patch("crypto_research_agents.core.model_gateway.GrokProvider", side_effect=fake_grok_provider):
+                    gateway = ModelGateway()
+
+        self.assertEqual(gateway.provider_name, "codex_grok")
+        self.assertFalse(seen["prefer_hermes_oauth"])
 
     def test_parse_json_response_accepts_fenced_or_prefaced_json(self) -> None:
         fenced = LLMResponse(
@@ -2964,8 +3043,10 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertIn("xai_oauth", router["runtime_order"])
         self.assertIn("grok", router["runtime_order"])
         self.assertEqual(router["env"]["hybrid_codex_provider"], "JIMMORIA_CODEX_PROVIDER")
+        self.assertEqual(router["env"]["hybrid_grok_auth_provider"], "JIMMORIA_GROK_AUTH_PROVIDER")
         self.assertEqual(router["env"]["hybrid_grok_tasks"], "JIMMORIA_GROK_TASKS")
         self.assertEqual(router["env"]["hybrid_grok_agents"], "JIMMORIA_GROK_AGENTS")
+        self.assertEqual(router["env"]["agent_provider_override"], "JIMMORIA_AGENT_PROVIDER_<AGENT_ID>")
         self.assertEqual(router["env"]["hermes_home"], "HERMES_HOME")
         self.assertEqual(router["env"]["hermes_auth_json"], "HERMES_AUTH_JSON")
         self.assertEqual(router["routes"]["supervisor_chat"], "fast_chat_model")
@@ -2988,6 +3069,11 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(router["defaults"]["reasoning_effort"], "pro")
         self.assertEqual(router["routes"]["source_ingestion"], "reasoning_model")
         self.assertEqual(router["hybrid_provider_routes"]["provider"], "codex_grok")
+        self.assertEqual(router["hybrid_provider_routes"]["agent_provider_families"]["supervisor_agent"], "codex")
+        self.assertEqual(router["hybrid_provider_routes"]["agent_provider_families"]["narrative_agent"], "grok")
+        self.assertEqual(router["hybrid_provider_routes"]["agent_provider_families"]["discovery_agent"], "grok")
+        self.assertEqual(router["hybrid_provider_routes"]["agent_provider_families"]["social_kol_agent"], "grok")
+        self.assertEqual(router["hybrid_provider_routes"]["agent_provider_families"]["report_agent"], "codex")
         self.assertIn("social_summary", router["hybrid_provider_routes"]["grok_task_types"])
         self.assertIn("report_writing", router["hybrid_provider_routes"]["codex_task_types"])
         self.assertEqual(router["reasoning_effort"]["codex_cli_pro_value"], "xhigh")

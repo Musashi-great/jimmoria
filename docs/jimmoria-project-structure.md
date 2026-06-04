@@ -265,6 +265,33 @@ Raw Grok/XAI bearer tokens are not saved in `data/model_settings.json`. Only pro
 
 `CODEX_REASONING_EFFORT=pro` remains the shared effort control. Codex CLI maps it to `model_reasoning_effort="xhigh"` where supported. Grok maps it to xAI Responses API `reasoning.effort="high"` for `grok-4.3`; `grok-4.20-multi-agent` maps pro to `xhigh`.
 
+### 5.2.2 Agent Role Provider Routing
+
+역할별 모델 사용은 `LLM_PROVIDER=codex_grok`에서 동작한다. `xai_oauth`는 Grok 인증 방식이고, 회사 전체를 Grok 단독으로 돌리는 provider 값이다. 따라서 Codex와 xAI/Grok을 동시에 쓰려면 top-level provider는 반드시 `codex_grok`여야 한다.
+
+기본 라우팅은 다음과 같다.
+
+| Agent | Provider family | 이유 |
+|---|---|---|
+| `supervisor_agent` | Codex | 대표/오케스트레이터, 목표 설정, 최종 판단 |
+| `ingestion_agent` | Codex | 원문 정리, entity/metadata 추출 |
+| `narrative_agent` | Grok/xAI | 시장 내러티브와 소셜 맥락 해석 |
+| `discovery_agent` | Grok/xAI | 초기 후보 발굴, 웹/소셜 단서 확장 |
+| `social_kol_agent` | Grok/xAI | X/KOL 포스팅, 언급, 커뮤니티 신호 해석 |
+| `contract_onchain_agent` | Codex | 컨트랙트, 체인, 토큰 식별 검증 |
+| `product_tech_agent` | Codex | 사이트, Docs, GitHub, 제품 구현 검증 |
+| `funding_token_agent` | Codex | 투자자, 포인트, 토큰 가치포착 정리 |
+| `report_agent` | Codex | 금융투자 보고서형 최종 문서 작성 |
+| `obsidian_curator_agent` | Codex | Vault 정리와 장기 기억 저장 |
+
+단일 에이전트 라우팅은 환경변수로 덮어쓸 수 있다.
+
+```powershell
+$env:LLM_PROVIDER = "codex_grok"
+$env:JIMMORIA_AGENT_PROVIDER_SOCIAL_KOL_AGENT = "grok"
+$env:JIMMORIA_AGENT_PROVIDER_REPORT_AGENT = "codex"
+```
+
 ## 6. Supervisor Role
 
 Supervisor는 단순 라우터가 아니라 회사의 boss/orchestrator다.

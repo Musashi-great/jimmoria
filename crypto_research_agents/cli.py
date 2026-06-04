@@ -82,8 +82,19 @@ MODEL_SETTING_ENV_NAMES = [
     "LLM_PROVIDER",
     "JIMMORIA_CODEX_PROVIDER",
     "CODEX_PROVIDER",
+    "JIMMORIA_GROK_AUTH_PROVIDER",
     "JIMMORIA_GROK_TASKS",
     "JIMMORIA_GROK_AGENTS",
+    "JIMMORIA_AGENT_PROVIDER_SUPERVISOR_AGENT",
+    "JIMMORIA_AGENT_PROVIDER_INGESTION_AGENT",
+    "JIMMORIA_AGENT_PROVIDER_NARRATIVE_AGENT",
+    "JIMMORIA_AGENT_PROVIDER_DISCOVERY_AGENT",
+    "JIMMORIA_AGENT_PROVIDER_SOCIAL_KOL_AGENT",
+    "JIMMORIA_AGENT_PROVIDER_CONTRACT_ONCHAIN_AGENT",
+    "JIMMORIA_AGENT_PROVIDER_PRODUCT_TECH_AGENT",
+    "JIMMORIA_AGENT_PROVIDER_FUNDING_TOKEN_AGENT",
+    "JIMMORIA_AGENT_PROVIDER_REPORT_AGENT",
+    "JIMMORIA_AGENT_PROVIDER_OBSIDIAN_CURATOR_AGENT",
     "CODEX_REASONING_EFFORT",
     "CODEX_MODEL_FAST_CHAT",
     "CODEX_MODEL_FAST",
@@ -1506,10 +1517,10 @@ def configure_model_panel(*, clear_before: bool = True) -> None:
         [
             f"Current provider: {os.getenv('LLM_PROVIDER') or 'offline_fallback'}",
             "",
-            "1. Codex SDK / local app-server (Recommended)",
+            "1. Codex SDK / local app-server",
             "2. Codex CLI exec",
-            "3. Grok / xAI OAuth or API key",
-            "4. Codex + Grok hybrid routing",
+            "3. Grok / xAI OAuth or API key only",
+            "4. Codex + Grok role routing (Recommended)",
             "5. Offline diagnostic fallback",
             "Enter. Keep current",
         ]
@@ -1645,22 +1656,24 @@ def configure_grok() -> None:
 def configure_codex_grok_hybrid() -> None:
     clear_legacy_model_session_env()
     os.environ["LLM_PROVIDER"] = "codex_grok"
+    os.environ.setdefault("JIMMORIA_GROK_AUTH_PROVIDER", "xai_oauth")
     clear_screen()
     print_screen(
         "Codex + Grok hybrid",
         [
             "JIMMORIA will use both model families in one Research Room.",
             "",
-            "Codex handles: Supervisor chat, source ingestion, contract/product/funding checks, report writing, final review.",
-            "Grok handles: X/KOL social synthesis, narrative mapping, candidate discovery.",
+            "Codex agents: Supervisor, Ingestion, Contract/On-chain, Product/Tech, Funding/Token, Report, Obsidian.",
+            "Grok agents: Social/KOL, Narrative, Discovery.",
             "",
             "Codex runtime: SDK if available, otherwise Codex CLI. Override with JIMMORIA_CODEX_PROVIDER=codex_cli or codex_sdk.",
-            "Grok auth: Hermes xAI OAuth, XAI_API_KEY/GROK_API_KEY, token file, or token command.",
+            "Grok auth: Hermes xAI OAuth by default, then XAI_API_KEY/GROK_API_KEY, token file, or token command.",
+            "This is role routing. Use LLM_PROVIDER=codex_grok; do not use xai_oauth as the top-level provider for this mode.",
             "No raw Grok/Codex tokens are saved in model_settings.json.",
             "",
             "Optional overrides:",
-            "  JIMMORIA_GROK_TASKS=candidate_discovery,narrative_reasoning,social_summary",
-            "  JIMMORIA_GROK_AGENTS=social_kol_agent",
+            "  JIMMORIA_AGENT_PROVIDER_SOCIAL_KOL_AGENT=grok",
+            "  JIMMORIA_AGENT_PROVIDER_REPORT_AGENT=codex",
         ],
     )
     input("Continue [Enter]: ")
@@ -1858,8 +1871,10 @@ def clear_legacy_model_session_env() -> None:
 def print_current_model_config() -> None:
     gateway = ModelGateway()
     provider = os.getenv("LLM_PROVIDER") or getattr(gateway, "provider_name", "") or getattr(gateway.provider, "provider_name", "offline_fallback")
-    fast_decision = gateway.select(agent_id="supervisor_agent", task_type="supervisor_chat")
-    reasoning_decision = gateway.select(agent_id="discovery_agent", task_type="candidate_discovery")
+    supervisor_decision = gateway.select(agent_id="supervisor_agent", task_type="supervisor_chat")
+    discovery_decision = gateway.select(agent_id="discovery_agent", task_type="candidate_discovery")
+    narrative_decision = gateway.select(agent_id="narrative_agent", task_type="narrative_reasoning")
+    social_decision = gateway.select(agent_id="social_kol_agent", task_type="social_summary")
     writing_decision = gateway.select(agent_id="report_agent", task_type="final_synthesis")
     if provider == "codex_sdk":
         token_source = "Codex SDK app-server" + (" available" if codex_sdk_available() else " package not installed")
@@ -1888,10 +1903,12 @@ def print_current_model_config() -> None:
         "Model Config",
         [
             f"Provider: {provider}",
-            f"Fast model: {fast_decision.selected_model}",
-            f"Discovery/social model: {reasoning_decision.selected_model} ({reasoning_decision.provider_family})",
+            f"Supervisor model: {supervisor_decision.selected_model} ({supervisor_decision.provider_family})",
+            f"Narrative model: {narrative_decision.selected_model} ({narrative_decision.provider_family})",
+            f"Discovery model: {discovery_decision.selected_model} ({discovery_decision.provider_family})",
+            f"Social/KOL model: {social_decision.selected_model} ({social_decision.provider_family})",
             f"Writing model: {writing_decision.selected_model} ({writing_decision.provider_family})",
-            f"Reasoning effort: {reasoning_decision.reasoning_effort}",
+            f"Reasoning effort: {discovery_decision.reasoning_effort}",
             f"Credential: {token_source}",
             f"Supported models: {supported_models}",
         ]

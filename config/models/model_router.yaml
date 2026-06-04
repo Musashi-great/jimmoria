@@ -18,8 +18,10 @@
   "env": {
     "provider": "LLM_PROVIDER",
     "hybrid_codex_provider": "JIMMORIA_CODEX_PROVIDER",
+    "hybrid_grok_auth_provider": "JIMMORIA_GROK_AUTH_PROVIDER",
     "hybrid_grok_tasks": "JIMMORIA_GROK_TASKS",
     "hybrid_grok_agents": "JIMMORIA_GROK_AGENTS",
+    "agent_provider_override": "JIMMORIA_AGENT_PROVIDER_<AGENT_ID>",
     "codex_sdk_sandbox": "CODEX_SDK_SANDBOX",
     "codex_sdk_approval_mode": "CODEX_SDK_APPROVAL_MODE",
     "codex_sdk_cwd": "CODEX_SDK_CWD",
@@ -126,6 +128,18 @@
   "hybrid_provider_routes": {
     "provider": "codex_grok",
     "default_provider_family": "codex",
+    "agent_provider_families": {
+      "supervisor_agent": "codex",
+      "ingestion_agent": "codex",
+      "narrative_agent": "grok",
+      "discovery_agent": "grok",
+      "social_kol_agent": "grok",
+      "contract_onchain_agent": "codex",
+      "product_tech_agent": "codex",
+      "funding_token_agent": "codex",
+      "report_agent": "codex",
+      "obsidian_curator_agent": "codex"
+    },
     "grok_task_types": [
       "candidate_discovery",
       "narrative_reasoning",
@@ -148,7 +162,9 @@
     "notes": [
       "Codex remains the final-writing and orchestration provider.",
       "Grok is used where X/KOL, narrative, and candidate discovery benefit from xAI/Grok context.",
-      "Override Grok routing with JIMMORIA_GROK_TASKS and JIMMORIA_GROK_AGENTS."
+      "Agent-level provider families are applied before task-type fallbacks.",
+      "Override a single agent with JIMMORIA_AGENT_PROVIDER_<AGENT_ID>=codex or grok.",
+      "Use LLM_PROVIDER=codex_grok for role routing; xai_oauth is a Grok credential mode, not the hybrid company mode."
     ]
   },
   "fallback": {
