@@ -68,6 +68,19 @@ class OfflineLLMProvider:
         )
 
 
+class HybridLLMProvider:
+    """Status provider for Codex+Grok mode.
+
+    Actual routing is handled by ModelGateway because each task can choose a
+    different concrete provider.
+    """
+
+    provider_name = "codex_grok"
+
+    def complete(self, request: LLMRequest) -> LLMResponse:
+        raise RuntimeError("Codex+Grok hybrid mode must be routed through ModelGateway.")
+
+
 class CodexCliProvider:
     """LLM provider that uses the local Codex CLI ChatGPT login session."""
 
@@ -270,6 +283,8 @@ def provider_from_env() -> LLMProvider:
     provider = os.getenv("LLM_PROVIDER", "").strip().lower()
     if provider in {"offline", "fallback", "none"}:
         return OfflineLLMProvider()
+    if provider in {"codex_grok", "grok_codex", "codex+grok", "grok+codex", "hybrid", "dual", "multi"}:
+        return HybridLLMProvider()
     if provider in {"codex_cli", "codex_device", "codex_login"}:
         return CodexCliProvider()
     if provider in {"codex_sdk", "codex", "sdk"}:

@@ -160,16 +160,18 @@ def collect_capabilities(
 
 def _agent_llm_routing_status(provider: Any) -> CapabilityStatus:
     gateway = ModelGateway(provider=provider)
-    reasoning = gateway.select(agent_id="discovery_agent", task_type="candidate_discovery").selected_model
-    writing = gateway.select(agent_id="report_agent", task_type="final_synthesis").selected_model
-    source = gateway.select(agent_id="ingestion_agent", task_type="source_ingestion").selected_model
+    reasoning_decision = gateway.select(agent_id="discovery_agent", task_type="candidate_discovery")
+    writing_decision = gateway.select(agent_id="report_agent", task_type="final_synthesis")
+    source_decision = gateway.select(agent_id="ingestion_agent", task_type="source_ingestion")
     status = "configured" if provider.provider_name != "offline_fallback" else "fallback"
     return CapabilityStatus(
         "Agent LLM routing",
         status,
         (
             "10 core agents call ModelGateway; "
-            f"source={source}, reasoning={reasoning}, writing={writing}"
+            f"source={source_decision.selected_model}/{source_decision.provider_family}, "
+            f"reasoning={reasoning_decision.selected_model}/{reasoning_decision.provider_family}, "
+            f"writing={writing_decision.selected_model}/{writing_decision.provider_family}"
         ),
     )
 
@@ -177,6 +179,8 @@ def _agent_llm_routing_status(provider: Any) -> CapabilityStatus:
 def _llm_provider_status(provider: Any) -> str:
     if provider.provider_name == "offline_fallback":
         return "fallback"
+    if provider.provider_name == "codex_grok" and _grok_capability_status() != "configured":
+        return "partial"
     if getattr(provider, "provider_name", "") == "grok" and not getattr(provider, "is_configured", False):
         return "missing"
     return "configured"

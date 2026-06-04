@@ -81,7 +81,7 @@ jimmoria demo
 
 ## Model Setup
 
-JIMMORIA is Codex-first, with optional Grok/xAI routing.
+JIMMORIA can run Codex-only, Grok-only, or Codex+Grok hybrid routing. The recommended production setup is hybrid: Codex keeps orchestration/final writing stable, while Grok is used for social/narrative/candidate discovery work.
 
 Recommended provider:
 
@@ -119,14 +119,35 @@ $env:GROK_OAUTH_TOKEN_COMMAND = "op read op://vault/xai/token"
 
 The xAI API uses an OpenAI-compatible endpoint at `https://api.x.ai/v1`. JIMMORIA does not save raw Grok/XAI tokens in `data/model_settings.json`; it only saves provider/model preferences, token file paths, or token commands. With `LLM_PROVIDER=xai_oauth`, Hermes OAuth is preferred over `XAI_API_KEY`. With `LLM_PROVIDER=grok`, API key/env sources are preferred and Hermes OAuth is used as a fallback.
 
+Hybrid Codex + Grok mode:
+
+```powershell
+$env:LLM_PROVIDER = "codex_grok"
+jimmoria
+```
+
+Default hybrid routing:
+
+```text
+Codex: supervisor chat, ingestion, contract/product/funding checks, report writing, final review
+Grok:  X/KOL social synthesis, narrative mapping, candidate discovery
+```
+
+Optional overrides:
+
+```powershell
+$env:JIMMORIA_CODEX_PROVIDER = "codex_cli"   # or codex_sdk
+$env:JIMMORIA_GROK_TASKS = "candidate_discovery,narrative_reasoning,social_summary"
+$env:JIMMORIA_GROK_AGENTS = "social_kol_agent"
+```
+
 Default model routing:
 
 ```text
 Codex supervisor chat:        gpt-5.4-mini
 Codex specialist reasoning:   gpt-5.5 + pro reasoning
-Grok supervisor chat:         grok-4.3
-Grok specialist reasoning:    grok-4.3 + high reasoning effort
-Report synthesis:             provider writing model + pro reasoning
+Grok-only chat/reasoning:     grok-4.3 + high reasoning effort
+Hybrid report synthesis:      Codex writing model + pro reasoning
 ```
 
 For Codex CLI, JIMMORIA maps `pro` to the local Codex config value `model_reasoning_effort="xhigh"` when the installed `codex exec` supports `--config`.

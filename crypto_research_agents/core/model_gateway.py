@@ -8,7 +8,17 @@ from typing import Any
 
 from .codex_models import codex_model_for_tier, codex_model_from_env_value
 from .grok_models import grok_model_for_tier, grok_model_from_env_value
-from .llm_provider import LLMProvider, LLMRequest, LLMResponse, parse_json_response, provider_from_env
+from .llm_provider import (
+    CodexCliProvider,
+    CodexSdkProvider,
+    GrokProvider,
+    LLMProvider,
+    LLMRequest,
+    LLMResponse,
+    codex_sdk_available,
+    parse_json_response,
+    provider_from_env,
+)
 from .usage import enrich_usage_with_estimates, token_usage_summary
 
 
@@ -19,6 +29,7 @@ class ModelDecision:
     max_tokens: int
     temperature: float
     reasoning_effort: str = "standard"
+    provider_family: str = "codex"
 
 
 class ModelGateway:
@@ -28,9 +39,20 @@ class ModelGateway:
         self,
         default_model: str | None = None,
         provider: LLMProvider | None = None,
+        providers: dict[str, LLMProvider] | None = None,
     ) -> None:
-        self.provider = provider or provider_from_env()
-        self.provider_family = _provider_family(self.provider)
+        configured_provider = provider or provider_from_env()
+        self.provider_mode = _provider_mode(configured_provider)
+        if providers is not None:
+            self.providers = dict(providers)
+            self.provider_mode = "codex_grok"
+        elif self.provider_mode == "codex_grok":
+            self.providers = _hybrid_providers_from_env()
+        else:
+            self.providers = {}
+        self.provider = self.providers.get("codex") or configured_provider
+        self.provider_name = "codex_grok" if self.provider_mode == "codex_grok" else getattr(self.provider, "provider_name", "unknown")
+        self.provider_family = "codex" if self.provider_mode == "codex_grok" else _provider_family(self.provider)
         default_model = default_model or _model_env("FAST", provider_family=self.provider_family) or _default_model_for_tier(
             "FAST",
             provider_family=self.provider_family,
@@ -40,26 +62,29 @@ class ModelGateway:
         self._lock = threading.RLock()
 
     def select(self, *, agent_id: str, task_type: str) -> ModelDecision:
+        provider_family = self.provider_family_for_task(agent_id=agent_id, task_type=task_type)
         if task_type == "supervisor_chat":
             return ModelDecision(
-                selected_model=_model_env("FAST_CHAT", provider_family=self.provider_family)
-                or _model_env("FAST", provider_family=self.provider_family)
-                or _model_env("STRONG", provider_family=self.provider_family)
-                or _default_model_for_tier("FAST_CHAT", provider_family=self.provider_family),
+                selected_model=_model_env("FAST_CHAT", provider_family=provider_family)
+                or _model_env("FAST", provider_family=provider_family)
+                or _model_env("STRONG", provider_family=provider_family)
+                or _default_model_for_tier("FAST_CHAT", provider_family=provider_family),
                 reason=f"{agent_id} requested front-door conversation",
                 max_tokens=1200,
                 temperature=0.45,
                 reasoning_effort=_reasoning_effort(default="standard"),
+                provider_family=provider_family,
             )
         if task_type in {"report_writing", "final_synthesis"}:
             return ModelDecision(
-                selected_model=_model_env("WRITING", provider_family=self.provider_family)
-                or _model_env("STRONG", provider_family=self.provider_family)
-                or _default_model_for_tier("WRITING", provider_family=self.provider_family),
+                selected_model=_model_env("WRITING", provider_family=provider_family)
+                or _model_env("STRONG", provider_family=provider_family)
+                or _default_model_for_tier("WRITING", provider_family=provider_family),
                 reason=f"{agent_id} requested synthesis/report work",
                 max_tokens=9000,
                 temperature=0.2,
                 reasoning_effort=_reasoning_effort(default="pro"),
+                provider_family=provider_family,
             )
         if task_type in {
             "source_ingestion",
@@ -73,13 +98,14 @@ class ModelGateway:
             "obsidian_sync",
         }:
             return ModelDecision(
-                selected_model=_model_env("REASONING", provider_family=self.provider_family)
-                or _model_env("STRONG", provider_family=self.provider_family)
-                or _default_model_for_tier("REASONING", provider_family=self.provider_family),
+                selected_model=_model_env("REASONING", provider_family=provider_family)
+                or _model_env("STRONG", provider_family=provider_family)
+                or _default_model_for_tier("REASONING", provider_family=provider_family),
                 reason=f"{agent_id} requested reasoning work",
                 max_tokens=8000,
                 temperature=0.2,
                 reasoning_effort=_reasoning_effort(default="pro"),
+                provider_family=provider_family,
             )
         if task_type == "embedding_search":
             return ModelDecision(
@@ -88,6 +114,7 @@ class ModelGateway:
                 max_tokens=0,
                 temperature=0.0,
                 reasoning_effort="standard",
+                provider_family=provider_family,
             )
         return ModelDecision(
             selected_model=self.default_model,
@@ -95,7 +122,23 @@ class ModelGateway:
             max_tokens=3000,
             temperature=0.1,
             reasoning_effort=_reasoning_effort(default="standard"),
+            provider_family=provider_family,
         )
+
+    def provider_family_for_task(self, *, agent_id: str, task_type: str) -> str:
+        if self.provider_mode != "codex_grok":
+            return self.provider_family
+        if task_type in _grok_task_types() or agent_id in _grok_agent_ids():
+            return "grok"
+        return "codex"
+
+    def provider_for_task(self, *, agent_id: str, task_type: str) -> LLMProvider:
+        family = self.provider_family_for_task(agent_id=agent_id, task_type=task_type)
+        return self.providers.get(family) or self.provider
+
+    def provider_name_for_task(self, *, agent_id: str, task_type: str) -> str:
+        provider = self.provider_for_task(agent_id=agent_id, task_type=task_type)
+        return getattr(provider, "provider_name", self.provider_name)
 
     def complete(
         self,
@@ -118,8 +161,9 @@ class ModelGateway:
             response_format=response_format,
             reasoning_effort=decision.reasoning_effort,
         )
+        provider = self.providers.get(decision.provider_family) or self.provider
         started = perf_counter()
-        response = self.provider.complete(request)
+        response = provider.complete(request)
         duration_ms = int((perf_counter() - started) * 1000)
         response.usage = enrich_usage_with_estimates(
             response.usage,
@@ -137,6 +181,7 @@ class ModelGateway:
                     "selected_model": decision.selected_model,
                     "reasoning_effort": decision.reasoning_effort,
                     "provider": response.provider,
+                    "provider_family": decision.provider_family,
                     "duration_ms": response.usage.get("duration_ms", duration_ms),
                     "token_usage": token_usage,
                     "usage": response.usage,
@@ -190,6 +235,66 @@ def _provider_family(provider: LLMProvider) -> str:
     if configured in {"grok", "xai", "grok_oauth", "xai_oauth"}:
         return "grok"
     return "codex"
+
+
+def _provider_mode(provider: LLMProvider) -> str:
+    provider_name = getattr(provider, "provider_name", "").strip().lower()
+    configured = os.getenv("LLM_PROVIDER", "").strip().lower()
+    if provider_name in _HYBRID_PROVIDER_NAMES or configured in _HYBRID_PROVIDER_NAMES:
+        return "codex_grok"
+    return "single"
+
+
+_HYBRID_PROVIDER_NAMES = {
+    "codex_grok",
+    "grok_codex",
+    "codex+grok",
+    "grok+codex",
+    "dual",
+    "hybrid",
+    "multi",
+}
+
+
+def _hybrid_providers_from_env() -> dict[str, LLMProvider]:
+    return {
+        "codex": _codex_provider_from_env(),
+        "grok": GrokProvider(prefer_hermes_oauth=True),
+    }
+
+
+def _codex_provider_from_env() -> LLMProvider:
+    preferred = (
+        os.getenv("JIMMORIA_CODEX_PROVIDER")
+        or os.getenv("CODEX_PROVIDER")
+        or os.getenv("JIMMORIA_HYBRID_CODEX_PROVIDER")
+        or ""
+    ).strip().lower()
+    if preferred in {"codex_cli", "cli", "exec"}:
+        return CodexCliProvider()
+    if preferred in {"codex_sdk", "sdk"}:
+        return CodexSdkProvider()
+    return CodexSdkProvider() if codex_sdk_available() else CodexCliProvider()
+
+
+def _grok_task_types() -> set[str]:
+    raw = os.getenv("JIMMORIA_GROK_TASKS", "").strip()
+    if raw:
+        return {item.strip() for item in raw.split(",") if item.strip()}
+    return {
+        "candidate_discovery",
+        "narrative_reasoning",
+        "social_summary",
+    }
+
+
+def _grok_agent_ids() -> set[str]:
+    raw = os.getenv("JIMMORIA_GROK_AGENTS", "").strip()
+    if raw:
+        return {item.strip() for item in raw.split(",") if item.strip()}
+    return {
+        "social_kol_agent",
+    }
 
 
 def _default_model_for_tier(tier: str, *, provider_family: str) -> str:

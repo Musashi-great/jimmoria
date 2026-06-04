@@ -8,6 +8,7 @@
     "xai_reasoning": "https://docs.x.ai/developers/model-capabilities/text/reasoning"
   },
   "runtime_order": [
+    "codex_grok",
     "codex_sdk",
     "codex_cli",
     "xai_oauth",
@@ -16,6 +17,9 @@
   ],
   "env": {
     "provider": "LLM_PROVIDER",
+    "hybrid_codex_provider": "JIMMORIA_CODEX_PROVIDER",
+    "hybrid_grok_tasks": "JIMMORIA_GROK_TASKS",
+    "hybrid_grok_agents": "JIMMORIA_GROK_AGENTS",
     "codex_sdk_sandbox": "CODEX_SDK_SANDBOX",
     "codex_sdk_approval_mode": "CODEX_SDK_APPROVAL_MODE",
     "codex_sdk_cwd": "CODEX_SDK_CWD",
@@ -118,6 +122,34 @@
     "report_writing": "writing_model",
     "final_synthesis": "writing_model",
     "embedding_search": "embedding_model"
+  },
+  "hybrid_provider_routes": {
+    "provider": "codex_grok",
+    "default_provider_family": "codex",
+    "grok_task_types": [
+      "candidate_discovery",
+      "narrative_reasoning",
+      "social_summary"
+    ],
+    "grok_agent_ids": [
+      "social_kol_agent"
+    ],
+    "codex_task_types": [
+      "supervisor_chat",
+      "supervision",
+      "source_ingestion",
+      "contract_info",
+      "product_docs",
+      "funding_token",
+      "obsidian_sync",
+      "report_writing",
+      "final_synthesis"
+    ],
+    "notes": [
+      "Codex remains the final-writing and orchestration provider.",
+      "Grok is used where X/KOL, narrative, and candidate discovery benefit from xAI/Grok context.",
+      "Override Grok routing with JIMMORIA_GROK_TASKS and JIMMORIA_GROK_AGENTS."
+    ]
   },
   "fallback": {
     "provider": "offline_diagnostic_fallback",

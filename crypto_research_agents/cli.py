@@ -80,6 +80,10 @@ MODEL_ROUTE_TIERS = [
 ]
 MODEL_SETTING_ENV_NAMES = [
     "LLM_PROVIDER",
+    "JIMMORIA_CODEX_PROVIDER",
+    "CODEX_PROVIDER",
+    "JIMMORIA_GROK_TASKS",
+    "JIMMORIA_GROK_AGENTS",
     "CODEX_REASONING_EFFORT",
     "CODEX_MODEL_FAST_CHAT",
     "CODEX_MODEL_FAST",
@@ -1505,11 +1509,12 @@ def configure_model_panel(*, clear_before: bool = True) -> None:
             "1. Codex SDK / local app-server (Recommended)",
             "2. Codex CLI exec",
             "3. Grok / xAI OAuth or API key",
-            "4. Offline diagnostic fallback",
+            "4. Codex + Grok hybrid routing",
+            "5. Offline diagnostic fallback",
             "Enter. Keep current",
         ]
     )
-    choice = input("Choose provider [1/2/3/4/Enter]: ").strip().lower()
+    choice = input("Choose provider [1/2/3/4/5/Enter]: ").strip().lower()
     if not choice:
         clear_screen()
         print_current_model_config()
@@ -1530,7 +1535,12 @@ def configure_model_panel(*, clear_before: bool = True) -> None:
         print_current_model_config()
         return
 
-    if choice in {"4", "offline", "fallback"}:
+    if choice in {"4", "hybrid", "dual", "codex_grok", "grok_codex", "codex+grok"}:
+        configure_codex_grok_hybrid()
+        print_current_model_config()
+        return
+
+    if choice in {"5", "offline", "fallback"}:
         configure_offline()
         print_current_model_config()
         return
@@ -1629,6 +1639,31 @@ def configure_grok() -> None:
         supported_model_lines=supported_grok_model_lines,
         model_by_index_fn=grok_model_by_index,
     )
+    save_model_settings()
+
+
+def configure_codex_grok_hybrid() -> None:
+    clear_legacy_model_session_env()
+    os.environ["LLM_PROVIDER"] = "codex_grok"
+    clear_screen()
+    print_screen(
+        "Codex + Grok hybrid",
+        [
+            "JIMMORIA will use both model families in one Research Room.",
+            "",
+            "Codex handles: Supervisor chat, source ingestion, contract/product/funding checks, report writing, final review.",
+            "Grok handles: X/KOL social synthesis, narrative mapping, candidate discovery.",
+            "",
+            "Codex runtime: SDK if available, otherwise Codex CLI. Override with JIMMORIA_CODEX_PROVIDER=codex_cli or codex_sdk.",
+            "Grok auth: Hermes xAI OAuth, XAI_API_KEY/GROK_API_KEY, token file, or token command.",
+            "No raw Grok/Codex tokens are saved in model_settings.json.",
+            "",
+            "Optional overrides:",
+            "  JIMMORIA_GROK_TASKS=candidate_discovery,narrative_reasoning,social_summary",
+            "  JIMMORIA_GROK_AGENTS=social_kol_agent",
+        ],
+    )
+    input("Continue [Enter]: ")
     save_model_settings()
 
 
@@ -1822,7 +1857,7 @@ def clear_legacy_model_session_env() -> None:
 
 def print_current_model_config() -> None:
     gateway = ModelGateway()
-    provider = os.getenv("LLM_PROVIDER") or getattr(gateway.provider, "provider_name", "offline_fallback")
+    provider = os.getenv("LLM_PROVIDER") or getattr(gateway, "provider_name", "") or getattr(gateway.provider, "provider_name", "offline_fallback")
     fast_decision = gateway.select(agent_id="supervisor_agent", task_type="supervisor_chat")
     reasoning_decision = gateway.select(agent_id="discovery_agent", task_type="candidate_discovery")
     writing_decision = gateway.select(agent_id="report_agent", task_type="final_synthesis")
@@ -1832,11 +1867,20 @@ def print_current_model_config() -> None:
         token_source = codex_login_status()
     elif provider in {"grok", "xai", "grok_oauth", "xai_oauth"}:
         token_source = grok_auth_status()
+    elif provider in {"codex_grok", "grok_codex", "codex+grok", "grok+codex", "hybrid", "dual", "multi"}:
+        token_source = (
+            "Codex: "
+            + ("Codex SDK app-server available" if codex_sdk_available() else codex_login_status())
+            + " | Grok: "
+            + grok_auth_status()
+        )
     else:
         token_source = "offline diagnostic fallback"
     supported_models = (
         ", ".join(SUPPORTED_GROK_MODEL_IDS)
         if provider in {"grok", "xai", "grok_oauth", "xai_oauth"}
+        else ("Codex: " + ", ".join(SUPPORTED_CODEX_MODEL_IDS) + " | Grok: " + ", ".join(SUPPORTED_GROK_MODEL_IDS))
+        if provider in {"codex_grok", "grok_codex", "codex+grok", "grok+codex", "hybrid", "dual", "multi"}
         else ", ".join(SUPPORTED_CODEX_MODEL_IDS)
     )
 
@@ -1845,8 +1889,8 @@ def print_current_model_config() -> None:
         [
             f"Provider: {provider}",
             f"Fast model: {fast_decision.selected_model}",
-            f"Reasoning model: {reasoning_decision.selected_model}",
-            f"Writing model: {writing_decision.selected_model}",
+            f"Discovery/social model: {reasoning_decision.selected_model} ({reasoning_decision.provider_family})",
+            f"Writing model: {writing_decision.selected_model} ({writing_decision.provider_family})",
             f"Reasoning effort: {reasoning_decision.reasoning_effort}",
             f"Credential: {token_source}",
             f"Supported models: {supported_models}",

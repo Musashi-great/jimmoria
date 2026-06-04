@@ -2370,6 +2370,12 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(provider.provider_name, "grok")
         self.assertTrue(getattr(provider, "is_configured", False))
 
+    def test_codex_grok_hybrid_provider_can_be_selected(self) -> None:
+        with patch.dict("os.environ", {"LLM_PROVIDER": "codex_grok"}, clear=True):
+            provider = provider_from_env()
+
+        self.assertEqual(provider.provider_name, "codex_grok")
+
     def test_grok_oauth_provider_reuses_hermes_xai_auth_json(self) -> None:
         with TemporaryDirectory() as tmp:
             hermes_home = Path(tmp) / ".hermes"
@@ -2553,7 +2559,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
         with TemporaryDirectory() as tmp:
             settings_path = str(Path(tmp) / "model_settings.json")
             with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path}, clear=True):
-                with patch("builtins.input", return_value="4"):
+                with patch("builtins.input", return_value="5"):
                     with redirect_stdout(output):
                         configure_model_panel()
                 self.assertEqual(os.environ["LLM_PROVIDER"], "offline")
@@ -2563,6 +2569,23 @@ Usage: codex exec [OPTIONS] [PROMPT]
         text = output.getvalue()
         self.assertIn("[Model Setup]", text)
         self.assertIn("[Offline diagnostic fallback]", text)
+
+    def test_model_setup_hybrid_choice_saves_codex_grok_provider(self) -> None:
+        output = StringIO()
+        with TemporaryDirectory() as tmp:
+            settings_path = str(Path(tmp) / "model_settings.json")
+            with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path}, clear=True):
+                with patch("builtins.input", side_effect=["4", ""]):
+                    with redirect_stdout(output):
+                        configure_model_panel()
+                self.assertEqual(os.environ["LLM_PROVIDER"], "codex_grok")
+                settings = json.loads(Path(settings_path).read_text(encoding="utf-8"))
+                self.assertEqual(settings["LLM_PROVIDER"], "codex_grok")
+                self.assertNotIn("GROK_OAUTH_TOKEN", settings)
+
+        text = output.getvalue()
+        self.assertIn("[Codex + Grok hybrid]", text)
+        self.assertIn("Grok handles: X/KOL social synthesis, narrative mapping, candidate discovery.", text)
 
     def test_model_setup_grok_choice_saves_provider_without_raw_token(self) -> None:
         output = StringIO()
@@ -2779,6 +2802,58 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(reasoning.selected_model, "grok-4.20-multi-agent")
         self.assertEqual(writing.selected_model, "grok-4.3")
 
+    def test_codex_grok_hybrid_routes_tasks_to_both_providers(self) -> None:
+        class FakeCodexProvider:
+            provider_name = "codex_cli"
+
+            def __init__(self) -> None:
+                self.requests: list[LLMRequest] = []
+
+            def complete(self, request: LLMRequest) -> LLMResponse:
+                self.requests.append(request)
+                return LLMResponse(text="codex ok", model=request.model, provider=self.provider_name, usage={})
+
+        class FakeGrokProvider:
+            provider_name = "grok"
+
+            def __init__(self) -> None:
+                self.requests: list[LLMRequest] = []
+
+            def complete(self, request: LLMRequest) -> LLMResponse:
+                self.requests.append(request)
+                return LLMResponse(text="grok ok", model=request.model, provider=self.provider_name, usage={})
+
+        codex = FakeCodexProvider()
+        grok = FakeGrokProvider()
+        with patch.dict("os.environ", {"LLM_PROVIDER": "codex_grok"}, clear=True):
+            gateway = ModelGateway(providers={"codex": codex, "grok": grok})
+            discovery_decision = gateway.select(agent_id="discovery_agent", task_type="candidate_discovery")
+            report_decision = gateway.select(agent_id="report_agent", task_type="final_synthesis")
+            social = gateway.complete(
+                agent_id="social_kol_agent",
+                task_type="social_summary",
+                system_prompt="social",
+                user_prompt="summarize X/KOL",
+            )
+            report = gateway.complete(
+                agent_id="report_agent",
+                task_type="final_synthesis",
+                system_prompt="report",
+                user_prompt="write final report",
+            )
+
+        self.assertEqual(gateway.provider_name, "codex_grok")
+        self.assertEqual(discovery_decision.provider_family, "grok")
+        self.assertEqual(discovery_decision.selected_model, "grok-4.3")
+        self.assertEqual(report_decision.provider_family, "codex")
+        self.assertEqual(report_decision.selected_model, "gpt-5.5")
+        self.assertEqual(social.provider, "grok")
+        self.assertEqual(report.provider, "codex_cli")
+        self.assertEqual(len(grok.requests), 1)
+        self.assertEqual(len(codex.requests), 1)
+        self.assertEqual(gateway.call_log[0]["provider_family"], "grok")
+        self.assertEqual(gateway.call_log[1]["provider_family"], "codex")
+
     def test_parse_json_response_accepts_fenced_or_prefaced_json(self) -> None:
         fenced = LLMResponse(
             text='```json\n{"summary": "ok", "confidence": 0.8}\n```',
@@ -2884,9 +2959,13 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(router["provider"], "codex_or_grok")
         self.assertIn("gpt-5.5", router["supported_models"]["codex"])
         self.assertIn("grok-4.3", router["supported_models"]["grok"])
+        self.assertIn("codex_grok", router["runtime_order"])
         self.assertIn("codex_sdk", router["runtime_order"])
         self.assertIn("xai_oauth", router["runtime_order"])
         self.assertIn("grok", router["runtime_order"])
+        self.assertEqual(router["env"]["hybrid_codex_provider"], "JIMMORIA_CODEX_PROVIDER")
+        self.assertEqual(router["env"]["hybrid_grok_tasks"], "JIMMORIA_GROK_TASKS")
+        self.assertEqual(router["env"]["hybrid_grok_agents"], "JIMMORIA_GROK_AGENTS")
         self.assertEqual(router["env"]["hermes_home"], "HERMES_HOME")
         self.assertEqual(router["env"]["hermes_auth_json"], "HERMES_AUTH_JSON")
         self.assertEqual(router["routes"]["supervisor_chat"], "fast_chat_model")
@@ -2908,6 +2987,9 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(router["defaults"]["grok"]["reasoning_model"], "grok-4.3")
         self.assertEqual(router["defaults"]["reasoning_effort"], "pro")
         self.assertEqual(router["routes"]["source_ingestion"], "reasoning_model")
+        self.assertEqual(router["hybrid_provider_routes"]["provider"], "codex_grok")
+        self.assertIn("social_summary", router["hybrid_provider_routes"]["grok_task_types"])
+        self.assertIn("report_writing", router["hybrid_provider_routes"]["codex_task_types"])
         self.assertEqual(router["reasoning_effort"]["codex_cli_pro_value"], "xhigh")
 
     def test_doctor_command_outputs_current_limitations(self) -> None:

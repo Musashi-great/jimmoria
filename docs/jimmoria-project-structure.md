@@ -146,7 +146,7 @@ flowchart LR
 | Collaboration Bus | `core/bus.py` | 요청, 응답, handoff, update 기록 |
 | Shared Memory | `core/memory.py` | sources, candidates, findings, entity graph |
 | Tool Gateway | `core/tool_gateway.py` | tool 권한, connector 호출, audit log |
-| Model Gateway | `core/model_gateway.py` | task type별 Codex model route, pro reasoning effort |
+| Model Gateway | `core/model_gateway.py` | task type별 Codex/Grok provider route, pro reasoning effort |
 | Usage Meter | `core/usage.py` | LLM duration/token usage extraction, fallback estimation, room/agent aggregation |
 | Concurrency Policy | `core/concurrency.py`, `config/concurrency.yaml` | Phase 1-4 병렬화 정책 |
 | Storage | `storage/` | run snapshot, reports, vault notes |
@@ -196,28 +196,31 @@ The active summary line exists so the user can still see the current worker with
 
 ## 5.2 Model Routing
 
-JIMMORIA는 현재 Codex-only 모델 정책을 사용한다.
+JIMMORIA는 Codex-only, Grok-only, Codex+Grok hybrid 모델 정책을 모두 지원한다. 기본 운영 권장값은 `LLM_PROVIDER=codex_grok`이다. 이 모드에서는 Supervisor/보고서/최종 검토는 Codex가 맡고, X/KOL과 내러티브/후보 발굴처럼 소셜 맥락이 중요한 작업은 Grok가 맡는다.
 
 ```text
-supervisor_chat       gpt-5.4-mini, standard by default
-source_ingestion      gpt-5.5, pro reasoning
-supervision           gpt-5.5, pro reasoning
-narrative_reasoning   gpt-5.5, pro reasoning
-candidate_discovery   gpt-5.5, pro reasoning
-social_summary        gpt-5.5, pro reasoning
-contract_info         gpt-5.5, pro reasoning
-product_docs          gpt-5.5, pro reasoning
-funding_token         gpt-5.5, pro reasoning
-obsidian_sync         gpt-5.5, pro reasoning
-report_writing        gpt-5.5, pro reasoning
-final_synthesis       gpt-5.5, pro reasoning
+Hybrid default
+  supervisor_chat       Codex / gpt-5.4-mini / standard
+  source_ingestion      Codex / gpt-5.5 / pro
+  supervision           Codex / gpt-5.5 / pro
+  narrative_reasoning   Grok  / grok-4.3 / pro->high
+  candidate_discovery   Grok  / grok-4.3 / pro->high
+  social_summary        Grok  / grok-4.3 / pro->high
+  contract_info         Codex / gpt-5.5 / pro
+  product_docs          Codex / gpt-5.5 / pro
+  funding_token         Codex / gpt-5.5 / pro
+  obsidian_sync         Codex / gpt-5.5 / pro
+  report_writing        Codex / gpt-5.5 / pro
+  final_synthesis       Codex / gpt-5.5 / pro
 ```
 
-`CODEX_REASONING_EFFORT=pro`는 ModelGateway에서 `reasoning_effort=pro`로 기록되고, Codex CLI provider는 `codex exec --config model_reasoning_effort="xhigh"`로 매핑한다. 이 값은 `data/runs/<room_id>/llm_call_log.json`에도 남아 나중에 어떤 작업이 어느 노력도로 실행됐는지 확인할 수 있다.
+`LLM_PROVIDER=codex_grok`에서 기본 Grok task는 `candidate_discovery`, `narrative_reasoning`, `social_summary`이고, 기본 Grok agent는 `social_kol_agent`다. `JIMMORIA_GROK_TASKS`와 `JIMMORIA_GROK_AGENTS`로 덮어쓸 수 있다.
+
+`CODEX_REASONING_EFFORT=pro`는 ModelGateway에서 `reasoning_effort=pro`로 기록된다. Codex CLI provider는 `codex exec --config model_reasoning_effort="xhigh"`로 매핑하고, Grok provider는 xAI Responses API `reasoning.effort="high"`로 매핑한다. 이 값은 `data/runs/<room_id>/llm_call_log.json`에도 남아 나중에 어떤 작업이 어느 provider/model/effort로 실행됐는지 확인할 수 있다.
 
 ### 5.2.1 Grok/xAI Provider
 
-JIMMORIA is Codex-first, but the model gateway can now route agents through Grok/xAI as a second live provider.
+JIMMORIA is Codex-first for orchestration and final writing, but the model gateway can route selected research agents through Grok/xAI as a second live provider.
 
 ```text
 Codex defaults
@@ -249,6 +252,14 @@ GROK_OAUTH_TOKEN_COMMAND / XAI_OAUTH_TOKEN_COMMAND
 ```
 
 `LLM_PROVIDER=xai_oauth` prefers the Hermes OAuth session over API-key env vars. `LLM_PROVIDER=grok` keeps API-key/env sources first and falls back to Hermes OAuth if no explicit bearer exists.
+
+Hybrid credential flow:
+
+```text
+LLM_PROVIDER=codex_grok
+  Codex side: Codex SDK if available, otherwise Codex CLI
+  Grok side: Hermes xAI OAuth first, then explicit Grok/XAI token sources
+```
 
 Raw Grok/XAI bearer tokens are not saved in `data/model_settings.json`. Only provider choice, file paths, commands, base URL, API mode, and model route preferences are persisted. When Hermes is installed in the same Python environment, JIMMORIA asks `hermes_cli.auth.resolve_xai_oauth_runtime_credentials()` for a refreshed runtime bearer. If that module is not importable, it falls back to reading `~/.hermes/auth.json` directly without printing token values.
 

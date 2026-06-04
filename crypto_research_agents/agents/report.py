@@ -41,7 +41,7 @@ class ReportAgent(BaseAgent):
         claim_ledger = build_claim_evidence_ledger(primary, findings, source_log)
         room.project_card["claim_evidence_ledger"] = claim_ledger
         llm_summary = self._write_llm_summary(room, memory, findings)
-        provider_name = getattr(self.model_gateway.provider, "provider_name", "unknown")
+        provider_name = self.model_gateway.provider_name_for_task(agent_id=self.agent_id, task_type=self.task_type)
         report = render_project_dossier(
             room,
             memory,
