@@ -356,10 +356,12 @@ category
 claim
 verification_status
 source_ids
+source_urls
+source_refs
 confidence
 ```
 
-The goal is to stop treating "12 URLs collected" as equivalent to "all important claims verified." A report can have enough URLs while still showing weak founder, GitHub activity, KOL, explorer, or live pool evidence.
+`source_ids` are real JIMMORIA source record IDs where available. `source_urls` are public URLs. `source_refs` combines `source_id`, `label`, and `url` so a report sentence can be traced back to the exact supporting record. The goal is to stop treating "12 URLs collected" as equivalent to "all important claims verified." A report can have enough URLs while still showing weak founder, GitHub activity, KOL, explorer, or live pool evidence.
 - 보고서가 충분한지, evidence가 부족한지 판단
 - 사용자에게 최종 응답 전달
 
@@ -429,9 +431,13 @@ config/skills/skill_registry.yaml
 config/hooks/common_hooks.yaml
 config/hooks/<hook_name>/HOOK.yaml
 config/hooks/<hook_name>/handler.py
+.agents/AGENTS.md
+.agents/skills/<skill_name>/SKILL.md
 ```
 
 These skill files are intentionally small and structured. Agents can read them through `skill_view`, and the Supervisor can use the same names when assigning tasks. `crypto_research_agents/core/skill_spec.py` loads both individual skill YAML files and `skill_registry.yaml` into a shared `SkillSpecRegistry`.
+
+The `.agents/skills` layer mirrors only the skills that need human-readable SOPs right now: identity gate, market signal intake, contract/token info, and report writing. Broader framework imports, complex dashboards, RBAC, and full external team runtimes remain intentionally out of scope until the report quality loop is stable.
 
 Hooks are also registry-backed. `crypto_research_agents/core/hook_registry.py` loads the common phase hooks and any Hermes-style manifest directory with `HOOK.yaml`. The runtime maps internal events such as `agent_start`, `tool_done`, `report_written`, and `room_completed` into stable hook events such as `agent:start`, `tool:done`, `report:after_render`, and `room:completed`. The current handlers are non-blocking guardrail/checkpoint declarations; they are ready for stricter validation later.
 
@@ -912,6 +918,7 @@ Important test coverage:
 ## 14. Current Limits
 
 - The research swarm now runs ingestion, Social/KOL, narrative, discovery, contract/on-chain, product/tech, and funding/token agents together after Supervisor seed context.
+- If one research swarm agent fails, the runtime retries only that agent once before failing the whole room.
 - Council, report writing, final review, and Obsidian sync still run after the swarm joins because they consume the combined evidence.
 - X/RootData/Explorer/RPC need optional secrets for live API results.
 - RSS, DefiLlama, Snapshot, GitHub activity, CoinGecko, DEX Screener, token metadata, DEX pair lookup, public web search, website/docs crawling, and airdrop hint search are implemented as public-web/read-only connectors.

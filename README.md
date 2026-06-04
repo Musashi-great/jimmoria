@@ -214,9 +214,12 @@ The runtime also has a lightweight SkillSpec registry:
 crypto_research_agents/core/skill_spec.py
 config/skills/*.yaml
 config/skills/skill_registry.yaml
+.agents/AGENTS.md
+.agents/skills/<skill-name>/SKILL.md
 ```
 
 This lets `skill_view` and the Supervisor read the same structured skill definitions instead of treating skills as loose prompt text.
+Only the core skills are mirrored as `SKILL.md` right now: identity gate, market signal intake, contract/token info, and report writing.
 
 Hooks use the same idea. Agents still declare phase hooks in `config/agents/*.yaml`, while `config/hooks/` can now hold Hermes-style hook manifests:
 
@@ -254,6 +257,23 @@ before_report     run report-specific claim and source coverage checks
 after_report      write artifact/evidence handoff and request final review
 quality_gate      verify the agent output is usable for the final report
 after_run         hand off findings to the next company step
+```
+
+Claim Ledger:
+
+```text
+report_agent builds claim_evidence_ledger for identity, product, social/KOL,
+funding/team, token/on-chain, GitHub activity, and live metrics.
+Each row separates source_ids, source_urls, and source_refs so a strong sentence
+can be traced back to the specific source record or public URL that supported it.
+```
+
+Checkpoint / retry:
+
+```text
+If one research_swarm agent fails, JIMMORIA retries only that agent once.
+The room continues when the retry succeeds, and emits agent_retry_* plus
+parallel_group_retry_done events for later debugging/replay.
 ```
 
 ## Tool Status

@@ -66,6 +66,9 @@ def skill_view(skill_id: str | None = None, *, name: str | None = None) -> dict[
     candidate = PROJECT_ROOT / "research_playbooks" / f"{normalized}.md"
     if candidate.exists():
         return _read_known_skill("skill_view", normalized, candidate)
+    agent_skill = PROJECT_ROOT / ".agents" / "skills" / normalized / "SKILL.md"
+    if agent_skill.exists():
+        return _read_known_skill("skill_view", normalized, agent_skill)
     registry_entry = _read_skill_registry_entry(normalized)
     if registry_entry is not None:
         return success("skill_view", registry_entry, "skill registry entry loaded")

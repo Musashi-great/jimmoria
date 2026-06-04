@@ -14,7 +14,7 @@ from io import StringIO
 from unittest.mock import patch
 
 from crypto_research_agents.runtime import ResearchRuntime
-from crypto_research_agents.agents.base import normalize_llm_analysis
+from crypto_research_agents.agents.base import AgentResult, normalize_llm_analysis
 from crypto_research_agents.agents.discovery import build_live_candidates, extract_project_query, project_identity_hints, should_live_discover
 from crypto_research_agents.agents.social_kol import (
     build_public_social_queries,
@@ -1458,6 +1458,10 @@ class SmokeTest(unittest.TestCase):
         registry_skill = gateway.call(agent_id, "skill_view", skill_id="market_signal_intake_skill")
         self.assertEqual(registry_skill["status"], "success")
         self.assertEqual(registry_skill["data"]["owner"], "social_kol_agent")
+        agent_skill = gateway.call(agent_id, "skill_view", skill_id="identity-gate")
+        self.assertEqual(agent_skill["status"], "success")
+        self.assertIn(".agents", agent_skill["data"]["path"])
+        self.assertIn("Identity Gate Skill", agent_skill["data"]["content"])
 
         search = gateway.call(
             agent_id,
@@ -1663,9 +1667,9 @@ class SmokeTest(unittest.TestCase):
         )
         quality = assess_report_quality([project])
         source_log = [
-            {"label": "3Jane site", "url": "https://www.3jane.xyz/"},
-            {"label": "docs intro", "url": "https://docs.3jane.xyz/introduction"},
-            {"label": "official X", "url": "https://x.com/3janexyz"},
+            {"source_id": "src_site", "label": "3Jane site", "url": "https://www.3jane.xyz/"},
+            {"source_id": "src_docs", "label": "docs intro", "url": "https://docs.3jane.xyz/introduction"},
+            {"source_id": "src_x", "label": "official X", "url": "https://x.com/3janexyz"},
         ]
 
         ledger = build_claim_evidence_ledger(project, [], source_log)
@@ -1684,6 +1688,10 @@ class SmokeTest(unittest.TestCase):
             },
         )
         self.assertTrue(any(item["verification_status"] == "unverified" for item in ledger))
+        identity = next(item for item in ledger if item["category"] == "identity")
+        self.assertIn("src_site", identity["source_ids"])
+        self.assertTrue(any(ref["source_id"] == "src_docs" for ref in identity["source_refs"]))
+        self.assertTrue(any(url.startswith("https://") for url in identity["source_urls"]))
         self.assertIn("evidence_confidence", score["breakdown"])
         self.assertIn("social_momentum", score["breakdown"])
 
@@ -2157,6 +2165,38 @@ class SmokeTest(unittest.TestCase):
         })
         self.assertEqual(swarm_starts_before_done, set(group_start["agents"]))
         self.assertEqual(group_done["group_id"], "research_swarm")
+
+    def test_runtime_retries_only_failed_swarm_agent_once(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            calls = {"product_tech_agent": 0}
+
+            def flaky_product_agent(room, memory, bus, **kwargs):
+                del room, memory, bus, kwargs
+                calls["product_tech_agent"] += 1
+                if calls["product_tech_agent"] == 1:
+                    raise RuntimeError("temporary docs crawl failure")
+                return AgentResult("product_tech_agent", "Product retry succeeded.", {}, confidence=0.5)
+
+            with patch.dict("os.environ", {**_offline_no_secret_env(), "JIMMORIA_SKIP_EXTERNAL_SEARCH": "1"}, clear=False):
+                runtime = ResearchRuntime()
+                runtime.agents["product_tech_agent"].run = flaky_product_agent
+                result = runtime.run_article_research(
+                    title="Retry Swarm Agent",
+                    content="3Jane crypto credit project report",
+                    vault_dir=root / "vault",
+                    reports_dir=root / "reports",
+                    memory_path=root / "memory.json",
+                )
+
+        event_types = [event["type"] for event in runtime.event_log]
+        self.assertEqual(result.room.status, "completed")
+        self.assertEqual(calls["product_tech_agent"], 2)
+        self.assertIn("agent_failed", event_types)
+        self.assertIn("agent_retry_start", event_types)
+        self.assertIn("agent_retry_done", event_types)
+        self.assertIn("parallel_group_retry_done", event_types)
+        self.assertNotIn("parallel_group_failed", event_types)
 
     def test_process_specs_load_when_cli_runs_outside_project_root(self) -> None:
         original_cwd = Path.cwd()

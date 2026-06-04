@@ -503,15 +503,35 @@ class ResearchRuntime:
                     failures.append((agent_id, str(exc)))
 
         if failures:
+            retry_failures = self._retry_failed_swarm_agents(
+                room,
+                failures,
+                title=title,
+                content=content,
+                url=url,
+            )
+            if not retry_failures:
+                self._emit(
+                    "parallel_group_retry_done",
+                    room_id=room.room_id,
+                    group_id="research_swarm",
+                    agents=[agent_id for agent_id, _ in failures],
+                    summary=f"Retried {len(failures)} failed research swarm agent(s) successfully.",
+                    messages=len(self.bus.messages),
+                    findings=len(self.memory.get_room_findings(room.room_id)),
+                )
+                failures = []
+
+        if failures:
             self._emit(
                 "parallel_group_failed",
                 room_id=room.room_id,
                 group_id="research_swarm",
                 agents=agent_ids,
-                failures=[{"agent_id": agent_id, "error": error} for agent_id, error in failures],
-                summary=f"{len(failures)} full parallel research swarm agent(s) failed.",
+                failures=[{"agent_id": agent_id, "error": error} for agent_id, error in retry_failures],
+                summary=f"{len(retry_failures)} full parallel research swarm agent(s) failed after retry.",
             )
-            failed = "; ".join(f"{agent_id}: {error}" for agent_id, error in failures)
+            failed = "; ".join(f"{agent_id}: {error}" for agent_id, error in retry_failures)
             raise RuntimeError(f"Parallel research swarm failed: {failed}")
 
         self._emit(
@@ -530,6 +550,54 @@ class ResearchRuntime:
             if group.group_id == group_id:
                 return group
         return None
+
+    def _retry_failed_swarm_agents(
+        self,
+        room: ResearchRoom,
+        failures: list[tuple[str, str]],
+        *,
+        title: str,
+        content: str,
+        url: str | None,
+    ) -> list[tuple[str, str]]:
+        retry_failures: list[tuple[str, str]] = []
+        for agent_id, error in failures:
+            self._emit(
+                "agent_retry_start",
+                room_id=room.room_id,
+                agent_id=agent_id,
+                reason=error,
+                attempt=2,
+                max_attempts=2,
+                summary=f"Retrying failed swarm agent: {agent_id}.",
+            )
+            try:
+                self._run_agent(
+                    agent_id,
+                    room,
+                    **_swarm_agent_kwargs(agent_id, title=title, content=content, url=url),
+                )
+            except Exception as exc:
+                retry_failures.append((agent_id, str(exc)))
+                self._emit(
+                    "agent_retry_failed",
+                    room_id=room.room_id,
+                    agent_id=agent_id,
+                    reason=str(exc),
+                    attempt=2,
+                    max_attempts=2,
+                    summary=f"Retry failed for swarm agent: {agent_id}.",
+                )
+                continue
+            self._emit(
+                "agent_retry_done",
+                room_id=room.room_id,
+                agent_id=agent_id,
+                attempt=2,
+                max_attempts=2,
+                summary=f"Retry completed for swarm agent: {agent_id}.",
+            )
+        return retry_failures
 
     def _run_agent_council(self, room: ResearchRoom) -> None:
         participants = [agent_id for agent_id in COUNCIL_AGENTS if agent_id in room.agents]

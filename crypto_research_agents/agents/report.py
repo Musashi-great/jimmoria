@@ -2414,62 +2414,105 @@ def build_claim_evidence_ledger(
             f"{project.name} identity, website, and category are resolved.",
             [project.website, *official_urls[:4]],
             "confirmed" if project.website and official_urls else "partial",
+            source_log,
         ),
         _claim_row(
             "product",
             "Project mechanics and product surface were checked through official site/docs/GitHub where available.",
             [*docs_urls, *github_urls],
             "confirmed" if product_rows and docs_urls else "partial" if product_rows or docs_urls else "unverified",
+            source_log,
         ),
         _claim_row(
             "social_kol",
             "X/KOL/article market signal was collected as a trigger layer, not final judgment.",
             social_urls,
             "confirmed" if len(social_urls) >= 3 else "partial" if social_urls else "unverified",
+            source_log,
         ),
         _claim_row(
             "funding_team",
             "Funding/team claims are separated from product proof and require source-backed confirmation.",
             funding_urls,
             "confirmed" if funding_urls else "partial" if funding_rows else "unverified",
+            source_log,
         ),
         _claim_row(
             "token_onchain",
             "Token, contract, chain, and official address evidence are checked separately from market hype.",
             address_sources,
             "confirmed" if address_sources else "partial" if token_rows else "unverified",
+            source_log,
         ),
         _claim_row(
             "github_activity",
             "GitHub presence and activity should be treated separately from simply finding a GitHub link.",
             github_urls,
             "partial" if github_urls else "unverified",
+            source_log,
         ),
         _claim_row(
             "live_metrics",
             "Live pool/app/borrower/default metrics remain a separate verification gate.",
             [],
             "unverified",
+            source_log,
         ),
     ]
     return ledger
 
 
-def _claim_row(category: str, claim: str, urls: list[Any], status: str) -> dict[str, Any]:
-    sources: list[str] = []
+def _claim_row(
+    category: str,
+    claim: str,
+    urls: list[Any],
+    status: str,
+    source_log: list[dict[str, str]],
+) -> dict[str, Any]:
+    source_refs = _source_refs_for_urls(source_log, urls)
+    source_urls: list[str] = []
     for url in urls:
         if not url:
             continue
         value = str(url)
-        if value and value not in sources:
-            sources.append(value)
+        if value and value not in source_urls:
+            source_urls.append(value)
+    source_ids = [
+        ref["source_id"]
+        for ref in source_refs
+        if ref.get("source_id")
+    ]
     return {
         "category": category,
         "claim": claim,
         "verification_status": status,
-        "source_ids": sources[:8],
+        "source_ids": source_ids[:8],
+        "source_urls": source_urls[:8],
+        "source_refs": source_refs[:8],
         "confidence": {"confirmed": 0.85, "partial": 0.55, "unverified": 0.2}.get(status, 0.35),
     }
+
+
+def _source_refs_for_urls(source_log: list[dict[str, str]], urls: list[Any]) -> list[dict[str, str]]:
+    refs: list[dict[str, str]] = []
+    by_url = {
+        str(item.get("url") or ""): item
+        for item in source_log
+        if item.get("url")
+    }
+    for url in urls:
+        value = str(url or "").strip()
+        if not value:
+            continue
+        item = by_url.get(value, {})
+        ref = {
+            "source_id": str(item.get("source_id") or ""),
+            "label": str(item.get("label") or source_label(value)),
+            "url": value,
+        }
+        if ref not in refs:
+            refs.append(ref)
+    return refs
 
 
 def render_claim_ledger_lines(ledger: list[dict[str, Any]], *, korean: bool) -> list[str]:
@@ -2481,12 +2524,28 @@ def render_claim_ledger_lines(ledger: list[dict[str, Any]], *, korean: bool) -> 
         else "- Key claims are separated from raw URL count and marked confirmed/partial/unverified."
     ]
     for item in ledger:
-        sources = item.get("source_ids") if isinstance(item.get("source_ids"), list) else []
-        source_text = ", ".join(source_markdown_link(url) for url in sources[:3]) if sources else "no direct source"
+        refs = item.get("source_refs") if isinstance(item.get("source_refs"), list) else []
+        sources = item.get("source_urls") if isinstance(item.get("source_urls"), list) else []
+        if refs:
+            source_text = ", ".join(
+                claim_ref_markdown(ref)
+                for ref in refs[:3]
+                if isinstance(ref, dict)
+            )
+        else:
+            source_text = ", ".join(source_markdown_link(url) for url in sources[:3]) if sources else "no direct source"
         lines.append(
             f"- **{item.get('category')}** `{item.get('verification_status')}`: {item.get('claim')} ({source_text})"
         )
     return lines
+
+
+def claim_ref_markdown(ref: dict[str, Any]) -> str:
+    source_id = str(ref.get("source_id") or "").strip()
+    label = str(ref.get("label") or "").strip()
+    url = str(ref.get("url") or "").strip()
+    linked = source_markdown_link(url, label) if url else label or "source unavailable"
+    return f"`{source_id}` {linked}" if source_id else linked
 
 
 def render_score_breakdown_lines(score: dict[str, Any], *, korean: bool) -> list[str]:
@@ -2624,10 +2683,10 @@ def collect_source_log(project: Any, sources: list[Any]) -> list[dict[str, str]]
     items: list[dict[str, str]] = []
     if project is not None:
         if project.website and is_relevant_source_url(project, str(project.website), label="official site"):
-            items.append({"label": source_label(project.website), "url": str(project.website)})
+            items.append({"label": source_label(project.website), "url": str(project.website), "source_id": ""})
         for url in project.metadata.get("evidence_urls", []):
             if is_relevant_source_url(project, str(url), label=source_label(url)):
-                items.append({"label": source_label(url), "url": str(url)})
+                items.append({"label": source_label(url), "url": str(url), "source_id": ""})
         website = project.metadata.get("website_crawl") if isinstance(project.metadata.get("website_crawl"), dict) else {}
         official_links = website.get("official_links") if isinstance(website.get("official_links"), dict) else {}
         for bucket, links in official_links.items():
@@ -2637,11 +2696,11 @@ def collect_source_log(project: Any, sources: list[Any]) -> list[dict[str, str]]
                 if isinstance(link, dict) and link.get("url"):
                     label = f"{bucket}: {source_label(link['url'])}"
                     if is_relevant_source_url(project, str(link["url"]), label=label):
-                        items.append({"label": label, "url": str(link["url"])})
+                        items.append({"label": label, "url": str(link["url"]), "source_id": ""})
     for source in sources:
         label = str(getattr(source, "title", "source"))
         if getattr(source, "url", None) and (project is None or is_relevant_source_url(project, str(source.url), label=label)):
-            items.append({"label": label, "url": str(source.url)})
+            items.append({"label": label, "url": str(source.url), "source_id": str(getattr(source, "source_id", ""))})
     return dedupe_source_items(items)
 
 
