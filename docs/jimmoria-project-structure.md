@@ -407,27 +407,27 @@ DISCORD_BOT_TOKEN
 
 ## 9. Research Room Flow
 
-Current Phase 2 runtime is dependency-aware parallel.
+Current runtime is a full parallel research swarm.
 
 ```text
 1. Supervisor intake
 2. User confirmation when needed
 3. Research Room creation
 4. Supervisor planning
-5. Ingestion
-6. Social/KOL market-signal intake
-7. Narrative
-8. Discovery
-9. Parallel evidence_checks group
-   - Social/KOL candidate verification
+5. Supervisor seeds shared source and primary candidate context
+6. Parallel research_swarm
+   - Ingestion
+   - Social/KOL market and candidate verification
+   - Narrative
+   - Discovery
    - Contract/On-chain verification
    - Product/Tech verification
    - Funding/Token verification
-10. Agent Council joins specialist findings
-11. Report writing
-12. Supervisor final review
-13. Obsidian sync
-14. Run snapshot and replay events saved
+7. Agent Council joins specialist findings
+8. Report writing
+9. Supervisor final review
+10. Obsidian sync
+11. Run snapshot and replay events saved
 ```
 
 ## 10. Concurrency Roadmap
@@ -436,16 +436,14 @@ Current Phase 2 runtime is dependency-aware parallel.
 
 | Phase | Status | Mode | Description |
 |---|---|---|---|
-| Phase 1 | stable baseline | sequential | Whole Research Room runs sequentially for fallback stability |
-| Phase 2 | active | bounded parallel group | After Discovery, Social / Contract / Product / Funding evidence checks run together |
-| Phase 3 | planned | background workers | X, GitHub, Docs, DEX, RSS, RootData, public web monitors run in parallel |
+| Phase 3 | active | full parallel agent swarm | After Supervisor seed context, seven research agents run together |
 | Phase 4 | planned | room worker pool | Candidate A/B/C get separate Research Rooms, then summaries are merged |
 
 Safety rules:
 
-- SharedMemory writes stay serialized
-- Report writing is single-writer
-- Obsidian sync is single-writer
+- SharedMemory writes are lock-guarded
+- Report writing runs after the research swarm joins
+- Obsidian sync runs after final review
 - Tool calls remain read-only or artifact-write only
 - Agent Council is the join point before final synthesis
 
@@ -568,31 +566,25 @@ Internal Supervisor final review, agent council notes, tool payloads, raw LLM JS
 
 Project research now treats X/Twitter, KOL posts, public threads, and related articles as the first market-signal layer. The official site, docs, GitHub, token metadata, and chain/on-chain checks are the verification layer.
 
-The Phase 2 room now behaves like this:
+The room now behaves like this:
 
 ```text
 Supervisor plan
--> Ingestion
--> Social/KOL market_signal_intake
-   - X recent search when X_BEARER_TOKEN exists
-   - public web fallback such as site:x.com project searches
-   - KOL/profile candidates
-   - official/candidate X handles and timeline status
-   - who-said-what rows: speaker, claim, URL, timestamp/confidence when available
-   - related article/public web mentions
--> Narrative map
--> Discovery uses the social seed plus web/GitHub/market evidence
--> Parallel evidence_checks group
-   - Candidate-specific Social/KOL verification
-   - Contract/On-chain verification
-   - Product/Site/Docs/GitHub verification
-   - Funding/Token opportunity check
+-> Supervisor seed source/candidate context
+-> Parallel research_swarm
+   - Ingestion stores and enriches the source
+   - Social/KOL checks X recent search, public site:x.com searches, KOL/article mentions, official/candidate X handles, timeline status, and who-said-what rows
+   - Narrative maps thesis categories from seeded source context
+   - Discovery resolves identity with web/GitHub/market evidence
+   - Contract/On-chain checks chain, token, contract, DEX, explorer evidence
+   - Product/Tech checks site, docs, app, GitHub, package/API/live infra
+   - Funding/Token checks founder, funding, points, airdrop, token mechanics, and value-capture
 -> Agent Council
 -> Report
 -> Obsidian sync
 ```
 
-This means Social/KOL is no longer only a later validation desk. It first acts as the market radar that asks: who is talking about this, what posts or articles exist, which handles or narratives are appearing, and what each source actually said. After that, Product/Tech and Contract/On-chain answer whether the project is real, documented, shipped, and technically identifiable.
+This means Social/KOL is not a later validation desk. It is one of the first workers in the research swarm and asks: who is talking about this, what posts or articles exist, which handles or narratives are appearing, and what each source actually said. Product/Tech and Contract/On-chain run at the same time to verify whether the project is real, documented, shipped, and technically identifiable.
 
 ### Hermes-Inspired Tool Guardrails
 
@@ -752,7 +744,7 @@ room.json.forked_from          source room, source seq, created_at
 web payload.event_cursor       last_seq and resume hint
 ```
 
-This makes the current Phase 2 runtime easier to replay and debug while preserving the audit trail needed for Phase 3/4 parallel execution.
+This makes the current full parallel swarm runtime easier to replay and debug while preserving the audit trail needed for multi-room parallel execution.
 
 ## 13. Tests
 
@@ -775,7 +767,8 @@ Important test coverage:
 
 ## 14. Current Limits
 
-- Phase 2 parallelizes only the evidence_checks group; Supervisor, ingestion, seed social intake, narrative, discovery, council, report, final review, and Obsidian sync remain ordered by design.
+- The research swarm now runs ingestion, Social/KOL, narrative, discovery, contract/on-chain, product/tech, and funding/token agents together after Supervisor seed context.
+- Council, report writing, final review, and Obsidian sync still run after the swarm joins because they consume the combined evidence.
 - X/RootData/Explorer/RPC need optional secrets for live API results.
 - RSS, DefiLlama, Snapshot, GitHub activity, CoinGecko, DEX Screener, token metadata, DEX pair lookup, public web search, website/docs crawling, and airdrop hint search are implemented as public-web/read-only connectors.
 - Advanced monitor workers are planned; the connector layer now has RSS support ready for them.
@@ -784,14 +777,14 @@ Important test coverage:
 
 ## 15. Next Development Order
 
-1. Keep Phase 2 stable with bounded parallel evidence checks.
+1. Stabilize the full parallel research_swarm under live X/public-web workloads.
 2. Improve official-source extraction and identity validation.
 3. Add stronger project identity collision checks.
 4. Improve X/KOL handling without relying on private chat channels; add better KOL ranking, repeated-mention detection, and article/thread clustering.
-5. Implement Phase 3 public web/RSS/GitHub/docs/DEX monitor workers.
+5. Add public web/RSS/GitHub/docs/DEX monitor workers as background collectors.
 6. Expand web dashboard replay and multi-room board.
 7. Add Phase 4 parallel Research Rooms for candidate fanout.
 
 ## 16. One-Line Summary
 
-JIMMORIA is currently a Codex-first, public-web-first multi-agent crypto research company with Supervisor orchestration, controlled P2P collaboration, shared memory, read-only ToolGateway, Markdown/Obsidian outputs, and Phase 2 bounded parallel evidence checks.
+JIMMORIA is currently a Codex-first, public-web-first multi-agent crypto research company with Supervisor orchestration, controlled P2P collaboration, shared memory, read-only ToolGateway, Markdown/Obsidian outputs, and a full parallel research_swarm for the core research agents.

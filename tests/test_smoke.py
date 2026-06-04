@@ -1817,16 +1817,16 @@ class SmokeTest(unittest.TestCase):
         assert research is not None
         assert source_only is not None
         self.assertEqual(loaded_research.process_id, research.process_id)
-        self.assertEqual(research.process_type, "controlled_p2p_with_parallel_evidence_checks")
-        self.assertEqual(research.execution_strategy["current_phase"], 2)
-        self.assertEqual(research.execution_strategy["current_mode"], "bounded_parallel_agent_group")
-        self.assertIn("phase_2", research.execution_strategy)
+        self.assertEqual(research.process_type, "controlled_p2p_full_parallel_research_swarm")
+        self.assertEqual(research.execution_strategy["current_phase"], 3)
+        self.assertEqual(research.execution_strategy["current_mode"], "full_parallel_agent_swarm")
+        self.assertIn("phase_3", research.execution_strategy)
         self.assertEqual(research.agent_ids[0], "supervisor_agent")
         self.assertEqual(research.agent_ids[-1], "obsidian_curator_agent")
         self.assertEqual(len(research.tasks), 13)
         self.assertEqual(len(research.agent_ids), 10)
         self.assertEqual(research.agent_ids[2], "social_kol_agent")
-        self.assertIn("market_signal_intake", {task.phase for task in research.tasks})
+        self.assertIn("research_swarm", {task.phase for task in research.tasks})
         self.assertIn("deliberation", {task.phase for task in research.tasks})
         self.assertIn("final_review", {task.phase for task in research.tasks})
         self.assertIn("representative_web3_project_diligence", research.playbooks)
@@ -1839,16 +1839,17 @@ class SmokeTest(unittest.TestCase):
     def test_concurrency_policy_loads_phase_roadmap(self) -> None:
         policy = load_concurrency_policy()
 
-        self.assertEqual(policy.active.phase, 2)
-        self.assertEqual(policy.active.mode, "bounded_parallel_agent_group")
-        self.assertEqual(policy.active.max_parallel, 4)
-        self.assertEqual(len(policy.phases), 4)
-        phase_two = [phase for phase in policy.phases if phase.phase == 2][0]
-        self.assertEqual(phase_two.status, "active")
-        self.assertEqual(phase_two.mode, "bounded_parallel_agent_group")
-        self.assertEqual(phase_two.max_parallel, 4)
-        self.assertEqual(phase_two.parallel_groups[0].group_id, "evidence_checks")
-        self.assertIn("social_kol_agent", phase_two.parallel_groups[0].agents)
+        self.assertEqual(policy.active.phase, 3)
+        self.assertEqual(policy.active.mode, "full_parallel_agent_swarm")
+        self.assertEqual(policy.active.max_parallel, 7)
+        self.assertEqual(len(policy.phases), 2)
+        phase_three = [phase for phase in policy.phases if phase.phase == 3][0]
+        self.assertEqual(phase_three.status, "active")
+        self.assertEqual(phase_three.mode, "full_parallel_agent_swarm")
+        self.assertEqual(phase_three.max_parallel, 7)
+        self.assertEqual(phase_three.parallel_groups[0].group_id, "research_swarm")
+        self.assertIn("ingestion_agent", phase_three.parallel_groups[0].agents)
+        self.assertIn("funding_token_agent", phase_three.parallel_groups[0].agents)
 
     def test_runtime_room_created_event_includes_concurrency_policy(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -1864,16 +1865,16 @@ class SmokeTest(unittest.TestCase):
             room_created = [event for event in runtime.event_log if event["type"] == "room_created"][0]
 
         self.assertEqual(result.room.status, "completed")
-        self.assertEqual(room_created["concurrency"]["active_phase"]["phase"], 2)
-        self.assertEqual(room_created["concurrency"]["active_phase"]["mode"], "bounded_parallel_agent_group")
+        self.assertEqual(room_created["concurrency"]["active_phase"]["phase"], 3)
+        self.assertEqual(room_created["concurrency"]["active_phase"]["mode"], "full_parallel_agent_swarm")
 
-    def test_runtime_runs_evidence_agents_as_parallel_group(self) -> None:
+    def test_runtime_runs_research_agents_as_parallel_swarm(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             with patch.dict("os.environ", {**_offline_no_secret_env(), "JIMMORIA_SKIP_EXTERNAL_SEARCH": "1"}, clear=False):
                 runtime = ResearchRuntime()
                 result = runtime.run_article_research(
-                    title="Parallel Evidence Check",
+                    title="Parallel Research Swarm",
                     content="3Jane crypto credit project report",
                     vault_dir=root / "vault",
                     reports_dir=root / "reports",
@@ -1883,19 +1884,35 @@ class SmokeTest(unittest.TestCase):
             event_types = [event["type"] for event in runtime.event_log]
             group_start = [event for event in runtime.event_log if event["type"] == "parallel_group_start"][0]
             group_done = [event for event in runtime.event_log if event["type"] == "parallel_group_done"][0]
+            first_swarm_done_seq = min(
+                event["seq"]
+                for event in runtime.event_log
+                if event["type"] == "agent_done" and event.get("agent_id") in group_start["agents"]
+            )
+            swarm_starts_before_done = {
+                event.get("agent_id")
+                for event in runtime.event_log
+                if event["type"] == "agent_start"
+                and event.get("agent_id") in group_start["agents"]
+                and event["seq"] < first_swarm_done_seq
+            }
 
         self.assertEqual(result.room.status, "completed")
         self.assertIn("parallel_group_start", event_types)
         self.assertIn("parallel_group_done", event_types)
-        self.assertEqual(group_start["group_id"], "evidence_checks")
-        self.assertEqual(group_start["max_parallel"], 4)
+        self.assertEqual(group_start["group_id"], "research_swarm")
+        self.assertEqual(group_start["max_parallel"], 7)
         self.assertEqual(set(group_start["agents"]), {
+            "ingestion_agent",
             "social_kol_agent",
+            "narrative_agent",
+            "discovery_agent",
             "contract_onchain_agent",
             "product_tech_agent",
             "funding_token_agent",
         })
-        self.assertEqual(group_done["group_id"], "evidence_checks")
+        self.assertEqual(swarm_starts_before_done, set(group_start["agents"]))
+        self.assertEqual(group_done["group_id"], "research_swarm")
 
     def test_process_specs_load_when_cli_runs_outside_project_root(self) -> None:
         original_cwd = Path.cwd()

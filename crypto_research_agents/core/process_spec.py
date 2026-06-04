@@ -36,7 +36,7 @@ class TaskSpec:
 class ProcessSpec:
     process_id: str
     name: str
-    process_type: str = "sequential"
+    process_type: str = "controlled_p2p"
     supervisor_mode: str = "controlled_p2p"
     goals: list[str] = field(default_factory=list)
     playbooks: list[str] = field(default_factory=list)
@@ -51,7 +51,7 @@ class ProcessSpec:
         return cls(
             process_id=data["process_id"],
             name=data.get("name", data["process_id"]),
-            process_type=data.get("process_type", "sequential"),
+            process_type=data.get("process_type", "controlled_p2p"),
             supervisor_mode=data.get("supervisor_mode", "controlled_p2p"),
             goals=list(data.get("goals", [])),
             playbooks=list(data.get("playbooks", [])),

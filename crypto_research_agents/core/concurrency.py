@@ -47,7 +47,7 @@ class ConcurrencyPhaseSpec:
     phase: int
     name: str
     status: str = "planned"
-    mode: str = "sequential"
+    mode: str = "full_parallel_agent_swarm"
     description: str = ""
     max_parallel: int = 1
     parallel_groups: list[ParallelGroupSpec] = field(default_factory=list)
@@ -58,7 +58,7 @@ class ConcurrencyPhaseSpec:
             phase=int(data["phase"]),
             name=str(data.get("name", data["phase"])),
             status=str(data.get("status", "planned")),
-            mode=str(data.get("mode", "sequential")),
+            mode=str(data.get("mode", "full_parallel_agent_swarm")),
             description=str(data.get("description", "")),
             max_parallel=max(1, int(data.get("max_parallel", 1) or 1)),
             parallel_groups=[
@@ -82,8 +82,8 @@ class ConcurrencyPhaseSpec:
 @dataclass(slots=True)
 class ConcurrencyPolicy:
     policy_version: str = "0.1"
-    active_phase: int = 1
-    default_max_parallel: int = 1
+    active_phase: int = 3
+    default_max_parallel: int = 7
     safety: dict[str, Any] = field(default_factory=dict)
     phases: list[ConcurrencyPhaseSpec] = field(default_factory=list)
 
@@ -104,11 +104,11 @@ class ConcurrencyPolicy:
                 return phase
         return ConcurrencyPhaseSpec(
             phase=self.active_phase,
-            name="sequential_room",
+            name="full_parallel_research_swarm",
             status="active",
-            mode="sequential",
-            description="Fallback sequential execution.",
-            max_parallel=1,
+            mode="full_parallel_agent_swarm",
+            description="Default full parallel research swarm execution.",
+            max_parallel=self.default_max_parallel,
         )
 
     def event_payload(self) -> dict[str, Any]:
@@ -127,12 +127,12 @@ def load_concurrency_policy(path: str | Path = "config/concurrency.yaml") -> Con
         return ConcurrencyPolicy(
             phases=[
                 ConcurrencyPhaseSpec(
-                    phase=1,
-                    name="sequential_room",
+                    phase=3,
+                    name="full_parallel_research_swarm",
                     status="active",
-                    mode="sequential",
-                    description="Fallback sequential execution.",
-                    max_parallel=1,
+                    mode="full_parallel_agent_swarm",
+                    description="Default full parallel research swarm execution.",
+                    max_parallel=7,
                 )
             ]
         )

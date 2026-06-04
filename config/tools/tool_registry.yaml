@@ -431,7 +431,7 @@
       "priority": "recommended",
       "owner_agent": "supervisor_agent",
       "implementation_status": "implemented",
-      "purpose": "Record parallel-tool intent while actual Phase 2+ parallel execution is handled by JIMMORIA concurrency policy.",
+      "purpose": "Record parallel-tool intent while full parallel research_swarm execution is handled by JIMMORIA concurrency policy.",
       "provider_options": ["local concurrency policy marker"],
       "required_secrets": [],
       "source_docs": ["https://github.com/NousResearch/hermes-agent"]

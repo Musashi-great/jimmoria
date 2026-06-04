@@ -315,7 +315,7 @@ def multi_tool_parallel(tasks: list[dict[str, Any]] | None = None) -> dict[str, 
         "multi_tool_use.parallel",
         {
             "tasks": tasks or [],
-            "note": "JIMMORIA records parallel intent here; actual Phase 2+ parallel execution is handled by the workflow/concurrency layer.",
+            "note": "JIMMORIA records parallel intent here; full parallel research_swarm execution is handled by the workflow/concurrency layer.",
         },
         "parallel tool intent recorded",
     )

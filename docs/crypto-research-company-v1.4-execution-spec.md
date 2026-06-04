@@ -14,4 +14,4 @@ Current implementation policy:
 - JIMMORIA is public-web first.
 - Telegram Bot and Discord Bot are not part of the current default research stack.
 - Supervisor decides whether a Research Room is needed before reports are created.
-- Phase 2 is active: the front half remains ordered, then Social / Contract / Product / Funding evidence checks run as a bounded parallel group.
+- Phase 3 is active: after Supervisor seed context, the core research agents run as one full parallel research swarm.

@@ -20,13 +20,15 @@ from crypto_research_agents.agents import (
     SupervisorAgent,
 )
 from crypto_research_agents.connectors import register_default_connectors
+from crypto_research_agents.agents.discovery import extract_project_query, project_identity_hints
 from crypto_research_agents.core.bus import CollaborationBus
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
 from crypto_research_agents.core.company_settings import company_settings_path_for, load_company_settings
 from crypto_research_agents.core.concurrency import ConcurrencyPolicy, load_concurrency_policy
 from crypto_research_agents.core.hooks import HookEngine
-from crypto_research_agents.core.memory import FindingRecord, SharedMemory
+from crypto_research_agents.core.memory import FindingRecord, ProjectCandidate, SharedMemory, SourceRecord
 from crypto_research_agents.core.model_gateway import ModelGateway
+from crypto_research_agents.core.project_profile import find_project_profile
 from crypto_research_agents.core.process_spec import load_process_spec
 from crypto_research_agents.core.room import ResearchRoom
 from crypto_research_agents.core.runtime_state import RuntimeState
@@ -53,6 +55,16 @@ DEFAULT_AGENTS = [
 ]
 
 COUNCIL_AGENTS = [
+    "ingestion_agent",
+    "social_kol_agent",
+    "narrative_agent",
+    "discovery_agent",
+    "contract_onchain_agent",
+    "product_tech_agent",
+    "funding_token_agent",
+]
+
+RESEARCH_SWARM_AGENTS = [
     "ingestion_agent",
     "social_kol_agent",
     "narrative_agent",
@@ -147,12 +159,8 @@ class ResearchRuntime:
                 process=process.event_payload(),
             )
             room.set_status(RuntimeState.RUNNING)
-            self._run_agent("ingestion_agent", room, title=title, content=content, url=url, source_type="article")
-            self._run_agent("social_kol_agent", room, seed_mode=True)
-            self._run_agent("narrative_agent", room)
-            self._run_agent("discovery_agent", room)
-            room.set_status(RuntimeState.WAITING_FOR_TOOL)
-            self._run_evidence_checks(room)
+            self._seed_parallel_room_context(room, title=title, content=content, url=url)
+            self._run_research_swarm(room, title=title, content=content, url=url)
             room.set_status(RuntimeState.DELIBERATING)
             self._run_agent_council(room)
             room.set_status(RuntimeState.READY_FOR_REPORT)
@@ -256,6 +264,7 @@ class ResearchRuntime:
         return ResearchRunResult(room=room, memory=self.memory, bus=self.bus)
 
     def _run_agent(self, agent_id: str, room: ResearchRoom, **kwargs: object) -> None:
+        start_barrier = kwargs.pop("_start_barrier", None)
         agent = self.agents[agent_id]
         started = perf_counter()
         llm_start_index = len(self.model_gateway.call_log)
@@ -266,6 +275,11 @@ class ResearchRuntime:
             agent_name=agent.name,
             task_type=agent.task_type,
         )
+        if start_barrier is not None and hasattr(start_barrier, "wait"):
+            try:
+                start_barrier.wait(timeout=10)
+            except threading.BrokenBarrierError:
+                pass
         self.hooks.run("before_run", agent_id=agent_id, room_id=room.room_id)
         try:
             result = agent.run(room, self.memory, self.bus, **kwargs)
@@ -298,32 +312,156 @@ class ResearchRuntime:
         )
         self._emit_output_events(room, result)
 
-    def _run_evidence_checks(self, room: ResearchRoom) -> None:
-        group = self._active_parallel_group("evidence_checks")
-        if group is None or self.concurrency_policy.active.mode != "bounded_parallel_agent_group":
-            self._run_evidence_checks_sequential(room)
+    def _seed_parallel_room_context(self, room: ResearchRoom, *, title: str, content: str, url: str | None) -> None:
+        project_query = extract_project_query(room.topic)
+        source = self.memory.add_source(
+            SourceRecord(
+                title=title,
+                content=content,
+                source_type="parallel_seed",
+                url=url,
+                metadata={
+                    "seeded_by": "supervisor_agent",
+                    "seed_reason": "full_parallel_research_swarm_requires_shared_context_before_workers_start",
+                    "project_query": project_query,
+                },
+            )
+        )
+        room.add_source(source.source_id)
+
+        if not project_query:
+            room.project_card["parallel_seed"] = {
+                "source_id": source.source_id,
+                "project_query": "",
+                "candidate_id": None,
+            }
             return
 
-        agent_ids = [agent_id for agent_id in group.agents if agent_id in room.agents]
-        max_parallel = max(1, min(self.concurrency_policy.active.max_parallel, len(agent_ids) or 1))
-        if max_parallel <= 1 or len(agent_ids) <= 1:
-            self._run_evidence_checks_sequential(room, agent_ids=agent_ids)
-            return
+        profile = find_project_profile(project_query)
+        identity_hints = project_identity_hints(project_query)
+        evidence_urls = _seed_evidence_urls(url, identity_hints)
+        candidate = self.memory.upsert_project(
+            ProjectCandidate(
+                name=_seed_project_name(project_query),
+                reason_found="Supervisor seeded the primary candidate before the full parallel research swarm.",
+                website=(profile.website if profile else _seed_website(project_query, identity_hints)),
+                x_account=(profile.official_x if profile else _seed_x_account(identity_hints)),
+                chain=profile.chain if profile else None,
+                token_status="unknown",
+                narratives=["Unclassified Early Crypto"],
+                score=0.5,
+                sources=[source.source_id],
+                metadata={
+                    "discovery_mode": "supervisor_parallel_seed",
+                    "candidate_origin": "live_source_backed" if evidence_urls else "supervisor_parallel_seed",
+                    "source_backing": "profile_or_identity_seed_evidence" if evidence_urls else "seeded_context_for_parallel_workers",
+                    "project_query": project_query,
+                    "evidence_urls": evidence_urls,
+                    "web_results": identity_hints[:12],
+                    "official_x": profile.official_x if profile else _seed_x_account(identity_hints),
+                    "search_queries": list(profile.search_queries) if profile else [],
+                    "address_registry": dict(profile.address_registry) if profile else {},
+                    "funding": dict(profile.funding) if profile else {},
+                    "article_notes": list(profile.article_notes) if profile else [],
+                },
+            )
+        )
+        room.project_card["parallel_seed"] = {
+            "source_id": source.source_id,
+            "project_query": project_query,
+            "candidate_id": candidate.project_id,
+            "candidate_name": candidate.name,
+            "evidence_urls": evidence_urls,
+        }
+        self._seed_specialist_requests(room, candidate.project_id)
+        self._emit(
+            "parallel_seed_ready",
+            room_id=room.room_id,
+            source_id=source.source_id,
+            candidate_id=candidate.project_id,
+            project_query=project_query,
+            summary="Supervisor seeded shared source and candidate context before the full parallel research swarm.",
+        )
+
+    def _seed_specialist_requests(self, room: ResearchRoom, candidate_id: str) -> None:
+        candidate_context = {"candidate_ids": [candidate_id], "seeded_by": "supervisor_agent"}
+        self.bus.request(
+            room_id=room.room_id,
+            from_agent="supervisor_agent",
+            to_agent="social_kol_agent",
+            objective="Check official X/Twitter, public KOL, and social signal for the seeded candidate.",
+            required_output=["official_x", "who_said_what", "community_signal", "sources"],
+            context=candidate_context,
+            priority="high",
+        )
+        self.bus.request(
+            room_id=room.room_id,
+            from_agent="supervisor_agent",
+            to_agent="contract_onchain_agent",
+            objective="Check chain, token identity, contract, DEX, and explorer evidence for the seeded candidate.",
+            required_output=["chain", "token_status", "contract_address", "dex_pair", "sources"],
+            context=candidate_context,
+            priority="high",
+        )
+        self.bus.request(
+            room_id=room.room_id,
+            from_agent="supervisor_agent",
+            to_agent="product_tech_agent",
+            objective="Check website, docs, GitHub, product state, and live infra for the seeded candidate.",
+            required_output=["product_status", "docs_status", "github_status", "live_infra", "sources"],
+            context=candidate_context,
+            priority="high",
+        )
+        self.bus.request(
+            room_id=room.room_id,
+            from_agent="supervisor_agent",
+            to_agent="funding_token_agent",
+            objective="Check founder, funding, points, airdrop, token mechanics, and value-capture evidence.",
+            required_output=["founders", "funding_status", "points_status", "token_value_capture", "sources"],
+            context=candidate_context,
+            priority="high",
+        )
+
+    def _run_research_swarm(self, room: ResearchRoom, *, title: str, content: str, url: str | None) -> None:
+        group = self._active_parallel_group("research_swarm")
+        agent_ids = [
+            agent_id
+            for agent_id in (group.agents if group is not None and group.agents else RESEARCH_SWARM_AGENTS)
+            if agent_id in room.agents and agent_id in self.agents
+        ]
+        max_parallel = max(
+            1,
+            min(
+                self.concurrency_policy.active.max_parallel or self.concurrency_policy.default_max_parallel,
+                len(agent_ids) or 1,
+            ),
+        )
 
         self._emit(
             "parallel_group_start",
             room_id=room.room_id,
-            group_id=group.group_id,
+            group_id="research_swarm",
             agents=agent_ids,
             max_parallel=max_parallel,
-            after_agent=group.after_agent,
-            join_before=group.join_before,
-            summary=f"Running {len(agent_ids)} evidence-check agents in parallel.",
+            after_agent="supervisor_agent",
+            join_before="agent_council",
+            summary=f"Running {len(agent_ids)} research agents in one full parallel swarm.",
+        )
+        start_barrier = (
+            threading.Barrier(len(agent_ids))
+            if len(agent_ids) > 1 and max_parallel >= len(agent_ids)
+            else None
         )
         failures: list[tuple[str, str]] = []
-        with ThreadPoolExecutor(max_workers=max_parallel, thread_name_prefix="jimmoria-evidence") as executor:
+        with ThreadPoolExecutor(max_workers=max_parallel, thread_name_prefix="jimmoria-swarm") as executor:
             futures = {
-                executor.submit(self._run_agent, agent_id, room): agent_id
+                executor.submit(
+                    self._run_agent,
+                    agent_id,
+                    room,
+                    **_swarm_agent_kwargs(agent_id, title=title, content=content, url=url),
+                    _start_barrier=start_barrier,
+                ): agent_id
                 for agent_id in agent_ids
             }
             for future in as_completed(futures):
@@ -337,33 +475,24 @@ class ResearchRuntime:
             self._emit(
                 "parallel_group_failed",
                 room_id=room.room_id,
-                group_id=group.group_id,
+                group_id="research_swarm",
                 agents=agent_ids,
                 failures=[{"agent_id": agent_id, "error": error} for agent_id, error in failures],
-                summary=f"{len(failures)} parallel evidence-check agent(s) failed.",
+                summary=f"{len(failures)} full parallel research swarm agent(s) failed.",
             )
             failed = "; ".join(f"{agent_id}: {error}" for agent_id, error in failures)
-            raise RuntimeError(f"Parallel evidence checks failed: {failed}")
+            raise RuntimeError(f"Parallel research swarm failed: {failed}")
 
         self._emit(
             "parallel_group_done",
             room_id=room.room_id,
-            group_id=group.group_id,
+            group_id="research_swarm",
             agents=agent_ids,
             max_parallel=max_parallel,
-            summary=f"Parallel evidence checks completed for {len(agent_ids)} agents.",
+            summary=f"Full parallel research swarm completed for {len(agent_ids)} agents.",
             messages=len(self.bus.messages),
             findings=len(self.memory.get_room_findings(room.room_id)),
         )
-
-    def _run_evidence_checks_sequential(self, room: ResearchRoom, *, agent_ids: list[str] | None = None) -> None:
-        for agent_id in agent_ids or [
-            "social_kol_agent",
-            "contract_onchain_agent",
-            "product_tech_agent",
-            "funding_token_agent",
-        ]:
-            self._run_agent(agent_id, room)
 
     def _active_parallel_group(self, group_id: str) -> Any | None:
         for group in self.concurrency_policy.active.parallel_groups:
@@ -637,6 +766,55 @@ class ResearchRuntime:
 
 def _elapsed_ms(started: float) -> int:
     return int((perf_counter() - started) * 1000)
+
+
+def _swarm_agent_kwargs(agent_id: str, *, title: str, content: str, url: str | None) -> dict[str, Any]:
+    if agent_id == "ingestion_agent":
+        return {"title": title, "content": content, "url": url, "source_type": "article"}
+    return {}
+
+
+def _seed_project_name(project_query: str) -> str:
+    profile = find_project_profile(project_query)
+    if profile:
+        return profile.display_name
+    if project_query.lower().strip() == "pearl":
+        return "Pearl Network"
+    return project_query.strip().title()
+
+
+def _seed_website(project_query: str, identity_hints: list[dict[str, Any]]) -> str | None:
+    if project_query.lower().strip() == "pearl":
+        return "https://pearlresearch.ai/"
+    for hint in identity_hints:
+        url = str(hint.get("url") or "")
+        if url.startswith(("http://", "https://")) and "x.com/" not in url and "twitter.com/" not in url:
+            return url
+    return None
+
+
+def _seed_x_account(identity_hints: list[dict[str, Any]]) -> str | None:
+    for hint in identity_hints:
+        url = str(hint.get("url") or "")
+        lowered = url.lower()
+        if lowered.startswith(("https://x.com/", "https://twitter.com/", "http://x.com/", "http://twitter.com/")):
+            return url
+    return None
+
+
+def _seed_evidence_urls(input_url: str | None, identity_hints: list[dict[str, Any]]) -> list[str]:
+    urls: list[str] = []
+    if input_url:
+        urls.append(input_url)
+    for hint in identity_hints:
+        url = str(hint.get("url") or "")
+        if url.startswith(("http://", "https://")):
+            urls.append(url)
+    deduped: list[str] = []
+    for url in urls:
+        if url not in deduped:
+            deduped.append(url)
+    return deduped[:16]
 
 
 def default_policy(agent_specs: AgentSpecRegistry | None = None) -> PolicyEngine:

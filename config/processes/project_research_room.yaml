@@ -1,19 +1,17 @@
 {
   "process_id": "project_research_room",
   "name": "Representative Web3 Project Research Room",
-  "process_type": "controlled_p2p_with_parallel_evidence_checks",
+  "process_type": "controlled_p2p_full_parallel_research_swarm",
   "supervisor_mode": "company_ceo_manager",
   "execution_strategy": {
-    "current_phase": 2,
-    "current_mode": "bounded_parallel_agent_group",
-    "phase_1": "Run the full Research Room sequentially until the room is stable end-to-end.",
-    "phase_2": "After discovery_agent, run candidate-specific social_kol_agent, contract_onchain_agent, product_tech_agent, and funding_token_agent in one bounded evidence_checks group.",
-    "phase_3": "Run 24H public-web monitor collectors for X/KOL, articles, GitHub, Docs, DEX, RSS, RootData, and other public web sources in parallel into a signal queue.",
+    "current_phase": 3,
+    "current_mode": "full_parallel_agent_swarm",
+    "phase_3": "Supervisor seeds the source/candidate context, then ingestion, social/KOL, narrative, discovery, contract/on-chain, product/tech, and funding/token agents run together as research_swarm.",
     "phase_4": "Run multiple candidate Research Rooms in parallel and merge room-level summaries."
   },
   "inspired_by": [
     "ChatDev configurable workflows/phases/roles",
-    "crewAI agents.yaml + tasks.yaml + Process.sequential",
+    "crewAI agents.yaml + tasks.yaml role/task separation",
     "Hermes Agent toolsets and delegation-style subagent task routing",
     "Representative Web3 project/token diligence profile"
   ],
@@ -45,7 +43,7 @@
     {
       "task_id": "ingest_source",
       "agent_id": "ingestion_agent",
-      "phase": "source_memory",
+      "phase": "research_swarm",
       "requires": ["orchestrate_room"],
       "description": "Store source text/URL/name/CA and extract entities, ticker hints, official-link candidates, keywords, metadata, and source note candidates.",
       "expected_output": "SourceRecord plus ingestion finding with identity hints.",
@@ -54,8 +52,8 @@
     {
       "task_id": "collect_market_signal",
       "agent_id": "social_kol_agent",
-      "phase": "market_signal_intake",
-      "requires": ["ingest_source"],
+      "phase": "research_swarm",
+      "requires": ["orchestrate_room"],
       "description": "Use X/Twitter recent search when credentials exist, plus public web searches for X posts, KOL opinions, threads, official posts, builder/ecosystem mentions, controversies, clarifications, and articles. Telegram and Discord are out of scope.",
       "expected_output": "Market signal intake finding with X API status, public X web hits, official/candidate X handles, timeline status, KOL/profile candidates, who-said-what rows, article hits, official-post hints, and shill/controversy flags.",
       "output_channels": ["finding", "tool_audit", "bus.update"]
@@ -63,8 +61,8 @@
     {
       "task_id": "map_narratives",
       "agent_id": "narrative_agent",
-      "phase": "thesis_mapping",
-      "requires": ["collect_market_signal"],
+      "phase": "research_swarm",
+      "requires": ["orchestrate_room"],
       "description": "Classify the market-signal intake into crypto narratives and separate hype narrative from product thesis.",
       "expected_output": "Narrative finding with categories, confidence, and why this narrative matters.",
       "output_channels": ["finding", "memory.entity_graph"]
@@ -72,8 +70,8 @@
     {
       "task_id": "identity_gate_and_discovery",
       "agent_id": "discovery_agent",
-      "phase": "candidate_discovery",
-      "requires": ["map_narratives"],
+      "phase": "research_swarm",
+      "requires": ["orchestrate_room"],
       "description": "Run Identity Gate before judgment: resolve official project, ticker, chain, CA, site, X, docs, GitHub, DEX/explorer, ticker collision, unofficial CA, and relaunch history. Only then create source-backed ProjectCandidate records.",
       "expected_output": "ProjectCandidate records with candidate_origin/source_backing labels, identity confidence, collision notes, and official evidence URLs.",
       "output_channels": ["memory.projects", "finding", "bus.requests"]
@@ -81,8 +79,8 @@
     {
       "task_id": "check_social_kol",
       "agent_id": "social_kol_agent",
-      "phase": "evidence_checks",
-      "requires": ["identity_gate_and_discovery"],
+      "phase": "research_swarm",
+      "requires": ["orchestrate_room"],
       "description": "Run candidate-specific social verification: official X handle, recent official posts, KOL thesis, builder/ecosystem mentions, controversy/clarification, and social/shill risk.",
       "expected_output": "Candidate-specific Social/KOL finding with who said what, links, confidence, and unresolved gaps.",
       "output_channels": ["finding", "tool_audit"]
@@ -90,8 +88,8 @@
     {
       "task_id": "check_contract_onchain",
       "agent_id": "contract_onchain_agent",
-      "phase": "evidence_checks",
-      "requires": ["identity_gate_and_discovery"],
+      "phase": "research_swarm",
+      "requires": ["orchestrate_room"],
       "description": "Verify chain, token identity, contract, DEX/explorer metadata, security background, tax/mintability/honeypot/launchpad status where available. Keep LP/holder/liquidity short unless fatal.",
       "expected_output": "Contract/on-chain finding with official vs unofficial CA separation, security flags, and token status.",
       "output_channels": ["finding", "tool_audit"]
@@ -99,8 +97,8 @@
     {
       "task_id": "check_product_tech",
       "agent_id": "product_tech_agent",
-      "phase": "evidence_checks",
-      "requires": ["identity_gate_and_discovery"],
+      "phase": "research_swarm",
+      "requires": ["orchestrate_room"],
       "description": "Verify product reality through website, docs, app, GitHub, repo structure, recent commits, contracts, circuits, SDK, tests, docs, package releases, API, and live infra where available.",
       "expected_output": "Product/tech finding with what the project does, operator evidence, GitHub/docs maturity, and live infra response status.",
       "output_channels": ["finding", "tool_audit"]
@@ -108,8 +106,8 @@
     {
       "task_id": "check_funding_token",
       "agent_id": "funding_token_agent",
-      "phase": "opportunity_checks",
-      "requires": ["identity_gate_and_discovery"],
+      "phase": "research_swarm",
+      "requires": ["orchestrate_room"],
       "description": "Review founder dossier, investor/funding evidence, point/airdrop hints, token status, and token value-capture: why token is needed, who pays, fee/gas/burn/buyback/staking/revenue connection, and live vs roadmap separation.",
       "expected_output": "Founder/funding/token finding with sourced founder data, value-capture analysis, and uncertainty labels.",
       "output_channels": ["finding", "tool_audit"]
@@ -119,6 +117,10 @@
       "agent_id": "supervisor_agent",
       "phase": "deliberation",
       "requires": [
+        "ingest_source",
+        "collect_market_signal",
+        "map_narratives",
+        "identity_gate_and_discovery",
         "check_social_kol",
         "check_contract_onchain",
         "check_product_tech",

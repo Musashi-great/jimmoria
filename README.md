@@ -232,19 +232,15 @@ vision_analyze        future external vision connector
 Current active phase:
 
 ```text
-Phase 2: parallel_evidence_checks
-Run the dependency-heavy front half sequentially, then run Social / Contract / Product / Funding evidence checks together.
+Phase 3: full_parallel_research_swarm
+After the Supervisor seeds the shared source/candidate context, ingestion, Social/KOL,
+Narrative, Discovery, Contract/On-chain, Product/Tech, and Funding/Token agents run
+at the same time.
 ```
 
 Planned:
 
 ```text
-Phase 1: sequential_room
-Kept as the stable baseline and fallback policy.
-
-Phase 3: parallel_24h_monitoring
-Run public web, X, GitHub, Docs, DEX, RSS, RootData monitor workers in parallel.
-
 Phase 4: parallel_research_rooms
 Investigate Candidate A, B, C in separate Research Rooms, then merge summaries.
 ```

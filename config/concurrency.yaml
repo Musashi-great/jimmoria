@@ -1,64 +1,35 @@
 {
-  "policy_version": "0.1",
-  "active_phase": 2,
-  "default_max_parallel": 4,
+  "policy_version": "0.2",
+  "active_phase": 3,
+  "default_max_parallel": 7,
   "safety": {
-    "shared_memory_writes": "serialized",
-    "report_writing": "single_writer",
-    "obsidian_sync": "single_writer",
+    "shared_memory_writes": "lock_guarded",
+    "report_writing": "post_swarm_single_writer",
+    "obsidian_sync": "post_swarm_single_writer",
     "tool_calls": "read_only_or_artifact_write_only"
   },
   "phases": [
     {
-      "phase": 1,
-      "name": "sequential_room",
-      "status": "stable_baseline",
-      "mode": "sequential",
-      "description": "Run the whole Research Room sequentially until every agent path is stable.",
-      "max_parallel": 1,
-      "parallel_groups": []
-    },
-    {
-      "phase": 2,
-      "name": "parallel_evidence_checks",
+      "phase": 3,
+      "name": "full_parallel_research_swarm",
       "status": "active",
-      "mode": "bounded_parallel_agent_group",
-      "description": "After social-first discovery, re-run candidate-specific Social together with Contract, Product, and Funding evidence checks at the same time.",
-      "max_parallel": 4,
+      "mode": "full_parallel_agent_swarm",
+      "description": "After the Supervisor seeds source and candidate context, ingestion, social/KOL, narrative, discovery, contract/on-chain, product/tech, and funding/token agents run at the same time. The council, report, final review, and Obsidian sync run only after the swarm joins.",
+      "max_parallel": 7,
       "parallel_groups": [
         {
-          "group_id": "evidence_checks",
-          "after_agent": "discovery_agent",
+          "group_id": "research_swarm",
+          "after_agent": "supervisor_agent",
           "agents": [
+            "ingestion_agent",
             "social_kol_agent",
+            "narrative_agent",
+            "discovery_agent",
             "contract_onchain_agent",
             "product_tech_agent",
             "funding_token_agent"
           ],
           "join_before": "agent_council"
-        }
-      ]
-    },
-    {
-      "phase": 3,
-      "name": "parallel_24h_monitoring",
-      "status": "planned",
-      "mode": "background_monitor_workers",
-      "description": "Run X/KOL, article, GitHub, Docs, DEX, RSS, RootData, and other public web monitor workers concurrently into a signal queue.",
-      "max_parallel": 6,
-      "parallel_groups": [
-        {
-          "group_id": "monitor_collectors",
-          "agents": ["monitor_24h_agent"],
-          "tools": [
-            "monitor_x_list",
-            "monitor_github_activity",
-            "monitor_docs_changes",
-            "dexscreener_latest_profiles",
-            "rss_monitor_feed",
-            "monitor_rootdata_updates"
-          ],
-          "join_before": "signal_queue_dedupe"
         }
       ]
     },

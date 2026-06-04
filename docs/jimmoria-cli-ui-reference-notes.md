@@ -27,7 +27,7 @@ This keeps the CLI usable like a terminal chat while making it clear which agent
 | [Spettro](https://github.com/cesp99/spettro) | manifest-driven agent roles, visible handoffs, `/connect`, `/models`, permission modes, live tool traces | Supervisor가 숨겨진 router가 아니라 visible front door가 되게 하고, tool/agent 이벤트를 운영 로그로 보여준다. |
 | [Goose](https://github.com/aaif-goose/goose) / [logs guide](https://goose-docs.ai/docs/guides/logs) | CLI 화면은 대화 중심으로 유지하고, tool calls/results/session records/system logs는 로컬 저장소에 남김 | 화면에는 compact event stream만 보여주고, 자세한 이벤트는 `data/runs/<room_id>`와 `/events`로 확인한다. |
 | [Agent Cockpit](https://agent-cockpit.dev/) | mission view, agent별 terminal stream, tool/file/approval event timestamps | JIMMORIA도 모든 runtime 이벤트를 큰 카드 대신 `Room >`, `Agent >`, `Tool >`, `Output >` 스트림으로 흘려보낸다. |
-| [crewAI](https://github.com/crewAIInc/crewAI) | `agents.yaml`, `tasks.yaml`, `Process.sequential`로 agent와 task를 분리 | JIMMORIA는 `config/processes/*.yaml`로 Research Room task order와 expected output을 분리한다. |
+| [crewAI](https://github.com/crewAIInc/crewAI) | `agents.yaml`, `tasks.yaml`로 agent와 task를 분리 | JIMMORIA는 `config/processes/*.yaml`로 Research Room task order와 expected output을 분리한다. |
 | [MetaGPT](https://github.com/FoundationAgents/MetaGPT) | one-line requirement를 회사 SOP와 role workflow로 전개 | 사용자의 한 문장을 Supervisor가 회사 업무로 해석하고, 필요할 때만 Research Room을 연다. |
 | [ChatDev](https://github.com/OpenBMB/ChatDev) | virtual software company, visual workflow/canvas console | 나중에 web visualizer로 agent workflow를 replay할 수 있게 CLI event log를 유지한다. |
 | [ZeroHuman](https://zerohuman.sh/) | manifest, profiles, skills/runbooks, predictable artifacts | JIMMORIA도 agents/tools/models/settings를 config와 문서에 남겨 audit 가능한 회사 운영 모델로 유지한다. |
