@@ -669,9 +669,57 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("FAIL", text)
         self.assertIn("Stopped: Failed: Codex CLI provider failed", text)
 
-    def test_runtime_events_default_to_compact_stream(self) -> None:
+    def test_runtime_events_default_to_background_dock(self) -> None:
         output = StringIO()
         console = JimmoriaConsole()
+
+        with redirect_stdout(output):
+            console.handle_event(
+                {
+                    "type": "room_created",
+                    "room_id": "room_test",
+                    "topic": "pearl pow project",
+                    "goals": ["Investigate the project."],
+                    "agents": ["supervisor_agent", "ingestion_agent"],
+                }
+            )
+            console.handle_event(
+                {
+                    "type": "agent_start",
+                    "room_id": "room_test",
+                    "agent_id": "ingestion_agent",
+                    "task_type": "source_ingestion",
+                }
+            )
+            console.handle_event(
+                {
+                    "type": "agent_done",
+                    "room_id": "room_test",
+                    "agent_id": "ingestion_agent",
+                    "summary": "Source stored and summarized.",
+                    "messages": 2,
+                    "findings": 3,
+                    "duration_ms": 1234,
+                    "llm_usage": {
+                        "calls": 2,
+                        "total_tokens": 4200,
+                        "estimated": True,
+                    },
+                }
+            )
+
+        text = output.getvalue()
+        self.assertNotIn("Room > OPEN room_test", text)
+        self.assertNotIn("Board > 2 wait/0 done", text)
+        self.assertNotIn("Agent > RUN ingestion_agent", text)
+        self.assertNotIn("Agent > DONE ingestion_agent", text)
+        self.assertEqual(console.last_room_id, "room_test")
+        self.assertEqual(console.agent_state["ingestion_agent"], "done")
+
+    def test_runtime_stream_event_style_prints_compact_log(self) -> None:
+        output = StringIO()
+        console = JimmoriaConsole()
+        console.event_style = "stream"
 
         with redirect_stdout(output):
             console.handle_event(

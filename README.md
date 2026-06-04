@@ -42,7 +42,7 @@ Start the company:
 jimmoria
 ```
 
-The CLI runs as a chat-style Research HQ. During a Research Room, logs keep flowing upward while a fixed runtime dock stays at the bottom:
+The CLI runs as a chat-style Research HQ. During a Research Room, raw runtime events stay in the background while a fixed runtime dock shows the current work:
 
 ```text
 --------------------------------------------------------------------------------+
@@ -59,7 +59,7 @@ The CLI runs as a chat-style Research HQ. During a Research Room, logs keep flow
 +--------------------------------------------------------------------------------+
 ```
 
-That dock is the lightweight TUI layer: it keeps the current room, provider, agent progress, and each agent's active job visible while detailed `Room >`, `Agent >`, `Tool >`, and `Output >` logs stream above it.
+That dock is the lightweight TUI layer: it keeps the current room, provider, agent progress, and each agent's active job visible while detailed `Room >`, `Agent >`, `Tool >`, and `Output >` events run in the background and are saved under `data/runs/<room_id>/`. Set `JIMMORIA_EVENT_STYLE=stream` only when you want the raw live event stream on screen for debugging.
 
 Open the local web dashboard:
 

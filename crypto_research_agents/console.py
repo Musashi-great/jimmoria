@@ -61,7 +61,7 @@ class JimmoriaConsole:
         terminal_width = shutil.get_terminal_size((120, 30)).columns
         self.width = max(72, min(terminal_width, 180))
         self.use_rich = RichConsole is not None and not os.getenv("JIMMORIA_PLAIN_LOGS")
-        self.event_style = os.getenv("JIMMORIA_EVENT_STYLE", "stream").strip().lower() or "stream"
+        self.event_style = os.getenv("JIMMORIA_EVENT_STYLE", "dock").strip().lower() or "dock"
         self.runtime_room_running = False
         self.runtime_dock_lines = 0
         self.runtime_dock_frame = 0
@@ -220,7 +220,8 @@ class JimmoriaConsole:
     def print_event_line(self, label: str, text: str, *, muted: bool = False) -> None:
         if self.use_runtime_dock():
             self.erase_runtime_dock()
-        self.print_log_line(label, text, muted=muted)
+        if self.show_event_log_lines():
+            self.print_log_line(label, text, muted=muted)
         if self.use_runtime_dock() and self.runtime_room_running:
             self.print_runtime_dock()
         elif self.use_runtime_dock():
@@ -228,6 +229,9 @@ class JimmoriaConsole:
 
     def use_stream_events(self) -> bool:
         return self.event_style not in {"card", "cards", "panel", "panels"}
+
+    def show_event_log_lines(self) -> bool:
+        return self.event_style in {"stream", "compact", "log", "logs", "debug", "trace"}
 
     def use_runtime_dock(self) -> bool:
         return self.use_stream_events() and supports_color() and not os.getenv("JIMMORIA_NO_RUNTIME_DOCK")

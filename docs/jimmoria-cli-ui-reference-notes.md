@@ -6,12 +6,12 @@ The current CLI uses a lightweight TUI dock during Research Room execution.
 
 Behavior:
 
-- Logs continue to scroll upward as compact lines: `Room >`, `Agent >`, `Tool >`, `Output >`.
+- Raw runtime events do not scroll upward by default. They update the fixed dock in the foreground and are stored in run artifacts in the background.
 - The old bottom input dock is expanded into a fixed runtime panel.
 - The panel contains `JIMMORIA HQ`, provider, room id, aggregate agent progress, and a `Live agent board - current work` table.
 - Each agent row shows `WAIT`, `RUN`, `DONE`, or `FAIL`.
 - Each agent row shows the current assignment or the latest tool action.
-- Tool events update the fixed board in addition to the scrolling log.
+- Tool events update the fixed board and are saved to `events.json` / `tool_audit_log.json`.
 - The `> working...` line stays inside the panel, and only the dots blink.
 
 This keeps the CLI usable like a terminal chat while making it clear which agent is currently doing what.
@@ -25,8 +25,8 @@ This keeps the CLI usable like a terminal chat while making it clear which agent
 | [Mato](https://github.com/mr-kelly/mato) / [mato.sh](https://mato.sh/) | offices/desks/tabs 같은 계층형 terminal workspace, live spinner activity, background persistence, theme persistence | Research HQ를 하나의 운영실처럼 보이게 하고, agent 상태를 짧은 live signal로 보여준다. |
 | [Conduit](https://github.com/conduit-cli/conduit) / [getconduit.sh](https://getconduit.sh/) | multi-agent TUI, tab-based sessions, real-time streaming, token/cost/status tracking, session persistence | 입력창 주변에 provider, room, agent state 같은 작동 상태를 계속 노출한다. |
 | [Spettro](https://github.com/cesp99/spettro) | manifest-driven agent roles, visible handoffs, `/connect`, `/models`, permission modes, live tool traces | Supervisor가 숨겨진 router가 아니라 visible front door가 되게 하고, tool/agent 이벤트를 운영 로그로 보여준다. |
-| [Goose](https://github.com/aaif-goose/goose) / [logs guide](https://goose-docs.ai/docs/guides/logs) | CLI 화면은 대화 중심으로 유지하고, tool calls/results/session records/system logs는 로컬 저장소에 남김 | 화면에는 compact event stream만 보여주고, 자세한 이벤트는 `data/runs/<room_id>`와 `/events`로 확인한다. |
-| [Agent Cockpit](https://agent-cockpit.dev/) | mission view, agent별 terminal stream, tool/file/approval event timestamps | JIMMORIA도 모든 runtime 이벤트를 큰 카드 대신 `Room >`, `Agent >`, `Tool >`, `Output >` 스트림으로 흘려보낸다. |
+| [Goose](https://github.com/aaif-goose/goose) / [logs guide](https://goose-docs.ai/docs/guides/logs) | CLI 화면은 대화 중심으로 유지하고, tool calls/results/session records/system logs는 로컬 저장소에 남김 | 화면은 Supervisor 대화와 live dock 중심으로 유지하고, 자세한 이벤트는 `data/runs/<room_id>`와 `/events`로 확인한다. |
+| [Agent Cockpit](https://agent-cockpit.dev/) | mission view, agent별 terminal stream, tool/file/approval event timestamps | JIMMORIA는 agent/tool 이벤트를 화면에 계속 뿌리지 않고 live board와 저장된 replay event로 분리한다. |
 | [crewAI](https://github.com/crewAIInc/crewAI) | `agents.yaml`, `tasks.yaml`로 agent와 task를 분리 | JIMMORIA는 `config/processes/*.yaml`로 Research Room task order와 expected output을 분리한다. |
 | [MetaGPT](https://github.com/FoundationAgents/MetaGPT) | one-line requirement를 회사 SOP와 role workflow로 전개 | 사용자의 한 문장을 Supervisor가 회사 업무로 해석하고, 필요할 때만 Research Room을 연다. |
 | [ChatDev](https://github.com/OpenBMB/ChatDev) | virtual software company, visual workflow/canvas console | 나중에 web visualizer로 agent workflow를 replay할 수 있게 CLI event log를 유지한다. |
@@ -41,8 +41,8 @@ JIMMORIA의 현재 CLI는 full-screen TUI가 아니라 line-oriented CLI다. 따
 - 사용자가 메시지를 제출하면 ANSI terminal에서는 input dock을 지운다.
 - 제출된 문장은 큰 `You` 패널로 반복하지 않고 `You > ...` 로그로 위에 남긴다.
 - Supervisor는 바로 `Supervisor > ...` 진행 로그를 남긴 뒤 답변하거나 Research Room을 연다.
-- Research Room이 열리면 기본적으로 `Room >`, `Board >`, `Agent >`, `Tool >`, `Output >` compact stream이 이어진다.
-- Compact runtime logs include elapsed time and LLM usage, for example `time 1.2s | llm 2 calls / ~4.2k tokens`.
+- Research Room이 열리면 기본적으로 raw event stream은 화면에 찍지 않고, dock의 `Live agent board`만 갱신한다.
+- Runtime metrics include elapsed time and LLM usage. `JIMMORIA_EVENT_STYLE=stream`을 켠 디버그 모드에서는 `time 1.2s | llm 2 calls / ~4.2k tokens`처럼 compact log로도 볼 수 있다.
 - Research Room 실행 중에도 하단 dock을 유지한다. 새 이벤트가 출력될 때는 이전 dock을 지우고 이벤트를 찍은 뒤 다시 dock을 그려, 사용자가 계속 같은 회사 채팅창 안에 있는 느낌을 준다.
 - Research Room 실행 중에는 실제 터미널 커서를 숨기고, dock 내부의 `> working...` 점만 blink 처리한다. 바깥 커서가 박스 밖에서 깜빡이면 안 된다.
 - 큰 `Live agent board`와 agent work card는 `/board` 또는 `JIMMORIA_EVENT_STYLE=cards`에서 사용한다.
@@ -62,15 +62,13 @@ Supervisor > Reading the message, choosing the response shape, and routing the c
 [Supervisor]
   좋아. 이건 리서치 요청이라 Research Room을 열고 에이전트들을 배정할게.
 
-Room > OPEN room_abc123 | agents 10 | pearl 프로젝트 리서치
-Board > 10 wait/0 done
-Agent > RUN supervisor_agent | Planning direction
-Agent > DONE supervisor_agent | Research room initialized | msg 1 / findings 1
-Agent > RUN ingestion_agent | Extracting source metadata
-Tool > RUN discovery_agent -> web_search | pearl crypto project
 +--------------------------------------------------------------------------------+
 | JIMMORIA HQ | Supervisor channel | provider: codex_cli | room: room_abc123 ... |
 | Room running. Input returns when Supervisor finishes this room.                 |
+| Live agent board - current work                                                |
+| STATE  AGENT                         CURRENT WORK                              |
+| RUN    supervisor_agent              Now: Planning direction                   |
+| WAIT   ingestion_agent               Waiting: Extracting source metadata       |
 | > working...                                                                   |
 +--------------------------------------------------------------------------------+
 ```
@@ -83,7 +81,7 @@ Tool > RUN discovery_agent -> web_search | pearl crypto project
 |---|---|---|---|
 | [Aider](https://github.com/Aider-AI/aider) / [install docs](https://aider.chat/docs/install.html) | 설치 후 프로젝트 폴더 안에서 바로 `aider`를 실행하고, 같은 터미널 세션에서 파일과 대화한다. | 사용자가 계속 한 채팅창에 요청하고, 도구/변경은 채팅 로그 위로 올라간다. | `jimmoria` 단일 명령으로 HQ에 들어오게 하고, 입력창은 항상 Supervisor 채널로 유지한다. |
 | [OpenHands CLI](https://docs.openhands.dev/openhands/usage/cli/quick-start) | CLI quick start가 task 입력, LLM 설정, 실행 모드를 분리한다. | 대화형 CLI, headless, web/server 같은 실행 모드가 분리되어 있다. | 지금은 CLI-first로 두되, 나중에 `jimmoria web`/visual replay가 붙을 수 있도록 `events.json`과 session artifact를 계속 표준화한다. |
-| [Goose](https://github.com/block/goose) | 설치 후 `goose`로 세션을 열고, provider/extension/tool 상태를 명령으로 관리한다. | 대화는 짧게 유지하고 tool call/log/session은 별도 저장소와 diagnostics로 뺀다. | 화면에는 compact stream만 보이고, 자세한 agent/tool log는 `data/runs/<room_id>`와 `/events`, `/messages`에서 확인한다. |
+| [Goose](https://github.com/block/goose) | 설치 후 `goose`로 세션을 열고, provider/extension/tool 상태를 명령으로 관리한다. | 대화는 짧게 유지하고 tool call/log/session은 별도 저장소와 diagnostics로 뺀다. | 화면에는 live dock만 보이고, 자세한 agent/tool log는 `data/runs/<room_id>`와 `/events`, `/messages`에서 확인한다. |
 | [Hermes Agent](https://hermes-agent.nousresearch.com/docs/getting-started/installation) | installer, device login, gateway, tools, cron, profiles 같은 운영 명령이 분리되어 있다. | 일반 대화와 운영 명령이 공존하지만, 운영 상태는 별도 명령으로 확인한다. | `jimmoria tools`, `cron`, `profile`, `playbook`, `sessions`, `doctor`처럼 회사 운영 명령을 분리한다. |
 | [crewAI](https://github.com/crewAIInc/crewAI) / [quickstart](https://docs.crewai.com/quickstart) | `crewai create crew`로 프로젝트를 만들고 agents/tasks YAML을 채운 뒤 `crewai run`으로 실행한다. | 대화형 assistant라기보다 crew/task 실행 프레임워크다. | 에이전트 내부는 유지하고, Research Room의 goals/tasks/expected outputs만 `config/processes/*.yaml`로 분리한다. |
 | [ChatDev](https://github.com/OpenBMB/ChatDev) | 자연어 요구사항을 software company workflow와 visual process로 전개한다. | 사용자는 회사에 일을 맡기고, 내부 role/phase가 순차적으로 움직인다. | 사용자는 Supervisor에게 외주를 주고, Supervisor가 Research Room을 열지 직접 대답할지 먼저 판단한다. |
@@ -98,7 +96,7 @@ JIMMORIA에 적용할 기준은 다음이다.
 - Conversation first: 일반 입력은 먼저 Supervisor와 대화한다. Supervisor가 Research Room 필요 여부를 판단한다.
 - Confirmation before run: 명확한 연구 작업이라도 Supervisor가 짧게 확인한 뒤 room을 연다. 사용자가 취소하면 run/report artifact를 만들지 않는다.
 - Stable input dock: 입력창은 하단 dock처럼 계속 유지되어야 한다. 로그가 올라와도 사용자는 "회사와 대화 중"이라는 감각을 잃지 않아야 한다.
-- Compact logs: 실시간 로그는 `Room >`, `Agent >`, `Tool >`, `Output >` 한 줄 stream을 기본값으로 둔다.
+- Background logs: 실시간 raw event는 기본적으로 화면에 찍지 않고 background artifact로 저장한다. 필요하면 `JIMMORIA_EVENT_STYLE=stream`으로 한 줄 stream을 켠다.
 - Deep logs elsewhere: 자세한 board, message, event, tool audit은 `/board`, `/messages`, `/events`, `data/runs/<room_id>`로 보낸다.
 - Report is not default: 모든 입력을 보고서로 만들지 않는다. 저장된 산출물을 부르는 `3jane 보고서 만들어봐/들고와봐/보내봐` 류는 report lookup으로 처리하고, `새로`, `리서치`, `조사`, `분석`이 있을 때만 새 Research Room을 연다.
 - External tools are visible: connector가 없거나 실패하면 조용히 넘어가지 않고, `unconfigured`, `missing evidence`, `insufficient_evidence`를 명확히 표시한다.
@@ -121,7 +119,7 @@ JIMMORIA에 적용할 기준은 다음이다.
 |---|---|---|
 | Aider-style single chat lane | 사용자는 한 대화창에 계속 입력하고, 시스템이 파일/작업 상태를 위로 올린다. | Supervisor channel은 하나로 유지하고, 여러 room은 `/rooms` workboard에서 선택한다. |
 | OpenHands-style task sessions | 각 task는 독립 세션이며, CLI/headless/web 모드가 분리된다. | Research Room은 독립 run artifact를 갖고, 나중에 `resume`/`tui`/`web` 모드가 같은 `events.json`을 읽는다. |
-| Goose-style sessions and logs | 대화 화면은 짧게, 자세한 tool/session log는 diagnostics로 분리된다. | 실시간 화면은 compact stream, 자세한 기록은 `/events`, `/messages`, `data/runs/<room_id>`. |
+| Goose-style sessions and logs | 대화 화면은 짧게, 자세한 tool/session log는 diagnostics로 분리된다. | 실시간 화면은 live dock, 자세한 기록은 `/events`, `/messages`, `data/runs/<room_id>`. |
 | Hermes-style operations layer | tools, cron, profiles, sessions가 별도 운영 명령으로 분리된다. | 여러 작업은 `cron`, `sessions`, `rooms`, `profile` 명령으로 관리한다. |
 | ChatDev/MetaGPT-style company workflow | 여러 role이 움직일 때 phase와 artifact가 보여야 한다. | Workboard는 room 단위, Live board는 agent 단위, event log는 replay 단위로 분리한다. |
 

@@ -140,7 +140,7 @@ flowchart LR
 | Layer | File | Role |
 |---|---|---|
 | CLI | `crypto_research_agents/cli.py` | 명령어, 채팅 루프, Supervisor intake |
-| Console | `crypto_research_agents/console.py` | 터미널 UI, 로고, 입력 dock, 로그 표시, live agent board |
+| Console | `crypto_research_agents/console.py` | 터미널 UI, 로고, 입력 dock, background event handling, live agent board |
 | Runtime | `crypto_research_agents/runtime.py` | Research Room 생성과 agent 실행 |
 | Research Room | `core/room.py` | 한 개 리서치 작업 단위 |
 | Collaboration Bus | `core/bus.py` | 요청, 응답, handoff, update 기록 |
@@ -156,16 +156,12 @@ flowchart LR
 
 `crypto_research_agents/console.py`는 Research Room 실행 중 lightweight TUI dock을 계속 유지한다.
 
-화면 모델은 다음과 같다.
+기본 화면 모델은 다음과 같다.
 
 ```text
-scrolling transcript
+conversation transcript
   You > ...
   Supervisor > ...
-  Room > ...
-  Agent > ...
-  Tool > ...
-  Output > ...
 
 fixed runtime dock
   JIMMORIA HQ status line
@@ -176,7 +172,9 @@ fixed runtime dock
   locked input line with blinking working dots
 ```
 
-이 dock은 runtime event가 들어올 때마다 다시 그려진다. 새 이벤트 로그를 찍기 전에 이전 dock을 ANSI cursor movement로 지우고, 로그를 출력한 뒤, 최신 agent state로 dock을 다시 그린다. 그래서 터미널 scrollback은 유지하면서도 아래쪽 status/input 영역은 고정된 TUI처럼 보인다.
+이 dock은 runtime event가 들어올 때마다 다시 그려진다. 기본값은 `JIMMORIA_EVENT_STYLE=dock`이며, `Room >`, `Agent >`, `Tool >`, `Output >` 같은 compact runtime log는 화면에 찍지 않는다. 이벤트는 백그라운드에서 `data/runs/<room_id>/events.json`, `messages.json`, `tool_audit_log.json`에 저장되고, 화면에는 최신 agent state만 dock으로 갱신된다.
+
+디버깅이 필요하면 `JIMMORIA_EVENT_STYLE=stream`을 설정해 예전처럼 compact runtime log를 위로 흘려보낼 수 있다.
 
 Tool event도 board를 갱신한다. 예를 들어 `discovery_agent`가 `web_search`를 호출하면 해당 row는 `Waiting: Resolving candidates`에서 `Now: Tool running: web_search - ...`로 바뀐다. Agent가 끝나면 `Finished: ...`로 바뀐다.
 
@@ -194,7 +192,7 @@ WAIT   ingestion_agent               Waiting: Extracting source metadata
 > working...
 ```
 
-The active summary line exists so the user can still see the current worker even if terminal scrollback or ANSI rendering hides part of the full board. The full board uses the current terminal width up to a wider cap, so long agent names such as `contract_onchain_agent` and `obsidian_curator_agent` remain visible during research rooms.
+The active summary line exists so the user can still see the current worker without reading raw event logs. The full board uses the current terminal width up to a wider cap, so long agent names such as `contract_onchain_agent` and `obsidian_curator_agent` remain visible during research rooms.
 
 ## 5.2 Model Routing
 
@@ -265,7 +263,7 @@ Supervisor는 단순 라우터가 아니라 회사의 boss/orchestrator다.
 - 사용자 발화를 먼저 읽고 대화/설정/리서치/보고서 조회 요청을 구분
 - Research Room이 필요한지 판단
 - 보고서/dossier 작성 요청이면 사용자에게 확인 후 room open
-- 사용자가 y/Enter로 승인한 뒤에는 중복 Supervisor 설명 박스를 출력하지 않고 바로 room/agent event stream으로 전환
+- 사용자가 y/Enter로 승인한 뒤에는 중복 Supervisor 설명 박스를 출력하지 않고 room 실행 dock으로 전환
 - 저장 보고서 조회가 실패한 뒤 사용자가 "만들어/작성해"라고 정정하면 직전 요청을 새 보고서 작성 요청으로 복구
 - `3jane`처럼 숫자로 시작하는 프로젝트명도 추출하고, 보고서 작성 요청이면 public web discovery를 우선 수행
 - 목표, 우선순위, task plan 생성
@@ -489,7 +487,7 @@ events.json room_completed.llm_usage
 room.json project_card.runtime_metrics
 ```
 
-The CLI compact stream renders these as `time 1.2s | llm 2 calls / ~4.2k tokens`. The `~` prefix means estimated tokens.
+The runtime dock and saved event records keep these metrics. If `JIMMORIA_EVENT_STYLE=stream` is enabled, compact logs render them as `time 1.2s | llm 2 calls / ~4.2k tokens`. The `~` prefix means estimated tokens.
 
 Workflow artifact runs also write:
 
