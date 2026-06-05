@@ -5,7 +5,6 @@ import os
 import re
 import shutil
 import sys
-import textwrap
 import unicodedata
 from pathlib import Path
 from typing import Any
@@ -113,27 +112,31 @@ class JimmoriaConsole:
         print_jimmoria_logo(self.width)
 
     def print_help(self) -> None:
+        command_rows = [
+            ("/add <text-or-url>", "소스만 저장"),
+            ("/models", "LLM provider/model 설정"),
+            ("/doctor", "연결 가능한 도구와 placeholder 상태 확인"),
+            ("/company", "활성/예정 에이전트 보기"),
+            ("/settings", "회사 운영 설정 보기"),
+            ("/board", "현재 에이전트 작업 보드 보기"),
+            ("/context", "공유 메모리와 최근 실행 컨텍스트 보기"),
+            ("/rooms", "여러 리서치룸 워크로드 보기"),
+            ("/runs", "이전 실행 기록 보기"),
+            ("/status [room_id]", "최신/선택 룸 상태 보기"),
+            ("/messages [room_id]", "협업 메시지 보기"),
+            ("/events [room_id]", "저장된 UI/replay 이벤트 보기"),
+            ("/report [room_id]", "저장된 리포트 출력"),
+            ("/last", "최신 실행 카드 보기"),
+            ("/help", "도움말"),
+            ("/quit", "종료"),
+        ]
         lines = [
             "메시지를 입력하면 슈퍼바이저가 대화/설정/소스저장/리서치룸 실행 여부를 판단합니다.",
-            "진행 중에는 전체 로그 대신 에이전트별 작업 카드와 토론방 카드가 업데이트됩니다.",
+            "진행 중에는 raw tool 로그 대신 에이전트별 작업 상태와 compact event line이 업데이트됩니다.",
             "",
-            "Commands:",
-            "  /add <text-or-url>       소스만 저장",
-            "  /models                  LLM provider/model 설정",
-            "  /doctor                  연결 가능한 도구와 placeholder 상태 확인",
-            "  /company                 활성/예정 에이전트 보기",
-            "  /settings                회사 운영 설정 보기",
-            "  /board                   현재 에이전트 작업 보드 보기",
-            "  /context                 공유 메모리와 최근 실행 컨텍스트 보기",
-            "  /rooms                   여러 리서치룸 워크로드 보기",
-            "  /runs                    이전 실행 기록 보기",
-            "  /status [room_id]        최신/선택 룸 상태 보기",
-            "  /messages [room_id]      협업 메시지 보기",
-            "  /events [room_id]        저장된 UI/replay 이벤트 보기",
-            "  /report [room_id]        저장된 리포트 출력",
-            "  /last                    최신 실행 카드 보기",
-            "  /help                    도움말",
-            "  /quit                    종료",
+            "COMMAND                         설명",
+            "-------                         ----",
+            *self.format_columns(command_rows, left_width=30),
         ]
         self.block("JIMMORIA 명령어", lines)
 
@@ -308,7 +311,7 @@ class JimmoriaConsole:
         print("")
         print(self.input_border_style(border))
         print(self.input_status_line_style(self.input_text_line(self.input_status_text())))
-        print(self.input_border_style(self.input_hint_line(hint)))
+        print(self.input_hint_line_style(self.input_hint_line(hint)))
         print(self.input_edit_line_style())
         print(self.input_border_style(border))
         try:
@@ -335,7 +338,7 @@ class JimmoriaConsole:
             self.input_border_style(border),
             self.input_status_line_style(self.input_text_line(self.input_status_text())),
             self.input_active_summary_line_style(),
-            self.input_border_style(self.input_hint_line("리서치룸 실행 중입니다. 슈퍼바이저가 완료하면 입력창이 돌아옵니다.")),
+            self.input_hint_line_style(self.input_hint_line("리서치룸 실행 중입니다. 슈퍼바이저가 완료하면 입력창이 돌아옵니다.")),
             self.input_divider_line_style(),
             self.input_board_title_line_style(),
             self.input_board_header_line_style(),
@@ -364,13 +367,11 @@ class JimmoriaConsole:
         hint = "요청, URL, /command, @path/to/file 을 입력하세요"
         border = self.input_border()
         print("")
-        print(border)
-        print(self.input_text_line(self.input_status_text()))
-        print(self.input_hint_line(hint))
-        try:
-            return input("| > ")
-        finally:
-            print(self.input_border_style(border))
+        print(self.input_border_style(border))
+        print(self.input_status_line_style(self.input_text_line(self.input_status_text())))
+        print(self.input_hint_line_style(self.input_hint_line(hint)))
+        print(self.input_border_style(border))
+        return input("> ")
 
     def input_box_width(self) -> int:
         available_width = max(32, self.width - 4)
@@ -426,6 +427,16 @@ class JimmoriaConsole:
         if not supports_color():
             return text
         return f"\033[38;2;211;95;255m{text}\033[0m"
+
+    def input_hint_line_style(self, text: str) -> str:
+        if not supports_color():
+            return text
+        violet = "\033[38;2;211;95;255m"
+        muted = "\033[38;2;160;132;188m"
+        reset = "\033[0m"
+        if not text.startswith("|") or not text.endswith("|"):
+            return f"{muted}{text}{reset}"
+        return f"{violet}|{reset}{muted}{text[1:-1]}{reset}{violet}|{reset}"
 
     def input_divider_line_style(self) -> str:
         return self.input_border_style(self.input_divider_line())
@@ -1517,17 +1528,74 @@ class JimmoriaConsole:
             self.rich_block(title, lines)
             return
         print("")
-        print(f"[{title}]")
+        print(self.block_border_style(self.frame_border(title=title)))
         for line in lines:
             if not line:
-                print("")
+                print(self.frame_text_line(""))
                 continue
-            for wrapped in self.wrap(line):
-                print(f"  {wrapped}")
+            for wrapped in self.wrap_for_frame(line):
+                print(self.frame_line_style(self.frame_text_line(wrapped)))
+        print(self.block_border_style(self.frame_border()))
 
     def wrap(self, text: str) -> list[str]:
         width = max(40, self.width - 4)
-        return textwrap.wrap(text, width=width, replace_whitespace=False) or [""]
+        return wrap_display(str(text), width) or [""]
+
+    def wrap_for_frame(self, text: str) -> list[str]:
+        return wrap_display(str(text), self.frame_inner_width()) or [""]
+
+    def frame_width(self) -> int:
+        return self.input_box_width()
+
+    def frame_inner_width(self) -> int:
+        return self.frame_width() - 4
+
+    def frame_border(self, *, title: str = "") -> str:
+        inner_width = self.frame_width() - 2
+        if not title:
+            return "+" + "-" * inner_width + "+"
+        label = f" {title} "
+        clipped = clip_display(label, inner_width)
+        right = max(inner_width - display_width(clipped), 0)
+        return "+" + clipped + "-" * right + "+"
+
+    def frame_text_line(self, text: str) -> str:
+        inner_width = self.frame_inner_width()
+        clipped = clip_display(str(text), inner_width)
+        return "| " + pad_display(clipped, inner_width) + " |"
+
+    def block_border_style(self, text: str) -> str:
+        if not supports_color():
+            return text
+        violet = "\033[38;2;211;95;255m"
+        pink = "\033[38;2;255;92;212m"
+        reset = "\033[0m"
+        if text.startswith("+ ") and " " in text[2:]:
+            end = text.find(" ", 2)
+            if end != -1:
+                return f"{violet}{text[:2]}{reset}{pink}{text[2:end]}{reset}{violet}{text[end:]}{reset}"
+        return f"{violet}{text}{reset}"
+
+    def frame_line_style(self, text: str) -> str:
+        if not supports_color():
+            return text
+        if not text.startswith("|") or not text.endswith("|"):
+            return text
+        violet = "\033[38;2;211;95;255m"
+        reset = "\033[0m"
+        return f"{violet}|{reset}{text[1:-1]}{violet}|{reset}"
+
+    def format_columns(self, rows: list[tuple[str, str]], *, left_width: int = 28) -> list[str]:
+        formatted: list[str] = []
+        gap = "  "
+        right_width = max(20, self.frame_inner_width() - left_width - display_width(gap))
+        for left, right in rows:
+            left_text = clip_display(left, left_width)
+            right_lines = wrap_display(right, right_width) or [""]
+            formatted.append(f"{pad_display(left_text, left_width)}{gap}{right_lines[0]}")
+            for continuation in right_lines[1:]:
+                formatted.append(f"{' ' * left_width}{gap}{continuation}")
+        return formatted
 
     def compact_text(self, text: str, max_length: int = 88) -> str:
         compact = " ".join(str(text).split())
@@ -1960,6 +2028,51 @@ def clip_display(text: object, max_width: int, *, suffix: str = "") -> str:
     if suffix and width + suffix_width <= max_width:
         output.append(suffix)
     return "".join(output)
+
+
+def wrap_display(text: object, max_width: int) -> list[str]:
+    value = str(text)
+    if max_width <= 0:
+        return [value] if value else [""]
+    if not value:
+        return [""]
+    lines: list[str] = []
+    current: list[str] = []
+    width = 0
+    last_space_index = -1
+
+    for char in value:
+        if char == "\n":
+            lines.append("".join(current).rstrip())
+            current = []
+            width = 0
+            last_space_index = -1
+            continue
+        char_width = char_display_width(char)
+        if width + char_width <= max_width:
+            current.append(char)
+            width += char_width
+            if char.isspace():
+                last_space_index = len(current) - 1
+            continue
+
+        if last_space_index > 0:
+            lines.append("".join(current[:last_space_index]).rstrip())
+            remainder = "".join(current[last_space_index + 1 :]).lstrip()
+            current = list(remainder)
+            width = display_width(remainder)
+        elif current:
+            lines.append("".join(current).rstrip())
+            current = []
+            width = 0
+
+        current.append(char)
+        width += char_width
+        last_space_index = len(current) - 1 if char.isspace() else -1
+
+    if current or not lines:
+        lines.append("".join(current).rstrip())
+    return lines
 
 
 def pad_display(text: object, width: int) -> str:

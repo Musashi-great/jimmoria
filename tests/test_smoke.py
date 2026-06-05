@@ -136,7 +136,11 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("+", output.getvalue())
         self.assertIn("슈퍼바이저 대화", output.getvalue())
         self.assertIn("@path/to/file", output.getvalue())
-        self.assertEqual(mocked_input.call_args[0][0], "| > ")
+        self.assertEqual(mocked_input.call_args[0][0], "> ")
+        box_lines = [line for line in output.getvalue().splitlines() if line.startswith(("+", "|"))]
+        self.assertGreaterEqual(len(box_lines), 4)
+        self.assertTrue(box_lines[0].startswith("+"))
+        self.assertTrue(box_lines[-1].startswith("+"))
 
     def test_chat_input_renders_closed_ansi_box(self) -> None:
         output = StringIO()
@@ -178,8 +182,13 @@ class SmokeTest(unittest.TestCase):
                         value = console.read_chat_input()
 
         self.assertEqual(value, "/quit")
-        self.assertEqual(mocked_input.call_args[0][0], "| > ")
+        self.assertEqual(mocked_input.call_args[0][0], "> ")
         self.assertNotIn("\033[5M", output.getvalue())
+        clean = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", output.getvalue())
+        box_lines = [line for line in clean.splitlines() if line.startswith(("+", "|"))]
+        self.assertGreaterEqual(len(box_lines), 4)
+        self.assertTrue(box_lines[0].startswith("+"))
+        self.assertTrue(box_lines[-1].startswith("+"))
 
     def test_chat_input_status_line_uses_display_width_for_korean(self) -> None:
         console = JimmoriaConsole()
@@ -255,7 +264,26 @@ class SmokeTest(unittest.TestCase):
         text = output.getvalue()
         self.assertIn("JIMMORIA 명령어", text)
         self.assertIn("/settings", text)
+        self.assertIn("+ JIMMORIA 명령어", text)
+        self.assertIn("| /settings", text)
         self.assertNotIn("Agents at work:", text)
+
+    def test_plain_block_renders_closed_frame_with_cjk_width(self) -> None:
+        output = StringIO()
+        console = JimmoriaConsole()
+        console.use_rich = False
+        console.width = 96
+
+        with redirect_stdout(output):
+            console.block("슈퍼바이저", ["한국어 문장이 길어도 오른쪽 테두리가 맞아야 합니다.", "", "/settings  회사 운영 설정 보기"])
+
+        lines = [line for line in output.getvalue().splitlines() if line.startswith(("+", "|"))]
+        widths = {display_width(line) for line in lines}
+        self.assertEqual(len(widths), 1)
+        self.assertTrue(lines[0].startswith("+ 슈퍼바이저"))
+        self.assertTrue(lines[-1].startswith("+"))
+        self.assertTrue(all(line.endswith(("+", "|")) for line in lines))
+        self.assertNotIn("[슈퍼바이저]", output.getvalue())
 
     def test_chat_intake_routes_company_settings_without_report(self) -> None:
         output = StringIO()
