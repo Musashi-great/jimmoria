@@ -182,13 +182,15 @@ class SmokeTest(unittest.TestCase):
                         value = console.read_chat_input()
 
         self.assertEqual(value, "/quit")
-        self.assertEqual(mocked_input.call_args[0][0], "> ")
+        self.assertEqual(mocked_input.call_args[0][0], "\033[2A\033[4C")
         self.assertNotIn("\033[5M", output.getvalue())
         clean = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", output.getvalue())
         box_lines = [line for line in clean.splitlines() if line.startswith(("+", "|"))]
-        self.assertGreaterEqual(len(box_lines), 4)
+        self.assertGreaterEqual(len(box_lines), 5)
         self.assertTrue(box_lines[0].startswith("+"))
+        self.assertTrue(box_lines[3].startswith("| >"))
         self.assertTrue(box_lines[-1].startswith("+"))
+        self.assertIn("\033[1B\r", output.getvalue())
 
     def test_chat_input_status_line_uses_display_width_for_korean(self) -> None:
         console = JimmoriaConsole()

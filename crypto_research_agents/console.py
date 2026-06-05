@@ -374,6 +374,14 @@ class JimmoriaConsole:
         print(self.input_border_style(border))
         print(self.input_status_line_style(self.input_text_line(self.input_status_text())))
         print(self.input_hint_line_style(self.input_hint_line(hint)))
+        if supports_color():
+            print(self.input_edit_line_style())
+            print(self.input_border_style(border))
+            try:
+                return input(self.input_cursor_sequence())
+            finally:
+                sys.stdout.write("\033[1B\r")
+                sys.stdout.flush()
         print(self.input_border_style(border))
         return input("> ")
 

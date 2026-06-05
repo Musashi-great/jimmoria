@@ -63,10 +63,10 @@ This keeps the CLI usable like a terminal chat while making it clear which agent
 
 JIMMORIA의 현재 CLI는 full-screen TUI가 아니라 line-oriented CLI다. 따라서 완전한 fixed bottom input은 아직 구현하지 않고, 다음의 lightweight terminal pattern을 사용한다.
 
-- 입력 전에는 닫힌 `JIMMORIA HQ` 상태 프레임을 그린다.
-- 상태 프레임에는 `Supervisor channel`, provider, latest room, agent state를 표시한다.
-- Windows 기본값에서는 프레임 아래의 단순 `>` 프롬프트로 입력을 받아, 입력 대기 중에도 하단 테두리가 빠지지 않는다.
-- ANSI input mode를 명시적으로 켠 경우에만 입력줄을 프레임 내부에 두고 제출 후 input dock을 지운다.
+- 입력 전에는 `JIMMORIA HQ` 상태/입력 프레임을 그린다.
+- 상태/입력 프레임에는 `Supervisor channel`, provider, latest room, agent state, 입력줄을 표시한다.
+- Windows 기본값에서는 입력 커서를 프레임 내부 `| > ... |` 줄로 올리고, 하단 테두리는 계속 보이게 둔다.
+- ANSI input mode를 명시적으로 켠 경우에는 제출 후 input dock을 지운다.
 - 제출된 문장은 큰 `You` 패널로 반복하지 않고 `You > ...` 로그로 위에 남긴다.
 - Supervisor는 바로 `Supervisor > ...` 진행 로그를 남긴 뒤 답변하거나 Research Room을 연다.
 - Research Room이 열리면 Windows 기본값에서는 stable compact event line을 출력한다. 내부 supervisor office tool은 숨기고, 에이전트 시작/완료와 외부 작업 tool만 보여준다.
@@ -82,8 +82,8 @@ JIMMORIA의 현재 CLI는 full-screen TUI가 아니라 line-oriented CLI다. 따
 +--------------------------------------------------------------------------------+
 | JIMMORIA HQ | Supervisor channel | provider: codex_cli | room: none | idle      |
 | Type a request, URL, /command, or @path/to/file                                 |
+| > pearl 프로젝트 리서치 진행해봐                                                |
 +--------------------------------------------------------------------------------+
-> pearl 프로젝트 리서치 진행해봐
 
 Supervisor > Reading the message, choosing the response shape, and routing the company.
 
@@ -124,7 +124,7 @@ JIMMORIA에 적용할 기준은 다음이다.
 - First setup: provider가 없을 때만 모델 설정을 묻는다. 이미 Codex CLI login이 있으면 설정 화면을 건너뛴다.
 - Conversation first: 일반 입력은 먼저 Supervisor와 대화한다. Supervisor가 Research Room 필요 여부를 판단한다.
 - Confirmation before run: 명확한 연구 작업이라도 Supervisor가 짧게 확인한 뒤 room을 연다. 사용자가 취소하면 run/report artifact를 만들지 않는다.
-- Stable input frame: 입력 전 상태 프레임은 닫힌 박스로 유지되어야 한다. 로그가 올라와도 사용자는 "회사와 대화 중"이라는 감각을 잃지 않아야 한다.
+- Stable input frame: 입력 전 상태/입력 프레임은 닫힌 박스로 유지되어야 한다. 로그가 올라와도 사용자는 "회사와 대화 중"이라는 감각을 잃지 않아야 한다.
 - Background logs: raw event는 기본적으로 background artifact로 저장한다. 필요하면 `JIMMORIA_EVENT_STYLE=stream`으로 raw one-line stream을 켠다.
 - Deep logs elsewhere: 자세한 board, message, event, tool audit은 `/board`, `/messages`, `/events`, `data/runs/<room_id>`로 보낸다.
 - Report is not default: 모든 입력을 보고서로 만들지 않는다. 저장된 산출물을 부르는 `3jane 보고서 만들어봐/들고와봐/보내봐` 류는 report lookup으로 처리하고, `새로`, `리서치`, `조사`, `분석`이 있을 때만 새 Research Room을 연다.
