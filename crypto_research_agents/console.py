@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import os
 import re
 import shutil
@@ -61,6 +62,22 @@ STATE_LABELS_KO = {
     "running": "진행",
     "done": "완료",
     "failed": "실패",
+}
+
+INTERNAL_RUNTIME_TOOLS = {
+    "create_task",
+    "assign_task",
+    "agent_handoff",
+    "update_task_status",
+    "read_agent_status",
+}
+
+INTERNAL_TOOL_ACTIVITY = {
+    "create_task": "작업 카드를 정리하는 중",
+    "assign_task": "담당 에이전트에게 작업을 배정하는 중",
+    "agent_handoff": "다음 에이전트로 인수인계하는 중",
+    "update_task_status": "작업 상태를 정리하는 중",
+    "read_agent_status": "에이전트 상태를 확인하는 중",
 }
 
 
@@ -257,11 +274,17 @@ class JimmoriaConsole:
         return self.event_style not in {"card", "cards", "panel", "panels"}
 
     def show_event_log_lines(self) -> bool:
-        return self.event_style in {"stream", "compact", "log", "logs", "debug", "trace"}
+        return self.use_compact_event_log() or self.use_debug_event_log()
+
+    def use_compact_event_log(self) -> bool:
+        return self.event_style in {"compact", "safe", "stable"}
+
+    def use_debug_event_log(self) -> bool:
+        return self.event_style in {"stream", "log", "logs", "debug", "trace"}
 
     def use_runtime_dock(self) -> bool:
         return (
-            self.use_stream_events()
+            self.event_style == "dock"
             and supports_color()
             and runtime_dock_enabled()
             and not os.getenv("JIMMORIA_NO_RUNTIME_DOCK")
@@ -481,6 +504,24 @@ class JimmoriaConsole:
         done_text = f" | 완료: {len(done)}" if done else ""
         return f"진행: {active} | 대기: {waiting or '없음'}{done_text}"
 
+    def compact_runtime_state(self) -> str:
+        if not self.agent_state:
+            return "대기: 활성 리서치룸 없음"
+        running = [agent_id for agent_id in DEFAULT_AGENTS if self.agent_state.get(agent_id) == "running"]
+        queued = [agent_id for agent_id in DEFAULT_AGENTS if self.agent_state.get(agent_id) == "queued"]
+        done = [agent_id for agent_id in DEFAULT_AGENTS if self.agent_state.get(agent_id) == "done"]
+        failed = [agent_id for agent_id in DEFAULT_AGENTS if self.agent_state.get(agent_id) == "failed"]
+        parts: list[str] = []
+        if running:
+            parts.append(f"진행: {self.compact_agent_list(running, limit=4)}")
+        if queued:
+            parts.append(f"대기: {self.compact_agent_list(queued, limit=5)}")
+        if done:
+            parts.append(f"완료: {len(done)}")
+        if failed:
+            parts.append(f"실패: {self.compact_agent_list(failed, limit=3)}")
+        return " | ".join(parts) or "대기: 없음"
+
     def compact_agent_list(self, agent_ids: list[str], *, limit: int = 4) -> str:
         if not agent_ids:
             return ""
@@ -669,7 +710,10 @@ class JimmoriaConsole:
                 process_id = process.get("process_id") if isinstance(process, dict) else ""
                 process_text = f" | process {process_id}" if process_id else ""
                 self.print_event_line("룸", f"OPEN {event.get('room_id')} | agents {agent_count}{process_text} | {topic}")
-                self.print_event_line("보드", self.agent_state_label(), muted=True)
+                if self.use_compact_event_log():
+                    self.print_event_line("상태", self.compact_runtime_state(), muted=True)
+                else:
+                    self.print_event_line("보드", self.agent_state_label(), muted=True)
                 return
             lines = [
                 f"Room: {event.get('room_id')}",
@@ -762,6 +806,12 @@ class JimmoriaConsole:
             checkpoint_count = len(checkpoints) if isinstance(checkpoints, list) else 0
             summary = self.compact_text(str(event.get("summary") or "Supervisor set the orchestration plan."), 78)
             if self.use_stream_events():
+                if self.use_compact_event_log():
+                    self.print_event_line(
+                        "계획",
+                        f"슈퍼바이저 | 작업 {delegated_count}개 배정 | 체크포인트 {checkpoint_count}개 | {summary}",
+                    )
+                    return
                 self.print_event_line(
                     "Plan",
                     f"ORCHESTRATE {delegated_count} tasks | checkpoints {checkpoint_count} | {summary}",
@@ -781,6 +831,13 @@ class JimmoriaConsole:
             agents = event.get("agents", [])
             agent_count = len(agents) if isinstance(agents, list) else 0
             if self.use_stream_events():
+                if self.use_compact_event_log():
+                    self.print_event_line(
+                        "병렬",
+                        f"START {event.get('group_id')} | {agent_count}개 에이전트 실행 | max {event.get('max_parallel')}",
+                    )
+                    self.print_event_line("상태", self.compact_runtime_state(), muted=True)
+                    return
                 self.print_event_line(
                     "Parallel",
                     f"START {event.get('group_id')} | agents {agent_count} | max {event.get('max_parallel')} | {event.get('summary')}",
@@ -801,6 +858,12 @@ class JimmoriaConsole:
             agents = event.get("agents", [])
             agent_count = len(agents) if isinstance(agents, list) else 0
             if self.use_stream_events():
+                if self.use_compact_event_log():
+                    self.print_event_line(
+                        "병렬",
+                        f"DONE {event.get('group_id')} | {agent_count}개 에이전트 완료 | msg {event.get('messages')} / findings {event.get('findings')}",
+                    )
+                    return
                 self.print_event_line(
                     "Parallel",
                     f"DONE {event.get('group_id')} | agents {agent_count} | msg {event.get('messages')} / findings {event.get('findings')}",
@@ -821,6 +884,12 @@ class JimmoriaConsole:
             failures = event.get("failures", [])
             failure_count = len(failures) if isinstance(failures, list) else 0
             if self.use_stream_events():
+                if self.use_compact_event_log():
+                    self.print_event_line(
+                        "병렬",
+                        f"FAIL {event.get('group_id')} | 실패 {failure_count}개 | {event.get('summary')}",
+                    )
+                    return
                 self.print_event_line(
                     "Parallel",
                     f"FAIL {event.get('group_id')} | failures {failure_count} | {event.get('summary')}",
@@ -1226,6 +1295,16 @@ class JimmoriaConsole:
             "tool_unconfigured": "WAIT",
         }.get(event_type, "TOOL")
         if self.use_stream_events():
+            tool_name = str(event.get("tool_name") or "tool")
+            if self.use_compact_event_log():
+                if self.is_internal_runtime_tool(tool_name) and event_type in {"tool_start", "tool_done"}:
+                    return
+                agent_name = self.agent_display_name(str(event.get("agent_id") or ""))
+                detail = self.compact_tool_detail(event_type, event, max_length=68)
+                latency = f" | {event.get('latency_ms')}ms" if event.get("latency_ms") is not None else ""
+                suffix = f" - {detail}" if detail else ""
+                self.print_event_line("작업", f"{agent_name} | {marker} {tool_name}{suffix}{latency}")
+                return
             summary = self.compact_text(str(event.get("summary") or event.get("input_preview") or ""), 82)
             latency = f" | {event.get('latency_ms')}ms" if event.get("latency_ms") is not None else ""
             suffix = f" | {summary}" if summary else ""
@@ -1254,10 +1333,77 @@ class JimmoriaConsole:
             "tool_denied": "툴 거절",
             "tool_unconfigured": "툴 대기",
         }.get(event_type, "툴")
-        detail = str(event.get("summary") or event.get("input_preview") or tool_name)
-        self.agent_activity[agent_id] = f"{marker}: {tool_name} - {detail}"
+        if self.is_internal_runtime_tool(tool_name):
+            self.agent_activity[agent_id] = INTERNAL_TOOL_ACTIVITY.get(tool_name, "내부 작업 상태를 정리하는 중")
+        else:
+            detail = self.compact_tool_detail(event_type, event, max_length=64) or tool_name
+            self.agent_activity[agent_id] = f"{marker}: {tool_name} - {detail}"
         if self.agent_state.get(agent_id) not in {"done", "failed"}:
             self.agent_state[agent_id] = "running"
+
+    def is_internal_runtime_tool(self, tool_name: str) -> bool:
+        return tool_name in INTERNAL_RUNTIME_TOOLS
+
+    def compact_tool_detail(self, event_type: str, event: dict[str, object], *, max_length: int = 72) -> str:
+        summary = str(event.get("summary") or "").strip()
+        preview = self.readable_tool_input(event.get("input_preview"))
+        if event_type == "tool_start" and preview:
+            return self.compact_text(preview, max_length)
+        if summary and summary.lower() not in {"success", "ok"}:
+            return self.compact_text(summary, max_length)
+        return self.compact_text(preview or summary, max_length)
+
+    def readable_tool_input(self, value: object) -> str:
+        raw = str(value or "").strip()
+        if not raw:
+            return ""
+        parsed: object = raw
+        try:
+            parsed = ast.literal_eval(raw)
+        except (SyntaxError, ValueError):
+            return self.compact_text(raw, 72)
+        if isinstance(parsed, dict):
+            return self.readable_mapping_preview(parsed)
+        if isinstance(parsed, list):
+            if not parsed:
+                return ""
+            return self.compact_text(", ".join(self.readable_value(item) for item in parsed[:3]), 72)
+        return self.readable_value(parsed)
+
+    def readable_mapping_preview(self, data: dict[object, object]) -> str:
+        priority_keys = (
+            "query",
+            "q",
+            "search_query",
+            "url",
+            "title",
+            "topic",
+            "objective",
+            "description",
+            "task_id",
+            "to_agent",
+            "from_agent",
+            "path",
+            "contract_address",
+            "token_symbol",
+        )
+        for key in priority_keys:
+            if key in data and data[key]:
+                return self.readable_value(data[key])
+        parts: list[str] = []
+        for key, item in list(data.items())[:3]:
+            if item in (None, "", [], {}):
+                continue
+            parts.append(f"{key}: {self.readable_value(item)}")
+        return "; ".join(parts)
+
+    def readable_value(self, value: object) -> str:
+        if isinstance(value, (list, tuple, set)):
+            return ", ".join(self.readable_value(item) for item in list(value)[:3])
+        if isinstance(value, dict):
+            nested = self.readable_mapping_preview(value)
+            return nested or "{}"
+        return self.compact_text(str(value), 72)
 
     def print_output_event(self, event_type: str, event: dict[str, object]) -> None:
         labels = {

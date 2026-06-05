@@ -170,7 +170,9 @@ $env:JIMMORIA_EVENT_STYLE = "dock"
 jimmoria
 ```
 
-`crypto_research_agents/console.py`는 Research Room 실행 중 lightweight TUI dock을 계속 유지한다.
+`crypto_research_agents/console.py`는 Windows 기본값에서 Research Room 실행 중
+stable compact log를 출력한다. 내부 supervisor office tool event는 화면에 찍지
+않고, 저장된 run artifact와 debug stream에만 남긴다.
 
 기본 화면 모델은 다음과 같다.
 
@@ -179,20 +181,26 @@ conversation transcript
   You > ...
   Supervisor > ...
 
-fixed runtime dock
-  JIMMORIA HQ status line
-  room/provider/agent progress
-  Live agent board - current work
-  each agent state: WAIT / RUN / DONE / FAIL
-  each agent activity: current assignment or latest tool call
-  locked input line with blinking working dots
+stable runtime lines
+  룸 > OPEN room_x | agents 10 | topic
+  상태 > 대기: 슈퍼바이저, 아카이비스트, 소셜/KOL, 내러티브, 스카우터 +5
+  병렬 > START research_swarm | 7개 에이전트 실행 | max 7
+  에이전트 > RUN 스카우터 | 공식 후보와 프로젝트 정체성을 찾는 중
+  작업 > 스카우터 | RUN web_search - official project query
 ```
 
-이 dock은 runtime event가 들어올 때마다 다시 그려진다. 기본값은 `JIMMORIA_EVENT_STYLE=dock`이며, `Room >`, `Agent >`, `Tool >`, `Output >` 같은 compact runtime log는 화면에 찍지 않는다. 이벤트는 백그라운드에서 `data/runs/<room_id>/events.json`, `messages.json`, `tool_audit_log.json`에 저장되고, 화면에는 최신 agent state만 dock으로 갱신된다.
+`JIMMORIA_FORCE_RUNTIME_DOCK=1`과 `JIMMORIA_EVENT_STYLE=dock`을 같이 설정하면
+live dock을 opt-in으로 사용할 수 있다. 이 dock은 runtime event가 들어올 때마다
+다시 그려지고, 화면에는 최신 agent state만 dock으로 갱신된다. 이벤트는
+백그라운드에서 `data/runs/<room_id>/events.json`, `messages.json`,
+`tool_audit_log.json`에 저장된다.
 
-디버깅이 필요하면 `JIMMORIA_EVENT_STYLE=stream`을 설정해 예전처럼 compact runtime log를 위로 흘려보낼 수 있다.
+디버깅이 필요하면 `JIMMORIA_EVENT_STYLE=stream`을 설정해 raw tool/debug runtime
+log를 위로 흘려보낼 수 있다.
 
-Tool event도 board를 갱신한다. 예를 들어 `discovery_agent`가 `web_search`를 호출하면 해당 row는 `Waiting: Resolving candidates`에서 `Now: Tool running: web_search - ...`로 바뀐다. Agent가 끝나면 `Finished: ...`로 바뀐다.
+Tool event도 compact 상태와 dock board를 갱신한다. 예를 들어 `discovery_agent`가
+`web_search`를 호출하면 해당 row는 `대기: 공식 후보와 프로젝트 정체성을 찾는 중`에서
+`진행: 툴 실행: web_search - ...`로 바뀐다. Agent가 끝나면 `완료: ...`로 바뀐다.
 
 Latest runtime dock behavior:
 

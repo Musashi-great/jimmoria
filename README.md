@@ -54,9 +54,12 @@ not leave stale panels in the terminal:
 
 ```text
 룸 > OPEN room_x | agents 10 | 3jane report
-보드 > 대기 10/완료 0
-Tool > RUN supervisor_agent -> create_task | write dossier
+상태 > 대기: 슈퍼바이저, 아카이비스트, 소셜/KOL, 내러티브, 스카우터 +5
+에이전트 > RUN 슈퍼바이저 | 리서치 방향과 작업 순서를 정리하는 중
+계획 > 슈퍼바이저 | 작업 9개 배정 | 체크포인트 3개 | plan ready
 에이전트 > DONE 슈퍼바이저 | plan ready | msg 4 / findings 1
+병렬 > START research_swarm | 7개 에이전트 실행 | max 7
+작업 > 스카우터 | RUN web_search - 3jane crypto project official
 ```
 
 Saved room, agent, tool, and output events are still written under
@@ -69,8 +72,9 @@ $env:JIMMORIA_EVENT_STYLE = "dock"
 jimmoria
 ```
 
-For explicit compact logs on any platform, set `JIMMORIA_EVENT_STYLE=compact` or
-`JIMMORIA_EVENT_STYLE=stream`.
+For explicit user-facing compact logs on any platform, set
+`JIMMORIA_EVENT_STYLE=compact`. Use `JIMMORIA_EVENT_STYLE=stream` only when you
+want raw tool/debug event lines.
 
 Open the local web dashboard:
 

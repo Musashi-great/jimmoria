@@ -802,13 +802,91 @@ class SmokeTest(unittest.TestCase):
 
         text = output.getvalue()
         self.assertIn("룸 > OPEN room_test", text)
-        self.assertIn("보드 > 대기 2/완료 0", text)
+        self.assertIn("상태 > 대기: 슈퍼바이저, 아카이비스트", text)
         self.assertIn("에이전트 > RUN 아카이비스트", text)
         self.assertIn("에이전트 > DONE 아카이비스트", text)
+        self.assertNotIn("Tool >", text)
         self.assertNotIn("JIMMORIA HQ", text)
         self.assertEqual(console.runtime_dock_lines, 0)
         self.assertEqual(console.last_room_id, "room_test")
         self.assertEqual(console.agent_state["ingestion_agent"], "done")
+
+    def test_runtime_compact_hides_internal_supervisor_tool_events(self) -> None:
+        output = StringIO()
+        console = JimmoriaConsole()
+        console.event_style = "compact"
+
+        with redirect_stdout(output):
+            console.handle_event(
+                {
+                    "type": "room_created",
+                    "room_id": "room_test",
+                    "topic": "pearl pow project",
+                    "goals": ["Investigate the project."],
+                    "agents": ["supervisor_agent", "discovery_agent"],
+                }
+            )
+            console.handle_event(
+                {
+                    "type": "tool_start",
+                    "room_id": "room_test",
+                    "agent_id": "supervisor_agent",
+                    "tool_name": "create_task",
+                    "input_preview": "{'task_id': 'write_dossier', 'description': 'Write the Korean report.'}",
+                }
+            )
+            console.handle_event(
+                {
+                    "type": "tool_done",
+                    "room_id": "room_test",
+                    "agent_id": "supervisor_agent",
+                    "tool_name": "create_task",
+                    "summary": "Task write_dossier created.",
+                    "latency_ms": 0,
+                }
+            )
+            console.handle_event(
+                {
+                    "type": "tool_start",
+                    "room_id": "room_test",
+                    "agent_id": "discovery_agent",
+                    "tool_name": "web_search",
+                    "input_preview": "{'query': 'pearl crypto project official'}",
+                }
+            )
+
+        text = output.getvalue()
+        self.assertNotIn("Tool >", text)
+        self.assertNotIn("create_task", text)
+        self.assertIn("작업 > 스카우터 | RUN web_search - pearl crypto project official", text)
+        self.assertEqual(console.agent_activity["supervisor_agent"], "작업 카드를 정리하는 중")
+        self.assertEqual(
+            console.agent_activity["discovery_agent"],
+            "툴 실행: web_search - pearl crypto project official",
+        )
+
+    def test_runtime_compact_style_does_not_open_live_dock(self) -> None:
+        output = StringIO()
+
+        with patch.dict("os.environ", {"JIMMORIA_FORCE_RUNTIME_DOCK": "1", "JIMMORIA_EVENT_STYLE": "compact"}, clear=False):
+            console = JimmoriaConsole()
+            with patch("crypto_research_agents.console.supports_color", return_value=True):
+                with redirect_stdout(output):
+                    console.handle_event(
+                        {
+                            "type": "room_created",
+                            "room_id": "room_test",
+                            "topic": "pearl pow project",
+                            "goals": ["Investigate the project."],
+                            "agents": ["supervisor_agent", "ingestion_agent"],
+                        }
+                    )
+
+        text = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", output.getvalue())
+        self.assertIn("룸 > OPEN room_test", text)
+        self.assertIn("상태 > 대기: 슈퍼바이저, 아카이비스트", text)
+        self.assertNotIn("JIMMORIA HQ", text)
+        self.assertEqual(console.runtime_dock_lines, 0)
 
     def test_runtime_stream_event_style_prints_compact_log(self) -> None:
         output = StringIO()

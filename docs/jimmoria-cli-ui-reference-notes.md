@@ -19,14 +19,21 @@ Without those env vars, Research Room execution prints stable event lines:
 
 ```text
 룸 > OPEN room_x | agents 10 | 3jane report
-Tool > RUN supervisor_agent -> create_task | write dossier
+상태 > 대기: 슈퍼바이저, 아카이비스트, 소셜/KOL, 내러티브, 스카우터 +5
+에이전트 > RUN 슈퍼바이저 | 리서치 방향과 작업 순서를 정리하는 중
+계획 > 슈퍼바이저 | 작업 9개 배정 | 체크포인트 3개 | plan ready
 에이전트 > DONE 슈퍼바이저 | plan ready
+병렬 > START research_swarm | 7개 에이전트 실행 | max 7
+작업 > 스카우터 | RUN web_search - 3jane crypto project official
 ```
 
 Behavior:
 
 - Windows default runtime logs scroll normally and do not redraw previous panels.
 - Raw event records are still stored in run artifacts in the background.
+- Compact logs hide internal supervisor office tools such as `create_task`,
+  `assign_task`, `agent_handoff`, and `update_task_status`; those details stay
+  in saved run artifacts and `JIMMORIA_EVENT_STYLE=stream`.
 - Forced dock mode contains `JIMMORIA HQ`, provider, room id, aggregate agent progress, and a `Live agent board - current work` table.
 - Each agent row shows `WAIT`, `RUN`, `DONE`, or `FAIL`.
 - Each agent row shows the current assignment or the latest tool action.
@@ -60,11 +67,12 @@ JIMMORIA의 현재 CLI는 full-screen TUI가 아니라 line-oriented CLI다. 따
 - 사용자가 메시지를 제출하면 ANSI terminal에서는 input dock을 지운다.
 - 제출된 문장은 큰 `You` 패널로 반복하지 않고 `You > ...` 로그로 위에 남긴다.
 - Supervisor는 바로 `Supervisor > ...` 진행 로그를 남긴 뒤 답변하거나 Research Room을 연다.
-- Research Room이 열리면 기본적으로 raw event stream은 화면에 찍지 않고, dock의 `Live agent board`만 갱신한다.
+- Research Room이 열리면 Windows 기본값에서는 stable compact event line을 출력한다. 내부 supervisor office tool은 숨기고, 에이전트 시작/완료와 외부 작업 tool만 보여준다.
 - Runtime metrics include elapsed time and LLM usage. `JIMMORIA_EVENT_STYLE=stream`을 켠 디버그 모드에서는 `time 1.2s | llm 2 calls / ~4.2k tokens`처럼 compact log로도 볼 수 있다.
-- Research Room 실행 중에도 하단 dock을 유지한다. 새 이벤트가 출력될 때는 이전 dock을 지우고 이벤트를 찍은 뒤 다시 dock을 그려, 사용자가 계속 같은 회사 채팅창 안에 있는 느낌을 준다.
-- Research Room 실행 중에는 실제 터미널 커서를 숨기고, dock 내부의 `> working...` 점만 blink 처리한다. 바깥 커서가 박스 밖에서 깜빡이면 안 된다.
-- 큰 `Live agent board`와 agent work card는 `/board` 또는 `JIMMORIA_EVENT_STYLE=cards`에서 사용한다.
+- `JIMMORIA_FORCE_RUNTIME_DOCK=1`과 `JIMMORIA_EVENT_STYLE=dock`을 같이 켠 경우에만 Research Room 실행 중 하단 dock을 유지한다.
+- Dock mode에서는 새 이벤트가 출력될 때 이전 dock을 지우고 이벤트를 찍은 뒤 다시 dock을 그려, 사용자가 계속 같은 회사 채팅창 안에 있는 느낌을 준다.
+- Dock mode에서는 실제 터미널 커서를 숨기고, dock 내부의 `> working...` 점만 blink 처리한다. 바깥 커서가 박스 밖에서 깜빡이면 안 된다.
+- 큰 `Live agent board`와 agent work card는 opt-in dock, `/board`, 또는 `JIMMORIA_EVENT_STYLE=cards`에서 사용한다.
 
 ## Target Shape
 
@@ -115,7 +123,7 @@ JIMMORIA에 적용할 기준은 다음이다.
 - Conversation first: 일반 입력은 먼저 Supervisor와 대화한다. Supervisor가 Research Room 필요 여부를 판단한다.
 - Confirmation before run: 명확한 연구 작업이라도 Supervisor가 짧게 확인한 뒤 room을 연다. 사용자가 취소하면 run/report artifact를 만들지 않는다.
 - Stable input dock: 입력창은 하단 dock처럼 계속 유지되어야 한다. 로그가 올라와도 사용자는 "회사와 대화 중"이라는 감각을 잃지 않아야 한다.
-- Background logs: 실시간 raw event는 기본적으로 화면에 찍지 않고 background artifact로 저장한다. 필요하면 `JIMMORIA_EVENT_STYLE=stream`으로 한 줄 stream을 켠다.
+- Background logs: raw event는 기본적으로 background artifact로 저장한다. 필요하면 `JIMMORIA_EVENT_STYLE=stream`으로 raw one-line stream을 켠다.
 - Deep logs elsewhere: 자세한 board, message, event, tool audit은 `/board`, `/messages`, `/events`, `data/runs/<room_id>`로 보낸다.
 - Report is not default: 모든 입력을 보고서로 만들지 않는다. 저장된 산출물을 부르는 `3jane 보고서 만들어봐/들고와봐/보내봐` 류는 report lookup으로 처리하고, `새로`, `리서치`, `조사`, `분석`이 있을 때만 새 Research Room을 연다.
 - External tools are visible: connector가 없거나 실패하면 조용히 넘어가지 않고, `unconfigured`, `missing evidence`, `insufficient_evidence`를 명확히 표시한다.
