@@ -39,7 +39,7 @@ from crypto_research_agents.cli import (
     previous_report_context,
     print_banner,
 )
-from crypto_research_agents.console import JimmoriaConsole, print_jimmoria_logo
+from crypto_research_agents.console import JimmoriaConsole, display_width, print_jimmoria_logo
 from crypto_research_agents.core.company_settings import CompanySettings
 from crypto_research_agents.core.input_resolver import resolve_research_input
 from crypto_research_agents.core.concurrency import load_concurrency_policy
@@ -165,6 +165,31 @@ class SmokeTest(unittest.TestCase):
         self.assertTrue(box_lines[3].endswith("|"))
         self.assertTrue(box_lines[4].startswith("+"))
         self.assertIn("\033[5M", output.getvalue())
+
+    def test_chat_input_status_line_uses_display_width_for_korean(self) -> None:
+        console = JimmoriaConsole()
+        console.width = 118
+
+        with patch.dict("os.environ", {"LLM_PROVIDER": "codex_sdk"}, clear=True):
+            line = console.input_text_line(console.input_status_text())
+
+        self.assertEqual(display_width(line), console.input_box_width())
+        self.assertTrue(line.endswith("|"))
+        self.assertIn("JIMMORIA HQ", line)
+        self.assertIn("슈퍼바이저 대화", line)
+
+    def test_status_card_uses_display_width_for_korean(self) -> None:
+        console = JimmoriaConsole()
+        console.width = 118
+
+        card = console.status_card(
+            title="슈퍼바이저  [진행]",
+            subtitle="supervisor_agent",
+            body="리서치 방향과 작업 순서를 정리하는 중",
+            state="running",
+        )
+
+        self.assertTrue(all(display_width(line) == console.runtime_card_width() for line in card))
 
     def test_input_status_line_tracks_room_and_agents(self) -> None:
         console = JimmoriaConsole()

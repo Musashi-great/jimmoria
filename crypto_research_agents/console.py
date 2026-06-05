@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import sys
 import textwrap
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -78,9 +80,9 @@ class JimmoriaConsole:
         self.agent_state: dict[str, str] = {}
         self.agent_activity: dict[str, str] = {}
         self.last_room_id = ""
-        terminal_width = shutil.get_terminal_size((120, 30)).columns
-        self.width = max(72, min(terminal_width, 180))
-        self.use_rich = RichConsole is not None and not os.getenv("JIMMORIA_PLAIN_LOGS")
+        terminal_width = shutil.get_terminal_size((136, 30)).columns
+        self.width = safe_terminal_width(terminal_width)
+        self.use_rich = RichConsole is not None and rich_blocks_enabled()
         self.event_style = os.getenv("JIMMORIA_EVENT_STYLE", "dock").strip().lower() or "dock"
         self.runtime_room_running = False
         self.runtime_dock_lines = 0
@@ -341,15 +343,15 @@ class JimmoriaConsole:
 
     def input_box_width(self) -> int:
         available_width = max(32, self.width - 4)
-        return max(32, min(available_width, 176))
+        return max(32, min(available_width, max_input_width()))
 
     def input_border(self) -> str:
         return "+" + "-" * (self.input_box_width() - 2) + "+"
 
     def input_text_line(self, text: str) -> str:
         inner_width = self.input_box_width() - 4
-        clipped = text[:inner_width]
-        return "| " + clipped.ljust(inner_width) + " |"
+        clipped = clip_display(text, inner_width)
+        return "| " + pad_display(clipped, inner_width) + " |"
 
     def input_hint_line(self, text: str) -> str:
         return self.input_text_line(text)
@@ -359,7 +361,7 @@ class JimmoriaConsole:
 
     def input_edit_line(self) -> str:
         inner_width = self.input_box_width() - 4
-        return "| " + "> ".ljust(inner_width) + " |"
+        return "| " + pad_display("> ", inner_width) + " |"
 
     def input_status_text(self) -> str:
         provider = os.getenv("LLM_PROVIDER") or "offline"
@@ -415,7 +417,7 @@ class JimmoriaConsole:
         pink = "\033[38;2;255;92;212m"
         reset = "\033[0m"
         inner_width = self.input_box_width() - 4
-        padding = " " * max(inner_width - 2, 0)
+        padding = " " * max(inner_width - display_width("> "), 0)
         return f"{violet}|{reset} {pink}>{reset} {padding}{violet}|{reset}"
 
     def input_locked_line_style(self) -> str:
@@ -428,7 +430,7 @@ class JimmoriaConsole:
         text = "> 작업중..."
         visible_prefix = "> 작업중"
         visible_dots = "..."
-        padding = " " * max(inner_width - len(text), 0)
+        padding = " " * max(inner_width - display_width(text), 0)
         return (
             f"{violet}|{reset} {muted}{visible_prefix}{reset}"
             f"{blink}{pink}{visible_dots}{reset}{padding}{violet}|{reset}"
@@ -521,9 +523,10 @@ class JimmoriaConsole:
             if agent_id not in self.agent_state:
                 continue
             cards.append(self.agent_status_card(agent_id))
+        lines = self.card_grid_lines(cards)
         if self.council_state != "idle" or self.runtime_room_running:
-            cards.append(self.council_status_card())
-        return self.card_grid_lines(cards)
+            lines.extend(self.card_grid_lines([self.council_status_card(full_width=True)], columns=1))
+        return lines
 
     def agent_status_card(self, agent_id: str) -> list[str]:
         state = self.agent_state.get(agent_id, "queued")
@@ -537,7 +540,7 @@ class JimmoriaConsole:
             state=state,
         )
 
-    def council_status_card(self) -> list[str]:
+    def council_status_card(self, *, full_width: bool = False) -> list[str]:
         participant_text = self.compact_agent_list(self.council_participants, limit=3)
         if participant_text:
             participant_text = f"참여: {participant_text}"
@@ -548,16 +551,17 @@ class JimmoriaConsole:
             subtitle=participant_text,
             body=self.council_activity,
             state=self.council_state,
+            width=self.runtime_wide_card_width() if full_width else None,
         )
 
-    def status_card(self, *, title: str, subtitle: str, body: str, state: str) -> list[str]:
-        width = self.runtime_card_width()
+    def status_card(self, *, title: str, subtitle: str, body: str, state: str, width: int | None = None) -> list[str]:
+        width = width or self.runtime_card_width()
         inner = width - 4
         return [
             "+" + "-" * (width - 2) + "+",
-            "| " + self.compact_text(title, inner).ljust(inner) + " |",
-            "| " + self.compact_text(subtitle, inner).ljust(inner) + " |",
-            "| " + self.compact_text(body, inner).ljust(inner) + " |",
+            "| " + pad_display(self.compact_text(title, inner), inner) + " |",
+            "| " + pad_display(self.compact_text(subtitle, inner), inner) + " |",
+            "| " + pad_display(self.compact_text(body, inner), inner) + " |",
             "+" + "-" * (width - 2) + "+",
         ]
 
@@ -566,10 +570,13 @@ class JimmoriaConsole:
             return max(46, min(58, (self.input_box_width() - 8) // 2))
         return max(36, min(72, self.input_box_width() - 4))
 
-    def card_grid_lines(self, cards: list[list[str]]) -> list[str]:
+    def runtime_wide_card_width(self) -> int:
+        return max(36, self.input_box_width() - 4)
+
+    def card_grid_lines(self, cards: list[list[str]], *, columns: int | None = None) -> list[str]:
         if not cards:
             return []
-        columns = 2 if self.input_box_width() >= 112 else 1
+        columns = columns or (2 if self.input_box_width() >= 112 else 1)
         lines: list[str] = []
         for index in range(0, len(cards), columns):
             row_cards = cards[index : index + columns]
@@ -1370,9 +1377,9 @@ class JimmoriaConsole:
 
     def compact_text(self, text: str, max_length: int = 88) -> str:
         compact = " ".join(str(text).split())
-        if len(compact) <= max_length:
+        if display_width(compact) <= max_length:
             return compact
-        return compact[: max_length - 3].rstrip() + "..."
+        return clip_display(compact, max_length, suffix="...").rstrip()
 
     def rule(self, char: str = "-") -> None:
         print(char * self.width)
@@ -1666,6 +1673,41 @@ def supports_color() -> bool:
     return True
 
 
+def rich_blocks_enabled() -> bool:
+    if os.getenv("JIMMORIA_PLAIN_LOGS") or os.getenv("JIMMORIA_NO_RICH"):
+        return False
+    if os.getenv("JIMMORIA_FORCE_RICH") or os.getenv("JIMMORIA_RICH"):
+        return True
+    # Windows PowerShell commonly mismeasures CJK text inside rich box borders.
+    # Keep the live input dock colored, but render help/config blocks as plain text.
+    if os.name == "nt":
+        return False
+    return True
+
+
+def safe_terminal_width(terminal_width: int) -> int:
+    return max(72, min(terminal_width, max_ui_width()))
+
+
+def max_ui_width() -> int:
+    default = "136" if os.name == "nt" else "160"
+    return positive_int_env("JIMMORIA_MAX_UI_WIDTH", default)
+
+
+def max_input_width() -> int:
+    default = str(max_ui_width())
+    return positive_int_env("JIMMORIA_MAX_INPUT_WIDTH", default)
+
+
+def positive_int_env(name: str, default: str) -> int:
+    raw = os.getenv(name, default)
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        value = int(default)
+    return max(32, value)
+
+
 def enable_windows_ansi() -> bool:
     try:
         import ctypes
@@ -1690,22 +1732,58 @@ def center_text(text: str, width: int) -> str:
 
 
 def center_ansi(text: str, width: int) -> str:
-    return " " * max((width - visible_len(text)) // 2, 0) + text
+    return " " * max((width - display_width(text)) // 2, 0) + text
 
 
 def visible_len(text: str) -> int:
-    length = 0
-    in_escape = False
-    for char in text:
-        if char == "\033":
-            in_escape = True
-            continue
-        if in_escape:
-            if char == "m":
-                in_escape = False
-            continue
-        length += 1
-    return length
+    return display_width(text)
+
+
+ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+
+
+def display_width(text: object) -> int:
+    value = ANSI_RE.sub("", str(text))
+    return sum(char_display_width(char) for char in value)
+
+
+def char_display_width(char: str) -> int:
+    if not char:
+        return 0
+    if unicodedata.combining(char):
+        return 0
+    category = unicodedata.category(char)
+    if category.startswith("C"):
+        return 0
+    if char == "\t":
+        return 4
+    return 2 if unicodedata.east_asian_width(char) in {"F", "W"} else 1
+
+
+def clip_display(text: object, max_width: int, *, suffix: str = "") -> str:
+    value = str(text)
+    if max_width <= 0:
+        return ""
+    if display_width(value) <= max_width:
+        return value
+    suffix_width = display_width(suffix)
+    content_width = max(max_width - suffix_width, 0)
+    output: list[str] = []
+    width = 0
+    for char in value:
+        char_width = char_display_width(char)
+        if width + char_width > content_width:
+            break
+        output.append(char)
+        width += char_width
+    if suffix and width + suffix_width <= max_width:
+        output.append(suffix)
+    return "".join(output)
+
+
+def pad_display(text: object, width: int) -> str:
+    clipped = clip_display(text, width)
+    return clipped + " " * max(width - display_width(clipped), 0)
 
 
 def format_duration_ms(value: object) -> str:
