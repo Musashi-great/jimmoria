@@ -363,9 +363,35 @@ class JimmoriaConsole:
                 self.input_border_style(border),
             ]
         )
+        lines = self.stable_runtime_dock_lines(lines)
         for line in lines:
             print(line)
         self.runtime_dock_lines = len(lines)
+
+    def stable_runtime_dock_lines(self, lines: list[str]) -> list[str]:
+        stable: list[str] = []
+        for line in lines:
+            if self.runtime_dock_line_is_stable(line):
+                stable.append(line)
+            else:
+                stable.append(self.input_hint_line_style(self.input_text_line(self.runtime_dock_safe_fallback(line))))
+        return stable
+
+    def runtime_dock_line_is_stable(self, line: str) -> bool:
+        if display_width(line) != self.input_box_width():
+            return False
+        plain = plain_text(line)
+        if not plain.startswith(("+", "|")):
+            return False
+        if plain.startswith("|") and not plain.endswith("|"):
+            return False
+        return not has_nested_runtime_frame(plain)
+
+    def runtime_dock_safe_fallback(self, line: str) -> str:
+        plain = plain_text(line)
+        if has_nested_runtime_frame(plain):
+            return "테마 보호: 내부 박스형 출력은 숨기고 에이전트 행만 표시합니다."
+        return plain
 
     def hide_cursor(self) -> None:
         if supports_color():
@@ -2167,8 +2193,17 @@ def visible_len(text: str) -> int:
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 
 
+def plain_text(text: object) -> str:
+    return ANSI_RE.sub("", str(text))
+
+
+def has_nested_runtime_frame(line: str) -> bool:
+    body = line[2:-2] if line.startswith("| ") and line.endswith(" |") else line[1:-1]
+    return "+---" in body or "---+" in body or "|   |" in body
+
+
 def display_width(text: object) -> int:
-    value = ANSI_RE.sub("", str(text))
+    value = plain_text(text)
     return sum(char_display_width(char) for char in value)
 
 

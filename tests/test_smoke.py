@@ -1163,6 +1163,20 @@ class SmokeTest(unittest.TestCase):
         self.assertTrue(all(display_width(line) == console.input_box_width() for line in frame_lines))
         self.assertFalse(any("+---" in line[2:-2] for line in frame_lines))
 
+    def test_runtime_dock_rejects_nested_frame_lines(self) -> None:
+        console = JimmoriaConsole()
+        console.width = 150
+        bad_line = console.input_text_line("+--------------------+   +--------------------+")
+        good_line = console.input_text_line("진행    스카우터          discovery_agent             공식 후보 확인 중")
+
+        self.assertFalse(console.runtime_dock_line_is_stable(bad_line))
+        self.assertTrue(console.runtime_dock_line_is_stable(good_line))
+
+        stable = console.stable_runtime_dock_lines([bad_line, good_line])
+        self.assertEqual(len(stable), 2)
+        self.assertTrue(all(display_width(line) == console.input_box_width() for line in stable))
+        self.assertNotIn("+--------------------+", stable[0])
+
 
     def test_runtime_dock_shows_council_room_card(self) -> None:
         output = StringIO()
