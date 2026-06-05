@@ -8,6 +8,11 @@ It is not a trading bot. It does not place orders, sign wallets, predict prices,
 
 The default research stack is social-signal first and public-web verified.
 
+Local operator handoff for the current merged state is in
+[`docs/jimmoria-local-current-state.md`](docs/jimmoria-local-current-state.md).
+Use that note when you want the short version of the current model routing,
+tool registry, workflow, and verification state.
+
 JIMMORIA now focuses on sources that can be reached through web-accessible, read-only research tools:
 
 - X/Twitter recent search and KOL timeline checks, when an X bearer token is configured

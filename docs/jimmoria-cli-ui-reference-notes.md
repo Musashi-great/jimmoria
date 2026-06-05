@@ -1,5 +1,8 @@
 # JIMMORIA CLI UI Reference Notes
 
+Current merged local-state handoff:
+[`docs/jimmoria-local-current-state.md`](jimmoria-local-current-state.md).
+
 ## Runtime Dock Update
 
 The current CLI uses a lightweight TUI dock during Research Room execution.
