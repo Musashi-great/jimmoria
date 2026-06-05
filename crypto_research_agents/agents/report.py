@@ -1,10 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from crypto_research_agents.agents.reporting.evidence_ledger import (
+    build_claim_evidence_ledger,
+    build_project_dossier_evidence_pack,
+    extract_social_seed_rows,
+    finding_rows,
+    render_claim_ledger_lines,
+    source_label,
+    source_markdown_link,
+)
+from crypto_research_agents.agents.reporting.quality import ReportQuality, assess_report_quality
 from crypto_research_agents.agents.base import AgentResult, BaseAgent
 from crypto_research_agents.core.bus import CollaborationBus
 from crypto_research_agents.core.company_settings import CompanySettings
@@ -40,6 +49,7 @@ class ReportAgent(BaseAgent):
         source_log = collect_source_log(primary, room_sources) if primary else []
         claim_ledger = build_claim_evidence_ledger(primary, findings, source_log)
         room.project_card["claim_evidence_ledger"] = claim_ledger
+        room.project_card["project_dossier_evidence_pack"] = build_project_dossier_evidence_pack(primary, findings, source_log)
         llm_summary = self._write_llm_summary(room, memory, findings)
         provider_name = self.model_gateway.provider_name_for_task(agent_id=self.agent_id, task_type=self.task_type)
         report = render_project_dossier(
@@ -140,50 +150,11 @@ class ReportAgent(BaseAgent):
             user_prompt=(
                 f"Topic: {room.topic}\n\n"
                 f"Goals:\n" + "\n".join(f"- {goal}" for goal in room.goals) + "\n\n"
-                f"Candidates:\n" + "\n".join(candidate_lines) + "\n\n"
-                f"Agent findings:\n" + "\n".join(finding_lines)
+                "Candidates:\n" + "\n".join(candidate_lines) + "\n\n"
+                "Agent findings:\n" + "\n".join(finding_lines)
             ),
         )
         return response.text.strip()
-
-
-@dataclass(slots=True)
-class ReportQuality:
-    status: str
-    evidence_url_count: int
-    candidate_count: int
-    live_source_backed_count: int
-    placeholder_count: int
-    reasons: list[str]
-
-    @property
-    def is_blocking(self) -> bool:
-        return self.status == "insufficient_evidence"
-
-    @property
-    def placeholder_only(self) -> bool:
-        return self.candidate_count > 0 and self.placeholder_count == self.candidate_count
-
-    @property
-    def has_live_source_backed(self) -> bool:
-        return self.live_source_backed_count > 0
-
-    def result_summary(self, report_path: Path) -> str:
-        if self.is_blocking:
-            return f"Research gate blocked completed report: insufficient source-backed evidence. Diagnostic memo written to {report_path}"
-        return f"Report written to {report_path}"
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "status": self.status,
-            "evidence_url_count": self.evidence_url_count,
-            "candidate_count": self.candidate_count,
-            "live_source_backed_count": self.live_source_backed_count,
-            "placeholder_count": self.placeholder_count,
-            "placeholder_only": self.placeholder_only,
-            "has_live_source_backed": self.has_live_source_backed,
-            "reasons": self.reasons,
-        }
 
 
 def render_project_dossier(
@@ -1203,7 +1174,6 @@ def render_research_coverage_v2(
     source_count = len(source_log)
     product_rows = finding_rows(findings, "product_tech_signal", project)
     token_rows = finding_rows(findings, "contract_token_info", project)
-    social_rows = finding_rows(findings, "social_kol_signal", project)
     seed_rows = [finding for finding in findings if finding.finding_type == "market_signal_intake"]
     funding_rows = finding_rows(findings, "funding_token_signal", project)
     if korean:
@@ -2200,33 +2170,6 @@ def coverage_status(condition: bool, ok: str, missing: str) -> str:
     return ok if condition else missing
 
 
-def finding_rows(findings: list[FindingRecord], finding_type: str, project: Any) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
-    for finding in findings:
-        if finding.finding_type != finding_type:
-            continue
-        raw_rows = finding.data.get("rows", [])
-        if not isinstance(raw_rows, list):
-            continue
-        for row in raw_rows:
-            if not isinstance(row, dict):
-                continue
-            if row.get("project_id") == project.project_id or row.get("project_name") == project.name:
-                rows.append(row)
-    return rows
-
-
-def extract_social_seed_rows(findings: list[FindingRecord]) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
-    for finding in findings:
-        if finding.finding_type != "market_signal_intake":
-            continue
-        raw_rows = finding.data.get("rows")
-        if isinstance(raw_rows, list):
-            rows.extend(row for row in raw_rows if isinstance(row, dict))
-    return rows
-
-
 def extract_builder_handles(findings: list[FindingRecord], project: Any) -> list[str]:
     handles: list[str] = []
     project_tokens_text = " ".join(project_tokens(project))
@@ -2289,54 +2232,6 @@ def handle_from_social_url(value: str) -> str | None:
     return "@" + handle
 
 
-def diligence_score(
-    project: Any,
-    findings: list[FindingRecord],
-    quality: ReportQuality,
-    source_log: list[dict[str, str]],
-) -> dict[str, Any]:
-    if project is None:
-        return {"score": 0, "stance": "제외", "reason": "No project resolved.", "components": {}}
-    product_rows = finding_rows(findings, "product_tech_signal", project)
-    token_rows = finding_rows(findings, "contract_token_info", project)
-    funding_rows = finding_rows(findings, "funding_token_signal", project)
-    social_seed_rows = extract_social_seed_rows(findings)
-    social_rows = finding_rows(findings, "social_kol_signal", project)
-    founder_handles = extract_builder_handles(findings, project)
-
-    components = {
-        "quality_gate": 20 if quality.status == "research_complete" else 0,
-        "source_depth": min(15, len(source_log) * 2),
-        "identity_gate": 12 if project.website and candidate_origin(project) == "live_source_backed" else 4,
-        "product_operator": 12 if product_rows else 0,
-        "github_or_docs": github_docs_score(project, product_rows),
-        "onchain_market": 10 if token_rows else 0,
-        "official_addresses": official_address_score(token_rows),
-        "social_kol": 8 if social_seed_rows or social_rows else 0,
-        "founder_dossier": 4 if founder_handles else 0,
-        "funding_token": 4 if funding_rows else 0,
-    }
-    score = min(100, sum(components.values()))
-    has_product = bool(product_rows)
-    has_token_value = display_token_status(project) not in {"", "unknown", "unknown_or_incentive_mining_unverified"}
-    has_fatal_identity_gap = candidate_origin(project) != "live_source_backed" or quality.is_blocking
-
-    if has_fatal_identity_gap or score < 45:
-        stance = "제외"
-        reason = "identity/source-backed evidence is not strong enough."
-    elif has_product and not has_token_value:
-        stance = "OPERATOR"
-        reason = "product/operator evidence exists, but token value-capture remains unclear."
-    elif score >= 86 and founder_handles and official_address_score(token_rows):
-        stance = "TOP"
-        reason = "identity, product, social, on-chain, and founder evidence are all strong enough for top-priority tracking."
-    else:
-        stance = "WATCH"
-        reason = "source-backed project with enough product/context evidence, but still needs live KOL/founder/token follow-up."
-    breakdown = score_breakdown(project, findings, quality, source_log, components)
-    return {"score": score, "stance": stance, "reason": reason, "components": components, "breakdown": breakdown}
-
-
 def score_breakdown(
     project: Any,
     findings: list[FindingRecord],
@@ -2372,180 +2267,6 @@ def score_breakdown(
         "social_momentum": min(100, 25 + (35 if social_seed_rows else 0) + len(social_rows) * 15),
         "token_opportunity": min(100, 25 + len(token_rows) * 20 + len(funding_rows) * 10),
     }
-
-
-def build_claim_evidence_ledger(
-    project: Any,
-    findings: list[FindingRecord],
-    source_log: list[dict[str, str]],
-) -> list[dict[str, Any]]:
-    if project is None:
-        return []
-    official_urls = [item["url"] for item in source_log if item.get("url")]
-    product_rows = finding_rows(findings, "product_tech_signal", project)
-    token_rows = finding_rows(findings, "contract_token_info", project)
-    funding_rows = finding_rows(findings, "funding_token_signal", project)
-    social_rows = finding_rows(findings, "social_kol_signal", project)
-    social_seed_rows = extract_social_seed_rows(findings)
-    github_urls = [url for url in official_urls if "github.com" in url.lower()]
-    docs_urls = [url for url in official_urls if "docs." in url.lower() or "whitepaper" in url.lower()]
-    funding_urls = [
-        url
-        for row in funding_rows
-        for url in row.get("funding_sources", [])
-        if isinstance(url, str) and url
-    ]
-    address_sources = [
-        str(row.get("official_addresses", {}).get("source"))
-        for row in token_rows
-        if isinstance(row.get("official_addresses"), dict) and row.get("official_addresses", {}).get("source")
-    ]
-    social_urls: list[str] = []
-    for row in [*social_rows, *social_seed_rows]:
-        if not isinstance(row, dict):
-            continue
-        for key in ["public_x_results", "official_social_sources", "kol_opinion_results", "article_results", "who_said_what"]:
-            values = row.get(key)
-            if isinstance(values, list):
-                social_urls.extend(str(item.get("url")) for item in values if isinstance(item, dict) and item.get("url"))
-    ledger = [
-        _claim_row(
-            "identity",
-            f"{project.name} identity, website, and category are resolved.",
-            [project.website, *official_urls[:4]],
-            "confirmed" if project.website and official_urls else "partial",
-            source_log,
-        ),
-        _claim_row(
-            "product",
-            "Project mechanics and product surface were checked through official site/docs/GitHub where available.",
-            [*docs_urls, *github_urls],
-            "confirmed" if product_rows and docs_urls else "partial" if product_rows or docs_urls else "unverified",
-            source_log,
-        ),
-        _claim_row(
-            "social_kol",
-            "X/KOL/article market signal was collected as a trigger layer, not final judgment.",
-            social_urls,
-            "confirmed" if len(social_urls) >= 3 else "partial" if social_urls else "unverified",
-            source_log,
-        ),
-        _claim_row(
-            "funding_team",
-            "Funding/team claims are separated from product proof and require source-backed confirmation.",
-            funding_urls,
-            "confirmed" if funding_urls else "partial" if funding_rows else "unverified",
-            source_log,
-        ),
-        _claim_row(
-            "token_onchain",
-            "Token, contract, chain, and official address evidence are checked separately from market hype.",
-            address_sources,
-            "confirmed" if address_sources else "partial" if token_rows else "unverified",
-            source_log,
-        ),
-        _claim_row(
-            "github_activity",
-            "GitHub presence and activity should be treated separately from simply finding a GitHub link.",
-            github_urls,
-            "partial" if github_urls else "unverified",
-            source_log,
-        ),
-        _claim_row(
-            "live_metrics",
-            "Live pool/app/borrower/default metrics remain a separate verification gate.",
-            [],
-            "unverified",
-            source_log,
-        ),
-    ]
-    return ledger
-
-
-def _claim_row(
-    category: str,
-    claim: str,
-    urls: list[Any],
-    status: str,
-    source_log: list[dict[str, str]],
-) -> dict[str, Any]:
-    source_refs = _source_refs_for_urls(source_log, urls)
-    source_urls: list[str] = []
-    for url in urls:
-        if not url:
-            continue
-        value = str(url)
-        if value and value not in source_urls:
-            source_urls.append(value)
-    source_ids = [
-        ref["source_id"]
-        for ref in source_refs
-        if ref.get("source_id")
-    ]
-    return {
-        "category": category,
-        "claim": claim,
-        "verification_status": status,
-        "source_ids": source_ids[:8],
-        "source_urls": source_urls[:8],
-        "source_refs": source_refs[:8],
-        "confidence": {"confirmed": 0.85, "partial": 0.55, "unverified": 0.2}.get(status, 0.35),
-    }
-
-
-def _source_refs_for_urls(source_log: list[dict[str, str]], urls: list[Any]) -> list[dict[str, str]]:
-    refs: list[dict[str, str]] = []
-    by_url = {
-        str(item.get("url") or ""): item
-        for item in source_log
-        if item.get("url")
-    }
-    for url in urls:
-        value = str(url or "").strip()
-        if not value:
-            continue
-        item = by_url.get(value, {})
-        ref = {
-            "source_id": str(item.get("source_id") or ""),
-            "label": str(item.get("label") or source_label(value)),
-            "url": value,
-        }
-        if ref not in refs:
-            refs.append(ref)
-    return refs
-
-
-def render_claim_ledger_lines(ledger: list[dict[str, Any]], *, korean: bool) -> list[str]:
-    if not ledger:
-        return ["- Claim ledger was not available." if not korean else "- claim ledger를 만들 수 없었습니다."]
-    lines = [
-        "- 주요 주장을 claim 단위로 분리했습니다. URL 개수만으로 완료 판정하지 않고, 각 주장별 confirmed/partial/unverified 상태를 따로 봅니다."
-        if korean
-        else "- Key claims are separated from raw URL count and marked confirmed/partial/unverified."
-    ]
-    for item in ledger:
-        refs = item.get("source_refs") if isinstance(item.get("source_refs"), list) else []
-        sources = item.get("source_urls") if isinstance(item.get("source_urls"), list) else []
-        if refs:
-            source_text = ", ".join(
-                claim_ref_markdown(ref)
-                for ref in refs[:3]
-                if isinstance(ref, dict)
-            )
-        else:
-            source_text = ", ".join(source_markdown_link(url) for url in sources[:3]) if sources else "no direct source"
-        lines.append(
-            f"- **{item.get('category')}** `{item.get('verification_status')}`: {item.get('claim')} ({source_text})"
-        )
-    return lines
-
-
-def claim_ref_markdown(ref: dict[str, Any]) -> str:
-    source_id = str(ref.get("source_id") or "").strip()
-    label = str(ref.get("label") or "").strip()
-    url = str(ref.get("url") or "").strip()
-    linked = source_markdown_link(url, label) if url else label or "source unavailable"
-    return f"`{source_id}` {linked}" if source_id else linked
 
 
 def render_score_breakdown_lines(score: dict[str, Any], *, korean: bool) -> list[str]:
@@ -2704,12 +2425,6 @@ def collect_source_log(project: Any, sources: list[Any]) -> list[dict[str, str]]
     return dedupe_source_items(items)
 
 
-def source_label(url: object) -> str:
-    value = str(url)
-    cleaned = value.removeprefix("https://").removeprefix("http://").strip("/")
-    return cleaned[:80] or value
-
-
 def source_role(url: object) -> str:
     value = str(url).lower()
     parsed = urlparse(value)
@@ -2735,56 +2450,11 @@ def source_role(url: object) -> str:
     return "public evidence source"
 
 
-def source_markdown_link(url: object, label: object | None = None) -> str:
-    value = str(url or "").strip()
-    if not value:
-        return "[source unavailable](#)"
-    display = str(label or "").strip() or compact_source_label(value)
-    display = compact_source_label(display)
-    return f"[{display}]({value})"
-
-
 def x_label_from_url(url: object) -> str:
     value = str(url or "")
     parsed = urlparse(value)
     parts = [part for part in parsed.path.split("/") if part]
     return f"@{parts[0]}" if parts else "official X"
-
-
-def compact_source_label(value: object) -> str:
-    text = str(value or "").strip()
-    if not text:
-        return "source"
-    parsed = urlparse(text if "://" in text else f"https://{text}")
-    if parsed.netloc:
-        host = parsed.netloc[4:] if parsed.netloc.startswith("www.") else parsed.netloc
-        path = parsed.path.strip("/")
-        if host in {"x.com", "twitter.com"}:
-            parts = [part for part in path.split("/") if part]
-            if len(parts) >= 3 and parts[1] == "status":
-                return f"x.com/{parts[0]}/status"
-            if parts:
-                return f"x.com/{parts[0]}"
-            return host
-        if "theblock.co" in host:
-            return "The Block"
-        if "delphidigital.io" in host:
-            return "Delphi Digital"
-        if "leviathannews.substack.com" in host:
-            return "Leviathan Substack"
-        if "ethdaily.io" in host:
-            return "ETH Daily"
-        if "defillama.com" in host:
-            return "DefiLlama"
-        if "github.com" in host:
-            parts = [part for part in path.split("/") if part]
-            return "github.com/" + "/".join(parts[:2]) if parts else "GitHub"
-        if "docs.3jane.xyz" in host:
-            return f"docs.3jane.xyz/{path}".rstrip("/")[:70]
-        if "3jane.xyz" in host and path:
-            return f"3jane.xyz/{path}".rstrip("/")[:70]
-        return f"{host}/{path}".rstrip("/")[:70]
-    return text[:70]
 
 
 def source_role_ko(url: object) -> str:
@@ -4160,40 +3830,6 @@ def dedupe_source_items(items: list[dict[str, str]]) -> list[dict[str, str]]:
         seen.add(url)
         result.append(item)
     return result[:40]
-
-
-def assess_report_quality(candidates: list[Any]) -> ReportQuality:
-    evidence_url_count = 0
-    placeholder_count = 0
-    live_source_backed_count = 0
-    for project in candidates:
-        metadata = project.metadata if isinstance(project.metadata, dict) else {}
-        evidence_urls = metadata.get("evidence_urls", [])
-        if isinstance(evidence_urls, list):
-            evidence_url_count += len([url for url in evidence_urls if url])
-        origin = candidate_origin(project)
-        if origin == "mvp_placeholder":
-            placeholder_count += 1
-        if origin == "live_source_backed":
-            live_source_backed_count += 1
-
-    reasons: list[str] = []
-    if not candidates:
-        reasons.append("no candidate project was resolved")
-    if candidates and placeholder_count == len(candidates):
-        reasons.append("all candidates are MVP placeholders")
-    if evidence_url_count == 0 and live_source_backed_count == 0:
-        reasons.append("no source-backed evidence URLs were collected")
-
-    status = "insufficient_evidence" if reasons else "research_complete"
-    return ReportQuality(
-        status=status,
-        evidence_url_count=evidence_url_count,
-        candidate_count=len(candidates),
-        live_source_backed_count=live_source_backed_count,
-        placeholder_count=placeholder_count,
-        reasons=reasons,
-    )
 
 
 def render_candidate_evidence(project: Any) -> list[str]:

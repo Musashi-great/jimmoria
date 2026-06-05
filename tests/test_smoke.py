@@ -22,6 +22,7 @@ from crypto_research_agents.agents.social_kol import (
     extract_handles_from_social_results,
 )
 from crypto_research_agents.agents.report import assess_report_quality, build_claim_evidence_ledger, diligence_score
+from crypto_research_agents.agents.reporting.evidence_ledger import build_project_dossier_evidence_pack
 from crypto_research_agents.connectors import register_default_connectors
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
 from crypto_research_agents.cli import (
@@ -37,9 +38,10 @@ from crypto_research_agents.cli import (
 )
 from crypto_research_agents.console import JimmoriaConsole, print_jimmoria_logo
 from crypto_research_agents.core.company_settings import CompanySettings
+from crypto_research_agents.core.input_resolver import resolve_research_input
 from crypto_research_agents.core.concurrency import load_concurrency_policy
-from crypto_research_agents.core.llm_provider import CodexCliProvider, CodexSdkProvider, LLMRequest, LLMResponse, grok_auth_status, parse_json_response, provider_from_env
-from crypto_research_agents.core.memory import FindingRecord, ProjectCandidate, SharedMemory, SourceRecord
+from crypto_research_agents.core.llm_provider import CodexApiProvider, CodexCliProvider, CodexSdkProvider, LLMRequest, LLMResponse, parse_json_response, provider_from_env
+from crypto_research_agents.core.memory import ProjectCandidate, SharedMemory, SourceRecord
 from crypto_research_agents.core.model_gateway import ModelGateway
 from crypto_research_agents.core.process_spec import ProcessSpecRegistry, load_process_spec
 from crypto_research_agents.core.project_profile import find_project_profile
@@ -129,7 +131,7 @@ class SmokeTest(unittest.TestCase):
 
         self.assertEqual(value, "/quit")
         self.assertIn("+", output.getvalue())
-        self.assertIn("Supervisor channel", output.getvalue())
+        self.assertIn("슈퍼바이저 대화", output.getvalue())
         self.assertIn("@path/to/file", output.getvalue())
         self.assertEqual(mocked_input.call_args[0][0], "| > ")
 
@@ -154,7 +156,7 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(mocked_input.call_args[0][0], "\033[2A\033[4C")
         self.assertGreaterEqual(len(box_lines), 5)
         self.assertTrue(box_lines[0].startswith("+"))
-        self.assertIn("Supervisor channel", box_lines[1])
+        self.assertIn("슈퍼바이저 대화", box_lines[1])
         self.assertTrue(box_lines[1].endswith("|"))
         self.assertTrue(box_lines[2].endswith("|"))
         self.assertTrue(box_lines[3].endswith("|"))
@@ -173,9 +175,9 @@ class SmokeTest(unittest.TestCase):
         status = console.input_status_text()
 
         self.assertIn("JIMMORIA HQ", status)
-        self.assertIn("Supervisor channel", status)
+        self.assertIn("슈퍼바이저 대화", status)
         self.assertIn("room_12345...bcdef", status)
-        self.assertIn("1 run/1 wait/1 done", status)
+        self.assertIn("진행 1/대기 1/완료 1", status)
 
     def test_user_message_prints_compact_log_not_panel(self) -> None:
         output = StringIO()
@@ -186,7 +188,7 @@ class SmokeTest(unittest.TestCase):
             console.print_user_message("안녕하세요")
 
         text = output.getvalue()
-        self.assertIn("You > 안녕하세요", text)
+        self.assertIn("사용자 > 안녕하세요", text)
         self.assertNotIn("[You]", text)
 
     def test_supervisor_working_prints_compact_log(self) -> None:
@@ -198,7 +200,7 @@ class SmokeTest(unittest.TestCase):
             console.print_supervisor_working("Reading and routing.")
 
         text = output.getvalue()
-        self.assertIn("Supervisor > Reading and routing.", text)
+        self.assertIn("슈퍼바이저 > Reading and routing.", text)
         self.assertNotIn("[Supervisor]", text)
 
     def test_chat_help_does_not_show_static_agent_roster(self) -> None:
@@ -208,7 +210,7 @@ class SmokeTest(unittest.TestCase):
             JimmoriaConsole().print_help()
 
         text = output.getvalue()
-        self.assertIn("JIMMORIA commands", text)
+        self.assertIn("JIMMORIA 명령어", text)
         self.assertIn("/settings", text)
         self.assertNotIn("Agents at work:", text)
 
@@ -241,7 +243,7 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("반영한 내용", text)
 
     def test_chat_intake_classifies_research_vs_settings(self) -> None:
-        self.assertEqual(classify_chat_input("pearl 프로젝트에 대해서 리서치 보고서 만들어봐"), "research_request")
+        self.assertEqual(classify_chat_input("pearl 프로젝트에 대해서 리서치 보고서 만들어봐"), "research_input_resolution")
         self.assertEqual(classify_chat_input("보고서는 한글로 만들어봐 영어단어는 써도 돼"), "company_config")
         self.assertEqual(classify_chat_input("현재 회사 상태랑 설정 보여줘"), "company_status")
         self.assertEqual(classify_chat_input("이 링크는 소스만 저장해줘"), "source_ingestion")
@@ -249,9 +251,9 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(classify_chat_input("안녕"), "supervisor_chat")
 
     def test_chat_intake_classifies_saved_report_request(self) -> None:
-        self.assertEqual(classify_chat_input("3jane 관련 투자 보고서 만들어봐"), "research_request")
+        self.assertEqual(classify_chat_input("3jane 관련 투자 보고서 만들어봐"), "research_input_resolution")
         self.assertEqual(classify_chat_input("3jane 보고서 만든거 보내봐 전체"), "report_retrieval")
-        self.assertEqual(classify_chat_input("3jane 보고서 만들어봐"), "research_request")
+        self.assertEqual(classify_chat_input("3jane 보고서 만들어봐"), "research_input_resolution")
         self.assertEqual(classify_chat_input("3jane 보고서 들고와봐"), "report_retrieval")
         self.assertEqual(classify_chat_input("show 3jane full report"), "report_retrieval")
         self.assertEqual(classify_chat_input("3jane 보고서 가지고 와봐"), "report_retrieval")
@@ -292,13 +294,16 @@ class SmokeTest(unittest.TestCase):
         settings = CompanySettings(supervisor_mode="company_ceo")
 
         research = decide_supervisor_intake("pearl 프로젝트를 분석해봐", settings)
-        report = decide_supervisor_intake("pearl 프로젝트 리서치 보고서 작성해봐", settings)
+        report = decide_supervisor_intake("pearl 프로젝트 리서치 보고서 작성해봐 https://x.com/pearl", settings)
+        missing_link_report = decide_supervisor_intake("pearl 프로젝트 리서치 보고서 작성해봐", settings)
         config = decide_supervisor_intake("로그 출력 스타일을 바꿔봐", settings)
         status = decide_supervisor_intake("현재 회사 상태 보여줘", settings)
 
         self.assertFalse(research.needs_research_room)
         self.assertEqual(research.output_mode, "supervisor_reply")
-        self.assertEqual(research.action, "ask_report_confirmation")
+        self.assertEqual(research.action, "ask_for_source_link")
+        self.assertTrue(research.requires_source_link)
+        self.assertEqual(missing_link_report.action, "ask_for_source_link")
         self.assertTrue(report.needs_research_room)
         self.assertEqual(report.output_mode, "research_dossier")
         self.assertFalse(config.needs_research_room)
@@ -308,6 +313,46 @@ class SmokeTest(unittest.TestCase):
         chat = decide_supervisor_intake("지금 보고서 작성은 한글 위주로 세팅된게 맞지?", settings)
         self.assertFalse(chat.needs_research_room)
         self.assertEqual(chat.output_mode, "supervisor_reply")
+
+    def test_project_research_input_resolver_requires_source_link_and_classifies_identity(self) -> None:
+        resolved = resolve_research_input("$POD Dolphin 리서치 https://x.com/dolphin_xyz https://github.com/dolphin/protocol 0x1234567890abcdef1234567890abcdef12345678")
+
+        self.assertTrue(resolved.required_link_present)
+        self.assertIn("ticker", resolved.input_types)
+        self.assertIn("x_account", resolved.input_types)
+        self.assertIn("github_repo", resolved.input_types)
+        self.assertEqual(resolved.tickers, ["POD"])
+        self.assertEqual(resolved.contract_addresses, ["0x1234567890abcdef1234567890abcdef12345678"])
+        self.assertTrue(any(candidate.source_type == "official_x_candidate" for candidate in resolved.identity_candidates))
+
+        no_link = resolve_research_input("Dolphin이 뭐하는 프로젝트인지 봐줘")
+        self.assertFalse(no_link.required_link_present)
+        self.assertTrue(no_link.needs_link_for_research)
+        self.assertIn("source_link_required_for_research", no_link.warnings)
+
+    def test_project_dossier_evidence_pack_marks_required_slots(self) -> None:
+        project = ProjectCandidate(
+            project_id="3jane",
+            name="3Jane",
+            reason_found="On-chain credit project",
+            website="https://3jane.xyz",
+        )
+        source_log = [
+            {"source_id": "S1", "label": "Official", "url": "https://3jane.xyz"},
+            {"source_id": "S2", "label": "X", "url": "https://x.com/3janexyz"},
+            {"source_id": "S3", "label": "Docs", "url": "https://docs.3jane.xyz"},
+            {"source_id": "S4", "label": "GitHub", "url": "https://github.com/3jane/credit"},
+        ]
+
+        pack = build_project_dossier_evidence_pack(project, [], source_log)
+
+        self.assertIn("official_website", pack)
+        self.assertIn("official_x", pack)
+        self.assertIn("unanswered_questions", pack)
+        self.assertEqual(pack["official_website"]["status"], "confirmed")
+        self.assertEqual(pack["official_x"]["status"], "confirmed")
+        self.assertEqual(pack["contract"]["status"], "unverified")
+        self.assertIn("미확인 evidence slots", " ".join(pack["unanswered_questions"]["notes"]))
 
     def test_supervisor_chat_answers_without_report(self) -> None:
         output = StringIO()
@@ -332,7 +377,7 @@ class SmokeTest(unittest.TestCase):
             self.assertFalse((root / "reports").exists())
 
         text = output.getvalue()
-        self.assertIn("Supervisor", text)
+        self.assertIn("슈퍼바이저", text)
         self.assertNotIn("Supervisor intake", text)
         self.assertNotIn("Report preview", text)
         self.assertIn("한국어 우선", text)
@@ -357,7 +402,7 @@ class SmokeTest(unittest.TestCase):
             self.assertFalse((root / "company_settings.json").exists())
 
         text = output.getvalue()
-        self.assertIn("Supervisor", text)
+        self.assertIn("슈퍼바이저", text)
         self.assertNotIn("Supervisor intake", text)
         self.assertIn("JIMMORIA Supervisor", text)
         self.assertNotIn("Company instruction applied", text)
@@ -421,7 +466,7 @@ class SmokeTest(unittest.TestCase):
             self.assertFalse((root / "reports").exists())
 
         text = output.getvalue()
-        self.assertIn("Supervisor", text)
+        self.assertIn("슈퍼바이저", text)
         self.assertNotIn("Supervisor intake", text)
         self.assertIn("Company settings", text)
 
@@ -478,7 +523,7 @@ class SmokeTest(unittest.TestCase):
             )
             with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(root / "model_settings.json")}, clear=True):
                 with patch("sys.stdin.isatty", return_value=True):
-                    with patch("builtins.input", side_effect=["pearl 프로젝트 리서치 보고서 작성해봐", "n", "/quit"]):
+                    with patch("builtins.input", side_effect=["pearl 프로젝트 리서치 보고서 작성해봐 https://x.com/pearl", "n", "/quit"]):
                         with redirect_stdout(output):
                             chat_command(args)
 
@@ -510,7 +555,7 @@ class SmokeTest(unittest.TestCase):
             self.assertFalse((root / "runs").exists())
 
         text = output.getvalue()
-        self.assertIn("보고서를 원하면", text)
+        self.assertIn("최소 1개 링크", text)
         self.assertNotIn("Room > OPEN", text)
 
     def test_chat_report_retrieval_miss_can_be_corrected_to_creation(self) -> None:
@@ -537,7 +582,7 @@ class SmokeTest(unittest.TestCase):
                 with patch("sys.stdin.isatty", return_value=True):
                     with patch(
                         "builtins.input",
-                        side_effect=["3jane 보고서 들고와봐", "만들어보라는거잖아", "y", "/quit"],
+                        side_effect=["3jane 보고서 들고와봐", "만들어보라는거잖아 https://x.com/3jane", "y", "/quit"],
                     ):
                         with patch(
                             "crypto_research_agents.cli.ResearchRuntime.run_article_research",
@@ -575,7 +620,7 @@ class SmokeTest(unittest.TestCase):
             )
             with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(root / "model_settings.json")}, clear=True):
                 with patch("sys.stdin.isatty", return_value=True):
-                    with patch("builtins.input", side_effect=["3jane 관련 투자 보고서 만들어봐", "y", "/quit"]):
+                    with patch("builtins.input", side_effect=["3jane 관련 투자 보고서 만들어봐 https://x.com/3jane", "y", "/quit"]):
                         with patch(
                             "crypto_research_agents.cli.ResearchRuntime.run_article_research",
                             return_value=fake_result,
@@ -594,7 +639,7 @@ class SmokeTest(unittest.TestCase):
     def test_runtime_records_supervisor_intake_decision(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
-            decision = decide_supervisor_intake("pearl 프로젝트 리서치 보고서 작성해봐").to_dict()
+            decision = decide_supervisor_intake("pearl 프로젝트 리서치 보고서 작성해봐 https://x.com/pearl").to_dict()
             with patch.dict("os.environ", {**_offline_no_secret_env(), "JIMMORIA_SKIP_EXTERNAL_SEARCH": "1"}, clear=False):
                 runtime = ResearchRuntime()
                 result = runtime.run_article_research(
@@ -641,7 +686,7 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("WAIT", text)
         self.assertIn("RUN", text)
         self.assertIn("ingestion_agent", text)
-        self.assertIn("Now: Extracting source metadata", text)
+        self.assertIn("진행: 입력 소스와 메타데이터를 정리하는 중", text)
         self.assertEqual(text.count("Live agent board"), 1)
 
     def test_live_agent_board_shows_failures(self) -> None:
@@ -671,7 +716,7 @@ class SmokeTest(unittest.TestCase):
 
         text = output.getvalue()
         self.assertIn("FAIL", text)
-        self.assertIn("Stopped: Failed: Codex CLI provider failed", text)
+        self.assertIn("중단: Codex CLI provider failed", text)
 
     def test_runtime_events_default_to_background_dock(self) -> None:
         output = StringIO()
@@ -713,10 +758,10 @@ class SmokeTest(unittest.TestCase):
             )
 
         text = output.getvalue()
-        self.assertNotIn("Room > OPEN room_test", text)
-        self.assertNotIn("Board > 2 wait/0 done", text)
-        self.assertNotIn("Agent > RUN ingestion_agent", text)
-        self.assertNotIn("Agent > DONE ingestion_agent", text)
+        self.assertNotIn("룸 > OPEN room_test", text)
+        self.assertNotIn("보드 > 대기 2/완료 0", text)
+        self.assertNotIn("에이전트 > RUN 아카이비스트", text)
+        self.assertNotIn("에이전트 > DONE 아카이비스트", text)
         self.assertEqual(console.last_room_id, "room_test")
         self.assertEqual(console.agent_state["ingestion_agent"], "done")
 
@@ -761,10 +806,10 @@ class SmokeTest(unittest.TestCase):
             )
 
         text = output.getvalue()
-        self.assertIn("Room > OPEN room_test", text)
-        self.assertIn("Board > 2 wait/0 done", text)
-        self.assertIn("Agent > RUN ingestion_agent", text)
-        self.assertIn("Agent > DONE ingestion_agent", text)
+        self.assertIn("룸 > OPEN room_test", text)
+        self.assertIn("보드 > 대기 2/완료 0", text)
+        self.assertIn("에이전트 > RUN 아카이비스트", text)
+        self.assertIn("에이전트 > DONE 아카이비스트", text)
         self.assertIn("time 1.2s", text)
         self.assertIn("llm 2", text)
         self.assertIn("calls / ~4.2k tokens", text)
@@ -797,19 +842,19 @@ class SmokeTest(unittest.TestCase):
 
         clean = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", output.getvalue())
         self.assertIn("JIMMORIA HQ", clean)
-        self.assertIn("Room running. Input returns when Supervisor finishes this room.", clean)
-        self.assertIn("Now: ingestion_agent -> Extracting source metadata", clean)
-        self.assertIn("Waiting: supervisor_agent", clean)
-        self.assertIn("Live agent board - current work", clean)
-        self.assertIn("STATE", clean)
-        self.assertIn("CURRENT WORK", clean)
+        self.assertIn("리서치룸 실행 중입니다. 슈퍼바이저가 완료하면 입력창이 돌아옵니다.", clean)
+        self.assertIn("진행: 아카이비스트 -> 입력 소스와 메타데이터를 정리하는 중", clean)
+        self.assertIn("대기: 슈퍼바이저", clean)
+        self.assertIn("에이전트 작업 카드 - 현재 진행 상황", clean)
+        self.assertIn("상태", clean)
+        self.assertIn("현재 작업", clean)
         self.assertIn("ingestion_agent", clean)
-        self.assertIn("Now: Extracting source metadata", clean)
-        self.assertIn("> working...", clean)
-        self.assertIn("\033[12A\033[12M", output.getvalue())
+        self.assertIn("진행: 입력 소스와 메타데이터를 정리하는 중", clean)
+        self.assertIn("> 작업중...", clean)
+        self.assertIn("\033[20A\033[20M", output.getvalue())
         self.assertIn("\033[?25l", output.getvalue())
         self.assertIn("\033[5m\033[38;2;255;92;212m...", output.getvalue())
-        self.assertEqual(console.runtime_dock_lines, 12)
+        self.assertEqual(console.runtime_dock_lines, 20)
 
     def test_runtime_dock_shows_full_agent_board_for_research_room(self) -> None:
         output = StringIO()
@@ -848,17 +893,55 @@ class SmokeTest(unittest.TestCase):
                 )
 
         clean = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", output.getvalue())
-        self.assertIn("Now: supervisor_agent -> Planning direction", clean)
-        self.assertIn("Waiting: ingestion_agent, social_kol_agent, narrative_agent, discovery_agent +5", clean)
-        self.assertIn("STATE", clean)
+        self.assertIn("진행: 슈퍼바이저 -> 리서치 방향과 작업 순서를 정리하는 중", clean)
+        self.assertIn("대기: 아카이비스트, 소셜/KOL, 내러티브, 스카우터 +5", clean)
+        self.assertIn("상태", clean)
         self.assertIn("supervisor_agent", clean)
         self.assertIn("ingestion_agent", clean)
         self.assertIn("social_kol_agent", clean)
         self.assertIn("contract_onchain_agent", clean)
         self.assertIn("obsidian_curator_agent", clean)
-        self.assertIn("Now: Planning direction", clean)
-        self.assertIn("Waiting: Syncing vault notes", clean)
-        self.assertEqual(console.runtime_dock_lines, 20)
+        self.assertIn("진행: 리서치 방향과 작업 순서를 정리하는 중", clean)
+        self.assertIn("대기: 볼트 노트와 지식 기록을 동기화하는 중", clean)
+        self.assertEqual(console.runtime_dock_lines, 40)
+
+
+    def test_runtime_dock_shows_council_room_card(self) -> None:
+        output = StringIO()
+        console = JimmoriaConsole()
+
+        with patch("crypto_research_agents.console.supports_color", return_value=True):
+            with redirect_stdout(output):
+                console.handle_event(
+                    {
+                        "type": "room_created",
+                        "room_id": "room_test",
+                        "topic": "3jane report",
+                        "goals": ["Investigate the project."],
+                        "agents": ["social_kol_agent", "product_tech_agent"],
+                    }
+                )
+                console.handle_event(
+                    {
+                        "type": "deliberation_start",
+                        "room_id": "room_test",
+                        "participants": ["social_kol_agent", "product_tech_agent"],
+                        "summary": "Specialists compare findings.",
+                    }
+                )
+                console.handle_event(
+                    {
+                        "type": "deliberation_statement",
+                        "room_id": "room_test",
+                        "agent_id": "social_kol_agent",
+                        "summary": "공식 X 신호는 약하지만 공개 기사 근거는 있습니다.",
+                    }
+                )
+
+        clean = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", output.getvalue())
+        self.assertIn("토론방 [진행]", clean)
+        self.assertIn("참여: 소셜/KOL, 제품/기술", clean)
+        self.assertIn("소셜/KOL: 공식 X 신호는 약하지만 공개 기사 근거는 있습니다.", clean)
 
     def test_runtime_dock_updates_agent_work_from_tool_events(self) -> None:
         output = StringIO()
@@ -886,9 +969,9 @@ class SmokeTest(unittest.TestCase):
                 )
 
         clean = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", output.getvalue())
-        self.assertIn("Live agent board - current work", clean)
+        self.assertIn("에이전트 작업 카드 - 현재 진행 상황", clean)
         self.assertIn("discovery_agent", clean)
-        self.assertIn("Now: Tool running: web_search - pearl crypto project", clean)
+        self.assertIn("진행: 툴 실행: web_search - pearl crypto project", clean)
         self.assertEqual(console.agent_state["discovery_agent"], "running")
 
     def test_runtime_stream_clears_input_dock_when_room_finishes(self) -> None:
@@ -916,7 +999,7 @@ class SmokeTest(unittest.TestCase):
                     }
                 )
 
-        self.assertIn("Room", output.getvalue())
+        self.assertIn("룸", output.getvalue())
         self.assertIn("\033[?25h", output.getvalue())
         self.assertEqual(console.runtime_dock_lines, 0)
         self.assertFalse(console.runtime_room_running)
@@ -2317,7 +2400,7 @@ class SmokeTest(unittest.TestCase):
                         "run",
                         "project_diligence_v1",
                         "--text",
-                        "Pearl crypto project diligence request.",
+                        "Pearl crypto project diligence request. https://x.com/pearl",
                         "--memory",
                         str(root / "memory.json"),
                         "--vault",
@@ -2469,7 +2552,7 @@ class SmokeTest(unittest.TestCase):
                         "--title",
                         "CLI Test",
                         "--text",
-                        "AI wallet automation with docs and points.",
+                        "AI wallet automation with docs and points. https://example.com/project",
                         "--vault",
                         str(root / "vault"),
                         "--reports",
@@ -2546,6 +2629,59 @@ class SmokeTest(unittest.TestCase):
             provider = provider_from_env()
 
         self.assertEqual(provider.provider_name, "codex_cli")
+
+    def test_codex_api_provider_can_be_selected_with_api_key(self) -> None:
+        with patch.dict("os.environ", {"LLM_PROVIDER": "codex_api", "OPENAI_API_KEY": "openai-test"}, clear=True):
+            provider = provider_from_env()
+
+        self.assertEqual(provider.provider_name, "codex_api")
+        self.assertTrue(getattr(provider, "is_configured", False))
+
+    def test_codex_api_provider_calls_openai_responses_api(self) -> None:
+        seen: dict[str, object] = {}
+
+        class FakeHTTPResponse:
+            def __enter__(self) -> "FakeHTTPResponse":
+                return self
+
+            def __exit__(self, *_args: object) -> None:
+                return None
+
+            def read(self) -> bytes:
+                return json.dumps({"output_text": "{\"summary\": \"ok\"}", "usage": {"input_tokens": 2}}).encode("utf-8")
+
+        def fake_urlopen(request: object, timeout: float) -> FakeHTTPResponse:
+            seen["timeout"] = timeout
+            seen["url"] = getattr(request, "full_url")
+            seen["authorization"] = request.get_header("Authorization")  # type: ignore[attr-defined]
+            seen["payload"] = json.loads(request.data.decode("utf-8"))  # type: ignore[attr-defined]
+            return FakeHTTPResponse()
+
+        request = LLMRequest(
+            agent_id="report_agent",
+            task_type="final_synthesis",
+            model="gpt-5.5",
+            system_prompt="Write JSON.",
+            user_prompt="3jane report",
+            max_tokens=500,
+            temperature=0.2,
+            response_format="json",
+            reasoning_effort="pro",
+        )
+
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "openai-test"}, clear=True):
+            with patch("crypto_research_agents.core.llm_provider.urllib.request.urlopen", side_effect=fake_urlopen):
+                response = CodexApiProvider().complete(request)
+
+        payload = seen["payload"]
+        assert isinstance(payload, dict)
+        self.assertEqual(seen["url"], "https://api.openai.com/v1/responses")
+        self.assertEqual(seen["authorization"], "Bearer openai-test")
+        self.assertEqual(payload["model"], "gpt-5.5")
+        self.assertEqual(payload["reasoning"], {"effort": "high"})
+        self.assertEqual(payload["text"], {"format": {"type": "json_object"}})
+        self.assertEqual(response.text, '{"summary": "ok"}')
+        self.assertEqual(response.provider, "codex_api")
 
     def test_grok_provider_can_be_selected_with_bearer_token(self) -> None:
         with patch.dict("os.environ", {"LLM_PROVIDER": "grok", "XAI_API_KEY": "xai-test"}, clear=True):
@@ -2738,6 +2874,39 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(response.usage["codex_model_reasoning_effort"], "xhigh")
         self.assertIs(exec_kwargs["text"], False)
 
+    def test_model_setup_all_logged_in_applies_codex_and_grok_without_raw_tokens(self) -> None:
+        output = StringIO()
+        with TemporaryDirectory() as tmp:
+            settings_path = str(Path(tmp) / "model_settings.json")
+            with patch.dict(
+                "os.environ",
+                {
+                    "JIMMORIA_MODEL_SETTINGS_PATH": settings_path,
+                    "OPENAI_API_KEY": "openai-secret",
+                    "XAI_API_KEY": "xai-secret",
+                },
+                clear=True,
+            ):
+                with patch("crypto_research_agents.cli.codex_sdk_available", return_value=False):
+                    with patch("crypto_research_agents.cli.codex_login_status", return_value="Codex login status unknown"):
+                        with patch("builtins.input", return_value="1"):
+                            with redirect_stdout(output):
+                                configure_model_panel()
+                self.assertEqual(os.environ["LLM_PROVIDER"], "codex_grok")
+                self.assertEqual(os.environ["JIMMORIA_CODEX_PROVIDER"], "codex_api")
+                self.assertEqual(os.environ["JIMMORIA_GROK_AUTH_PROVIDER"], "api_key")
+                settings = json.loads(Path(settings_path).read_text(encoding="utf-8"))
+                self.assertEqual(settings["LLM_PROVIDER"], "codex_grok")
+                self.assertEqual(settings["JIMMORIA_CODEX_PROVIDER"], "codex_api")
+                self.assertEqual(settings["JIMMORIA_GROK_AUTH_PROVIDER"], "api_key")
+                self.assertNotIn("OPENAI_API_KEY", settings)
+                self.assertNotIn("XAI_API_KEY", settings)
+
+        text = output.getvalue()
+        self.assertIn("[All logged-in models]", text)
+        self.assertIn("Codex API", text)
+        self.assertIn("Grok OAuth/API", text)
+
     def test_model_setup_offline_choice_uses_screen_flow(self) -> None:
         output = StringIO()
         with TemporaryDirectory() as tmp:
@@ -2820,7 +2989,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
                 "CODEX_MODEL_FAST": "bad-manual-value",
             }
             with patch.dict("os.environ", env, clear=True):
-                with patch("builtins.input", side_effect=["1", "", ""]):
+                with patch("builtins.input", side_effect=["2", "1", "", ""]):
                     with redirect_stdout(output):
                         configure_model_panel()
                 self.assertEqual(os.environ["LLM_PROVIDER"], "codex_sdk")
@@ -3583,6 +3752,37 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(payload["event_cursor"]["last_seq"], 2)
         self.assertEqual(payload["agent_state"][0]["state"], "DONE")
         self.assertIn("Web Report", payload["report_preview"])
+
+    def test_agent_skill_and_hook_references_are_registered(self) -> None:
+        agent_registry = AgentSpecRegistry.load_dir("config/agents")
+        skill_registry = SkillSpecRegistry.load_dir("config/skills")
+        hook_registry = HookRegistry.load_dir("config/hooks")
+
+        missing_skills: list[str] = []
+        missing_hooks: list[str] = []
+        for spec in agent_registry.specs.values():
+            for skill_id in spec.skills.all():
+                if skill_registry.get(skill_id) is None:
+                    missing_skills.append(f"{spec.agent_id}:{skill_id}")
+            for phase, hook_ids in spec.hooks.items():
+                for hook_id in hook_ids:
+                    if hook_registry.get(hook_id) is None:
+                        missing_hooks.append(f"{spec.agent_id}:{phase}:{hook_id}")
+
+        self.assertEqual([], missing_skills)
+        self.assertEqual([], missing_hooks)
+
+    def test_agent_system_prompt_includes_persona_scope_memory_and_hooks(self) -> None:
+        spec = AgentSpecRegistry.load_dir("config/agents").get("social_kol_agent")
+        self.assertIsNotNone(spec)
+        prompt = spec.system_prompt()  # type: ignore[union-attr]
+
+        self.assertIn("Persona: The Signal Listener", prompt)
+        self.assertIn("Strengths to use:", prompt)
+        self.assertIn("Biases to avoid:", prompt)
+        self.assertIn("Memory access contract:", prompt)
+        self.assertIn("Runtime hooks:", prompt)
+        self.assertIn("Primary skills:", prompt)
 
     def test_safety_gate_blocks_investment_advice(self) -> None:
         result = review_report_quality("This is not advice but you should swap into it. https://example.com")

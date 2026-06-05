@@ -194,6 +194,51 @@ class CodexSdkProvider:
         )
 
 
+class CodexApiProvider:
+    """OpenAI-compatible API provider for Codex/OpenAI model routes."""
+
+    provider_name = "codex_api"
+
+    def __init__(self, *, api_key: str | None = None, base_url: str | None = None, api_mode: str | None = None) -> None:
+        self.api_key = api_key or os.getenv("CODEX_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
+        self.auth_source = "constructor" if api_key else "CODEX_API_KEY" if os.getenv("CODEX_API_KEY") else "OPENAI_API_KEY" if os.getenv("OPENAI_API_KEY") else "missing"
+        self.base_url = (base_url or os.getenv("CODEX_API_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
+        self.api_mode = (api_mode or os.getenv("CODEX_API_MODE") or os.getenv("OPENAI_API_MODE") or "responses").strip().lower()
+        self.timeout = float(os.getenv("CODEX_API_TIMEOUT") or os.getenv("OPENAI_API_TIMEOUT") or "360")
+
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.api_key)
+
+    def complete(self, request: LLMRequest) -> LLMResponse:
+        if not self.api_key:
+            raise RuntimeError("Codex API provider is missing a bearer token. Set OPENAI_API_KEY or CODEX_API_KEY.")
+        if self.api_mode in {"chat", "chat_completions", "chat-completions"}:
+            endpoint = f"{self.base_url}/chat/completions"
+            payload = _openai_chat_payload(request)
+        else:
+            endpoint = f"{self.base_url}/responses"
+            payload = _openai_responses_payload(request)
+        raw = _post_json(
+            endpoint,
+            payload,
+            headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+            timeout=self.timeout,
+        )
+        text = _extract_openai_compatible_text(raw)
+        usage = raw.get("usage") if isinstance(raw.get("usage"), dict) else {}
+        usage = {
+            **usage,
+            "mode": "codex_api",
+            "api_mode": self.api_mode,
+            "base_url": self.base_url,
+            "auth_source": self.auth_source,
+            "reasoning_effort": request.reasoning_effort,
+            "openai_reasoning_effort": _openai_reasoning_effort(request.reasoning_effort),
+        }
+        return LLMResponse(text=text.strip(), model=request.model, provider=self.provider_name, usage=usage, raw=raw)
+
+
 class GrokProvider:
     """LLM provider for the xAI Grok OpenAI-compatible API."""
 
@@ -287,6 +332,8 @@ def provider_from_env() -> LLMProvider:
         return HybridLLMProvider()
     if provider in {"codex_cli", "codex_device", "codex_login"}:
         return CodexCliProvider()
+    if provider in {"codex_api", "openai_api", "api"}:
+        return CodexApiProvider()
     if provider in {"codex_sdk", "codex", "sdk"}:
         return CodexSdkProvider()
     if provider in {"grok", "xai"}:
@@ -294,6 +341,14 @@ def provider_from_env() -> LLMProvider:
     if provider in {"grok_oauth", "xai_oauth", "grok-oauth", "xai-oauth"}:
         return GrokProvider(prefer_hermes_oauth=True)
     return OfflineLLMProvider()
+
+
+def codex_api_status() -> str:
+    if os.getenv("CODEX_API_KEY"):
+        return "Codex/OpenAI API key from CODEX_API_KEY"
+    if os.getenv("OPENAI_API_KEY"):
+        return "Codex/OpenAI API key from OPENAI_API_KEY"
+    return "missing Codex/OpenAI API key; set OPENAI_API_KEY or CODEX_API_KEY"
 
 
 def grok_auth_status() -> str:
@@ -597,6 +652,55 @@ def _hermes_auth_json_path() -> Path:
         return Path.home() / ".hermes" / "auth.json"
     except RuntimeError:
         return Path(".hermes") / "auth.json"
+
+
+def _openai_responses_payload(request: LLMRequest) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "model": request.model,
+        "input": [
+            {"role": "system", "content": request.system_prompt},
+            {"role": "user", "content": request.user_prompt},
+        ],
+        "store": False,
+    }
+    if request.max_tokens:
+        payload["max_output_tokens"] = request.max_tokens
+    reasoning_effort = _openai_reasoning_effort(request.reasoning_effort)
+    if reasoning_effort:
+        payload["reasoning"] = {"effort": reasoning_effort}
+    if request.response_format == "json":
+        payload["text"] = {"format": {"type": "json_object"}}
+    return payload
+
+
+def _openai_chat_payload(request: LLMRequest) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "model": request.model,
+        "messages": [
+            {"role": "system", "content": request.system_prompt},
+            {"role": "user", "content": request.user_prompt},
+        ],
+        "temperature": request.temperature,
+    }
+    if request.max_tokens:
+        payload["max_tokens"] = request.max_tokens
+    reasoning_effort = _openai_reasoning_effort(request.reasoning_effort)
+    if reasoning_effort:
+        payload["reasoning_effort"] = reasoning_effort
+    if request.response_format == "json":
+        payload["response_format"] = {"type": "json_object"}
+    return payload
+
+
+def _openai_reasoning_effort(reasoning_effort: str) -> str:
+    normalized = (reasoning_effort or "standard").strip().lower().replace("-", "_")
+    if normalized in {"pro", "xhigh", "extra_high", "max", "maximum"}:
+        return "high"
+    if normalized in {"high", "deep"}:
+        return "high"
+    if normalized in {"fast", "low"}:
+        return "low"
+    return "medium"
 
 
 def _grok_responses_payload(request: LLMRequest) -> dict[str, Any]:

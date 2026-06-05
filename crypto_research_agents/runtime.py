@@ -636,6 +636,15 @@ class ResearchRuntime:
                 summary=statement["summary"],
                 payload=statement,
             )
+            self._emit(
+                "deliberation_statement",
+                room_id=room.room_id,
+                agent_id=agent_id,
+                finding_id=statement.get("finding_id"),
+                confidence=statement.get("confidence"),
+                finding_type=statement.get("finding_type"),
+                summary=statement["summary"],
+            )
 
         consensus = _build_council_consensus(room, statements)
         council_finding = self.memory.add_finding(

@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from crypto_research_agents.core.company_settings import CompanySettings
+from crypto_research_agents.core.input_resolver import resolve_research_input
 
 
 @dataclass(slots=True)
@@ -18,6 +19,8 @@ class SupervisorIntakeDecision:
     rationale: str
     next_step: str
     supervisor_authority: list[str] = field(default_factory=list)
+    resolved_input: dict[str, Any] = field(default_factory=dict)
+    requires_source_link: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -34,7 +37,14 @@ def build_supervisor_reply(
     report_language = settings.report_language
     terms_policy = "allowed" if settings.allow_english_terms else "restricted"
 
-    if decision.action == "ask_report_confirmation":
+    if decision.action == "ask_for_source_link":
+        lines = [
+            "리서치 혼동을 줄이기 위해 Research Room은 최소 1개 링크가 있을 때만 엽니다.",
+            "가능하면 공식 웹사이트 또는 공식 X 링크를 먼저 붙여 주세요. GitHub, docs, 기사, DEX/explorer 링크도 기준 source로 사용할 수 있습니다.",
+            "예: `3Jane 프로젝트 리서치 보고서 작성해줘 https://x.com/3janexyz`",
+            "링크가 없으면 ticker collision, 동명이 프로젝트, 비공식 컨트랙트 위험은 보고서에서 `미확인`으로 남길 수밖에 없습니다.",
+        ]
+    elif decision.action == "ask_report_confirmation":
         lines = [
             "조사 방향은 이해했습니다.",
             "다만 지금부터는 보고서/dossier 작성처럼 산출물을 명확히 요청할 때만 Research Room을 엽니다.",
@@ -173,16 +183,32 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
             supervisor_authority=authority,
         )
 
+    resolved = resolve_research_input(stripped)
+
     if _looks_like_report_creation_request(stripped, lowered):
+        if not resolved.required_link_present:
+            return SupervisorIntakeDecision(
+                intent_type="research_input_resolution",
+                action="ask_for_source_link",
+                output_mode="supervisor_reply",
+                needs_research_room=False,
+                confidence=0.88,
+                rationale="The client explicitly requested a project dossier, but no source link was provided for Identity Gate.",
+                next_step="Ask for at least one official/X/GitHub/article/explorer link before opening a Research Room.",
+                supervisor_authority=authority,
+                resolved_input=resolved.to_dict(),
+                requires_source_link=True,
+            )
         return SupervisorIntakeDecision(
             intent_type="research_request",
             action="open_research_room",
             output_mode="research_dossier",
             needs_research_room=True,
-            confidence=0.84,
-            rationale="The client explicitly asked JIMMORIA to create a report or dossier.",
-            next_step="Open a full Research Room and assign specialist agents.",
+            confidence=0.86,
+            rationale="The client explicitly asked JIMMORIA to create a report or dossier and supplied at least one source link.",
+            next_step="Open a full Research Room, run Identity Gate first, and assign specialist agents.",
             supervisor_authority=authority,
+            resolved_input=resolved.to_dict(),
         )
 
     if _looks_like_report_retrieval_request(stripped, lowered):
@@ -250,15 +276,29 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
         )
 
     if has_research or has_explicit_research_action:
+        if not resolved.required_link_present:
+            return SupervisorIntakeDecision(
+                intent_type="research_input_resolution",
+                action="ask_for_source_link",
+                output_mode="supervisor_reply",
+                needs_research_room=False,
+                confidence=0.82,
+                rationale="The client asked for research-like work, but no source link was provided for Identity Gate.",
+                next_step="Ask for at least one link and a clear report/dossier instruction before dispatching agents.",
+                supervisor_authority=authority,
+                resolved_input=resolved.to_dict(),
+                requires_source_link=True,
+            )
         return SupervisorIntakeDecision(
             intent_type="research_request",
             action="ask_report_confirmation",
             output_mode="supervisor_reply",
             needs_research_room=False,
             confidence=0.78,
-            rationale="The client asked for research-like work but did not explicitly request a report or dossier.",
+            rationale="The client asked for research-like work and supplied source context, but did not explicitly request a report or dossier.",
             next_step="Keep the room closed and ask for a report-writing instruction before dispatching agents.",
             supervisor_authority=authority,
+            resolved_input=resolved.to_dict(),
         )
 
     return SupervisorIntakeDecision(

@@ -1,0 +1,1538 @@
+{
+  "hooks": {
+    "address_format_check": {
+      "description": "Address format check guardrail for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": true
+    },
+    "airdrop_no_promise_guard": {
+      "description": "Airdrop no promise guardrail for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": true
+    },
+    "archive_source_snapshot": {
+      "description": "Archive source snapshot normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "audit_log_write": {
+      "description": "Audit log write normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "avoid_shallow_tags": {
+      "description": "Avoid shallow tags normalization/action hook for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": false
+    },
+    "build_social_search_plan": {
+      "description": "Build social search plan normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "candidate_not_final_judgment": {
+      "description": "Candidate not final judgment normalization/action hook for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": false
+    },
+    "candidate_origin_required": {
+      "description": "Candidate origin required guardrail for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": true
+    },
+    "chainid_resolver": {
+      "description": "Chainid resolver normalization/action hook for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": false
+    },
+    "claim_evidence_check": {
+      "description": "Claim evidence check guardrail for after_tool_call, quality_gate events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed",
+        "quality_gate"
+      ],
+      "priority": 30,
+      "guardrail": true
+    },
+    "classify_client_intent": {
+      "description": "Classify client intent normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "classify_product_stage": {
+      "description": "Classify product stage normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "classify_source_backing": {
+      "description": "Classify source backing normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "client_report_shape": {
+      "description": "Client report shape normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "confirm_room_needed": {
+      "description": "Confirm room needed normalization/action hook for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": false
+    },
+    "connector_health_check": {
+      "description": "Connector health check guardrail for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": true
+    },
+    "create_backlinks": {
+      "description": "Create backlinks normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "cursor_attach": {
+      "description": "Cursor attach normalization/action hook for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": false
+    },
+    "decide_seed_or_candidate_mode": {
+      "description": "Decide seed or candidate mode normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "dedupe_candidates": {
+      "description": "Dedupe candidates normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "dedupe_memory_hits": {
+      "description": "Dedupe memory hits normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "dedupe_narrative_sources": {
+      "description": "Dedupe narrative sources normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "dedupe_note_paths": {
+      "description": "Dedupe note paths normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "dedupe_source": {
+      "description": "Dedupe source normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "dedupe_source_appendix": {
+      "description": "Dedupe source appendix normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "dispatch_specialist_verification": {
+      "description": "Dispatch specialist verification normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "entity_relation_writer": {
+      "description": "Entity relation writer normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "extract_evidence_urls": {
+      "description": "Extract evidence urls normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "extract_handles": {
+      "description": "Extract handles normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "extract_investors": {
+      "description": "Extract investors normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "extract_product_mechanics": {
+      "description": "Extract product mechanics normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "fetch_prior_narrative_memory": {
+      "description": "Fetch prior narrative memory normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "final_report_path_required": {
+      "description": "Final report path required guardrail for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": true
+    },
+    "funding_query_builder": {
+      "description": "Funding query builder normalization/action hook for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": false
+    },
+    "funding_source_reputation_check": {
+      "description": "Funding source reputation check guardrail for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": true
+    },
+    "github_generic_link_filter": {
+      "description": "Github generic link filter normalization/action hook for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": false
+    },
+    "github_rate_limit_check": {
+      "description": "Github rate limit check guardrail for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": true
+    },
+    "handoff_entities_to_narrative": {
+      "description": "Handoff entities to narrative normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "handoff_plan_to_research_room": {
+      "description": "Handoff plan to research room normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "handoff_product_mechanics_to_report": {
+      "description": "Handoff product mechanics to report normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "handoff_social_seed_to_discovery": {
+      "description": "Handoff social seed to discovery normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "handoff_to_discovery_and_report": {
+      "description": "Handoff to discovery and report normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "handoff_token_status_to_report": {
+      "description": "Handoff token status to report normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "handoff_token_thesis_to_report": {
+      "description": "Handoff token thesis to report normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "identity_gate_required": {
+      "description": "Identity gate required guardrail for before_run, quality_gate events.",
+      "events": [
+        "before_run",
+        "agent:start",
+        "quality_gate"
+      ],
+      "priority": 10,
+      "guardrail": true
+    },
+    "investment_advice_guard": {
+      "description": "Investment advice guardrail for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": true
+    },
+    "korean_first_output": {
+      "description": "Korean first output normalization/action hook for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": false
+    },
+    "label_social_confidence": {
+      "description": "Label social confidence normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "live_vs_roadmap_required": {
+      "description": "Live vs roadmap required guardrail for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": true
+    },
+    "load_article_ingestion_skill": {
+      "description": "Load article ingestion skill normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "load_company_context": {
+      "description": "Load company context normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "load_early_discovery_skill": {
+      "description": "Load early discovery skill normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "load_evidence_quality_gate": {
+      "description": "Load evidence quality gate normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "load_existing_projects": {
+      "description": "Load existing projects normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "load_identity_gate": {
+      "description": "Load identity gate normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "load_market_signal_intake": {
+      "description": "Load market signal intake normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "load_monitor_sources": {
+      "description": "Load monitor sources normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "load_narrative_mapping_skill": {
+      "description": "Load narrative mapping skill normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "load_obsidian_sync_skill": {
+      "description": "Load obsidian sync skill normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "load_product_tech_skill": {
+      "description": "Load product tech skill normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "load_project_research_playbook": {
+      "description": "Load project research playbook normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "load_report_synthesis_skill": {
+      "description": "Load report synthesis skill normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "load_signal_queue": {
+      "description": "Load signal queue normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "load_social_signal_skill": {
+      "description": "Load social signal skill normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "load_token_value_capture_skill": {
+      "description": "Load token value capture skill normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "load_tool_policy_guardrail": {
+      "description": "Load tool policy guardrail guardrail for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": true
+    },
+    "load_watchlist": {
+      "description": "Load watchlist normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "markdown_sanitize": {
+      "description": "Markdown sanitize normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "match_official_docs_address": {
+      "description": "Match official docs address normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "memory_scope_guard": {
+      "description": "Memory scope guardrail for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": true
+    },
+    "merge_duplicate_signals": {
+      "description": "Merge duplicate signals normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "missing_section_check": {
+      "description": "Missing section check guardrail for before_report events.",
+      "events": [
+        "before_report",
+        "report:before_render"
+      ],
+      "priority": 50,
+      "guardrail": true
+    },
+    "no_agent_log_in_final": {
+      "description": "No agent log in final guardrail for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": true
+    },
+    "no_airdrop_promise": {
+      "description": "No airdrop promise guardrail for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": true
+    },
+    "no_claim_invention": {
+      "description": "No claim invention guardrail for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": true
+    },
+    "no_contract_guessing": {
+      "description": "No contract guessing guardrail for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": true
+    },
+    "no_final_judgment": {
+      "description": "No final judgment guardrail for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": true
+    },
+    "no_hardcoded_project_profile_check": {
+      "description": "No hardcoded project profile check guardrail for before_report events.",
+      "events": [
+        "before_report",
+        "report:before_render"
+      ],
+      "priority": 50,
+      "guardrail": true
+    },
+    "no_hype_as_fact": {
+      "description": "No hype as fact guardrail for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": true
+    },
+    "no_memory_overclaim": {
+      "description": "No memory overclaim guardrail for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": true
+    },
+    "no_new_research_claims": {
+      "description": "No new research claims guardrail for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": true
+    },
+    "no_secret_leak": {
+      "description": "No secret leak guardrail for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": true
+    },
+    "normalize_chain_evidence": {
+      "description": "Normalize chain evidence normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "normalize_docs_crawl": {
+      "description": "Normalize docs crawl normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "normalize_funding_sources": {
+      "description": "Normalize funding sources normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "normalize_github_repo": {
+      "description": "Normalize github repo normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "normalize_market_signal": {
+      "description": "Normalize market signal normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "normalize_signal_source": {
+      "description": "Normalize signal source normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "normalize_source_metadata": {
+      "description": "Normalize source metadata normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "normalize_value_capture_claims": {
+      "description": "Normalize value capture claims normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "normalize_website_crawl": {
+      "description": "Normalize website crawl normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "normalize_who_said_what": {
+      "description": "Normalize who said what normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "normalize_x_posts": {
+      "description": "Normalize x posts normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "notify_supervisor_if_urgent": {
+      "description": "Notify supervisor if urgent normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "official_contract_or_unknown": {
+      "description": "Official contract or unknown normalization/action hook for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": false
+    },
+    "official_handle_or_unknown": {
+      "description": "Official handle or unknown normalization/action hook for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": false
+    },
+    "official_site_docs_priority": {
+      "description": "Official site docs priority normalization/action hook for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": false
+    },
+    "official_source_priority": {
+      "description": "Official source priority normalization/action hook for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": false
+    },
+    "persist_supervisor_decision": {
+      "description": "Persist supervisor decision normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "pii_redact": {
+      "description": "Pii redact normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "prepare_who_said_what_schema": {
+      "description": "Prepare who said what schema normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "product_claim_requires_source": {
+      "description": "Product claim requires source normalization/action hook for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": false
+    },
+    "public_web_fallback_if_no_x_token": {
+      "description": "Public web fallback if no x token normalization/action hook for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": false
+    },
+    "public_web_only_scope": {
+      "description": "Public web only scope normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "push_signal_queue": {
+      "description": "Push signal queue normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "query_builder": {
+      "description": "Query builder normalization/action hook for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": false
+    },
+    "query_expansion_for_kol_terms": {
+      "description": "Query expansion for kol terms normalization/action hook for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": false
+    },
+    "query_normalization": {
+      "description": "Query normalization normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "rank_memory_relevance": {
+      "description": "Rank memory relevance normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "rank_search_results": {
+      "description": "Rank search results normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "read_only_boundary": {
+      "description": "Read only boundary normalization/action hook for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": false
+    },
+    "read_only_chain_guard": {
+      "description": "Read only chain guardrail for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": true
+    },
+    "read_only_repo_guard": {
+      "description": "Read only repo guardrail for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": true
+    },
+    "record_orchestration_action": {
+      "description": "Record orchestration action normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "redact_sensitive_inputs": {
+      "description": "Redact sensitive inputs normalization/action hook for before_tool_call, after_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start",
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 20,
+      "guardrail": false
+    },
+    "reject_generic_platform_links": {
+      "description": "Reject generic platform links normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "report_quality_score": {
+      "description": "Report quality score normalization/action hook for after_report events.",
+      "events": [
+        "after_report",
+        "report:after_render"
+      ],
+      "priority": 60,
+      "guardrail": false
+    },
+    "request_supervisor_final_review": {
+      "description": "Request supervisor final review normalization/action hook for after_report events.",
+      "events": [
+        "after_report",
+        "report:after_render"
+      ],
+      "priority": 60,
+      "guardrail": false
+    },
+    "require_thesis_reason": {
+      "description": "Require thesis reason normalization/action hook for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": false
+    },
+    "retrieval_permission_check": {
+      "description": "Retrieval permission check guardrail for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": true
+    },
+    "retrieve_related_memory": {
+      "description": "Retrieve related memory normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "route_to_archive_watchlist_or_supervisor": {
+      "description": "Route to archive watchlist or supervisor normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "schedule_window_check": {
+      "description": "Schedule window check guardrail for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": true
+    },
+    "score_narrative_fit": {
+      "description": "Score narrative fit normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "search_query_scope_check": {
+      "description": "Search query scope check guardrail for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": true
+    },
+    "secret_scan": {
+      "description": "Secret scan normalization/action hook for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": false
+    },
+    "seed_previous_report_context": {
+      "description": "Seed previous report context normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "select_best_official_site": {
+      "description": "Select best official site normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "separate_confirmed_hint_unknown": {
+      "description": "Separate confirmed hint unknown normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "signal_dedupe": {
+      "description": "Signal dedupe normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "signal_url_required": {
+      "description": "Signal url required guardrail for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": true
+    },
+    "source_citation_check": {
+      "description": "Source citation check guardrail for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": true
+    },
+    "source_id_or_report_path_required": {
+      "description": "Source id or report path required guardrail for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": true
+    },
+    "source_id_required": {
+      "description": "Source id required guardrail for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": true
+    },
+    "source_links_preserved": {
+      "description": "Source links preserved normalization/action hook for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": false
+    },
+    "source_quality_filter": {
+      "description": "Source quality filter normalization/action hook for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": false
+    },
+    "source_relevance_filter": {
+      "description": "Source relevance filter normalization/action hook for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": false
+    },
+    "source_reliability_filter": {
+      "description": "Source reliability filter normalization/action hook for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": false
+    },
+    "source_rights_check": {
+      "description": "Source rights check guardrail for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": true
+    },
+    "source_safety_check": {
+      "description": "Source safety check guardrail for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": true
+    },
+    "source_scope_check": {
+      "description": "Source scope check guardrail for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": true
+    },
+    "suggested_action_required": {
+      "description": "Suggested action required guardrail for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": true
+    },
+    "ticker_collision_checked": {
+      "description": "Ticker collision checked normalization/action hook for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": false
+    },
+    "ticker_collision_guard": {
+      "description": "Ticker collision guardrail for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": true
+    },
+    "token_claim_scope_check": {
+      "description": "Token claim scope check guardrail for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": true
+    },
+    "update_kol_db": {
+      "description": "Update kol db normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "update_last_seen_cursor": {
+      "description": "Update last seen cursor normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "update_task_status": {
+      "description": "Update task status normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "update_watchlist": {
+      "description": "Update watchlist normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "url_relevance_check": {
+      "description": "Url relevance check guardrail for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": true
+    },
+    "url_safety_check": {
+      "description": "Url safety check guardrail for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": true
+    },
+    "validate_frontmatter": {
+      "description": "Validate frontmatter normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "vault_path_safety_check": {
+      "description": "Vault path safety check guardrail for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": true
+    },
+    "verify_specialist_assignment": {
+      "description": "Verify specialist assignment normalization/action hook for quality_gate events.",
+      "events": [
+        "quality_gate"
+      ],
+      "priority": 40,
+      "guardrail": false
+    },
+    "write_contract_source_ids": {
+      "description": "Write contract source ids normalization/action hook for after_tool_call events.",
+      "events": [
+        "after_tool_call",
+        "tool:done",
+        "tool:failed"
+      ],
+      "priority": 30,
+      "guardrail": false
+    },
+    "write_evidence_packet": {
+      "description": "Write evidence packet normalization/action hook for after_report, after_run events.",
+      "events": [
+        "after_report",
+        "report:after_render",
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 60,
+      "guardrail": false
+    },
+    "write_funding_token_finding": {
+      "description": "Write funding token finding normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "write_market_signal_intake_or_social_finding": {
+      "description": "Write market signal intake or social finding normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "write_narrative_map": {
+      "description": "Write narrative map normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "write_onchain_finding": {
+      "description": "Write onchain finding normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "write_policy_decision": {
+      "description": "Write policy decision normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "write_product_finding": {
+      "description": "Write product finding normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "write_report_artifact": {
+      "description": "Write report artifact normalization/action hook for after_report events.",
+      "events": [
+        "after_report",
+        "report:after_render"
+      ],
+      "priority": 60,
+      "guardrail": false
+    },
+    "write_retrieval_finding": {
+      "description": "Write retrieval finding normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "write_source_record": {
+      "description": "Write source record normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "write_triaged_signal": {
+      "description": "Write triaged signal normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "write_vault_sync_summary": {
+      "description": "Write vault sync summary normalization/action hook for after_run events.",
+      "events": [
+        "after_run",
+        "agent:end"
+      ],
+      "priority": 70,
+      "guardrail": false
+    },
+    "x_public_source_guard": {
+      "description": "X public source guardrail for before_tool_call events.",
+      "events": [
+        "before_tool_call",
+        "tool:start"
+      ],
+      "priority": 20,
+      "guardrail": true
+    }
+  }
+}

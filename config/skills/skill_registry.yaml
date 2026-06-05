@@ -2,27 +2,2258 @@
   "skills": {
     "market_signal_intake_skill": {
       "owner": "social_kol_agent",
-      "steps": ["build_x_and_public_web_queries", "search_live_x_if_available", "search_public_web_fallback", "extract_official_handles", "build_who_said_what_rows", "write_market_signal_finding"]
+      "steps": [
+        "build_x_and_public_web_queries",
+        "search_live_x_if_available",
+        "search_public_web_fallback",
+        "extract_official_handles",
+        "build_who_said_what_rows",
+        "write_market_signal_finding"
+      ],
+      "owner_agents": [
+        "social_kol_agent"
+      ],
+      "purpose": "Market signal intake sub-skill for social_kol_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ]
     },
     "candidate_social_verification_skill": {
       "owner": "social_kol_agent",
-      "steps": ["read_candidate_context", "check_official_account", "collect_recent_posts", "cluster_kol_opinions", "write_social_verification_finding"]
+      "steps": [
+        "read_candidate_context",
+        "check_official_account",
+        "collect_recent_posts",
+        "cluster_kol_opinions",
+        "write_social_verification_finding"
+      ],
+      "owner_agents": [
+        "social_kol_agent"
+      ],
+      "purpose": "Candidate social verification sub-skill for social_kol_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ]
     },
     "candidate_discovery_skill": {
       "owner": "discovery_agent",
-      "steps": ["read_narrative_and_market_signal", "search_web_github_market", "resolve_project_identity", "select_official_site", "create_candidate_record", "request_specialist_checks"]
+      "steps": [
+        "read_narrative_and_market_signal",
+        "search_web_github_market",
+        "resolve_project_identity",
+        "select_official_site",
+        "create_candidate_record",
+        "request_specialist_checks"
+      ],
+      "owner_agents": [
+        "discovery_agent"
+      ],
+      "purpose": "Candidate discovery sub-skill for discovery_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ]
     },
     "contract_token_info_skill": {
       "owner": "contract_onchain_agent",
-      "steps": ["resolve_chain", "read_official_address_registry", "lookup_explorer", "search_dex_pairs", "classify_token_status", "write_contract_info"]
+      "steps": [
+        "resolve_chain",
+        "read_official_address_registry",
+        "lookup_explorer",
+        "search_dex_pairs",
+        "classify_token_status",
+        "write_contract_info"
+      ],
+      "owner_agents": [
+        "contract_onchain_agent"
+      ],
+      "purpose": "Contract token info sub-skill for contract_onchain_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ]
     },
     "project_dossier_render_skill": {
       "owner": "report_agent",
-      "steps": ["merge_agent_findings", "build_quick_card", "build_claim_ledger", "render_dossier", "render_unclear_points", "compile_sources"]
+      "steps": [
+        "merge_agent_findings",
+        "build_quick_card",
+        "build_claim_ledger",
+        "render_dossier",
+        "render_unclear_points",
+        "compile_sources"
+      ],
+      "owner_agents": [
+        "report_agent"
+      ],
+      "purpose": "Project dossier render sub-skill for report_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ]
     },
     "signal_dedup_skill": {
       "owner": "signal_triage_agent",
-      "steps": ["load_signal_queue", "merge_duplicate_signals", "rank_priority", "route_archive_watchlist_or_supervisor"]
+      "steps": [
+        "load_signal_queue",
+        "merge_duplicate_signals",
+        "rank_priority",
+        "route_archive_watchlist_or_supervisor"
+      ],
+      "owner_agents": [
+        "signal_triage_agent"
+      ],
+      "purpose": "Signal dedup sub-skill for signal_triage_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ]
+    },
+    "agent_council_skill": {
+      "owner": "supervisor_agent",
+      "owner_agents": [
+        "supervisor_agent"
+      ],
+      "purpose": "Agent council sub-skill for supervisor_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_agent_council_context",
+        "execute_agent_council_workflow",
+        "record_agent_council_evidence",
+        "handoff_agent_council_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "agent_findings_merge_skill": {
+      "owner": "report_agent",
+      "owner_agents": [
+        "report_agent"
+      ],
+      "purpose": "Agent findings merge sub-skill for report_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_agent_findings_merge_context",
+        "execute_agent_findings_merge_workflow",
+        "record_agent_findings_merge_evidence",
+        "handoff_agent_findings_merge_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "app_surface_check_skill": {
+      "owner": "product_tech_agent",
+      "owner_agents": [
+        "product_tech_agent"
+      ],
+      "purpose": "App surface check sub-skill for product_tech_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_app_surface_check_context",
+        "execute_app_surface_check_workflow",
+        "record_app_surface_check_evidence",
+        "handoff_app_surface_check_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "audit_log_skill": {
+      "owner": "tool_policy_agent",
+      "owner_agents": [
+        "tool_policy_agent"
+      ],
+      "purpose": "Audit log sub-skill for tool_policy_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_audit_log_context",
+        "execute_audit_log_workflow",
+        "record_audit_log_evidence",
+        "handoff_audit_log_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "candidate_scoring_skill": {
+      "owner": "discovery_agent",
+      "owner_agents": [
+        "discovery_agent"
+      ],
+      "purpose": "Candidate scoring sub-skill for discovery_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_candidate_scoring_context",
+        "execute_candidate_scoring_workflow",
+        "record_candidate_scoring_evidence",
+        "handoff_candidate_scoring_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "canonical_source_dedupe_skill": {
+      "owner": "ingestion_agent",
+      "owner_agents": [
+        "ingestion_agent"
+      ],
+      "purpose": "Canonical source dedupe sub-skill for ingestion_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_canonical_source_dedupe_context",
+        "execute_canonical_source_dedupe_workflow",
+        "record_canonical_source_dedupe_evidence",
+        "handoff_canonical_source_dedupe_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "claim_extraction_skill": {
+      "owner": "ingestion_agent",
+      "owner_agents": [
+        "ingestion_agent"
+      ],
+      "purpose": "Claim extraction sub-skill for ingestion_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_claim_extraction_context",
+        "execute_claim_extraction_workflow",
+        "record_claim_extraction_evidence",
+        "handoff_claim_extraction_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "claim_ledger_compilation_skill": {
+      "owner": "report_agent",
+      "owner_agents": [
+        "report_agent"
+      ],
+      "purpose": "Claim ledger compilation sub-skill for report_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_claim_ledger_compilation_context",
+        "execute_claim_ledger_compilation_workflow",
+        "record_claim_ledger_compilation_evidence",
+        "handoff_claim_ledger_compilation_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "community_signal_summary_skill": {
+      "owner": "social_kol_agent",
+      "owner_agents": [
+        "social_kol_agent"
+      ],
+      "purpose": "Community signal summary sub-skill for social_kol_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_community_signal_summary_context",
+        "execute_community_signal_summary_workflow",
+        "record_community_signal_summary_evidence",
+        "handoff_community_signal_summary_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "contract_source_match_skill": {
+      "owner": "contract_onchain_agent",
+      "owner_agents": [
+        "contract_onchain_agent"
+      ],
+      "purpose": "Contract source match sub-skill for contract_onchain_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_contract_source_match_context",
+        "execute_contract_source_match_workflow",
+        "record_contract_source_match_evidence",
+        "handoff_contract_source_match_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "controversy_or_counter_thesis_skill": {
+      "owner": "social_kol_agent",
+      "owner_agents": [
+        "social_kol_agent"
+      ],
+      "purpose": "Controversy or counter thesis sub-skill for social_kol_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_controversy_or_counter_thesis_context",
+        "execute_controversy_or_counter_thesis_workflow",
+        "record_controversy_or_counter_thesis_evidence",
+        "handoff_controversy_or_counter_thesis_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "credential_protection_skill": {
+      "owner": "tool_policy_agent",
+      "owner_agents": [
+        "tool_policy_agent"
+      ],
+      "purpose": "Credential protection sub-skill for tool_policy_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_credential_protection_context",
+        "execute_credential_protection_workflow",
+        "record_credential_protection_evidence",
+        "handoff_credential_protection_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "daily_radar_candidate_skill": {
+      "owner": "signal_triage_agent",
+      "owner_agents": [
+        "signal_triage_agent"
+      ],
+      "purpose": "Daily radar candidate sub-skill for signal_triage_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_daily_radar_candidate_context",
+        "execute_daily_radar_candidate_workflow",
+        "record_daily_radar_candidate_evidence",
+        "handoff_daily_radar_candidate_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "dex_pair_lookup_skill": {
+      "owner": "contract_onchain_agent",
+      "owner_agents": [
+        "contract_onchain_agent"
+      ],
+      "purpose": "Dex pair lookup sub-skill for contract_onchain_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_dex_pair_lookup_context",
+        "execute_dex_pair_lookup_workflow",
+        "record_dex_pair_lookup_evidence",
+        "handoff_dex_pair_lookup_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "dex_pair_monitoring_skill": {
+      "owner": "monitor_24h_agent",
+      "owner_agents": [
+        "monitor_24h_agent"
+      ],
+      "purpose": "Dex pair monitoring sub-skill for monitor_24h_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_dex_pair_monitoring_context",
+        "execute_dex_pair_monitoring_workflow",
+        "record_dex_pair_monitoring_evidence",
+        "handoff_dex_pair_monitoring_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "docs_change_monitoring_skill": {
+      "owner": "monitor_24h_agent",
+      "owner_agents": [
+        "monitor_24h_agent"
+      ],
+      "purpose": "Docs change monitoring sub-skill for monitor_24h_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_docs_change_monitoring_context",
+        "execute_docs_change_monitoring_workflow",
+        "record_docs_change_monitoring_evidence",
+        "handoff_docs_change_monitoring_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "docs_crawl_skill": {
+      "owner": "product_tech_agent",
+      "owner_agents": [
+        "product_tech_agent"
+      ],
+      "purpose": "Docs crawl sub-skill for product_tech_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_docs_crawl_context",
+        "execute_docs_crawl_workflow",
+        "record_docs_crawl_evidence",
+        "handoff_docs_crawl_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "duplicate_detection_skill": {
+      "owner": "memory_retrieval_agent",
+      "owner_agents": [
+        "memory_retrieval_agent"
+      ],
+      "purpose": "Duplicate detection sub-skill for memory_retrieval_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_duplicate_detection_context",
+        "execute_duplicate_detection_workflow",
+        "record_duplicate_detection_evidence",
+        "handoff_duplicate_detection_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "duplicate_note_merge_skill": {
+      "owner": "obsidian_curator_agent",
+      "owner_agents": [
+        "obsidian_curator_agent"
+      ],
+      "purpose": "Duplicate note merge sub-skill for obsidian_curator_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_duplicate_note_merge_context",
+        "execute_duplicate_note_merge_workflow",
+        "record_duplicate_note_merge_evidence",
+        "handoff_duplicate_note_merge_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "entity_extraction_skill": {
+      "owner": "ingestion_agent",
+      "owner_agents": [
+        "ingestion_agent"
+      ],
+      "purpose": "Entity extraction sub-skill for ingestion_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_entity_extraction_context",
+        "execute_entity_extraction_workflow",
+        "record_entity_extraction_evidence",
+        "handoff_entity_extraction_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "entity_graph_linking_skill": {
+      "owner": "memory_retrieval_agent",
+      "owner_agents": [
+        "memory_retrieval_agent",
+        "narrative_agent"
+      ],
+      "purpose": "Entity graph linking sub-skill for memory_retrieval_agent, narrative_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_entity_graph_linking_context",
+        "execute_entity_graph_linking_workflow",
+        "record_entity_graph_linking_evidence",
+        "handoff_entity_graph_linking_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "evidence_packet_skill": {
+      "owner": "report_agent",
+      "owner_agents": [
+        "report_agent"
+      ],
+      "purpose": "Evidence packet sub-skill for report_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_evidence_packet_context",
+        "execute_evidence_packet_workflow",
+        "record_evidence_packet_evidence",
+        "handoff_evidence_packet_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "evidence_url_collection_skill": {
+      "owner": "discovery_agent",
+      "owner_agents": [
+        "discovery_agent"
+      ],
+      "purpose": "Evidence url collection sub-skill for discovery_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_evidence_url_collection_context",
+        "execute_evidence_url_collection_workflow",
+        "record_evidence_url_collection_evidence",
+        "handoff_evidence_url_collection_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "explorer_identity_check_skill": {
+      "owner": "contract_onchain_agent",
+      "owner_agents": [
+        "contract_onchain_agent"
+      ],
+      "purpose": "Explorer identity check sub-skill for contract_onchain_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_explorer_identity_check_context",
+        "execute_explorer_identity_check_workflow",
+        "record_explorer_identity_check_evidence",
+        "handoff_explorer_identity_check_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "final_review_skill": {
+      "owner": "supervisor_agent",
+      "owner_agents": [
+        "supervisor_agent"
+      ],
+      "purpose": "Final review sub-skill for supervisor_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_final_review_context",
+        "execute_final_review_workflow",
+        "record_final_review_evidence",
+        "handoff_final_review_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "frontmatter_update_skill": {
+      "owner": "obsidian_curator_agent",
+      "owner_agents": [
+        "obsidian_curator_agent"
+      ],
+      "purpose": "Frontmatter update sub-skill for obsidian_curator_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_frontmatter_update_context",
+        "execute_frontmatter_update_workflow",
+        "record_frontmatter_update_evidence",
+        "handoff_frontmatter_update_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "funding_profile_skill": {
+      "owner": "funding_token_agent",
+      "owner_agents": [
+        "funding_token_agent"
+      ],
+      "purpose": "Funding profile sub-skill for funding_token_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_funding_profile_context",
+        "execute_funding_profile_workflow",
+        "record_funding_profile_evidence",
+        "handoff_funding_profile_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "github_activity_monitoring_skill": {
+      "owner": "monitor_24h_agent",
+      "owner_agents": [
+        "monitor_24h_agent"
+      ],
+      "purpose": "Github activity monitoring sub-skill for monitor_24h_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_github_activity_monitoring_context",
+        "execute_github_activity_monitoring_workflow",
+        "record_github_activity_monitoring_evidence",
+        "handoff_github_activity_monitoring_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "github_activity_skill": {
+      "owner": "product_tech_agent",
+      "owner_agents": [
+        "product_tech_agent"
+      ],
+      "purpose": "Github activity sub-skill for product_tech_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_github_activity_context",
+        "execute_github_activity_workflow",
+        "record_github_activity_evidence",
+        "handoff_github_activity_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "github_repo_resolution_skill": {
+      "owner": "product_tech_agent",
+      "owner_agents": [
+        "product_tech_agent"
+      ],
+      "purpose": "Github repo resolution sub-skill for product_tech_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_github_repo_resolution_context",
+        "execute_github_repo_resolution_workflow",
+        "record_github_repo_resolution_evidence",
+        "handoff_github_repo_resolution_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "intake_classification_skill": {
+      "owner": "supervisor_agent",
+      "owner_agents": [
+        "supervisor_agent"
+      ],
+      "purpose": "Intake classification sub-skill for supervisor_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_intake_classification_context",
+        "execute_intake_classification_workflow",
+        "record_intake_classification_evidence",
+        "handoff_intake_classification_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "investor_extraction_skill": {
+      "owner": "funding_token_agent",
+      "owner_agents": [
+        "funding_token_agent"
+      ],
+      "purpose": "Investor extraction sub-skill for funding_token_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_investor_extraction_context",
+        "execute_investor_extraction_workflow",
+        "record_investor_extraction_evidence",
+        "handoff_investor_extraction_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "kol_opinion_clustering_skill": {
+      "owner": "social_kol_agent",
+      "owner_agents": [
+        "social_kol_agent"
+      ],
+      "purpose": "Kol opinion clustering sub-skill for social_kol_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_kol_opinion_clustering_context",
+        "execute_kol_opinion_clustering_workflow",
+        "record_kol_opinion_clustering_evidence",
+        "handoff_kol_opinion_clustering_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "launch_or_tge_signal_skill": {
+      "owner": "funding_token_agent",
+      "owner_agents": [
+        "funding_token_agent"
+      ],
+      "purpose": "Launch or tge signal sub-skill for funding_token_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_launch_or_tge_signal_context",
+        "execute_launch_or_tge_signal_workflow",
+        "record_launch_or_tge_signal_evidence",
+        "handoff_launch_or_tge_signal_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "market_metadata_collision_check_skill": {
+      "owner": "discovery_agent",
+      "owner_agents": [
+        "discovery_agent"
+      ],
+      "purpose": "Market metadata collision check sub-skill for discovery_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_market_metadata_collision_check_context",
+        "execute_market_metadata_collision_check_workflow",
+        "record_market_metadata_collision_check_evidence",
+        "handoff_market_metadata_collision_check_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "mention_trend_skill": {
+      "owner": "social_kol_agent",
+      "owner_agents": [
+        "social_kol_agent"
+      ],
+      "purpose": "Mention trend sub-skill for social_kol_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_mention_trend_context",
+        "execute_mention_trend_workflow",
+        "record_mention_trend_evidence",
+        "handoff_mention_trend_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "metadata_extraction_skill": {
+      "owner": "ingestion_agent",
+      "owner_agents": [
+        "ingestion_agent"
+      ],
+      "purpose": "Metadata extraction sub-skill for ingestion_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_metadata_extraction_context",
+        "execute_metadata_extraction_workflow",
+        "record_metadata_extraction_evidence",
+        "handoff_metadata_extraction_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "missing_info_routing_skill": {
+      "owner": "supervisor_agent",
+      "owner_agents": [
+        "supervisor_agent"
+      ],
+      "purpose": "Missing info routing sub-skill for supervisor_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_missing_info_routing_context",
+        "execute_missing_info_routing_workflow",
+        "record_missing_info_routing_evidence",
+        "handoff_missing_info_routing_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "narrative_mapping_skill": {
+      "owner": "narrative_agent",
+      "owner_agents": [
+        "narrative_agent"
+      ],
+      "purpose": "Narrative mapping sub-skill for narrative_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_narrative_mapping_context",
+        "execute_narrative_mapping_workflow",
+        "record_narrative_mapping_evidence",
+        "handoff_narrative_mapping_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "narrative_timeline_update_skill": {
+      "owner": "narrative_agent",
+      "owner_agents": [
+        "narrative_agent"
+      ],
+      "purpose": "Narrative timeline update sub-skill for narrative_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_narrative_timeline_update_context",
+        "execute_narrative_timeline_update_workflow",
+        "record_narrative_timeline_update_evidence",
+        "handoff_narrative_timeline_update_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "obsidian_project_note_skill": {
+      "owner": "obsidian_curator_agent",
+      "owner_agents": [
+        "obsidian_curator_agent"
+      ],
+      "purpose": "Obsidian project note sub-skill for obsidian_curator_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_obsidian_project_note_context",
+        "execute_obsidian_project_note_workflow",
+        "record_obsidian_project_note_evidence",
+        "handoff_obsidian_project_note_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "obsidian_report_note_skill": {
+      "owner": "obsidian_curator_agent",
+      "owner_agents": [
+        "obsidian_curator_agent"
+      ],
+      "purpose": "Obsidian report note sub-skill for obsidian_curator_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_obsidian_report_note_context",
+        "execute_obsidian_report_note_workflow",
+        "record_obsidian_report_note_evidence",
+        "handoff_obsidian_report_note_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "obsidian_source_note_skill": {
+      "owner": "obsidian_curator_agent",
+      "owner_agents": [
+        "obsidian_curator_agent"
+      ],
+      "purpose": "Obsidian source note sub-skill for obsidian_curator_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_obsidian_source_note_context",
+        "execute_obsidian_source_note_workflow",
+        "record_obsidian_source_note_evidence",
+        "handoff_obsidian_source_note_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "official_account_check_skill": {
+      "owner": "social_kol_agent",
+      "owner_agents": [
+        "social_kol_agent"
+      ],
+      "purpose": "Official account check sub-skill for social_kol_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_official_account_check_context",
+        "execute_official_account_check_workflow",
+        "record_official_account_check_evidence",
+        "handoff_official_account_check_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "official_address_registry_skill": {
+      "owner": "contract_onchain_agent",
+      "owner_agents": [
+        "contract_onchain_agent"
+      ],
+      "purpose": "Official address registry sub-skill for contract_onchain_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_official_address_registry_context",
+        "execute_official_address_registry_workflow",
+        "record_official_address_registry_evidence",
+        "handoff_official_address_registry_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "official_site_selection_skill": {
+      "owner": "discovery_agent",
+      "owner_agents": [
+        "discovery_agent"
+      ],
+      "purpose": "Official site selection sub-skill for discovery_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_official_site_selection_context",
+        "execute_official_site_selection_workflow",
+        "record_official_site_selection_evidence",
+        "handoff_official_site_selection_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "official_social_handle_resolution_skill": {
+      "owner": "social_kol_agent",
+      "owner_agents": [
+        "social_kol_agent"
+      ],
+      "purpose": "Official social handle resolution sub-skill for social_kol_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_official_social_handle_resolution_context",
+        "execute_official_social_handle_resolution_workflow",
+        "record_official_social_handle_resolution_evidence",
+        "handoff_official_social_handle_resolution_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "output_mode_selection_skill": {
+      "owner": "supervisor_agent",
+      "owner_agents": [
+        "supervisor_agent"
+      ],
+      "purpose": "Output mode selection sub-skill for supervisor_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_output_mode_selection_context",
+        "execute_output_mode_selection_workflow",
+        "record_output_mode_selection_evidence",
+        "handoff_output_mode_selection_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "permission_enforcement_skill": {
+      "owner": "tool_policy_agent",
+      "owner_agents": [
+        "tool_policy_agent"
+      ],
+      "purpose": "Permission enforcement sub-skill for tool_policy_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_permission_enforcement_context",
+        "execute_permission_enforcement_workflow",
+        "record_permission_enforcement_evidence",
+        "handoff_permission_enforcement_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "points_airdrop_hint_skill": {
+      "owner": "funding_token_agent",
+      "owner_agents": [
+        "funding_token_agent"
+      ],
+      "purpose": "Points airdrop hint sub-skill for funding_token_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_points_airdrop_hint_context",
+        "execute_points_airdrop_hint_workflow",
+        "record_points_airdrop_hint_evidence",
+        "handoff_points_airdrop_hint_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "prior_report_lookup_skill": {
+      "owner": "memory_retrieval_agent",
+      "owner_agents": [
+        "memory_retrieval_agent"
+      ],
+      "purpose": "Prior report lookup sub-skill for memory_retrieval_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_prior_report_lookup_context",
+        "execute_prior_report_lookup_workflow",
+        "record_prior_report_lookup_evidence",
+        "handoff_prior_report_lookup_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "product_stage_classification_skill": {
+      "owner": "product_tech_agent",
+      "owner_agents": [
+        "product_tech_agent"
+      ],
+      "purpose": "Product stage classification sub-skill for product_tech_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_product_stage_classification_context",
+        "execute_product_stage_classification_workflow",
+        "record_product_stage_classification_evidence",
+        "handoff_product_stage_classification_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "project_guess_resolution_skill": {
+      "owner": "signal_triage_agent",
+      "owner_agents": [
+        "signal_triage_agent"
+      ],
+      "purpose": "Project guess resolution sub-skill for signal_triage_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_project_guess_resolution_context",
+        "execute_project_guess_resolution_workflow",
+        "record_project_guess_resolution_evidence",
+        "handoff_project_guess_resolution_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "project_identity_resolution_skill": {
+      "owner": "discovery_agent",
+      "owner_agents": [
+        "discovery_agent"
+      ],
+      "purpose": "Project identity resolution sub-skill for discovery_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_project_identity_resolution_context",
+        "execute_project_identity_resolution_workflow",
+        "record_project_identity_resolution_evidence",
+        "handoff_project_identity_resolution_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "quick_card_render_skill": {
+      "owner": "report_agent",
+      "owner_agents": [
+        "report_agent"
+      ],
+      "purpose": "Quick card render sub-skill for report_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_quick_card_render_context",
+        "execute_quick_card_render_workflow",
+        "record_quick_card_render_evidence",
+        "handoff_quick_card_render_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "rate_limit_guard_skill": {
+      "owner": "tool_policy_agent",
+      "owner_agents": [
+        "tool_policy_agent"
+      ],
+      "purpose": "Rate limit guard sub-skill for tool_policy_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_rate_limit_guard_context",
+        "execute_rate_limit_guard_workflow",
+        "record_rate_limit_guard_evidence",
+        "handoff_rate_limit_guard_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "raw_signal_collection_skill": {
+      "owner": "monitor_24h_agent",
+      "owner_agents": [
+        "monitor_24h_agent"
+      ],
+      "purpose": "Raw signal collection sub-skill for monitor_24h_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_raw_signal_collection_context",
+        "execute_raw_signal_collection_workflow",
+        "record_raw_signal_collection_evidence",
+        "handoff_raw_signal_collection_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "related_memory_search_skill": {
+      "owner": "memory_retrieval_agent",
+      "owner_agents": [
+        "memory_retrieval_agent",
+        "narrative_agent"
+      ],
+      "purpose": "Related memory search sub-skill for memory_retrieval_agent, narrative_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_related_memory_search_context",
+        "execute_related_memory_search_workflow",
+        "record_related_memory_search_evidence",
+        "handoff_related_memory_search_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "report_language_localization_skill": {
+      "owner": "report_agent",
+      "owner_agents": [
+        "report_agent"
+      ],
+      "purpose": "Report language localization sub-skill for report_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_report_language_localization_context",
+        "execute_report_language_localization_workflow",
+        "record_report_language_localization_evidence",
+        "handoff_report_language_localization_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "research_quality_briefing_skill": {
+      "owner": "supervisor_agent",
+      "owner_agents": [
+        "supervisor_agent"
+      ],
+      "purpose": "Research quality briefing sub-skill for supervisor_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_research_quality_briefing_context",
+        "execute_research_quality_briefing_workflow",
+        "record_research_quality_briefing_evidence",
+        "handoff_research_quality_briefing_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "research_room_planning_skill": {
+      "owner": "supervisor_agent",
+      "owner_agents": [
+        "supervisor_agent"
+      ],
+      "purpose": "Research room planning sub-skill for supervisor_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_research_room_planning_context",
+        "execute_research_room_planning_workflow",
+        "record_research_room_planning_evidence",
+        "handoff_research_room_planning_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "research_room_request_skill": {
+      "owner": "signal_triage_agent",
+      "owner_agents": [
+        "signal_triage_agent"
+      ],
+      "purpose": "Research room request sub-skill for signal_triage_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_research_room_request_context",
+        "execute_research_room_request_workflow",
+        "record_research_room_request_evidence",
+        "handoff_research_room_request_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "rootdata_profile_skill": {
+      "owner": "funding_token_agent",
+      "owner_agents": [
+        "funding_token_agent"
+      ],
+      "purpose": "Rootdata profile sub-skill for funding_token_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_rootdata_profile_context",
+        "execute_rootdata_profile_workflow",
+        "record_rootdata_profile_evidence",
+        "handoff_rootdata_profile_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "rss_monitoring_skill": {
+      "owner": "monitor_24h_agent",
+      "owner_agents": [
+        "monitor_24h_agent"
+      ],
+      "purpose": "Rss monitoring sub-skill for monitor_24h_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_rss_monitoring_context",
+        "execute_rss_monitoring_workflow",
+        "record_rss_monitoring_evidence",
+        "handoff_rss_monitoring_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "scheduled_market_monitoring_skill": {
+      "owner": "monitor_24h_agent",
+      "owner_agents": [
+        "monitor_24h_agent"
+      ],
+      "purpose": "Scheduled market monitoring sub-skill for monitor_24h_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_scheduled_market_monitoring_context",
+        "execute_scheduled_market_monitoring_workflow",
+        "record_scheduled_market_monitoring_evidence",
+        "handoff_scheduled_market_monitoring_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "score_breakdown_skill": {
+      "owner": "report_agent",
+      "owner_agents": [
+        "report_agent"
+      ],
+      "purpose": "Score breakdown sub-skill for report_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_score_breakdown_context",
+        "execute_score_breakdown_workflow",
+        "record_score_breakdown_evidence",
+        "handoff_score_breakdown_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "signal_priority_scoring_skill": {
+      "owner": "signal_triage_agent",
+      "owner_agents": [
+        "signal_triage_agent"
+      ],
+      "purpose": "Signal priority scoring sub-skill for signal_triage_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_signal_priority_scoring_context",
+        "execute_signal_priority_scoring_workflow",
+        "record_signal_priority_scoring_evidence",
+        "handoff_signal_priority_scoring_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "signal_queue_push_skill": {
+      "owner": "monitor_24h_agent",
+      "owner_agents": [
+        "monitor_24h_agent"
+      ],
+      "purpose": "Signal queue push sub-skill for monitor_24h_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_signal_queue_push_context",
+        "execute_signal_queue_push_workflow",
+        "record_signal_queue_push_evidence",
+        "handoff_signal_queue_push_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "similar_project_context_skill": {
+      "owner": "narrative_agent",
+      "owner_agents": [
+        "narrative_agent"
+      ],
+      "purpose": "Similar project context sub-skill for narrative_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_similar_project_context_context",
+        "execute_similar_project_context_workflow",
+        "record_similar_project_context_evidence",
+        "handoff_similar_project_context_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "similar_project_search_skill": {
+      "owner": "discovery_agent",
+      "owner_agents": [
+        "discovery_agent"
+      ],
+      "purpose": "Similar project search sub-skill for discovery_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_similar_project_search_context",
+        "execute_similar_project_search_workflow",
+        "record_similar_project_search_evidence",
+        "handoff_similar_project_search_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "source_appendix_skill": {
+      "owner": "report_agent",
+      "owner_agents": [
+        "report_agent"
+      ],
+      "purpose": "Source appendix sub-skill for report_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_source_appendix_context",
+        "execute_source_appendix_workflow",
+        "record_source_appendix_evidence",
+        "handoff_source_appendix_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "source_ingestion_skill": {
+      "owner": "ingestion_agent",
+      "owner_agents": [
+        "ingestion_agent"
+      ],
+      "purpose": "Source ingestion sub-skill for ingestion_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_source_ingestion_context",
+        "execute_source_ingestion_workflow",
+        "record_source_ingestion_evidence",
+        "handoff_source_ingestion_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "source_quality_scoring_skill": {
+      "owner": "ingestion_agent",
+      "owner_agents": [
+        "ingestion_agent"
+      ],
+      "purpose": "Source quality scoring sub-skill for ingestion_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_source_quality_scoring_context",
+        "execute_source_quality_scoring_workflow",
+        "record_source_quality_scoring_evidence",
+        "handoff_source_quality_scoring_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "source_snapshot_skill": {
+      "owner": "ingestion_agent",
+      "owner_agents": [
+        "ingestion_agent"
+      ],
+      "purpose": "Source snapshot sub-skill for ingestion_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_source_snapshot_context",
+        "execute_source_snapshot_workflow",
+        "record_source_snapshot_evidence",
+        "handoff_source_snapshot_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "source_worker_dispatch_skill": {
+      "owner": "monitor_24h_agent",
+      "owner_agents": [
+        "monitor_24h_agent"
+      ],
+      "purpose": "Source worker dispatch sub-skill for monitor_24h_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_source_worker_dispatch_context",
+        "execute_source_worker_dispatch_workflow",
+        "record_source_worker_dispatch_evidence",
+        "handoff_source_worker_dispatch_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "suggested_action_routing_skill": {
+      "owner": "signal_triage_agent",
+      "owner_agents": [
+        "signal_triage_agent"
+      ],
+      "purpose": "Suggested action routing sub-skill for signal_triage_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_suggested_action_routing_context",
+        "execute_suggested_action_routing_workflow",
+        "record_suggested_action_routing_evidence",
+        "handoff_suggested_action_routing_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "task_delegation_skill": {
+      "owner": "supervisor_agent",
+      "owner_agents": [
+        "supervisor_agent"
+      ],
+      "purpose": "Task delegation sub-skill for supervisor_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_task_delegation_context",
+        "execute_task_delegation_workflow",
+        "record_task_delegation_evidence",
+        "handoff_task_delegation_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "technical_keyword_extraction_skill": {
+      "owner": "product_tech_agent",
+      "owner_agents": [
+        "product_tech_agent"
+      ],
+      "purpose": "Technical keyword extraction sub-skill for product_tech_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_technical_keyword_extraction_context",
+        "execute_technical_keyword_extraction_workflow",
+        "record_technical_keyword_extraction_evidence",
+        "handoff_technical_keyword_extraction_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "thesis_extraction_skill": {
+      "owner": "narrative_agent",
+      "owner_agents": [
+        "narrative_agent"
+      ],
+      "purpose": "Thesis extraction sub-skill for narrative_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_thesis_extraction_context",
+        "execute_thesis_extraction_workflow",
+        "record_thesis_extraction_evidence",
+        "handoff_thesis_extraction_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "token_opportunity_skill": {
+      "owner": "funding_token_agent",
+      "owner_agents": [
+        "funding_token_agent"
+      ],
+      "purpose": "Token opportunity sub-skill for funding_token_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_token_opportunity_context",
+        "execute_token_opportunity_workflow",
+        "record_token_opportunity_evidence",
+        "handoff_token_opportunity_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "token_status_classification_skill": {
+      "owner": "contract_onchain_agent",
+      "owner_agents": [
+        "contract_onchain_agent"
+      ],
+      "purpose": "Token status classification sub-skill for contract_onchain_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_token_status_classification_context",
+        "execute_token_status_classification_workflow",
+        "record_token_status_classification_evidence",
+        "handoff_token_status_classification_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "unclear_points_render_skill": {
+      "owner": "report_agent",
+      "owner_agents": [
+        "report_agent"
+      ],
+      "purpose": "Unclear points render sub-skill for report_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_unclear_points_render_context",
+        "execute_unclear_points_render_workflow",
+        "record_unclear_points_render_evidence",
+        "handoff_unclear_points_render_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "value_capture_summary_skill": {
+      "owner": "funding_token_agent",
+      "owner_agents": [
+        "funding_token_agent"
+      ],
+      "purpose": "Value capture summary sub-skill for funding_token_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_value_capture_summary_context",
+        "execute_value_capture_summary_workflow",
+        "record_value_capture_summary_evidence",
+        "handoff_value_capture_summary_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "watchlist_update_skill": {
+      "owner": "signal_triage_agent",
+      "owner_agents": [
+        "signal_triage_agent"
+      ],
+      "purpose": "Watchlist update sub-skill for signal_triage_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_watchlist_update_context",
+        "execute_watchlist_update_workflow",
+        "record_watchlist_update_evidence",
+        "handoff_watchlist_update_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "website_product_surface_skill": {
+      "owner": "product_tech_agent",
+      "owner_agents": [
+        "product_tech_agent"
+      ],
+      "purpose": "Website product surface sub-skill for product_tech_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_website_product_surface_context",
+        "execute_website_product_surface_workflow",
+        "record_website_product_surface_evidence",
+        "handoff_website_product_surface_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "who_said_what_extraction_skill": {
+      "owner": "social_kol_agent",
+      "owner_agents": [
+        "social_kol_agent"
+      ],
+      "purpose": "Who said what extraction sub-skill for social_kol_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_who_said_what_extraction_context",
+        "execute_who_said_what_extraction_workflow",
+        "record_who_said_what_extraction_evidence",
+        "handoff_who_said_what_extraction_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "wikilink_generation_skill": {
+      "owner": "obsidian_curator_agent",
+      "owner_agents": [
+        "obsidian_curator_agent"
+      ],
+      "purpose": "Wikilink generation sub-skill for obsidian_curator_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_wikilink_generation_context",
+        "execute_wikilink_generation_workflow",
+        "record_wikilink_generation_evidence",
+        "handoff_wikilink_generation_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "x_kol_public_search_skill": {
+      "owner": "social_kol_agent",
+      "owner_agents": [
+        "social_kol_agent"
+      ],
+      "purpose": "X kol public search sub-skill for social_kol_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_x_kol_public_search_context",
+        "execute_x_kol_public_search_workflow",
+        "record_x_kol_public_search_evidence",
+        "handoff_x_kol_public_search_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
+    },
+    "x_list_monitoring_skill": {
+      "owner": "monitor_24h_agent",
+      "owner_agents": [
+        "monitor_24h_agent"
+      ],
+      "purpose": "X list monitoring sub-skill for monitor_24h_agent; keeps the agent within its declared persona, scope, evidence rules, and handoff contract.",
+      "steps": [
+        "load_x_list_monitoring_context",
+        "execute_x_list_monitoring_workflow",
+        "record_x_list_monitoring_evidence",
+        "handoff_x_list_monitoring_output"
+      ],
+      "guardrails": [
+        "stay_within_agent_scope",
+        "source_bound_claims",
+        "unknown_when_unverified"
+      ],
+      "required_output": [
+        "summary",
+        "evidence",
+        "confidence",
+        "handoff"
+      ]
     }
   }
 }

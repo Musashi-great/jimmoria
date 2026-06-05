@@ -9,7 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from crypto_research_agents import APP_NAME, __version__
+from crypto_research_agents import APP_NAME
 from crypto_research_agents.connectors import register_default_connectors
 from crypto_research_agents.console import JimmoriaConsole, format_duration_ms, format_llm_usage
 from crypto_research_agents.runtime import ResearchRuntime
@@ -22,6 +22,7 @@ from crypto_research_agents.core.company_settings import (
     save_company_settings,
 )
 from crypto_research_agents.core.supervisor_intake import decide_supervisor_intake
+from crypto_research_agents.core.input_resolver import resolve_research_input
 from crypto_research_agents.core.supervisor_intake import (
     build_company_instruction_reply,
     build_company_status_reply,
@@ -39,7 +40,7 @@ from crypto_research_agents.core.grok_models import (
     grok_model_by_index,
     supported_grok_model_lines,
 )
-from crypto_research_agents.core.llm_provider import codex_sdk_available, grok_auth_status
+from crypto_research_agents.core.llm_provider import codex_api_status, codex_sdk_available, grok_auth_status
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 from crypto_research_agents.core.playbook import ResearchPlaybookRegistry
 from crypto_research_agents.core.profile import WorkerProfileRegistry
@@ -82,6 +83,7 @@ MODEL_ROUTE_TIERS = [
 MODEL_SETTING_ENV_NAMES = [
     "LLM_PROVIDER",
     "JIMMORIA_CODEX_PROVIDER",
+    "JIMMORIA_CODEX_AUTH_PROVIDER",
     "CODEX_PROVIDER",
     "JIMMORIA_GROK_AUTH_PROVIDER",
     "JIMMORIA_GROK_TASKS",
@@ -107,6 +109,10 @@ MODEL_SETTING_ENV_NAMES = [
     "CODEX_CLI_MODEL_REASONING",
     "CODEX_CLI_MODEL_WRITING",
     "CODEX_CLI_MODEL_STRONG",
+    "CODEX_API_BASE_URL",
+    "OPENAI_BASE_URL",
+    "CODEX_API_MODE",
+    "OPENAI_API_MODE",
     "GROK_BASE_URL",
     "XAI_BASE_URL",
     "HERMES_HOME",
@@ -355,6 +361,7 @@ def main(argv: list[str] | None = None) -> None:
                 memory_path=args.memory,
             )
         else:
+            require_research_source_link(title, content, url)
             result = runtime.run_article_research(
                 title=title,
                 content=content,
@@ -452,6 +459,17 @@ def read_source_input(args: argparse.Namespace) -> tuple[str, str, str | None]:
     return title, content, url
 
 
+def require_research_source_link(title: str, content: str, url: str | None) -> None:
+    payload = "\n".join(part for part in [title, content, url or ""] if part)
+    resolved = resolve_research_input(payload)
+    if resolved.required_link_present:
+        return
+    raise SystemExit(
+        "Research runs require at least one source link to reduce identity confusion. "
+        "Add --url or include an official website/X/GitHub/article/explorer link in --text."
+    )
+
+
 def fetch_url_text(url: str) -> str:
     policy = PolicyEngine()
     policy.allow("cli", "fetch_url")
@@ -516,6 +534,7 @@ def workflow_command(args: argparse.Namespace) -> None:
     if args.workflow_command == "run":
         spec = load_workflow_spec(args.workflow_id, args.workflow_dir)
         title, content, url = read_source_input(args)
+        require_research_source_link(title, content, url)
         runtime = ResearchRuntime(load_memory(args.memory))
         result = runtime.run_article_research(
             title=title,
@@ -817,10 +836,10 @@ def chat_command(args: argparse.Namespace) -> None:
             continue
 
         console.print_user_message(line)
-        console.print_supervisor_working("Reading the message, choosing the response shape, and routing the company.")
+        console.print_supervisor_working("메시지를 읽고 답변 형태와 라우팅을 정하는 중입니다.")
         route_line = line
         if pending_report_creation_line and looks_like_report_creation_correction(line):
-            route_line = coerce_report_creation_request(pending_report_creation_line)
+            route_line = coerce_report_creation_request(pending_report_creation_line, line)
             pending_report_creation_line = ""
         elif pending_report_creation_line and looks_like_pending_report_cancel(line):
             pending_report_creation_line = ""
@@ -1017,10 +1036,12 @@ def looks_like_pending_report_cancel(line: str) -> bool:
     return any(term in lowered for term in cancel_terms) or any(term in line for term in cancel_terms)
 
 
-def coerce_report_creation_request(previous_line: str) -> str:
+def coerce_report_creation_request(previous_line: str, correction_line: str = "") -> str:
+    resolved_correction = resolve_research_input(correction_line) if correction_line else None
+    link_context = f" {correction_line.strip()}" if resolved_correction and resolved_correction.required_link_present else ""
     if looks_like_report_creation_correction(previous_line):
-        return previous_line
-    return f"{previous_line} 새 보고서 작성해봐"
+        return f"{previous_line}{link_context}".strip()
+    return f"{previous_line}{link_context} 새 보고서 작성해봐"
 
 
 def handle_chat_command(
@@ -1138,7 +1159,7 @@ def handle_chat_command(
         title, content, url = chat_input_to_source(rest)
         runtime = ResearchRuntime(load_memory(args.memory))
         console.print_user_message(rest)
-        console.print_supervisor_working("Saving this as a source-only task and assigning the archivist.")
+        console.print_supervisor_working("소스 저장 작업으로 처리하고 아카이비스트에게 배정하는 중입니다.")
         runtime.event_handler = console.make_event_handler()
         result = runtime.run_source_ingestion(
             title=title,
@@ -1309,9 +1330,15 @@ def _add_unique(values: list[str], value: str) -> None:
 
 
 def chat_input_to_source(line: str) -> tuple[str, str, str | None]:
-    if line.startswith("http://") or line.startswith("https://"):
-        content = fetch_url_text(line)
-        return infer_title(content, line), content, line
+    resolved = resolve_research_input(line)
+    if resolved.primary_url:
+        stripped = line.strip()
+        if stripped == resolved.primary_url and stripped.startswith(("http://", "https://")):
+            content = fetch_url_text(stripped)
+            return infer_title(content, stripped), content, stripped
+        # Keep the user's full request in the room context, but promote the first link
+        # as the canonical seed URL for Identity Gate and connector verification.
+        return infer_title(line, resolved.primary_url), line, resolved.primary_url
     return infer_title(line, None), line, None
 
 
@@ -1579,10 +1606,10 @@ def configure_model_panel(*, clear_before: bool = True) -> None:
         [
             f"Current provider: {os.getenv('LLM_PROVIDER') or 'offline_fallback'}",
             "",
-            "1. Codex SDK / local app-server",
-            "2. Codex CLI exec",
-            "3. Grok / xAI OAuth or API key only",
-            "4. Codex + Grok role routing (Recommended)",
+            "1. Apply all logged-in Codex + Grok models (Recommended)",
+            "2. Codex only (OAuth/local login or API key)",
+            "3. Grok only (OAuth or API key)",
+            "4. Codex + Grok role routing (manual review)",
             "5. Offline diagnostic fallback",
             "Enter. Keep current",
         ]
@@ -1593,13 +1620,13 @@ def configure_model_panel(*, clear_before: bool = True) -> None:
         print_current_model_config()
         return
 
-    if choice in {"1", "codex", "codex_sdk", "sdk"}:
-        configure_codex_sdk()
+    if choice in {"1", "all", "auto", "recommended", "logged_in", "logged-in"}:
+        configure_all_logged_in_models()
         print_current_model_config()
         return
 
-    if choice in {"2", "codex_cli", "cli"}:
-        configure_codex_cli()
+    if choice in {"2", "codex", "codex_sdk", "sdk", "codex_cli", "cli", "codex_api", "openai_api"}:
+        configure_codex()
         print_current_model_config()
         return
 
@@ -1623,9 +1650,79 @@ def configure_model_panel(*, clear_before: bool = True) -> None:
     print_current_model_config()
 
 
+
+def configure_all_logged_in_models() -> None:
+    """Apply every authenticated model family without asking for another login."""
+
+    clear_legacy_model_session_env()
+    codex_available = codex_sdk_available() or codex_is_logged_in() or codex_api_key_configured()
+    grok_available = grok_is_configured()
+    if codex_available and grok_available:
+        os.environ["LLM_PROVIDER"] = "codex_grok"
+        os.environ["JIMMORIA_CODEX_PROVIDER"] = preferred_codex_provider()
+        os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = preferred_grok_auth_provider()
+    elif codex_available:
+        provider = preferred_codex_provider()
+        os.environ["LLM_PROVIDER"] = provider
+        os.environ["JIMMORIA_CODEX_PROVIDER"] = provider
+    elif grok_available:
+        os.environ["LLM_PROVIDER"] = "xai_oauth" if preferred_grok_auth_provider() in {"xai_oauth", "grok_oauth"} else "grok"
+        os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = preferred_grok_auth_provider()
+    else:
+        os.environ["LLM_PROVIDER"] = "offline"
+    clear_screen()
+    print_screen(
+        "All logged-in models",
+        [
+            "로그인/키가 감지된 Codex와 Grok 모델 패밀리를 모두 적용했습니다.",
+            "다시 로그인하지 않고 기존 OAuth session, local Codex login, API key env/file/command를 재사용합니다.",
+            f"Codex OAuth/local: {codex_login_status()}",
+            f"Codex API: {codex_api_status()}",
+            f"Grok OAuth/API: {grok_auth_status()}",
+            "Raw OAuth/API tokens are not saved in model_settings.json.",
+        ],
+    )
+    save_model_settings()
+
+
+def configure_codex() -> None:
+    clear_legacy_model_session_env()
+    clear_screen()
+    print_screen(
+        "Codex",
+        [
+            "Codex can use OAuth/local login or an API key.",
+            "1. Use Codex SDK / local app-server OAuth session",
+            "2. Use Codex CLI exec OAuth/local login",
+            "3. Use OPENAI_API_KEY / CODEX_API_KEY API key",
+            "4. Apply whichever Codex credential is already available",
+            "Enter. Apply available Codex credential",
+        ],
+    )
+    choice = input("Choose Codex credential [1/2/3/4/Enter]: ").strip().lower()
+    if choice in {"1", "sdk"}:
+        configure_codex_sdk()
+        return
+    if choice in {"2", "cli", "oauth", "login"}:
+        configure_codex_cli()
+        return
+    if choice in {"3", "api", "api_key", "key", "openai"}:
+        configure_codex_api()
+        return
+    provider = preferred_codex_provider()
+    if provider == "codex_api":
+        configure_codex_api(prompt_for_key=False)
+    elif provider == "codex_cli":
+        configure_codex_cli()
+    else:
+        configure_codex_sdk()
+
+
 def configure_codex_sdk() -> None:
     clear_legacy_model_session_env()
     os.environ["LLM_PROVIDER"] = "codex_sdk"
+    os.environ["JIMMORIA_CODEX_AUTH_PROVIDER"] = "oauth"
+    os.environ["JIMMORIA_CODEX_PROVIDER"] = "codex_sdk"
     clear_screen()
     print_screen(
         "Codex SDK",
@@ -1646,6 +1743,8 @@ def configure_codex_sdk() -> None:
 def configure_codex_cli() -> None:
     clear_legacy_model_session_env()
     os.environ["LLM_PROVIDER"] = "codex_cli"
+    os.environ["JIMMORIA_CODEX_AUTH_PROVIDER"] = "oauth"
+    os.environ["JIMMORIA_CODEX_PROVIDER"] = "codex_cli"
     clear_screen()
     print_screen(
         "Codex CLI",
@@ -1653,19 +1752,49 @@ def configure_codex_cli() -> None:
             "JIMMORIA will call `codex exec` through your local Codex login.",
             "",
             "1. Start Codex device login",
+            "2. Use OPENAI_API_KEY / CODEX_API_KEY API key",
             "Enter. Use existing Codex login",
         ],
     )
     source_choice = input("Choose Codex CLI auth method [1/Enter]: ").strip().lower()
     if source_choice == "1":
         run_codex_device_login()
+    elif source_choice in {"2", "api", "api_key", "key"}:
+        configure_codex_api()
+        return
     configure_model_routes(prefix="CODEX_CLI_MODEL")
+    save_model_settings()
+
+
+
+def configure_codex_api(*, prompt_for_key: bool = True) -> None:
+    clear_legacy_model_session_env()
+    os.environ["LLM_PROVIDER"] = "codex_api"
+    os.environ["JIMMORIA_CODEX_AUTH_PROVIDER"] = "api_key"
+    os.environ["JIMMORIA_CODEX_PROVIDER"] = "codex_api"
+    clear_screen()
+    lines = [
+        "JIMMORIA will call the OpenAI-compatible API for Codex/OpenAI model routes.",
+        "Supported credentials: OPENAI_API_KEY or CODEX_API_KEY.",
+        "Raw API keys are never saved in model_settings.json.",
+    ]
+    if not codex_api_key_configured() and prompt_for_key:
+        lines.extend(["", "1. Paste API key for this session only", "Enter. Continue and rely on existing env/key injection"])
+    print_screen("Codex API", lines)
+    if not codex_api_key_configured() and prompt_for_key:
+        choice = input("Choose Codex API credential [1/Enter]: ").strip().lower()
+        if choice in {"1", "paste", "key", "api"}:
+            token = getpass.getpass("Paste OPENAI/Codex API key (not saved): ").strip()
+            if token:
+                os.environ["OPENAI_API_KEY"] = token
+    configure_model_routes(prefix="CODEX_MODEL")
     save_model_settings()
 
 
 def configure_grok() -> None:
     clear_legacy_model_session_env()
     os.environ["LLM_PROVIDER"] = "grok"
+    os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = "api_key"
     clear_screen()
     print_screen(
         "Grok / xAI",
@@ -1686,11 +1815,14 @@ def configure_grok() -> None:
     source_choice = input("Choose Grok credential source [1/2/3/4/5/6/Enter]: ").strip().lower()
     if source_choice in {"1", "hermes", "oauth", "login", "xai_oauth"}:
         os.environ["LLM_PROVIDER"] = "xai_oauth"
+        os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = "xai_oauth"
         run_hermes_xai_oauth_login()
     elif source_choice in {"2", "existing", "session"}:
         os.environ["LLM_PROVIDER"] = "xai_oauth"
+        os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = "xai_oauth"
     elif source_choice in {"3", "api", "api_key", "key"}:
         os.environ["LLM_PROVIDER"] = "grok"
+        os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = "api_key"
     elif source_choice == "4":
         token = getpass.getpass("Paste Grok/xAI bearer token (not saved): ").strip()
         if token:
@@ -1699,10 +1831,12 @@ def configure_grok() -> None:
         path = input("Token file path: ").strip()
         if path:
             os.environ["GROK_OAUTH_TOKEN_FILE"] = path
+            os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = "token_file"
     elif source_choice == "6":
         command = input("Token command: ").strip()
         if command:
             os.environ["GROK_OAUTH_TOKEN_COMMAND"] = command
+            os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = "token_command"
 
     configure_model_routes(
         prefix="GROK_MODEL",
@@ -1718,7 +1852,9 @@ def configure_grok() -> None:
 def configure_codex_grok_hybrid() -> None:
     clear_legacy_model_session_env()
     os.environ["LLM_PROVIDER"] = "codex_grok"
-    os.environ.setdefault("JIMMORIA_GROK_AUTH_PROVIDER", "xai_oauth")
+    os.environ["JIMMORIA_CODEX_PROVIDER"] = preferred_codex_provider()
+    os.environ["JIMMORIA_CODEX_AUTH_PROVIDER"] = "api_key" if os.environ["JIMMORIA_CODEX_PROVIDER"] == "codex_api" else "oauth"
+    os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = preferred_grok_auth_provider()
     clear_screen()
     print_screen(
         "Codex + Grok hybrid",
@@ -1728,8 +1864,8 @@ def configure_codex_grok_hybrid() -> None:
             "Codex agents: Supervisor, Ingestion, Contract/On-chain, Product/Tech, Funding/Token, Report, Obsidian.",
             "Grok agents: Social/KOL, Narrative, Discovery.",
             "",
-            "Codex runtime: SDK if available, otherwise Codex CLI. Override with JIMMORIA_CODEX_PROVIDER=codex_cli or codex_sdk.",
-            "Grok auth: Hermes xAI OAuth by default, then XAI_API_KEY/GROK_API_KEY, token file, or token command.",
+            "Codex auth: SDK/CLI OAuth local login or OPENAI_API_KEY/CODEX_API_KEY API key.",
+            "Grok auth: Hermes xAI OAuth, XAI_API_KEY/GROK_API_KEY, token file, or token command.",
             "This is role routing. Use LLM_PROVIDER=codex_grok; do not use xai_oauth as the top-level provider for this mode.",
             "No raw Grok/Codex tokens are saved in model_settings.json.",
             "",
@@ -1915,7 +2051,6 @@ def clear_legacy_model_session_env() -> None:
         "CODEX_OAUTH_TOKEN",
         "CODEX_OAUTH_TOKEN_FILE",
         "CODEX_OAUTH_TOKEN_COMMAND",
-        "OPENAI_API_KEY",
         "CODEX_OAUTH_MODEL_FAST",
         "CODEX_OAUTH_MODEL_REASONING",
         "CODEX_OAUTH_MODEL_WRITING",
@@ -1925,7 +2060,6 @@ def clear_legacy_model_session_env() -> None:
         "OPENAI_MODEL_WRITING",
         "OPENAI_MODEL_STRONG",
         "CODEX_OAUTH_BASE_URL",
-        "OPENAI_BASE_URL",
     ]:
         os.environ.pop(name, None)
 
@@ -1942,12 +2076,14 @@ def print_current_model_config() -> None:
         token_source = "Codex SDK app-server" + (" available" if codex_sdk_available() else " package not installed")
     elif provider == "codex_cli":
         token_source = codex_login_status()
+    elif provider == "codex_api":
+        token_source = codex_api_status()
     elif provider in {"grok", "xai", "grok_oauth", "xai_oauth"}:
         token_source = grok_auth_status()
     elif provider in {"codex_grok", "grok_codex", "codex+grok", "grok+codex", "hybrid", "dual", "multi"}:
         token_source = (
             "Codex: "
-            + ("Codex SDK app-server available" if codex_sdk_available() else codex_login_status())
+            + codex_multi_auth_status()
             + " | Grok: "
             + grok_auth_status()
         )
@@ -1975,6 +2111,53 @@ def print_current_model_config() -> None:
             f"Supported models: {supported_models}",
         ]
     )
+
+
+
+def codex_api_key_configured() -> bool:
+    return bool(os.getenv("OPENAI_API_KEY") or os.getenv("CODEX_API_KEY"))
+
+
+def grok_is_configured() -> bool:
+    return "missing" not in grok_auth_status().lower()
+
+
+def preferred_codex_provider() -> str:
+    configured = (os.getenv("JIMMORIA_CODEX_PROVIDER") or os.getenv("CODEX_PROVIDER") or "").strip().lower()
+    if configured in {"codex_sdk", "codex_cli", "codex_api"}:
+        return configured
+    logged_in = codex_is_logged_in()
+    if codex_sdk_available() and logged_in:
+        return "codex_sdk"
+    if logged_in:
+        return "codex_cli"
+    if codex_api_key_configured():
+        return "codex_api"
+    if codex_sdk_available():
+        return "codex_sdk"
+    return "codex_cli"
+
+
+def preferred_grok_auth_provider() -> str:
+    configured = (os.getenv("JIMMORIA_GROK_AUTH_PROVIDER") or "").strip().lower().replace("-", "_")
+    if configured in {"xai_oauth", "grok_oauth", "api_key", "token_file", "token_command"}:
+        return configured
+    if os.getenv("GROK_OAUTH_TOKEN_FILE") or os.getenv("XAI_OAUTH_TOKEN_FILE"):
+        return "token_file"
+    if os.getenv("GROK_OAUTH_TOKEN_COMMAND") or os.getenv("XAI_OAUTH_TOKEN_COMMAND"):
+        return "token_command"
+    if os.getenv("XAI_API_KEY") or os.getenv("GROK_API_KEY"):
+        return "api_key"
+    return "xai_oauth"
+
+
+def codex_multi_auth_status() -> str:
+    parts = []
+    sdk_status = "SDK available" if codex_sdk_available() else "SDK package missing"
+    parts.append(sdk_status)
+    parts.append(codex_login_status())
+    parts.append(codex_api_status())
+    return " / ".join(parts)
 
 
 def model_settings_path() -> Path:

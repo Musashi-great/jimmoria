@@ -42,24 +42,31 @@ Start the company:
 jimmoria
 ```
 
-The CLI runs as a chat-style Research HQ. During a Research Room, raw runtime events stay in the background while a fixed runtime dock shows the current work:
+The CLI runs as a chat-style Research HQ. During a Research Room, raw runtime events stay in the background while a tmux-friendly runtime dock shows each agent as a Korean-first work card:
 
 ```text
---------------------------------------------------------------------------------+
-| JIMMORIA HQ | Supervisor channel | provider: codex_cli | room: room_x | ...    |
-| Room running. Input returns when Supervisor finishes this room.                 |
++--------------------------------------------------------------------------------+
+| JIMMORIA HQ | 슈퍼바이저 대화 | provider: codex_cli | room: room_x | ...        |
+| 진행: 스카우터 -> 툴 실행: web_search - official site | 대기: 제품/기술          |
+| 리서치룸 실행 중입니다. 슈퍼바이저가 완료하면 입력창이 돌아옵니다.              |
 |--------------------------------------------------------------------------------|
-| Live agent board - current work                                                |
-| STATE  AGENT                        CURRENT WORK                               |
-| RUN    discovery_agent              Now: Tool running: web_search - ...        |
-| WAIT   product_tech_agent           Waiting: Checking docs/GitHub              |
-| DONE   supervisor_agent             Finished: Research room initialized        |
+| 에이전트 작업 카드 - 현재 진행 상황                                             |
+| 상태     에이전트                 현재 작업                                     |
+| +----------------------------+   +----------------------------+                |
+| | 스카우터 [진행]            |   | 제품/기술 [대기]            |                |
+| | discovery_agent            |   | product_tech_agent          |                |
+| | 진행: 공식 후보 확인 중    |   | 대기: 문서/GitHub 확인 중   |                |
+| +----------------------------+   +----------------------------+                |
+| | 토론방 [진행]              |                                                    |
+| | 참여: 소셜/KOL, 제품/기술  |                                                    |
+| | 소셜/KOL: 공개 기사 근거 확인 |                                                  |
+| +----------------------------+                                                    |
 |--------------------------------------------------------------------------------|
-| > working...                                                                   |
+| > 작업중...                                                                    |
 +--------------------------------------------------------------------------------+
 ```
 
-That dock is the lightweight TUI layer: it keeps the current room, provider, agent progress, and each agent's active job visible while detailed `Room >`, `Agent >`, `Tool >`, and `Output >` events run in the background and are saved under `data/runs/<room_id>/`. Set `JIMMORIA_EVENT_STYLE=stream` only when you want the raw live event stream on screen for debugging.
+That dock is the lightweight TUI layer: it keeps the current room, provider, agent progress, each agent's active job, and Agent Council discussion summaries visible while detailed `룸 >`, `에이전트 >`, `툴 >`, and `Output >` events stay in the background and are saved under `data/runs/<room_id>/`. Set `JIMMORIA_EVENT_STYLE=stream` only when you want the raw live event stream on screen for debugging.
 
 Open the local web dashboard:
 
@@ -83,11 +90,13 @@ jimmoria demo
 
 JIMMORIA can run Codex-only, Grok-only, or Codex+Grok hybrid routing. The recommended production setup is hybrid: Codex keeps orchestration/final writing stable, while Grok/xAI is used for social, narrative, and candidate-discovery work.
 
-Recommended provider:
+Recommended setup panel choice:
 
 ```text
-Codex + Grok role routing
+1. Apply all logged-in Codex + Grok models
 ```
+
+This auto-applies every credential JIMMORIA can already see: Codex SDK/CLI OAuth login, Codex/OpenAI API key, Hermes xAI OAuth, Grok/xAI API key, token file, or token command. You do not need to pick and re-login each model family one by one.
 
 Install Codex SDK support:
 
@@ -95,7 +104,7 @@ Install Codex SDK support:
 python -m pip install -e ".[codex]"
 ```
 
-If Codex login already exists locally, JIMMORIA can reuse it. It stores provider/model preferences in `data/model_settings.json`, not raw tokens.
+If Codex login already exists locally, JIMMORIA can reuse it. Codex can also run through `OPENAI_API_KEY` or `CODEX_API_KEY` with `LLM_PROVIDER=codex_api`. JIMMORIA stores provider/model preferences in `data/model_settings.json`, not raw OAuth or API tokens.
 
 Optional Grok/xAI provider:
 
@@ -117,7 +126,7 @@ $env:GROK_OAUTH_TOKEN_FILE = "C:\path\to\xai-token.txt"
 $env:GROK_OAUTH_TOKEN_COMMAND = "op read op://vault/xai/token"
 ```
 
-The xAI API uses an OpenAI-compatible endpoint at `https://api.x.ai/v1`. JIMMORIA does not save raw Grok/XAI tokens in `data/model_settings.json`; it only saves provider/model preferences, token file paths, or token commands. With `LLM_PROVIDER=xai_oauth`, Hermes OAuth is preferred over `XAI_API_KEY`. With `LLM_PROVIDER=grok`, API key/env sources are preferred and Hermes OAuth is used as a fallback.
+The xAI API uses an OpenAI-compatible endpoint at `https://api.x.ai/v1`. The Codex API provider uses `https://api.openai.com/v1` by default. JIMMORIA does not save raw Codex/OpenAI/Grok/XAI tokens in `data/model_settings.json`; it only saves provider/model preferences, token file paths, or token commands. With `LLM_PROVIDER=xai_oauth`, Hermes OAuth is preferred over `XAI_API_KEY`. With `LLM_PROVIDER=grok`, API key/env sources are preferred and Hermes OAuth is used as a fallback.
 
 Important: `xai_oauth` is a Grok credential mode. For role-based company routing, use `LLM_PROVIDER=codex_grok`; JIMMORIA will still use Hermes xAI OAuth for the Grok side.
 

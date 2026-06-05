@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from typing import Any
 
 from crypto_research_agents.core.company_settings import CompanySettings
 from crypto_research_agents.core.model_gateway import ModelGateway

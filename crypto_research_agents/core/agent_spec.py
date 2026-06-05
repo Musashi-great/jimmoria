@@ -160,14 +160,34 @@ class AgentSpec:
             lines.append(f"Identity: {self.identity.one_liner}")
         if self.identity.description:
             lines.append(self.identity.description)
+        if self.role.description:
+            lines.append(f"Role: {self.role.description}")
         if self.mission.primary_goal:
             lines.append(f"Primary goal: {self.mission.primary_goal}")
+        if self.mission.secondary_goals:
+            lines.append("Secondary goals: " + ", ".join(self.mission.secondary_goals))
         if self.scope.owns:
             lines.append("You own: " + ", ".join(self.scope.owns))
         if self.scope.does_not_own:
             lines.append("You do not own: " + ", ".join(self.scope.does_not_own))
         if self.personality.tone:
             lines.append("Tone: " + ", ".join(self.personality.tone))
+        if self.personality.strengths:
+            lines.append("Strengths to use: " + ", ".join(self.personality.strengths))
+        if self.personality.biases_to_avoid:
+            lines.append("Biases to avoid: " + ", ".join(self.personality.biases_to_avoid))
+        if self.memory_scope.read or self.memory_scope.write or self.memory_scope.no_access:
+            lines.append("Memory access contract:")
+            if self.memory_scope.read:
+                lines.append("- read: " + ", ".join(self.memory_scope.read))
+            if self.memory_scope.write:
+                lines.append("- write: " + ", ".join(self.memory_scope.write))
+            if self.memory_scope.no_access:
+                lines.append("- no access: " + ", ".join(self.memory_scope.no_access))
+        if self.collaboration:
+            lines.append("Collaboration contract:")
+            for key, values in self.collaboration.items():
+                lines.append(f"- {key}: " + ", ".join(values))
         if self.skills:
             lines.append("Skills/playbooks: " + ", ".join(self.skills.all()))
             if self.skills.primary:

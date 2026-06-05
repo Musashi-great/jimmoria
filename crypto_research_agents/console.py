@@ -29,16 +29,36 @@ except ImportError:  # pragma: no cover - fallback for non-installed editable ch
 
 
 AGENT_ACTIVITY = {
-    "supervisor_agent": "Planning direction",
-    "ingestion_agent": "Extracting source metadata",
-    "social_kol_agent": "Collecting X/KOL market signals",
-    "narrative_agent": "Mapping narratives",
-    "discovery_agent": "Resolving candidates",
-    "contract_onchain_agent": "Checking token identity",
-    "product_tech_agent": "Checking docs/GitHub",
-    "funding_token_agent": "Checking funding/token hints",
-    "report_agent": "Writing dossier",
-    "obsidian_curator_agent": "Syncing vault notes",
+    "supervisor_agent": "리서치 방향과 작업 순서를 정리하는 중",
+    "ingestion_agent": "입력 소스와 메타데이터를 정리하는 중",
+    "social_kol_agent": "X/KOL/공개 소셜 신호를 모으는 중",
+    "narrative_agent": "내러티브와 투자 논리를 매핑하는 중",
+    "discovery_agent": "공식 후보와 프로젝트 정체성을 찾는 중",
+    "contract_onchain_agent": "체인·토큰·컨트랙트 식별 정보를 확인하는 중",
+    "product_tech_agent": "웹사이트·문서·GitHub 제품 근거를 확인하는 중",
+    "funding_token_agent": "펀딩·포인트·토큰 단서를 검증하는 중",
+    "report_agent": "고객용 리서치 리포트를 작성하는 중",
+    "obsidian_curator_agent": "볼트 노트와 지식 기록을 동기화하는 중",
+}
+
+AGENT_DISPLAY_NAMES = {
+    "supervisor_agent": "슈퍼바이저",
+    "ingestion_agent": "아카이비스트",
+    "social_kol_agent": "소셜/KOL",
+    "narrative_agent": "내러티브",
+    "discovery_agent": "스카우터",
+    "contract_onchain_agent": "온체인",
+    "product_tech_agent": "제품/기술",
+    "funding_token_agent": "펀딩/토큰",
+    "report_agent": "리포트",
+    "obsidian_curator_agent": "옵시디언",
+}
+
+STATE_LABELS_KO = {
+    "queued": "대기",
+    "running": "진행",
+    "done": "완료",
+    "failed": "실패",
 }
 
 
@@ -66,33 +86,37 @@ class JimmoriaConsole:
         self.runtime_dock_lines = 0
         self.runtime_dock_frame = 0
         self.last_runtime_metrics: dict[str, object] = {}
+        self.council_state = "idle"
+        self.council_activity = "토론방 대기 중"
+        self.council_participants: list[str] = []
 
     def print_intro(self) -> None:
         print_jimmoria_logo(self.width)
 
     def print_help(self) -> None:
         lines = [
-            "Type a message. The Supervisor decides whether it is research, settings, status, or source ingest.",
+            "메시지를 입력하면 슈퍼바이저가 대화/설정/소스저장/리서치룸 실행 여부를 판단합니다.",
+            "진행 중에는 전체 로그 대신 에이전트별 작업 카드와 토론방 카드가 업데이트됩니다.",
             "",
             "Commands:",
-            "  /add <text-or-url>       Ingest source only",
-            "  /models                  Configure LLM provider/models",
-            "  /doctor                  Show configured vs placeholder capabilities",
-            "  /company                 Show active and planned agents",
-            "  /settings                Show company operating settings",
-            "  /board                   Show current live agent board",
-            "  /context                 Show shared memory and latest run context",
-            "  /rooms                   Show multi-room workload board",
-            "  /runs                    Show previous runs",
-            "  /status [room_id]        Show latest or selected room status",
-            "  /messages [room_id]      Show collaboration history",
-            "  /events [room_id]        Show saved UI/replay events",
-            "  /report [room_id]        Print saved report",
-            "  /last                    Show the latest run card",
-            "  /help                    Show this help",
-            "  /quit                    Exit",
+            "  /add <text-or-url>       소스만 저장",
+            "  /models                  LLM provider/model 설정",
+            "  /doctor                  연결 가능한 도구와 placeholder 상태 확인",
+            "  /company                 활성/예정 에이전트 보기",
+            "  /settings                회사 운영 설정 보기",
+            "  /board                   현재 에이전트 작업 보드 보기",
+            "  /context                 공유 메모리와 최근 실행 컨텍스트 보기",
+            "  /rooms                   여러 리서치룸 워크로드 보기",
+            "  /runs                    이전 실행 기록 보기",
+            "  /status [room_id]        최신/선택 룸 상태 보기",
+            "  /messages [room_id]      협업 메시지 보기",
+            "  /events [room_id]        저장된 UI/replay 이벤트 보기",
+            "  /report [room_id]        저장된 리포트 출력",
+            "  /last                    최신 실행 카드 보기",
+            "  /help                    도움말",
+            "  /quit                    종료",
         ]
-        self.block("JIMMORIA commands", lines)
+        self.block("JIMMORIA 명령어", lines)
 
     def print_company(self, *, active_only: bool = False) -> None:
         agent_ids = DEFAULT_AGENTS if active_only else sorted(self.registry.specs)
@@ -139,7 +163,7 @@ class JimmoriaConsole:
         self.block("Supervisor intake", lines)
 
     def print_supervisor_reply(self, lines: list[str]) -> None:
-        self.block("Supervisor", lines)
+        self.block("슈퍼바이저", lines)
 
     def confirm_dispatch(
         self,
@@ -166,8 +190,8 @@ class JimmoriaConsole:
         answer = input("Proceed [Enter/Y/n]: ").strip().lower()
         return answer in {"", "y", "yes", "ye", "go", "proceed", "ㅇ", "예", "네", "응"}
 
-    def print_supervisor_working(self, activity: str = "Reading your request and choosing the next move.") -> None:
-        self.print_log_line("Supervisor", activity, muted=True)
+    def print_supervisor_working(self, activity: str = "요청을 읽고 다음 진행 방식을 정하는 중입니다.") -> None:
+        self.print_log_line("슈퍼바이저", activity, muted=True)
 
     def print_company_settings_updated(self, settings: Any, applied: list[str], path: str | Path) -> None:
         lines = [
@@ -188,7 +212,7 @@ class JimmoriaConsole:
         self.block("Company instruction applied", lines)
 
     def print_user_message(self, text: str) -> None:
-        self.print_log_line("You", text)
+        self.print_log_line("사용자", text)
 
     def print_log_line(self, label: str, text: str, *, muted: bool = False) -> None:
         wrapped = self.wrap(text)
@@ -246,7 +270,7 @@ class JimmoriaConsole:
 
     def read_ansi_boxed_input(self) -> str:
         self.show_cursor()
-        hint = "Type a request, URL, /command, or @path/to/file"
+        hint = "요청, URL, /command, @path/to/file 을 입력하세요"
         border = self.input_border()
         print("")
         print(self.input_border_style(border))
@@ -278,7 +302,7 @@ class JimmoriaConsole:
             self.input_border_style(border),
             self.input_status_line_style(self.input_text_line(self.input_status_text())),
             self.input_active_summary_line_style(),
-            self.input_border_style(self.input_hint_line("Room running. Input returns when Supervisor finishes this room.")),
+            self.input_border_style(self.input_hint_line("리서치룸 실행 중입니다. 슈퍼바이저가 완료하면 입력창이 돌아옵니다.")),
             self.input_divider_line_style(),
             self.input_board_title_line_style(),
             self.input_board_header_line_style(),
@@ -304,7 +328,7 @@ class JimmoriaConsole:
             sys.stdout.write("\033[?25h")
 
     def read_basic_boxed_input(self) -> str:
-        hint = "Type a request, URL, /command, or @path/to/file"
+        hint = "요청, URL, /command, @path/to/file 을 입력하세요"
         border = self.input_border()
         print("")
         print(border)
@@ -341,7 +365,7 @@ class JimmoriaConsole:
         provider = os.getenv("LLM_PROVIDER") or "offline"
         room = self.short_room_label()
         agents = self.agent_state_label()
-        return f"JIMMORIA HQ | Supervisor channel | provider: {provider} | room: {room} | agents: {agents}"
+        return f"JIMMORIA HQ | 슈퍼바이저 대화 | provider: {provider} | room: {room} | agents: {agents}"
 
     def short_room_label(self) -> str:
         if not self.last_room_id:
@@ -358,12 +382,12 @@ class JimmoriaConsole:
         done = sum(1 for state in self.agent_state.values() if state == "done")
         failed = sum(1 for state in self.agent_state.values() if state == "failed")
         if failed:
-            return f"{failed} fail/{running} run/{queued} wait"
+            return f"실패 {failed}/진행 {running}/대기 {queued}"
         if running:
-            return f"{running} run/{queued} wait/{done} done"
+            return f"진행 {running}/대기 {queued}/완료 {done}"
         if queued:
-            return f"{queued} wait/{done} done"
-        return f"{done} done"
+            return f"대기 {queued}/완료 {done}"
+        return f"완료 {done}"
 
     def input_border_style(self, text: str) -> str:
         if not supports_color():
@@ -381,8 +405,8 @@ class JimmoriaConsole:
         pink = "\033[38;2;255;92;212m"
         reset = "\033[0m"
         return text.replace("|", f"{violet}|{reset}", 2).replace("JIMMORIA HQ", f"{pink}JIMMORIA HQ{reset}", 1).replace(
-            "Supervisor channel",
-            f"{dim}Supervisor channel{reset}",
+            "슈퍼바이저 대화",
+            f"{dim}슈퍼바이저 대화{reset}",
             1,
         )
 
@@ -401,8 +425,8 @@ class JimmoriaConsole:
         blink = "\033[5m"
         reset = "\033[0m"
         inner_width = self.input_box_width() - 4
-        text = "> working..."
-        visible_prefix = "> working"
+        text = "> 작업중..."
+        visible_prefix = "> 작업중"
         visible_dots = "..."
         padding = " " * max(inner_width - len(text), 0)
         return (
@@ -419,89 +443,165 @@ class JimmoriaConsole:
         muted = "\033[38;2;160;132;188m"
         reset = "\033[0m"
         styled = line.replace("|", f"{violet}|{reset}", 2)
-        styled = styled.replace("Now:", f"{pink}Now:{reset}", 1)
-        styled = styled.replace("Waiting:", f"{muted}Waiting:{reset}", 1)
-        styled = styled.replace("Done:", f"{muted}Done:{reset}", 1)
+        styled = styled.replace("진행:", f"{pink}진행:{reset}", 1)
+        styled = styled.replace("대기:", f"{muted}대기:{reset}", 1)
+        styled = styled.replace("완료:", f"{muted}완료:{reset}", 1)
         return styled
 
     def runtime_active_summary(self) -> str:
         if not self.agent_state:
-            return "Now: idle | Waiting: next request"
+            return "진행: 대기 중 | 다음 요청을 기다립니다"
         running = [agent_id for agent_id in DEFAULT_AGENTS if self.agent_state.get(agent_id) == "running"]
         queued = [agent_id for agent_id in DEFAULT_AGENTS if self.agent_state.get(agent_id) == "queued"]
         done = [agent_id for agent_id in DEFAULT_AGENTS if self.agent_state.get(agent_id) == "done"]
         failed = [agent_id for agent_id in DEFAULT_AGENTS if self.agent_state.get(agent_id) == "failed"]
         if running:
             active_parts = [
-                f"{agent_id} -> {self.compact_text(self.agent_activity.get(agent_id) or AGENT_ACTIVITY.get(agent_id, ''), 38)}"
+                f"{self.agent_display_name(agent_id)} -> {self.compact_text(self.agent_activity.get(agent_id) or AGENT_ACTIVITY.get(agent_id, ''), 38)}"
                 for agent_id in running[:2]
             ]
             active = "; ".join(active_parts)
         elif failed:
-            active = f"failed: {', '.join(failed[:2])}"
+            active = "실패: " + ", ".join(self.agent_display_name(agent_id) for agent_id in failed[:2])
         elif queued:
-            active = "standing by"
+            active = "준비 중"
         else:
-            active = "room wrap-up"
+            active = "룸 마무리"
         waiting = self.compact_agent_list(queued, limit=4)
-        done_text = f" | Done: {len(done)}" if done else ""
-        return f"Now: {active} | Waiting: {waiting or 'none'}{done_text}"
+        done_text = f" | 완료: {len(done)}" if done else ""
+        return f"진행: {active} | 대기: {waiting or '없음'}{done_text}"
 
     def compact_agent_list(self, agent_ids: list[str], *, limit: int = 4) -> str:
         if not agent_ids:
             return ""
         shown = agent_ids[:limit]
         suffix = f" +{len(agent_ids) - limit}" if len(agent_ids) > limit else ""
-        return ", ".join(shown) + suffix
+        return ", ".join(self.agent_display_name(agent_id) for agent_id in shown) + suffix
 
     def input_board_title_line_style(self) -> str:
-        line = self.input_text_line("Live agent board - current work")
+        line = self.input_text_line("에이전트 작업 카드 - 현재 진행 상황")
         if not supports_color():
             return line
         pink = "\033[38;2;255;92;212m"
         violet = "\033[38;2;211;95;255m"
         reset = "\033[0m"
         return line.replace("|", f"{violet}|{reset}", 2).replace(
-            "Live agent board",
-            f"{pink}Live agent board{reset}",
+            "에이전트 작업 카드",
+            f"{pink}에이전트 작업 카드{reset}",
             1,
         )
 
     def input_board_header_line_style(self) -> str:
-        line = self.input_text_line(f"{'STATE':<6} {'AGENT':<28} CURRENT WORK")
+        line = self.input_text_line(f"{'상태':<6} {'에이전트':<20} 현재 작업")
         if not supports_color():
             return line
         violet = "\033[38;2;211;95;255m"
         muted = "\033[38;2;160;132;188m"
         reset = "\033[0m"
         return line.replace("|", f"{violet}|{reset}", 2).replace(
-            "STATE",
-            f"{muted}STATE{reset}",
+            "상태",
+            f"{muted}상태{reset}",
             1,
         ).replace(
-            "AGENT",
-            f"{muted}AGENT{reset}",
+            "에이전트",
+            f"{muted}에이전트{reset}",
             1,
         ).replace(
-            "CURRENT WORK",
-            f"{muted}CURRENT WORK{reset}",
+            "현재 작업",
+            f"{muted}현재 작업{reset}",
             1,
         )
 
     def runtime_agent_board_lines(self) -> list[str]:
         if not self.agent_state:
-            return [self.input_text_line("IDLE   no active room              Waiting for your next request")]
+            return [self.input_text_line("대기   활성 리서치룸 없음        다음 요청을 기다립니다")]
 
-        lines: list[str] = []
+        cards: list[list[str]] = []
         for agent_id in DEFAULT_AGENTS:
             if agent_id not in self.agent_state:
                 continue
-            state = self.agent_state[agent_id]
-            activity = self.agent_activity.get(agent_id) or AGENT_ACTIVITY.get(agent_id, "")
-            label = self.state_label(state)
-            row = f"{label:<6} {agent_id:<28} {self.activity_label(state, activity)}"
-            lines.append(self.runtime_agent_board_line_style(self.input_text_line(row), state))
+            cards.append(self.agent_status_card(agent_id))
+        if self.council_state != "idle" or self.runtime_room_running:
+            cards.append(self.council_status_card())
+        return self.card_grid_lines(cards)
+
+    def agent_status_card(self, agent_id: str) -> list[str]:
+        state = self.agent_state.get(agent_id, "queued")
+        activity = self.agent_activity.get(agent_id) or AGENT_ACTIVITY.get(agent_id, "")
+        name = self.agent_display_name(agent_id)
+        state_text = self.state_label_ko(state)
+        return self.status_card(
+            title=f"{name}  [{state_text}]",
+            subtitle=agent_id,
+            body=self.activity_label(state, activity),
+            state=state,
+        )
+
+    def council_status_card(self) -> list[str]:
+        participant_text = self.compact_agent_list(self.council_participants, limit=3)
+        if participant_text:
+            participant_text = f"참여: {participant_text}"
+        else:
+            participant_text = "참여: 대기"
+        return self.status_card(
+            title=f"토론방  [{self.state_label_ko(self.council_state)}]",
+            subtitle=participant_text,
+            body=self.council_activity,
+            state=self.council_state,
+        )
+
+    def status_card(self, *, title: str, subtitle: str, body: str, state: str) -> list[str]:
+        width = self.runtime_card_width()
+        inner = width - 4
+        return [
+            "+" + "-" * (width - 2) + "+",
+            "| " + self.compact_text(title, inner).ljust(inner) + " |",
+            "| " + self.compact_text(subtitle, inner).ljust(inner) + " |",
+            "| " + self.compact_text(body, inner).ljust(inner) + " |",
+            "+" + "-" * (width - 2) + "+",
+        ]
+
+    def runtime_card_width(self) -> int:
+        if self.input_box_width() >= 112:
+            return max(46, min(58, (self.input_box_width() - 8) // 2))
+        return max(36, min(72, self.input_box_width() - 4))
+
+    def card_grid_lines(self, cards: list[list[str]]) -> list[str]:
+        if not cards:
+            return []
+        columns = 2 if self.input_box_width() >= 112 else 1
+        lines: list[str] = []
+        for index in range(0, len(cards), columns):
+            row_cards = cards[index : index + columns]
+            for line_index in range(len(row_cards[0])):
+                joined = "   ".join(card[line_index] for card in row_cards)
+                lines.append(self.runtime_card_line_style(self.input_text_line(joined), self.card_row_state(row_cards, line_index)))
         return lines
+
+    def card_row_state(self, row_cards: list[list[str]], line_index: int) -> str:
+        # Use a neutral style for borders and row text; state labels are highlighted separately.
+        return "card"
+
+    def runtime_card_line_style(self, line: str, state: str) -> str:
+        if not supports_color():
+            return line
+        violet = "\033[38;2;211;95;255m"
+        reset = "\033[0m"
+        styled = line.replace("|", f"{violet}|{reset}").replace("+", f"{violet}+{reset}")
+        for label, color in {
+            "진행": "\033[38;2;255;210;245m",
+            "대기": "\033[38;2;160;132;188m",
+            "완료": "\033[38;2;120;255;190m",
+            "실패": "\033[38;2;255;92;120m",
+        }.items():
+            styled = styled.replace(f"[{label}]", f"[{color}{label}{reset}]", 1)
+        return styled
+
+    def agent_display_name(self, agent_id: str) -> str:
+        return AGENT_DISPLAY_NAMES.get(agent_id, agent_id)
+
+    def state_label_ko(self, state: str) -> str:
+        return STATE_LABELS_KO.get(state, state)
 
     def runtime_agent_board_line_style(self, line: str, state: str) -> str:
         if not supports_color():
@@ -541,17 +641,20 @@ class JimmoriaConsole:
                 for agent_id in event.get("agents", [])
             }
             self.agent_activity = {
-                str(agent_id): AGENT_ACTIVITY.get(str(agent_id), "Waiting for assignment")
+                str(agent_id): AGENT_ACTIVITY.get(str(agent_id), "배정 대기 중")
                 for agent_id in event.get("agents", [])
             }
+            self.council_state = "queued"
+            self.council_activity = "전문 에이전트 결과를 기다리는 중"
+            self.council_participants = []
             if self.use_stream_events():
                 topic = self.compact_text(str(event.get("topic", "")), 72)
                 agent_count = len(event.get("agents", []))
                 process = event.get("process") if isinstance(event.get("process"), dict) else {}
                 process_id = process.get("process_id") if isinstance(process, dict) else ""
                 process_text = f" | process {process_id}" if process_id else ""
-                self.print_event_line("Room", f"OPEN {event.get('room_id')} | agents {agent_count}{process_text} | {topic}")
-                self.print_event_line("Board", self.agent_state_label(), muted=True)
+                self.print_event_line("룸", f"OPEN {event.get('room_id')} | agents {agent_count}{process_text} | {topic}")
+                self.print_event_line("보드", self.agent_state_label(), muted=True)
                 return
             lines = [
                 f"Room: {event.get('room_id')}",
@@ -570,7 +673,7 @@ class JimmoriaConsole:
             self.agent_state[agent_id] = "running"
             self.agent_activity[agent_id] = AGENT_ACTIVITY.get(agent_id, f"Running {event.get('task_type')}")
             if self.use_stream_events():
-                self.print_event_line("Agent", f"RUN {agent_id} | {self.agent_activity[agent_id]}")
+                self.print_event_line("에이전트", f"RUN {self.agent_display_name(agent_id)} | {self.agent_activity[agent_id]}")
                 return
             label = self.agent_label(agent_id)
             self.block(
@@ -578,7 +681,7 @@ class JimmoriaConsole:
                 [
                     f"State: {self.state_label('running')}",
                     f"Task type: {event.get('task_type')}",
-                    f"Now: {self.agent_activity[agent_id]}",
+                    f"진행: {self.agent_activity[agent_id]}",
                 ],
             )
             return
@@ -590,8 +693,8 @@ class JimmoriaConsole:
             if self.use_stream_events():
                 summary = self.compact_text(str(event.get("summary", "")), 76)
                 self.print_event_line(
-                    "Agent",
-                    f"DONE {agent_id} | {summary} | msg {event.get('messages')} / findings {event.get('findings')}{self.event_metrics_suffix(event)}",
+                    "에이전트",
+                    f"DONE {self.agent_display_name(agent_id)} | {summary} | msg {event.get('messages')} / findings {event.get('findings')}{self.event_metrics_suffix(event)}",
                 )
                 return
             label = self.agent_label(agent_id)
@@ -600,7 +703,7 @@ class JimmoriaConsole:
                 f"{label} finished",
                 [
                     f"State: {self.state_label('done')}",
-                    f"Finished: {summary}",
+                    f"완료: {summary}",
                     f"Messages: {event.get('messages')}",
                     f"Findings: {event.get('findings')}",
                     *self.event_metric_lines(event),
@@ -614,7 +717,7 @@ class JimmoriaConsole:
             self.agent_activity[agent_id] = f"Failed: {event.get('error')}"
             if self.use_stream_events():
                 error = self.compact_text(str(event.get("error", "")), 82)
-                self.print_event_line("Agent", f"FAIL {agent_id} | {error}{self.event_metrics_suffix(event)}")
+                self.print_event_line("에이전트", f"FAIL {self.agent_display_name(agent_id)} | {error}{self.event_metrics_suffix(event)}")
                 return
             label = self.agent_label(agent_id)
             self.block(
@@ -622,7 +725,7 @@ class JimmoriaConsole:
                 [
                     f"State: {self.state_label('failed')}",
                     f"Task type: {event.get('task_type')}",
-                    f"Stopped: {event.get('error')}",
+                    f"중단: {event.get('error')}",
                     *self.event_metric_lines(event),
                 ],
             )
@@ -720,35 +823,49 @@ class JimmoriaConsole:
 
         if event_type == "deliberation_start":
             participants = event.get("participants", [])
-            count = len(participants) if isinstance(participants, list) else 0
+            self.council_participants = [str(agent_id) for agent_id in participants] if isinstance(participants, list) else []
+            self.council_state = "running"
+            self.council_activity = self.compact_text(str(event.get("summary") or "전문 에이전트들이 근거를 비교하는 중"), 92)
+            count = len(self.council_participants)
             if self.use_stream_events():
-                self.print_event_line("Council", f"START specialist roundtable | agents {count}")
+                self.print_event_line("토론방", f"START specialist roundtable | agents {count}")
                 return
             self.block(
-                "Agent council started",
+                "에이전트 토론방 시작",
                 [
-                    f"Participants: {count}",
-                    str(event.get("summary") or "Specialists compare findings."),
+                    f"참여 에이전트: {count}",
+                    self.council_activity,
                 ],
             )
+            return
+
+        if event_type == "deliberation_statement":
+            agent_id = str(event.get("agent_id") or "")
+            summary = self.compact_text(str(event.get("summary") or ""), 92)
+            self.council_state = "running"
+            self.council_activity = f"{self.agent_display_name(agent_id)}: {summary}" if agent_id else summary
+            if self.use_stream_events():
+                self.print_event_line("토론방", self.council_activity)
             return
 
         if event_type == "deliberation_done":
             decision = str(event.get("decision") or "")
             summary = self.compact_text(str(event.get("summary") or ""), 84)
+            self.council_state = "done"
+            self.council_activity = f"합의: {decision} | {summary}" if decision else summary
             if self.use_stream_events():
                 self.print_event_line(
-                    "Council",
+                    "토론방",
                     f"DONE {decision} | {summary} | msg {event.get('messages')} / findings {event.get('findings')}",
                 )
                 return
             self.block(
-                "Agent council consensus",
+                "에이전트 토론방 합의",
                 [
-                    f"Decision: {decision}",
-                    f"Summary: {event.get('summary')}",
-                    f"Messages: {event.get('messages')}",
-                    f"Findings: {event.get('findings')}",
+                    f"결론: {decision}",
+                    f"요약: {event.get('summary')}",
+                    f"메시지: {event.get('messages')}",
+                    f"근거: {event.get('findings')}",
                 ],
             )
             return
@@ -1116,12 +1233,12 @@ class JimmoriaConsole:
             return
         tool_name = str(event.get("tool_name") or "tool")
         marker = {
-            "tool_start": "Tool running",
-            "tool_done": "Tool done",
-            "tool_failed": "Tool failed",
-            "tool_denied": "Tool denied",
-            "tool_unconfigured": "Tool waiting",
-        }.get(event_type, "Tool")
+            "tool_start": "툴 실행",
+            "tool_done": "툴 완료",
+            "tool_failed": "툴 실패",
+            "tool_denied": "툴 거절",
+            "tool_unconfigured": "툴 대기",
+        }.get(event_type, "툴")
         detail = str(event.get("summary") or event.get("input_preview") or tool_name)
         self.agent_activity[agent_id] = f"{marker}: {tool_name} - {detail}"
         if self.agent_state.get(agent_id) not in {"done", "failed"}:
@@ -1193,11 +1310,11 @@ class JimmoriaConsole:
 
     def activity_label(self, state: str, activity: str) -> str:
         prefix = {
-            "queued": "Waiting",
-            "running": "Now",
-            "done": "Finished",
-            "failed": "Stopped",
-        }.get(state, "Status")
+            "queued": "대기",
+            "running": "진행",
+            "done": "완료",
+            "failed": "중단",
+        }.get(state, "상태")
         compact = " ".join(str(activity).split())
         if len(compact) > 64:
             compact = compact[:61].rstrip() + "..."
@@ -1394,7 +1511,7 @@ class JimmoriaConsole:
 
 
 def print_jimmoria_logo(width: int = 100) -> None:
-    width = max(64, min(width, 110))
+    width = max(72, min(width, 132))
     if supports_color():
         print_color_hero(width)
     else:
@@ -1412,7 +1529,8 @@ def print_color_hero(width: int) -> None:
     line = "=" * width
     logo = jimmoria_3d_logo_layers()
     subtitle = "Multi-agent crypto research company"
-    workflow = "research rooms  /  agent bus  /  obsidian memory"
+    korean_subtitle = "슈퍼바이저가 이끄는 온체인 리서치 HQ"
+    workflow = "tmux-friendly TUI  /  agent cards  /  council room  /  obsidian memory"
 
     print(f"{violet}{line}{reset}")
     print("")
@@ -1421,6 +1539,7 @@ def print_color_hero(width: int) -> None:
     print("")
     print(center_ansi(f"{bold}{pink}JIMMORIA v{__version__}{reset}", width))
     print(center_ansi(f"{silver}{subtitle}{reset}", width))
+    print(center_ansi(f"{silver}{korean_subtitle}{reset}", width))
     print(center_ansi(f"{dim}{muted}{workflow}{reset}", width))
     print(f"{pink}{line}{reset}")
 
@@ -1434,7 +1553,8 @@ def print_plain_hero(width: int) -> None:
     print("")
     print(center_text(f"JIMMORIA v{__version__}", width))
     print(center_text("Multi-agent crypto research company", width))
-    print(center_text("research rooms  /  agent bus  /  obsidian memory", width))
+    print(center_text("슈퍼바이저가 이끄는 온체인 리서치 HQ", width))
+    print(center_text("tmux-friendly TUI  /  agent cards  /  council room  /  obsidian memory", width))
     print(line)
 
 

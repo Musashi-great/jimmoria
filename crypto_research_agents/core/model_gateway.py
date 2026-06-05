@@ -9,6 +9,7 @@ from typing import Any
 from .codex_models import codex_model_for_tier, codex_model_from_env_value
 from .grok_models import grok_model_for_tier, grok_model_from_env_value
 from .llm_provider import (
+    CodexApiProvider,
     CodexCliProvider,
     CodexSdkProvider,
     GrokProvider,
@@ -280,6 +281,8 @@ def _codex_provider_from_env() -> LLMProvider:
     ).strip().lower()
     if preferred in {"codex_cli", "cli", "exec"}:
         return CodexCliProvider()
+    if preferred in {"codex_api", "openai_api", "api"}:
+        return CodexApiProvider()
     if preferred in {"codex_sdk", "sdk"}:
         return CodexSdkProvider()
     return CodexSdkProvider() if codex_sdk_available() else CodexCliProvider()
@@ -334,7 +337,7 @@ def _agent_provider_override(agent_id: str) -> str | None:
 
 def _normalize_provider_family(raw: str) -> str | None:
     normalized = raw.strip().lower().replace("-", "_")
-    if normalized in {"codex", "codex_cli", "codex_sdk", "openai_codex"}:
+    if normalized in {"codex", "codex_cli", "codex_sdk", "codex_api", "openai_api", "openai_codex"}:
         return "codex"
     if normalized in {"grok", "xai", "xai_oauth", "grok_oauth", "xai_api", "grok_api"}:
         return "grok"

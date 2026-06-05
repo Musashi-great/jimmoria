@@ -701,7 +701,6 @@ def source_social_results(room: ResearchRoom, memory: SharedMemory, project_quer
         if source is None:
             continue
         url = str(source.url or "").strip()
-        title = str(source.title or project_query or "source")
         content = str(source.content or "")
         if _looks_like_social_url(url):
             results.append(
