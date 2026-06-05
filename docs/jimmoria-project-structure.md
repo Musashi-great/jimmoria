@@ -157,6 +157,19 @@ flowchart LR
 
 ## 5.1 CLI Runtime TUI Dock
 
+Windows PowerShell default: `JIMMORIA_EVENT_STYLE=compact`. The CLI prints
+stable one-line room, agent, tool, and output logs instead of trying to redraw a
+live dock with cursor-up/delete-line escape sequences. This avoids stale panels
+and broken right borders in terminals with unreliable ANSI line deletion.
+
+Opt into the live dock only on terminals where it renders cleanly:
+
+```powershell
+$env:JIMMORIA_FORCE_RUNTIME_DOCK = "1"
+$env:JIMMORIA_EVENT_STYLE = "dock"
+jimmoria
+```
+
 `crypto_research_agents/console.py`는 Research Room 실행 중 lightweight TUI dock을 계속 유지한다.
 
 기본 화면 모델은 다음과 같다.

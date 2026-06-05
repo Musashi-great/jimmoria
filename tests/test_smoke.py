@@ -143,11 +143,12 @@ class SmokeTest(unittest.TestCase):
         console = JimmoriaConsole()
         console.width = 72
 
-        with patch("sys.stdin.isatty", return_value=True):
-            with patch("crypto_research_agents.console.supports_color", return_value=True):
-                with patch("builtins.input", return_value="/quit") as mocked_input:
-                    with redirect_stdout(output):
-                        value = console.read_chat_input()
+        with patch.dict("os.environ", {"JIMMORIA_FORCE_ANSI_INPUT": "1"}, clear=False):
+            with patch("sys.stdin.isatty", return_value=True):
+                with patch("crypto_research_agents.console.supports_color", return_value=True):
+                    with patch("builtins.input", return_value="/quit") as mocked_input:
+                        with redirect_stdout(output):
+                            value = console.read_chat_input()
 
         clean = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", output.getvalue())
         box_lines = [
@@ -165,6 +166,20 @@ class SmokeTest(unittest.TestCase):
         self.assertTrue(box_lines[3].endswith("|"))
         self.assertTrue(box_lines[4].startswith("+"))
         self.assertIn("\033[5M", output.getvalue())
+
+    def test_windows_default_chat_input_uses_stable_plain_box(self) -> None:
+        output = StringIO()
+        console = JimmoriaConsole()
+
+        with patch("sys.stdin.isatty", return_value=True):
+            with patch("crypto_research_agents.console.supports_color", return_value=True):
+                with patch("builtins.input", return_value="/quit") as mocked_input:
+                    with redirect_stdout(output):
+                        value = console.read_chat_input()
+
+        self.assertEqual(value, "/quit")
+        self.assertEqual(mocked_input.call_args[0][0], "| > ")
+        self.assertNotIn("\033[5M", output.getvalue())
 
     def test_chat_input_status_line_uses_display_width_for_korean(self) -> None:
         console = JimmoriaConsole()
@@ -746,7 +761,7 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("FAIL", text)
         self.assertIn("중단: Codex CLI provider failed", text)
 
-    def test_runtime_events_default_to_background_dock(self) -> None:
+    def test_runtime_events_default_to_compact_log_on_windows(self) -> None:
         output = StringIO()
         console = JimmoriaConsole()
 
@@ -786,10 +801,12 @@ class SmokeTest(unittest.TestCase):
             )
 
         text = output.getvalue()
-        self.assertNotIn("룸 > OPEN room_test", text)
-        self.assertNotIn("보드 > 대기 2/완료 0", text)
-        self.assertNotIn("에이전트 > RUN 아카이비스트", text)
-        self.assertNotIn("에이전트 > DONE 아카이비스트", text)
+        self.assertIn("룸 > OPEN room_test", text)
+        self.assertIn("보드 > 대기 2/완료 0", text)
+        self.assertIn("에이전트 > RUN 아카이비스트", text)
+        self.assertIn("에이전트 > DONE 아카이비스트", text)
+        self.assertNotIn("JIMMORIA HQ", text)
+        self.assertEqual(console.runtime_dock_lines, 0)
         self.assertEqual(console.last_room_id, "room_test")
         self.assertEqual(console.agent_state["ingestion_agent"], "done")
 
@@ -846,27 +863,28 @@ class SmokeTest(unittest.TestCase):
 
     def test_runtime_stream_keeps_input_dock_visible_during_room(self) -> None:
         output = StringIO()
-        console = JimmoriaConsole()
 
-        with patch("crypto_research_agents.console.supports_color", return_value=True):
-            with redirect_stdout(output):
-                console.handle_event(
-                    {
-                        "type": "room_created",
-                        "room_id": "room_test",
-                        "topic": "pearl pow project",
-                        "goals": ["Investigate the project."],
-                        "agents": ["supervisor_agent", "ingestion_agent"],
-                    }
-                )
-                console.handle_event(
-                    {
-                        "type": "agent_start",
-                        "room_id": "room_test",
-                        "agent_id": "ingestion_agent",
-                        "task_type": "source_ingestion",
-                    }
-                )
+        with patch.dict("os.environ", {"JIMMORIA_FORCE_RUNTIME_DOCK": "1", "JIMMORIA_EVENT_STYLE": "dock"}, clear=False):
+            console = JimmoriaConsole()
+            with patch("crypto_research_agents.console.supports_color", return_value=True):
+                with redirect_stdout(output):
+                    console.handle_event(
+                        {
+                            "type": "room_created",
+                            "room_id": "room_test",
+                            "topic": "pearl pow project",
+                            "goals": ["Investigate the project."],
+                            "agents": ["supervisor_agent", "ingestion_agent"],
+                        }
+                    )
+                    console.handle_event(
+                        {
+                            "type": "agent_start",
+                            "room_id": "room_test",
+                            "agent_id": "ingestion_agent",
+                            "task_type": "source_ingestion",
+                        }
+                    )
 
         clean = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", output.getvalue())
         self.assertIn("JIMMORIA HQ", clean)
@@ -886,39 +904,40 @@ class SmokeTest(unittest.TestCase):
 
     def test_runtime_dock_shows_full_agent_board_for_research_room(self) -> None:
         output = StringIO()
-        console = JimmoriaConsole()
-        console.width = 160
 
-        with patch("crypto_research_agents.console.supports_color", return_value=True):
-            with redirect_stdout(output):
-                console.handle_event(
-                    {
-                        "type": "room_created",
-                        "room_id": "room_test",
-                        "topic": "3jane report",
-                        "goals": ["Investigate the project."],
-                        "agents": [
-                            "supervisor_agent",
-                            "ingestion_agent",
-                            "social_kol_agent",
-                            "narrative_agent",
-                            "discovery_agent",
-                            "contract_onchain_agent",
-                            "product_tech_agent",
-                            "funding_token_agent",
-                            "report_agent",
-                            "obsidian_curator_agent",
-                        ],
-                    }
-                )
-                console.handle_event(
-                    {
-                        "type": "agent_start",
-                        "room_id": "room_test",
-                        "agent_id": "supervisor_agent",
-                        "task_type": "supervision",
-                    }
-                )
+        with patch.dict("os.environ", {"JIMMORIA_FORCE_RUNTIME_DOCK": "1", "JIMMORIA_EVENT_STYLE": "dock"}, clear=False):
+            console = JimmoriaConsole()
+            console.width = 160
+            with patch("crypto_research_agents.console.supports_color", return_value=True):
+                with redirect_stdout(output):
+                    console.handle_event(
+                        {
+                            "type": "room_created",
+                            "room_id": "room_test",
+                            "topic": "3jane report",
+                            "goals": ["Investigate the project."],
+                            "agents": [
+                                "supervisor_agent",
+                                "ingestion_agent",
+                                "social_kol_agent",
+                                "narrative_agent",
+                                "discovery_agent",
+                                "contract_onchain_agent",
+                                "product_tech_agent",
+                                "funding_token_agent",
+                                "report_agent",
+                                "obsidian_curator_agent",
+                            ],
+                        }
+                    )
+                    console.handle_event(
+                        {
+                            "type": "agent_start",
+                            "room_id": "room_test",
+                            "agent_id": "supervisor_agent",
+                            "task_type": "supervision",
+                        }
+                    )
 
         clean = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", output.getvalue())
         self.assertIn("진행: 슈퍼바이저 -> 리서치 방향과 작업 순서를 정리하는 중", clean)
@@ -936,35 +955,36 @@ class SmokeTest(unittest.TestCase):
 
     def test_runtime_dock_shows_council_room_card(self) -> None:
         output = StringIO()
-        console = JimmoriaConsole()
 
-        with patch("crypto_research_agents.console.supports_color", return_value=True):
-            with redirect_stdout(output):
-                console.handle_event(
-                    {
-                        "type": "room_created",
-                        "room_id": "room_test",
-                        "topic": "3jane report",
-                        "goals": ["Investigate the project."],
-                        "agents": ["social_kol_agent", "product_tech_agent"],
-                    }
-                )
-                console.handle_event(
-                    {
-                        "type": "deliberation_start",
-                        "room_id": "room_test",
-                        "participants": ["social_kol_agent", "product_tech_agent"],
-                        "summary": "Specialists compare findings.",
-                    }
-                )
-                console.handle_event(
-                    {
-                        "type": "deliberation_statement",
-                        "room_id": "room_test",
-                        "agent_id": "social_kol_agent",
-                        "summary": "공식 X 신호는 약하지만 공개 기사 근거는 있습니다.",
-                    }
-                )
+        with patch.dict("os.environ", {"JIMMORIA_FORCE_RUNTIME_DOCK": "1", "JIMMORIA_EVENT_STYLE": "dock"}, clear=False):
+            console = JimmoriaConsole()
+            with patch("crypto_research_agents.console.supports_color", return_value=True):
+                with redirect_stdout(output):
+                    console.handle_event(
+                        {
+                            "type": "room_created",
+                            "room_id": "room_test",
+                            "topic": "3jane report",
+                            "goals": ["Investigate the project."],
+                            "agents": ["social_kol_agent", "product_tech_agent"],
+                        }
+                    )
+                    console.handle_event(
+                        {
+                            "type": "deliberation_start",
+                            "room_id": "room_test",
+                            "participants": ["social_kol_agent", "product_tech_agent"],
+                            "summary": "Specialists compare findings.",
+                        }
+                    )
+                    console.handle_event(
+                        {
+                            "type": "deliberation_statement",
+                            "room_id": "room_test",
+                            "agent_id": "social_kol_agent",
+                            "summary": "공식 X 신호는 약하지만 공개 기사 근거는 있습니다.",
+                        }
+                    )
 
         clean = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", output.getvalue())
         self.assertIn("토론방 [진행]", clean)
@@ -973,28 +993,29 @@ class SmokeTest(unittest.TestCase):
 
     def test_runtime_dock_updates_agent_work_from_tool_events(self) -> None:
         output = StringIO()
-        console = JimmoriaConsole()
 
-        with patch("crypto_research_agents.console.supports_color", return_value=True):
-            with redirect_stdout(output):
-                console.handle_event(
-                    {
-                        "type": "room_created",
-                        "room_id": "room_test",
-                        "topic": "pearl pow project",
-                        "goals": ["Investigate the project."],
-                        "agents": ["discovery_agent"],
-                    }
-                )
-                console.handle_event(
-                    {
-                        "type": "tool_start",
-                        "room_id": "room_test",
-                        "agent_id": "discovery_agent",
-                        "tool_name": "web_search",
-                        "input_preview": "pearl crypto project official",
-                    }
-                )
+        with patch.dict("os.environ", {"JIMMORIA_FORCE_RUNTIME_DOCK": "1", "JIMMORIA_EVENT_STYLE": "dock"}, clear=False):
+            console = JimmoriaConsole()
+            with patch("crypto_research_agents.console.supports_color", return_value=True):
+                with redirect_stdout(output):
+                    console.handle_event(
+                        {
+                            "type": "room_created",
+                            "room_id": "room_test",
+                            "topic": "pearl pow project",
+                            "goals": ["Investigate the project."],
+                            "agents": ["discovery_agent"],
+                        }
+                    )
+                    console.handle_event(
+                        {
+                            "type": "tool_start",
+                            "room_id": "room_test",
+                            "agent_id": "discovery_agent",
+                            "tool_name": "web_search",
+                            "input_preview": "pearl crypto project official",
+                        }
+                    )
 
         clean = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", output.getvalue())
         self.assertIn("에이전트 작업 카드 - 현재 진행 상황", clean)
@@ -1004,28 +1025,29 @@ class SmokeTest(unittest.TestCase):
 
     def test_runtime_stream_clears_input_dock_when_room_finishes(self) -> None:
         output = StringIO()
-        console = JimmoriaConsole()
 
-        with patch("crypto_research_agents.console.supports_color", return_value=True):
-            with redirect_stdout(output):
-                console.handle_event(
-                    {
-                        "type": "room_created",
-                        "room_id": "room_test",
-                        "topic": "pearl pow project",
-                        "goals": ["Investigate the project."],
-                        "agents": ["supervisor_agent"],
-                    }
-                )
-                console.handle_event(
-                    {
-                        "type": "room_completed",
-                        "room_id": "room_test",
-                        "status": "completed",
-                        "messages": 2,
-                        "findings": 1,
-                    }
-                )
+        with patch.dict("os.environ", {"JIMMORIA_FORCE_RUNTIME_DOCK": "1", "JIMMORIA_EVENT_STYLE": "dock"}, clear=False):
+            console = JimmoriaConsole()
+            with patch("crypto_research_agents.console.supports_color", return_value=True):
+                with redirect_stdout(output):
+                    console.handle_event(
+                        {
+                            "type": "room_created",
+                            "room_id": "room_test",
+                            "topic": "pearl pow project",
+                            "goals": ["Investigate the project."],
+                            "agents": ["supervisor_agent"],
+                        }
+                    )
+                    console.handle_event(
+                        {
+                            "type": "room_completed",
+                            "room_id": "room_test",
+                            "status": "completed",
+                            "messages": 2,
+                            "findings": 1,
+                        }
+                    )
 
         self.assertIn("룸", output.getvalue())
         self.assertIn("\033[?25h", output.getvalue())

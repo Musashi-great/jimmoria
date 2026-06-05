@@ -5,13 +5,29 @@ Current merged local-state handoff:
 
 ## Runtime Dock Update
 
-The current CLI uses a lightweight TUI dock during Research Room execution.
+The current CLI uses safe compact runtime logs by default on Windows PowerShell.
+The lightweight TUI dock is still available, but it is opt-in because repeated
+ANSI cursor-up/delete-line redraws can leave stale panels in Windows terminals.
+
+```powershell
+$env:JIMMORIA_FORCE_RUNTIME_DOCK = "1"
+$env:JIMMORIA_EVENT_STYLE = "dock"
+jimmoria
+```
+
+Without those env vars, Research Room execution prints stable event lines:
+
+```text
+룸 > OPEN room_x | agents 10 | 3jane report
+Tool > RUN supervisor_agent -> create_task | write dossier
+에이전트 > DONE 슈퍼바이저 | plan ready
+```
 
 Behavior:
 
-- Raw runtime events do not scroll upward by default. They update the fixed dock in the foreground and are stored in run artifacts in the background.
-- The old bottom input dock is expanded into a fixed runtime panel.
-- The panel contains `JIMMORIA HQ`, provider, room id, aggregate agent progress, and a `Live agent board - current work` table.
+- Windows default runtime logs scroll normally and do not redraw previous panels.
+- Raw event records are still stored in run artifacts in the background.
+- Forced dock mode contains `JIMMORIA HQ`, provider, room id, aggregate agent progress, and a `Live agent board - current work` table.
 - Each agent row shows `WAIT`, `RUN`, `DONE`, or `FAIL`.
 - Each agent row shows the current assignment or the latest tool action.
 - Tool events update the fixed board and are saved to `events.json` / `tool_audit_log.json`.

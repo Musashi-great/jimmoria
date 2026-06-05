@@ -83,7 +83,7 @@ class JimmoriaConsole:
         terminal_width = shutil.get_terminal_size((136, 30)).columns
         self.width = safe_terminal_width(terminal_width)
         self.use_rich = RichConsole is not None and rich_blocks_enabled()
-        self.event_style = os.getenv("JIMMORIA_EVENT_STYLE", "dock").strip().lower() or "dock"
+        self.event_style = default_event_style()
         self.runtime_room_running = False
         self.runtime_dock_lines = 0
         self.runtime_dock_frame = 0
@@ -260,15 +260,23 @@ class JimmoriaConsole:
         return self.event_style in {"stream", "compact", "log", "logs", "debug", "trace"}
 
     def use_runtime_dock(self) -> bool:
-        return self.use_stream_events() and supports_color() and not os.getenv("JIMMORIA_NO_RUNTIME_DOCK")
+        return (
+            self.use_stream_events()
+            and supports_color()
+            and runtime_dock_enabled()
+            and not os.getenv("JIMMORIA_NO_RUNTIME_DOCK")
+        )
 
     def read_chat_input(self) -> str:
         if not sys.stdin.isatty():
             return input(f"\n{APP_NAME.lower()}> ")
 
-        if supports_color():
+        if self.use_ansi_input_box():
             return self.read_ansi_boxed_input()
         return self.read_basic_boxed_input()
+
+    def use_ansi_input_box(self) -> bool:
+        return supports_color() and ansi_input_box_enabled()
 
     def read_ansi_boxed_input(self) -> str:
         self.show_cursor()
@@ -1683,6 +1691,33 @@ def rich_blocks_enabled() -> bool:
     if os.name == "nt":
         return False
     return True
+
+
+def default_event_style() -> str:
+    configured = os.getenv("JIMMORIA_EVENT_STYLE", "").strip().lower()
+    if configured:
+        return configured
+    # Windows terminals often leave stale lines when we use ANSI cursor-up and
+    # delete-line sequences for a live dock. Compact logs are boring, but solid.
+    if os.name == "nt" and not os.getenv("JIMMORIA_FORCE_RUNTIME_DOCK"):
+        return "compact"
+    return "dock"
+
+
+def runtime_dock_enabled() -> bool:
+    if os.getenv("JIMMORIA_FORCE_RUNTIME_DOCK"):
+        return True
+    if os.getenv("JIMMORIA_DISABLE_RUNTIME_DOCK"):
+        return False
+    return os.name != "nt"
+
+
+def ansi_input_box_enabled() -> bool:
+    if os.getenv("JIMMORIA_FORCE_ANSI_INPUT"):
+        return True
+    if os.getenv("JIMMORIA_DISABLE_ANSI_INPUT"):
+        return False
+    return os.name != "nt"
 
 
 def safe_terminal_width(terminal_width: int) -> int:

@@ -48,31 +48,29 @@ After that, start the company from the same venv/shell:
 jimmoria
 ```
 
-The CLI runs as a chat-style Research HQ. During a Research Room, raw runtime events stay in the background while a tmux-friendly runtime dock shows each agent as a Korean-first work card:
+The CLI runs as a chat-style Research HQ. On Windows PowerShell, Research Room
+progress uses stable compact event logs by default so ANSI cursor movement does
+not leave stale panels in the terminal:
 
 ```text
-+--------------------------------------------------------------------------------+
-| JIMMORIA HQ | 슈퍼바이저 대화 | provider: codex_cli | room: room_x | ...        |
-| 진행: 스카우터 -> 툴 실행: web_search - official site | 대기: 제품/기술          |
-| 리서치룸 실행 중입니다. 슈퍼바이저가 완료하면 입력창이 돌아옵니다.              |
-|--------------------------------------------------------------------------------|
-| 에이전트 작업 카드 - 현재 진행 상황                                             |
-| 상태     에이전트                 현재 작업                                     |
-| +----------------------------+   +----------------------------+                |
-| | 스카우터 [진행]            |   | 제품/기술 [대기]            |                |
-| | discovery_agent            |   | product_tech_agent          |                |
-| | 진행: 공식 후보 확인 중    |   | 대기: 문서/GitHub 확인 중   |                |
-| +----------------------------+   +----------------------------+                |
-| | 토론방 [진행]              |                                                    |
-| | 참여: 소셜/KOL, 제품/기술  |                                                    |
-| | 소셜/KOL: 공개 기사 근거 확인 |                                                  |
-| +----------------------------+                                                    |
-|--------------------------------------------------------------------------------|
-| > 작업중...                                                                    |
-+--------------------------------------------------------------------------------+
+룸 > OPEN room_x | agents 10 | 3jane report
+보드 > 대기 10/완료 0
+Tool > RUN supervisor_agent -> create_task | write dossier
+에이전트 > DONE 슈퍼바이저 | plan ready | msg 4 / findings 1
 ```
 
-That dock is the lightweight TUI layer: it keeps the current room, provider, agent progress, each agent's active job, and Agent Council discussion summaries visible while detailed `룸 >`, `에이전트 >`, `툴 >`, and `Output >` events stay in the background and are saved under `data/runs/<room_id>/`. Set `JIMMORIA_EVENT_STYLE=stream` only when you want the raw live event stream on screen for debugging.
+Saved room, agent, tool, and output events are still written under
+`data/runs/<room_id>/`. On terminals with reliable ANSI cursor controls, you can
+opt into the live dock with:
+
+```powershell
+$env:JIMMORIA_FORCE_RUNTIME_DOCK = "1"
+$env:JIMMORIA_EVENT_STYLE = "dock"
+jimmoria
+```
+
+For explicit compact logs on any platform, set `JIMMORIA_EVENT_STYLE=compact` or
+`JIMMORIA_EVENT_STYLE=stream`.
 
 Open the local web dashboard:
 
