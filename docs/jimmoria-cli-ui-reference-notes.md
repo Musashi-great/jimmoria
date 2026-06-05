@@ -8,7 +8,7 @@ Current merged local-state handoff:
 The current CLI uses the live runtime dock by default. When a Research Room is
 running, the visible screen becomes a fixed agent dashboard: raw runtime/tool
 events stay in saved run artifacts, while the terminal shows each AI agent's
-current work card and a running LLM call/token total.
+current work row and a running LLM call/token total.
 
 ```powershell
 $env:JIMMORIA_EVENT_STYLE = "dock"
@@ -24,10 +24,9 @@ The default dock shape:
 | 진행: 스카우터 -> 툴 실행: web_search - official project query | 대기: ... |
 | 리서치룸 실행 중입니다. 슈퍼바이저가 완료하면 입력창이 돌아옵니다.       |
 | 전체 AI 에이전트 대시보드 - 현재 작업                                      |
-| +------------------------------+  +------------------------------+          |
-| | 스카우터 [진행] discovery... |  | 아카이비스트 [완료] ingest... |          |
-| | 진행: 공식 후보를 확인하는 중 |  | 완료: 소스 정리 완료          |          |
-| +------------------------------+  +------------------------------+          |
+| 상태    AI                ID                          현재 작업             |
+| 진행    스카우터          discovery_agent             공식 후보 확인 중     |
+| 완료    아카이비스트      ingestion_agent             소스 정리 완료        |
 | > 작업중...                                                                 |
 +--------------------------------------------------------------------------------+
 ```
@@ -38,16 +37,16 @@ Behavior:
 - Raw event records are still stored in run artifacts in the background.
 - The header shows cumulative LLM calls and total tokens as agent results arrive.
 - The dashboard redraw uses cursor-up plus per-line clear sequences so stale
-  card borders are less likely than with delete-line redraws.
+  borders are less likely than with delete-line redraws.
 - Compact log mode is still available with `JIMMORIA_EVENT_STYLE=compact`.
 - Compact logs hide internal supervisor office tools such as
   `create_research_room`, `create_task`, `assign_task`, `agent_handoff`, and
   `update_task_status`; those details stay in saved run artifacts and
   `JIMMORIA_EVENT_STYLE=stream`.
 - Dock mode contains `JIMMORIA HQ`, provider, room id, aggregate agent progress,
-  token/call usage, and a full AI agent card grid.
-- Each agent card shows `대기`, `진행`, `완료`, or `실패`.
-- Each agent card shows the current assignment or the latest tool action.
+  token/call usage, and a full AI agent table.
+- Each agent row shows `대기`, `진행`, `완료`, or `실패`.
+- Each agent row shows the current assignment or the latest tool action.
 - Tool events update the fixed board and are saved to `events.json` / `tool_audit_log.json`.
 - The `> working...` line stays inside the panel, and only the dots blink.
 
@@ -83,7 +82,7 @@ JIMMORIA의 현재 CLI는 full-screen TUI가 아니라 line-oriented CLI다. 따
 - Runtime metrics include elapsed time and LLM usage. Dock header는 누적 token/call을 보여주고, `JIMMORIA_EVENT_STYLE=stream`을 켠 디버그 모드에서는 `time 1.2s | llm 2 calls / ~4.2k tokens`처럼 compact log로도 볼 수 있다.
 - Dock mode에서는 새 이벤트가 출력될 때 이전 dock을 line-clear 방식으로 지운 뒤 같은 위치에 다시 그려, 화면이 agent 상태판으로 유지되게 한다.
 - Dock mode에서는 실제 터미널 커서를 숨기고, dock 내부의 `> working...` 점만 blink 처리한다. 바깥 커서가 박스 밖에서 깜빡이면 안 된다.
-- 큰 agent work card는 기본 dock, `/board`, 또는 `JIMMORIA_EVENT_STYLE=cards`에서 사용한다.
+- 큰 agent work table은 기본 dock, `/board`, 또는 `JIMMORIA_EVENT_STYLE=cards`에서 사용한다.
 
 ## Target Shape
 

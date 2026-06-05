@@ -159,7 +159,7 @@ flowchart LR
 
 Default: `JIMMORIA_EVENT_STYLE=dock`. The CLI keeps a live agent dashboard on
 screen while a Research Room is running. The visible terminal shows each AI
-agent's current work card and cumulative LLM call/token usage; raw room, agent,
+agent's current work row and cumulative LLM call/token usage; raw room, agent,
 tool, and output logs are stored in the background run artifacts.
 
 Use compact lines only when explicitly requested:
@@ -185,7 +185,7 @@ fixed runtime dashboard
   토큰 사용: ~42.0k tokens | LLM 호출: 12 | 로그: 백단 저장
   진행: 스카우터 -> 툴 실행: web_search - official project query | 대기: ...
   전체 AI 에이전트 대시보드 - 현재 작업
-  [agent card grid with 대기/진행/완료/실패]
+  상태 / AI / ID / 현재 작업 rows with 대기/진행/완료/실패
 ```
 
 이 dock은 runtime event가 들어올 때마다 line-clear 방식으로 같은 위치에 다시
@@ -208,10 +208,9 @@ Token/call usage line
 Now: active_agent -> current work | Waiting: next agents
 Room running notice
 전체 AI 에이전트 대시보드 - 현재 작업
-+------------------------------+  +------------------------------+
-| 슈퍼바이저 [진행] supervisor |  | 아카이비스트 [대기] ingest... |
-| 진행: Planning direction     |  | 대기: Extracting metadata     |
-+------------------------------+  +------------------------------+
+상태    AI                ID                          현재 작업
+진행    슈퍼바이저        supervisor_agent            Planning direction
+대기    아카이비스트      ingestion_agent             Extracting metadata
 ...
 > working...
 ```

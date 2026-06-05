@@ -50,7 +50,7 @@ jimmoria
 
 The CLI runs as a chat-style Research HQ. When a Research Room is active, the
 default runtime view is a fixed agent dashboard: the screen shows each AI agent's
-current work card, keeps raw events in the background run artifacts, and updates
+current work row, keeps raw events in the background run artifacts, and updates
 the total LLM call/token count in the header.
 
 ```text
@@ -59,10 +59,9 @@ the total LLM call/token count in the header.
 | 토큰 사용: ~42.0k tokens | LLM 호출: 12 | 로그: 백단 저장                  |
 | 진행: 스카우터 -> 툴 실행: web_search - official project query | 대기: ... |
 | 전체 AI 에이전트 대시보드 - 현재 작업                                      |
-| +------------------------------+  +------------------------------+          |
-| | 스카우터 [진행] discovery... |  | 아카이비스트 [완료] ingest... |          |
-| | 진행: 공식 후보를 확인하는 중 |  | 완료: 소스 정리 완료          |          |
-| +------------------------------+  +------------------------------+          |
+| 상태    AI                ID                          현재 작업             |
+| 진행    스카우터          discovery_agent             공식 후보 확인 중     |
+| 완료    아카이비스트      ingestion_agent             소스 정리 완료        |
 | > 작업중...                                                                 |
 +--------------------------------------------------------------------------------+
 ```
@@ -78,7 +77,7 @@ jimmoria
 ```
 
 If a terminal has trouble with live cursor redraws, set
-`JIMMORIA_DISABLE_RUNTIME_DOCK=1` to fall back to framed non-live cards.
+`JIMMORIA_DISABLE_RUNTIME_DOCK=1` to fall back to framed non-live status blocks.
 
 Open the local web dashboard:
 

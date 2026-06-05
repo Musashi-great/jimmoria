@@ -461,14 +461,22 @@ class JimmoriaConsole:
     def input_divider_line_style(self) -> str:
         return self.input_border_style(self.input_divider_line())
 
+    def input_frame_line_style(self, text: str) -> str:
+        if not supports_color():
+            return text
+        if not text.startswith("|") or not text.endswith("|"):
+            return text
+        violet = "\033[38;2;211;95;255m"
+        reset = "\033[0m"
+        return f"{violet}|{reset}{text[1:-1]}{violet}|{reset}"
+
     def input_status_line_style(self, text: str) -> str:
         if not supports_color():
             return text
-        violet = "\033[38;2;211;95;255m"
         dim = "\033[38;2;126;96;154m"
         pink = "\033[38;2;255;92;212m"
         reset = "\033[0m"
-        return text.replace("|", f"{violet}|{reset}", 2).replace("JIMMORIA HQ", f"{pink}JIMMORIA HQ{reset}", 1).replace(
+        return self.input_frame_line_style(text).replace("JIMMORIA HQ", f"{pink}JIMMORIA HQ{reset}", 1).replace(
             "슈퍼바이저 대화",
             f"{dim}슈퍼바이저 대화{reset}",
             1,
@@ -480,7 +488,7 @@ class JimmoriaConsole:
         reset = "\033[0m"
         inner_width = self.input_box_width() - 4
         padding = " " * max(inner_width - display_width("> "), 0)
-        return f"{violet}|{reset} {pink}>{reset} {padding}{violet}|{reset}"
+        return f"{violet}|{reset} {pink}>{reset} {padding} {violet}|{reset}"
 
     def input_locked_line_style(self) -> str:
         violet = "\033[38;2;211;95;255m"
@@ -495,7 +503,7 @@ class JimmoriaConsole:
         padding = " " * max(inner_width - display_width(text), 0)
         return (
             f"{violet}|{reset} {muted}{visible_prefix}{reset}"
-            f"{blink}{pink}{visible_dots}{reset}{padding}{violet}|{reset}"
+            f"{blink}{pink}{visible_dots}{reset}{padding} {violet}|{reset}"
         )
 
     def input_active_summary_line_style(self) -> str:
@@ -506,7 +514,7 @@ class JimmoriaConsole:
         pink = "\033[38;2;255;92;212m"
         muted = "\033[38;2;160;132;188m"
         reset = "\033[0m"
-        styled = line.replace("|", f"{violet}|{reset}", 2)
+        styled = self.input_frame_line_style(line)
         styled = styled.replace("진행:", f"{pink}진행:{reset}", 1)
         styled = styled.replace("대기:", f"{muted}대기:{reset}", 1)
         styled = styled.replace("완료:", f"{muted}완료:{reset}", 1)
@@ -520,7 +528,7 @@ class JimmoriaConsole:
         pink = "\033[38;2;255;92;212m"
         muted = "\033[38;2;160;132;188m"
         reset = "\033[0m"
-        styled = line.replace("|", f"{violet}|{reset}", 2)
+        styled = self.input_frame_line_style(line)
         styled = styled.replace("토큰 사용:", f"{pink}토큰 사용:{reset}", 1)
         styled = styled.replace("로그:", f"{muted}로그:{reset}", 1)
         return styled
@@ -588,26 +596,32 @@ class JimmoriaConsole:
         pink = "\033[38;2;255;92;212m"
         violet = "\033[38;2;211;95;255m"
         reset = "\033[0m"
-        return line.replace("|", f"{violet}|{reset}", 2).replace(
+        return self.input_frame_line_style(line).replace(
             "전체 AI 에이전트 대시보드",
             f"{pink}전체 AI 에이전트 대시보드{reset}",
             1,
         )
 
     def input_board_header_line_style(self) -> str:
-        line = self.input_text_line(f"{'상태':<6} {'에이전트':<20} 현재 작업")
+        state_width, name_width, agent_width, _activity_width = self.runtime_agent_table_widths()
+        header = (
+            f"{pad_display('상태', state_width)}  "
+            f"{pad_display('AI', name_width)}  "
+            f"{pad_display('ID', agent_width)}  "
+            "현재 작업"
+        )
+        line = self.input_text_line(header)
         if not supports_color():
             return line
-        violet = "\033[38;2;211;95;255m"
         muted = "\033[38;2;160;132;188m"
         reset = "\033[0m"
-        return line.replace("|", f"{violet}|{reset}", 2).replace(
+        return self.input_frame_line_style(line).replace(
             "상태",
             f"{muted}상태{reset}",
             1,
         ).replace(
-            "에이전트",
-            f"{muted}에이전트{reset}",
+            "AI",
+            f"{muted}AI{reset}",
             1,
         ).replace(
             "현재 작업",
@@ -619,15 +633,76 @@ class JimmoriaConsole:
         if not self.agent_state:
             return [self.input_text_line("대기   활성 리서치룸 없음        다음 요청을 기다립니다")]
 
-        cards: list[list[str]] = []
+        lines: list[str] = []
         for agent_id in DEFAULT_AGENTS:
             if agent_id not in self.agent_state:
                 continue
-            cards.append(self.agent_status_card(agent_id))
-        lines = self.card_grid_lines(cards)
+            lines.append(self.runtime_agent_table_line(agent_id))
         if self.council_state not in {"idle", "queued"}:
-            lines.extend(self.card_grid_lines([self.council_status_card(full_width=True)], columns=1))
+            lines.append(self.runtime_council_table_line())
         return lines
+
+    def runtime_agent_table_line(self, agent_id: str) -> str:
+        state = self.agent_state.get(agent_id, "queued")
+        activity = self.agent_activity.get(agent_id) or AGENT_ACTIVITY.get(agent_id, "")
+        row = self.runtime_agent_table_row(
+            state=self.state_label_ko(state),
+            name=self.agent_display_name(agent_id),
+            agent_id=agent_id,
+            activity=self.activity_label(state, activity),
+        )
+        return self.runtime_agent_table_line_style(self.input_text_line(row), state)
+
+    def runtime_council_table_line(self) -> str:
+        participant_text = self.compact_agent_list(self.council_participants, limit=3) or "대기"
+        row = self.runtime_agent_table_row(
+            state=self.state_label_ko(self.council_state),
+            name="토론방",
+            agent_id=participant_text,
+            activity=self.council_activity,
+        )
+        return self.runtime_agent_table_line_style(self.input_text_line(row), self.council_state)
+
+    def runtime_agent_table_row(self, *, state: str, name: str, agent_id: str, activity: str) -> str:
+        state_width, name_width, agent_width, activity_width = self.runtime_agent_table_widths()
+        return (
+            f"{pad_display(state, state_width)}  "
+            f"{pad_display(name, name_width)}  "
+            f"{pad_display(agent_id, agent_width)}  "
+            f"{clip_display(activity, activity_width, suffix='...')}"
+        )
+
+    def runtime_agent_table_widths(self) -> tuple[int, int, int, int]:
+        inner = self.input_box_width() - 4
+        state_width = 6
+        name_width = 16 if inner >= 96 else 12
+        agent_width = 26 if inner >= 112 else 20
+        gap_width = 6
+        activity_width = max(16, inner - state_width - name_width - agent_width - gap_width)
+        total = state_width + name_width + agent_width + activity_width + gap_width
+        if total > inner:
+            overflow = total - inner
+            agent_width = max(14, agent_width - overflow)
+            activity_width = max(12, inner - state_width - name_width - agent_width - gap_width)
+        return state_width, name_width, agent_width, activity_width
+
+    def runtime_agent_table_line_style(self, line: str, state: str) -> str:
+        if not supports_color():
+            return line
+        running = "\033[38;2;255;210;245m"
+        done = "\033[38;2;120;255;190m"
+        failed = "\033[38;2;255;92;120m"
+        waiting = "\033[38;2;160;132;188m"
+        reset = "\033[0m"
+        state_style = {
+            "running": running,
+            "done": done,
+            "failed": failed,
+            "queued": waiting,
+        }.get(state, "\033[38;2;230;214;255m")
+        styled = self.input_frame_line_style(line)
+        label = self.state_label_ko(state)
+        return styled.replace(label, f"{state_style}{label}{reset}", 1)
 
     def agent_status_card(self, agent_id: str) -> list[str]:
         state = self.agent_state.get(agent_id, "queued")

@@ -13,7 +13,7 @@ This note is the local operator handoff after merging
 - Grok/xAI handles social/KOL, narrative reasoning, and candidate discovery by default.
 - If a Grok route fails in hybrid mode, JIMMORIA retries the same task through Codex by default and records the fallback in `llm_call_log.json`.
 - Runtime room, agent, tool, and output events are saved under `data/runs/<room_id>/`.
-- Windows PowerShell uses the live agent dashboard by default. The screen shows all active AI agent cards, brief current work, and cumulative LLM call/token usage while raw logs stay in `data/runs/<room_id>/`.
+- Windows PowerShell uses the live agent dashboard by default. The screen shows all active AI agent rows, brief current work, and cumulative LLM call/token usage while raw logs stay in `data/runs/<room_id>/`.
 - Tool access is now registry-backed through `config/tools/tool_registry.yaml` and policy-backed through `config/toolsets.yaml`.
 - Agents have explicit skills and hooks in `config/agents/*.yaml`, `config/skills/`, and `config/hooks/`.
 - The web dashboard entry point is `jimmoria web`, with the default local URL `http://127.0.0.1:8787`.

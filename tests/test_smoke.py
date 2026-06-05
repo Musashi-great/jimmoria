@@ -1071,11 +1071,11 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("ingestion_agent", clean)
         self.assertIn("진행: 입력 소스와 메타데이터를 정리하는 중", clean)
         self.assertIn("> 작업중...", clean)
-        self.assertIn("\033[15A", output.getvalue())
+        self.assertIn("\033[13A", output.getvalue())
         self.assertIn("\033[2K", output.getvalue())
         self.assertIn("\033[?25l", output.getvalue())
         self.assertIn("\033[5m\033[38;2;255;92;212m...", output.getvalue())
-        self.assertEqual(console.runtime_dock_lines, 15)
+        self.assertEqual(console.runtime_dock_lines, 13)
 
     def test_runtime_dock_shows_full_agent_board_for_research_room(self) -> None:
         output = StringIO()
@@ -1125,7 +1125,43 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("obsidian_curator_agent", clean)
         self.assertIn("진행: 리서치 방향과 작업 순서를 정리하는 중", clean)
         self.assertIn("대기: 볼트 노트와 지식 기록을 동기화하는 중", clean)
-        self.assertEqual(console.runtime_dock_lines, 31)
+        self.assertNotIn("+--------------------------------------------------------+", clean)
+        self.assertEqual(console.runtime_dock_lines, 21)
+
+    def test_runtime_dock_frame_lines_keep_equal_display_width(self) -> None:
+        output = StringIO()
+
+        with patch.dict("os.environ", {"JIMMORIA_FORCE_RUNTIME_DOCK": "1", "JIMMORIA_EVENT_STYLE": "dock"}, clear=False):
+            console = JimmoriaConsole()
+            console.width = 150
+            with patch("crypto_research_agents.console.supports_color", return_value=True):
+                with redirect_stdout(output):
+                    console.handle_event(
+                        {
+                            "type": "room_created",
+                            "room_id": "room_test",
+                            "topic": "border stability test",
+                            "goals": ["Keep borders aligned."],
+                            "agents": [
+                                "supervisor_agent",
+                                "ingestion_agent",
+                                "social_kol_agent",
+                                "narrative_agent",
+                                "discovery_agent",
+                                "contract_onchain_agent",
+                                "product_tech_agent",
+                                "funding_token_agent",
+                                "report_agent",
+                                "obsidian_curator_agent",
+                            ],
+                        }
+                    )
+
+        clean = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", output.getvalue()).replace("\r", "")
+        frame_lines = [line for line in clean.splitlines() if line.startswith(("+", "|"))]
+        self.assertTrue(frame_lines)
+        self.assertTrue(all(display_width(line) == console.input_box_width() for line in frame_lines))
+        self.assertFalse(any("+---" in line[2:-2] for line in frame_lines))
 
 
     def test_runtime_dock_shows_council_room_card(self) -> None:
@@ -1162,8 +1198,8 @@ class SmokeTest(unittest.TestCase):
                     )
 
         clean = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", output.getvalue())
-        self.assertIn("토론방 [진행]", clean)
-        self.assertIn("참여: 소셜/KOL, 제품/기술", clean)
+        self.assertIn("진행    토론방", clean)
+        self.assertIn("소셜/KOL, 제품/기술", clean)
         self.assertIn("소셜/KOL: 공식 X 신호는 약하지만 공개 기사 근거는 있습니다.", clean)
 
     def test_runtime_dock_updates_agent_work_from_tool_events(self) -> None:
