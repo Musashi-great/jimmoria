@@ -1074,6 +1074,21 @@ def handle_chat_command(
         console.print_help()
         return False, last_room_id
 
+    if command in {"/research", "/dossier"}:
+        if not rest:
+            console.block(
+                "보고서 작성 명령",
+                [
+                    "Usage: /research <topic-or-url>",
+                    "Alias: /dossier <topic-or-url>",
+                    "예: /research https://z.cash/ 최근 ZEC 하락에 대한 보고서 작성",
+                    "",
+                    "단계: 입력 해석 -> 실행 확인 -> Research Room -> 보고서 저장",
+                ],
+            )
+            return False, last_room_id
+        return False, run_chat_report_workflow(rest, args, last_room_id, console, command_name=command)
+
     if command == "/board":
         console.print_agent_state()
         return False, last_room_id
@@ -1187,6 +1202,86 @@ def handle_chat_command(
 
     print("Unknown command. Type /help.")
     return False, last_room_id
+
+
+def run_chat_report_workflow(
+    request: str,
+    args: argparse.Namespace,
+    last_room_id: str,
+    console: JimmoriaConsole,
+    *,
+    command_name: str,
+) -> str:
+    route_line = f"{request} 보고서 작성해봐"
+    title, content, url = chat_input_to_source(request)
+    previous_context = previous_report_context(
+        request,
+        runs_dir=Path(args.memory).parent / "runs",
+        reports_dir=args.reports,
+        last_room_id=last_room_id,
+    )
+    if previous_context:
+        content = f"{content}\n\n{previous_context}"
+    settings = load_company_settings(company_settings_path_for(args.memory))
+    intake_decision = decide_supervisor_intake(route_line, settings)
+    intake_payload = intake_decision.to_dict()
+    intake_payload.update(
+        {
+            "intent_type": "research_request",
+            "action": "open_research_room",
+            "output_mode": "research_dossier",
+            "needs_research_room": True,
+            "confidence": max(float(intake_payload.get("confidence") or 0), 0.95),
+            "rationale": f"{command_name} command explicitly requested a staged research report.",
+            "next_step": "Confirm, run the Research Room, then write and save the report.",
+        }
+    )
+
+    console.print_user_message(f"{command_name} {request}")
+    console.print_supervisor_working("보고서 작성 명령을 단계별 Research Room 작업으로 준비하는 중입니다.")
+    source_line = url or "링크 없음 - 후보 식별 단계에서 공식 출처 검증 필요"
+    console.block(
+        "보고서 작성 워크플로우",
+        [
+            f"1. 입력 해석: {title}",
+            f"2. 기준 소스: {source_line}",
+            "3. 확인: Enter/y를 받으면 Research Room을 엽니다.",
+            f"4. 실행: 슈퍼바이저 + 전문 에이전트 {len(DEFAULT_AGENTS)}개가 근거를 수집합니다.",
+            "5. 산출물: 리서치 보고서, room 기록, event/tool audit을 저장합니다.",
+        ],
+    )
+    if not console.confirm_dispatch(
+        intent_type="research_request",
+        title=title,
+        agent_count=len(DEFAULT_AGENTS),
+    ):
+        console.print_supervisor_reply(
+            [
+                "좋습니다. 보고서 작성 워크플로우를 취소했습니다.",
+                "다시 실행하려면 /research <topic-or-url> 또는 /dossier <topic-or-url>을 입력하세요.",
+            ]
+        )
+        return last_room_id
+
+    runtime = ResearchRuntime(load_memory(args.memory))
+    runtime.event_handler = console.make_event_handler()
+    try:
+        result = runtime.run_article_research(
+            title=title,
+            content=content,
+            url=url,
+            vault_dir=args.vault,
+            reports_dir=args.reports,
+            memory_path=args.memory,
+            intake_decision=intake_payload,
+            retention_policy=chat_run_retention_policy(),
+        )
+    except RuntimeError as exc:
+        console.print_supervisor_reply(model_runtime_error_reply(exc))
+        return last_room_id
+    console.last_room_id = result.room.room_id
+    console.print_run_summary(result)
+    return result.room.room_id
 
 
 def classify_chat_input(line: str) -> str:

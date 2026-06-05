@@ -64,6 +64,7 @@ STATE_LABELS_KO = {
 }
 
 INTERNAL_RUNTIME_TOOLS = {
+    "create_research_room",
     "create_task",
     "assign_task",
     "agent_handoff",
@@ -72,6 +73,7 @@ INTERNAL_RUNTIME_TOOLS = {
 }
 
 INTERNAL_TOOL_ACTIVITY = {
+    "create_research_room": "리서치룸을 여는 중",
     "create_task": "작업 카드를 정리하는 중",
     "assign_task": "담당 에이전트에게 작업을 배정하는 중",
     "agent_handoff": "다음 에이전트로 인수인계하는 중",
@@ -114,6 +116,8 @@ class JimmoriaConsole:
     def print_help(self) -> None:
         command_rows = [
             ("/add <text-or-url>", "소스만 저장"),
+            ("/research <topic-or-url>", "단계별 리서치 보고서 작성"),
+            ("/dossier <topic-or-url>", "리서치 보고서 작성 alias"),
             ("/models", "LLM provider/model 설정"),
             ("/doctor", "연결 가능한 도구와 placeholder 상태 확인"),
             ("/company", "활성/예정 에이전트 보기"),

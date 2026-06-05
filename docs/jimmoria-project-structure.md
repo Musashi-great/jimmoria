@@ -324,7 +324,8 @@ Supervisor는 단순 라우터가 아니라 회사의 boss/orchestrator다.
 
 - 사용자 발화를 먼저 읽고 대화/설정/리서치/보고서 조회 요청을 구분
 - Research Room이 필요한지 판단
-- 보고서/dossier 작성 요청이면 사용자에게 확인 후 room open
+- `/research <topic-or-url>` 또는 `/dossier <topic-or-url>` 명령은 보고서 작성 워크플로우를 단계별로 표시한 뒤 사용자 확인 후 room open
+- 자연어 보고서/dossier 작성 요청이면 사용자에게 확인 후 room open
 - 사용자가 y/Enter로 승인한 뒤에는 중복 Supervisor 설명 박스를 출력하지 않고 room 실행 dock으로 전환
 - 저장 보고서 조회가 실패한 뒤 사용자가 "만들어/작성해"라고 정정하면 직전 요청을 새 보고서 작성 요청으로 복구
 - `3jane`처럼 숫자로 시작하는 프로젝트명도 추출하고, 보고서 작성 요청이면 public web discovery를 우선 수행
@@ -389,7 +390,7 @@ confidence
 - 보고서가 충분한지, evidence가 부족한지 판단
 - 사용자에게 최종 응답 전달
 
-일상 대화, 설정 변경, 단순 "조사해봐/알아봐" 요청은 report를 만들지 않고 Supervisor가 직접 응답한다. Research Room은 "보고서 작성해봐", "dossier 만들어봐", "리서치 보고서 생성해줘"처럼 최종 산출물 작성이 명확한 경우에만 열린다.
+일상 대화, 설정 변경, 단순 "조사해봐/알아봐" 요청은 report를 만들지 않고 Supervisor가 직접 응답한다. Research Room은 `/research`, `/dossier`, 또는 "보고서 작성해봐", "dossier 만들어봐", "리서치 보고서 생성해줘"처럼 최종 산출물 작성이 명확한 경우에만 열린다.
 
 ## 7. Agent Roster
 

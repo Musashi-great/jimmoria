@@ -31,9 +31,10 @@ Behavior:
 
 - Windows default runtime logs scroll normally and do not redraw previous panels.
 - Raw event records are still stored in run artifacts in the background.
-- Compact logs hide internal supervisor office tools such as `create_task`,
-  `assign_task`, `agent_handoff`, and `update_task_status`; those details stay
-  in saved run artifacts and `JIMMORIA_EVENT_STYLE=stream`.
+- Compact logs hide internal supervisor office tools such as
+  `create_research_room`, `create_task`, `assign_task`, `agent_handoff`, and
+  `update_task_status`; those details stay in saved run artifacts and
+  `JIMMORIA_EVENT_STYLE=stream`.
 - Forced dock mode contains `JIMMORIA HQ`, provider, room id, aggregate agent progress, and a `Live agent board - current work` table.
 - Each agent row shows `WAIT`, `RUN`, `DONE`, or `FAIL`.
 - Each agent row shows the current assignment or the latest tool action.

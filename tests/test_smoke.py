@@ -264,6 +264,8 @@ class SmokeTest(unittest.TestCase):
         text = output.getvalue()
         self.assertIn("JIMMORIA 명령어", text)
         self.assertIn("/settings", text)
+        self.assertIn("/research <topic-or-url>", text)
+        self.assertIn("/dossier <topic-or-url>", text)
         self.assertIn("+ JIMMORIA 명령어", text)
         self.assertIn("| /settings", text)
         self.assertNotIn("Agents at work:", text)
@@ -707,6 +709,48 @@ class SmokeTest(unittest.TestCase):
         self.assertNotIn("작업을 배정하겠습니다", text)
         self.assertNotIn("제가 먼저 목표와 우선순위를", text)
 
+    def test_chat_research_slash_command_runs_staged_report_workflow(self) -> None:
+        output = StringIO()
+        fake_result = types.SimpleNamespace(
+            room=types.SimpleNamespace(
+                room_id="room_slash",
+                status="completed",
+                output_paths={},
+                project_card={},
+            ),
+            memory=types.SimpleNamespace(get_room_findings=lambda room_id: []),
+            bus=types.SimpleNamespace(messages=[]),
+        )
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            args = argparse.Namespace(
+                memory=str(root / "memory.json"),
+                vault=str(root / "vault"),
+                reports=str(root / "reports"),
+                skip_model_setup=True,
+            )
+            with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(root / "model_settings.json")}, clear=True):
+                with patch("sys.stdin.isatty", return_value=True):
+                    with patch("builtins.input", side_effect=["/research https://z.cash/ 최근 ZEC 하락 보고서", "y", "/quit"]):
+                        with patch(
+                            "crypto_research_agents.cli.ResearchRuntime.run_article_research",
+                            return_value=fake_result,
+                        ) as run_article:
+                            with redirect_stdout(output):
+                                chat_command(args)
+
+            self.assertTrue(run_article.called)
+            kwargs = run_article.call_args.kwargs
+            self.assertIn("z.cash", kwargs["title"])
+            self.assertEqual(kwargs["url"], "https://z.cash/")
+            self.assertEqual(kwargs["intake_decision"]["intent_type"], "research_request")
+            self.assertEqual(kwargs["intake_decision"]["output_mode"], "research_dossier")
+
+        text = output.getvalue()
+        self.assertIn("보고서 작성 워크플로우", text)
+        self.assertIn("1. 입력 해석", text)
+        self.assertIn("Research Room", text)
+
     def test_runtime_records_supervisor_intake_decision(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -859,6 +903,25 @@ class SmokeTest(unittest.TestCase):
                     "type": "tool_start",
                     "room_id": "room_test",
                     "agent_id": "supervisor_agent",
+                    "tool_name": "create_research_room",
+                    "input_preview": "{'topic': 'pearl pow project'}",
+                }
+            )
+            console.handle_event(
+                {
+                    "type": "tool_done",
+                    "room_id": "room_test",
+                    "agent_id": "supervisor_agent",
+                    "tool_name": "create_research_room",
+                    "summary": "Supervisor office opened room_test.",
+                    "latency_ms": 1,
+                }
+            )
+            console.handle_event(
+                {
+                    "type": "tool_start",
+                    "room_id": "room_test",
+                    "agent_id": "supervisor_agent",
                     "tool_name": "create_task",
                     "input_preview": "{'task_id': 'write_dossier', 'description': 'Write the Korean report.'}",
                 }
@@ -885,6 +948,7 @@ class SmokeTest(unittest.TestCase):
 
         text = output.getvalue()
         self.assertNotIn("Tool >", text)
+        self.assertNotIn("create_research_room", text)
         self.assertNotIn("create_task", text)
         self.assertIn("작업 > 스카우터 | RUN web_search - pearl crypto project official", text)
         self.assertEqual(console.agent_activity["supervisor_agent"], "작업 카드를 정리하는 중")

@@ -180,7 +180,7 @@ Typical flow:
 ```text
 User request
 -> Supervisor intake and confirmation
--> Research Room opens only for explicit report/dossier creation
+-> Research Room opens for /research, /dossier, or explicit report/dossier creation
 -> Supervisor creates a plan and delegates tasks
 -> Ingestion stores the request/source
 -> Social/KOL agent collects X, KOL, public thread, and article market signals first
@@ -394,6 +394,8 @@ Inside `jimmoria`:
 
 ```text
 /models
+/research <topic-or-url>
+/dossier <topic-or-url>
 /doctor
 /company
 /context
@@ -406,6 +408,9 @@ Inside `jimmoria`:
 /help
 /quit
 ```
+
+Use `/research <topic-or-url>` or `/dossier <topic-or-url>` when you want a new
+report. `/report [room_id]` is reserved for printing an already saved report.
 
 ## Report Output
 
