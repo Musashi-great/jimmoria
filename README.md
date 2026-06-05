@@ -442,7 +442,10 @@ Agent execution logs, council discussion, tool payloads, raw LLM output, special
 
 Completed reports now include a claim-level evidence ledger. This separates major claims such as identity, product, social/KOL, funding/team, token/on-chain, GitHub activity, and live metrics so a report is not marked strong merely because it collected many URLs.
 
-If evidence is insufficient, the CLI prints a diagnostic preview instead of presenting it as a finished dossier.
+By default, the CLI prints a run summary, agent completion summary, and report
+preview. This keeps the terminal usable after long reports. If evidence is
+insufficient, the preview is labeled diagnostic instead of being presented as a
+finished dossier.
 
 Reprint any saved report:
 
@@ -451,7 +454,8 @@ Reprint any saved report:
 jimmoria report <room_id>
 ```
 
-Set `JIMMORIA_REPORT_DISPLAY=preview` when you want completed rooms to show only a preview.
+Set `JIMMORIA_REPORT_DISPLAY=full` only when you want completed rooms to print
+the entire Markdown report immediately.
 
 ## AX-Inspired Runtime Controls
 

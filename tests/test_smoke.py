@@ -1365,7 +1365,61 @@ class SmokeTest(unittest.TestCase):
         self.assertNotIn("JIMMORIA response", text)
         self.assertNotIn("Report preview", text)
 
-    def test_run_summary_prints_full_report_for_completed_research(self) -> None:
+    def test_run_summary_defaults_to_report_preview_for_completed_research(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report_path = root / "report.md"
+            report_path.write_text(
+                "\n".join(
+                    [
+                        "# Project Research Dossier: 3Jane",
+                        "## 1. TL;DR",
+                        "- complete",
+                        *[f"detail line {index}" for index in range(1, 16)],
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = types.SimpleNamespace(
+                room=types.SimpleNamespace(
+                    room_id="room_full",
+                    status="completed",
+                    output_paths={"report": str(report_path)},
+                    project_card={
+                        "research_quality": {
+                            "status": "research_complete",
+                        }
+                    },
+                ),
+                memory=types.SimpleNamespace(get_room_findings=lambda room_id: []),
+                bus=types.SimpleNamespace(messages=[]),
+            )
+            output = StringIO()
+            console = JimmoriaConsole(runs_dir=root / "runs")
+            console.agent_state = {
+                "supervisor_agent": "done",
+                "report_agent": "done",
+            }
+            console.agent_activity = {
+                "supervisor_agent": "Done: plan ready",
+                "report_agent": "Done: wrote the final dossier",
+            }
+
+            with redirect_stdout(output):
+                console.print_run_summary(result)
+
+        text = output.getvalue()
+        self.assertIn("JIMMORIA response", text)
+        self.assertIn("에이전트 완료 요약", text)
+        self.assertIn("슈퍼바이저", text)
+        self.assertIn("리포트", text)
+        self.assertIn("Report preview", text)
+        self.assertIn("Full report command: /report room_full", text)
+        self.assertNotIn("+ Full report", text)
+        self.assertNotIn("완료: Done:", text)
+        self.assertNotIn("detail line 15", text)
+
+    def test_run_summary_prints_full_report_when_requested(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             report_path = root / "report.md"
@@ -1397,8 +1451,9 @@ class SmokeTest(unittest.TestCase):
             output = StringIO()
             console = JimmoriaConsole(runs_dir=root / "runs")
 
-            with redirect_stdout(output):
-                console.print_run_summary(result)
+            with patch.dict("os.environ", {"JIMMORIA_REPORT_DISPLAY": "full"}, clear=False):
+                with redirect_stdout(output):
+                    console.print_run_summary(result)
 
         text = output.getvalue()
         self.assertIn("JIMMORIA response", text)

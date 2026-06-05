@@ -1086,6 +1086,7 @@ class JimmoriaConsole:
         summary_title = "JIMMORIA diagnostic" if quality_status == "insufficient_evidence" else "JIMMORIA response"
         preview_title = "Diagnostic preview" if quality_status == "insufficient_evidence" else "Report preview"
         self.block(summary_title, lines)
+        self.print_agent_completion_summary()
         if report_path:
             if self.should_print_full_report(quality_status):
                 self.print_report_full(report_path)
@@ -1301,6 +1302,23 @@ class JimmoriaConsole:
             [f"{self.state_label(state):<8} {agent_id:<28} {activity}" for state, agent_id, activity in rows],
         )
 
+    def print_agent_completion_summary(self) -> None:
+        if not self.agent_state:
+            return
+        rows: list[tuple[str, str, str]] = []
+        for agent_id in DEFAULT_AGENTS:
+            if agent_id not in self.agent_state:
+                continue
+            state = self.agent_state.get(agent_id, "")
+            activity = self.agent_activity.get(agent_id) or AGENT_ACTIVITY.get(agent_id, "")
+            rows.append((self.state_label_ko(state), self.agent_display_name(agent_id), self.activity_label(state, activity)))
+        if not rows:
+            return
+        lines = ["에이전트                 상태  완료/최근 작업"]
+        for state, name, activity in rows:
+            lines.append(f"{pad_display(name, 24)} {pad_display(state, 6)} {activity}")
+        self.block("에이전트 완료 요약", lines)
+
     def print_tool_event(self, event_type: str, event: dict[str, object]) -> None:
         marker = {
             "tool_start": "RUN",
@@ -1492,6 +1510,10 @@ class JimmoriaConsole:
             "failed": "중단",
         }.get(state, "상태")
         compact = " ".join(str(activity).split())
+        if state == "done" and compact.lower().startswith("done:"):
+            compact = compact[5:].strip()
+        if state == "failed" and compact.lower().startswith("failed:"):
+            compact = compact[7:].strip()
         if len(compact) > 64:
             compact = compact[:61].rstrip() + "..."
         return f"{prefix}: {compact}"
@@ -1517,7 +1539,7 @@ class JimmoriaConsole:
             return False
         if mode in {"full", "all"}:
             return True
-        return quality_status != "insufficient_evidence"
+        return False
 
     def agent_label(self, agent_id: str) -> str:
         spec = self.registry.get(agent_id)
