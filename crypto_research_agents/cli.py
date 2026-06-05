@@ -54,7 +54,7 @@ from crypto_research_agents.core.workflow_loader import (
 )
 from crypto_research_agents.storage.artifact_store import ArtifactStore
 from crypto_research_agents.storage.json_store import load_memory
-from crypto_research_agents.storage.paths import default_project_path, resolve_project_path
+from crypto_research_agents.storage.paths import default_project_path, resolve_project_path, user_config_path
 from crypto_research_agents.storage.run_store import (
     events_after_seq,
     fork_run_snapshot,
@@ -806,6 +806,8 @@ def inspect_command(args: argparse.Namespace) -> None:
 
 def chat_command(args: argparse.Namespace) -> None:
     apply_saved_model_settings()
+    if os.getenv("LLM_PROVIDER") and not configured_model_provider_ready():
+        clear_model_provider_env()
     auto_configure_codex_provider_if_logged_in()
     console = JimmoriaConsole(
         memory_path=args.memory,
@@ -937,25 +939,35 @@ def chat_command(args: argparse.Namespace) -> None:
         runtime = ResearchRuntime(load_memory(args.memory))
         runtime.event_handler = console.make_event_handler()
         if intake_decision.intent_type == "source_ingestion":
-            result = runtime.run_source_ingestion(
-                title=title,
-                content=content,
-                url=url,
-                vault_dir=args.vault,
-                memory_path=args.memory,
-                intake_decision=intake_decision.to_dict(),
-            )
+            try:
+                result = runtime.run_source_ingestion(
+                    title=title,
+                    content=content,
+                    url=url,
+                    vault_dir=args.vault,
+                    memory_path=args.memory,
+                    intake_decision=intake_decision.to_dict(),
+                )
+            except RuntimeError as exc:
+                console.print_supervisor_reply(model_runtime_error_reply(exc))
+                append_supervisor_history(supervisor_history, line, model_runtime_error_reply(exc))
+                continue
         else:
-            result = runtime.run_article_research(
-                title=title,
-                content=content,
-                url=url,
-                vault_dir=args.vault,
-                reports_dir=args.reports,
-                memory_path=args.memory,
-                intake_decision=intake_decision.to_dict(),
-                retention_policy=chat_run_retention_policy(),
-            )
+            try:
+                result = runtime.run_article_research(
+                    title=title,
+                    content=content,
+                    url=url,
+                    vault_dir=args.vault,
+                    reports_dir=args.reports,
+                    memory_path=args.memory,
+                    intake_decision=intake_decision.to_dict(),
+                    retention_policy=chat_run_retention_policy(),
+                )
+            except RuntimeError as exc:
+                console.print_supervisor_reply(model_runtime_error_reply(exc))
+                append_supervisor_history(supervisor_history, line, model_runtime_error_reply(exc))
+                continue
         last_room_id = result.room.room_id
         console.last_room_id = last_room_id
         console.print_run_summary(result)
@@ -2160,11 +2172,60 @@ def codex_multi_auth_status() -> str:
     return " / ".join(parts)
 
 
+
+def clear_model_provider_env() -> None:
+    for name in [
+        "LLM_PROVIDER",
+        "JIMMORIA_CODEX_PROVIDER",
+        "JIMMORIA_CODEX_AUTH_PROVIDER",
+        "JIMMORIA_GROK_AUTH_PROVIDER",
+    ]:
+        os.environ.pop(name, None)
+
+
+def configured_model_provider_ready() -> bool:
+    provider = (os.getenv("LLM_PROVIDER") or "").strip().lower()
+    if not provider:
+        return False
+    if provider in {"offline", "fallback", "none"}:
+        return True
+    if provider == "codex_sdk":
+        return codex_sdk_available() and codex_is_logged_in()
+    if provider == "codex_cli":
+        return codex_is_logged_in()
+    if provider in {"codex_api", "openai_api", "api"}:
+        return codex_api_key_configured()
+    if provider in {"grok", "xai", "grok_oauth", "xai_oauth", "grok-oauth", "xai-oauth"}:
+        return grok_is_configured()
+    if provider in {"codex_grok", "grok_codex", "codex+grok", "grok+codex", "hybrid", "dual", "multi"}:
+        return codex_provider_ready(preferred_codex_provider()) and grok_is_configured()
+    return False
+
+
+def codex_provider_ready(provider: str) -> bool:
+    normalized = provider.strip().lower().replace("-", "_")
+    if normalized == "codex_sdk":
+        return codex_sdk_available() and codex_is_logged_in()
+    if normalized == "codex_cli":
+        return codex_is_logged_in()
+    if normalized in {"codex_api", "openai_api", "api"}:
+        return codex_api_key_configured()
+    return (codex_sdk_available() and codex_is_logged_in()) or codex_is_logged_in() or codex_api_key_configured()
+
+
+def model_runtime_error_reply(exc: RuntimeError) -> list[str]:
+    return [
+        "모델 인증 또는 provider 실행 중 오류가 발생해 Research Room을 중단했습니다.",
+        "다른 사용자/다른 로컬의 저장된 모델 설정을 그대로 쓰지 않도록, /models에서 본인 OAuth 또는 API key 기준으로 다시 적용해 주세요.",
+        f"오류: {exc}",
+    ]
+
+
 def model_settings_path() -> Path:
     configured = os.getenv("JIMMORIA_MODEL_SETTINGS_PATH")
     if configured:
         return Path(configured)
-    return resolve_project_path("data/model_settings.json")
+    return user_config_path("model_settings.json")
 
 
 def apply_saved_model_settings() -> None:

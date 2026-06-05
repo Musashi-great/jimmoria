@@ -29,14 +29,15 @@ Telegram and Discord are intentionally not part of the default connector stack. 
 
 ## Quick Start
 
-Install once:
+Fresh clone install is one-time; it creates the `jimmoria` console command for that user/venv:
 
 ```powershell
-cd C:\jimmoria
+git clone <repo-url> jimmoria
+cd jimmoria
 python -m pip install -e ".[all]"
 ```
 
-Start the company:
+After that, start the company from the same venv/shell:
 
 ```powershell
 jimmoria
@@ -104,7 +105,7 @@ Install Codex SDK support:
 python -m pip install -e ".[codex]"
 ```
 
-If Codex login already exists locally, JIMMORIA can reuse it. Codex can also run through `OPENAI_API_KEY` or `CODEX_API_KEY` with `LLM_PROVIDER=codex_api`. JIMMORIA stores provider/model preferences in `data/model_settings.json`, not raw OAuth or API tokens.
+If Codex login already exists locally, JIMMORIA can reuse it. Codex can also run through `OPENAI_API_KEY` or `CODEX_API_KEY` with `LLM_PROVIDER=codex_api`. JIMMORIA stores provider/model preferences in the current user config file, normally `~/.config/jimmoria/model_settings.json` on Linux/macOS or `%APPDATA%\JIMMORIA\model_settings.json` on Windows, not raw OAuth or API tokens.
 
 Optional Grok/xAI provider:
 
@@ -126,7 +127,7 @@ $env:GROK_OAUTH_TOKEN_FILE = "C:\path\to\xai-token.txt"
 $env:GROK_OAUTH_TOKEN_COMMAND = "op read op://vault/xai/token"
 ```
 
-The xAI API uses an OpenAI-compatible endpoint at `https://api.x.ai/v1`. The Codex API provider uses `https://api.openai.com/v1` by default. JIMMORIA does not save raw Codex/OpenAI/Grok/XAI tokens in `data/model_settings.json`; it only saves provider/model preferences, token file paths, or token commands. With `LLM_PROVIDER=xai_oauth`, Hermes OAuth is preferred over `XAI_API_KEY`. With `LLM_PROVIDER=grok`, API key/env sources are preferred and Hermes OAuth is used as a fallback.
+The xAI API uses an OpenAI-compatible endpoint at `https://api.x.ai/v1`. The Codex API provider uses `https://api.openai.com/v1` by default. JIMMORIA does not save raw Codex/OpenAI/Grok/XAI tokens in the user model settings file; it only saves provider/model preferences, token file paths, or token commands. With `LLM_PROVIDER=xai_oauth`, Hermes OAuth is preferred over `XAI_API_KEY`. With `LLM_PROVIDER=grok`, API key/env sources are preferred and Hermes OAuth is used as a fallback.
 
 Important: `xai_oauth` is a Grok credential mode. For role-based company routing, use `LLM_PROVIDER=codex_grok`; JIMMORIA will still use Hermes xAI OAuth for the Grok side.
 

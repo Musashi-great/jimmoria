@@ -29,8 +29,11 @@ from crypto_research_agents.cli import (
     apply_company_instruction,
     chat_command,
     classify_chat_input,
+    chat_input_to_source,
     configure_model_panel,
+    configured_model_provider_ready,
     find_saved_report_for_request,
+    model_settings_path,
     main as cli_main,
     message_summary,
     previous_report_context,
@@ -2980,6 +2983,26 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertIn("Hermes xAI OAuth", text)
         self.assertIn("Provider: xai_oauth", text)
 
+    def test_chat_input_promotes_first_url_without_fetching_mixed_instruction(self) -> None:
+        with patch("crypto_research_agents.cli.fetch_url_text", side_effect=AssertionError("should not fetch mixed chat input")):
+            title, content, url = chat_input_to_source("https://x.com/3janexyz 보고서 만들어봐")
+
+        self.assertEqual(url, "https://x.com/3janexyz")
+        self.assertIn("보고서", content)
+        self.assertIn("https://x.com/3janexyz", title)
+
+    def test_model_settings_default_path_is_user_scoped(self) -> None:
+        with TemporaryDirectory() as tmp:
+            with patch.dict("os.environ", {"XDG_CONFIG_HOME": tmp}, clear=True):
+                self.assertEqual(model_settings_path(), Path(tmp) / "jimmoria" / "model_settings.json")
+
+    def test_stale_hybrid_model_settings_are_not_ready_without_user_credentials(self) -> None:
+        with TemporaryDirectory() as tmp:
+            with patch.dict("os.environ", {"LLM_PROVIDER": "codex_grok", "HERMES_HOME": tmp}, clear=True):
+                with patch("crypto_research_agents.cli.codex_sdk_available", return_value=False):
+                    with patch("crypto_research_agents.cli.codex_login_status", return_value="Codex login status unknown"):
+                        self.assertFalse(configured_model_provider_ready())
+
     def test_codex_setup_can_use_default_model_routes_without_model_names(self) -> None:
         output = StringIO()
         with TemporaryDirectory() as tmp:
@@ -3015,12 +3038,14 @@ Usage: codex exec [OPTIONS] [PROMPT]
                 skip_model_setup=False,
             )
             with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(settings_path)}, clear=True):
-                with patch("sys.stdin.isatty", return_value=True):
-                    with patch("builtins.input", return_value="/quit"):
-                        with patch("crypto_research_agents.cli.configure_model_panel") as setup_panel:
-                            with redirect_stdout(output):
-                                chat_command(args)
-                            self.assertFalse(setup_panel.called)
+                with patch("crypto_research_agents.cli.codex_login_status", return_value="Logged in using ChatGPT"):
+                    with patch("crypto_research_agents.cli.codex_sdk_available", return_value=True):
+                        with patch("sys.stdin.isatty", return_value=True):
+                            with patch("builtins.input", return_value="/quit"):
+                                with patch("crypto_research_agents.cli.configure_model_panel") as setup_panel:
+                                    with redirect_stdout(output):
+                                        chat_command(args)
+                                    self.assertFalse(setup_panel.called)
 
         self.assertIn("JIMMORIA v0.1.0", output.getvalue())
 
