@@ -157,22 +157,21 @@ flowchart LR
 
 ## 5.1 CLI Runtime TUI Dock
 
-Windows PowerShell default: `JIMMORIA_EVENT_STYLE=compact`. The CLI prints
-stable one-line room, agent, tool, and output logs instead of trying to redraw a
-live dock with cursor-up/delete-line escape sequences. This avoids stale panels
-and broken right borders in terminals with unreliable ANSI line deletion.
+Default: `JIMMORIA_EVENT_STYLE=dock`. The CLI keeps a live agent dashboard on
+screen while a Research Room is running. The visible terminal shows each AI
+agent's current work card and cumulative LLM call/token usage; raw room, agent,
+tool, and output logs are stored in the background run artifacts.
 
-Opt into the live dock only on terminals where it renders cleanly:
+Use compact lines only when explicitly requested:
 
 ```powershell
-$env:JIMMORIA_FORCE_RUNTIME_DOCK = "1"
-$env:JIMMORIA_EVENT_STYLE = "dock"
+$env:JIMMORIA_EVENT_STYLE = "compact"
 jimmoria
 ```
 
-`crypto_research_agents/console.py`는 Windows 기본값에서 Research Room 실행 중
-stable compact log를 출력한다. 내부 supervisor office tool event는 화면에 찍지
-않고, 저장된 run artifact와 debug stream에만 남긴다.
+`crypto_research_agents/console.py`는 Research Room 실행 중 전체 AI agent
+dashboard를 유지한다. 내부 supervisor office tool event는 화면에 찍지 않고,
+저장된 run artifact와 debug stream에만 남긴다.
 
 기본 화면 모델은 다음과 같다.
 
@@ -181,24 +180,23 @@ conversation transcript
   You > ...
   Supervisor > ...
 
-stable runtime lines
-  룸 > OPEN room_x | agents 10 | topic
-  상태 > 대기: 슈퍼바이저, 아카이비스트, 소셜/KOL, 내러티브, 스카우터 +5
-  병렬 > START research_swarm | 7개 에이전트 실행 | max 7
-  에이전트 > RUN 스카우터 | 공식 후보와 프로젝트 정체성을 찾는 중
-  작업 > 스카우터 | RUN web_search - official project query
+fixed runtime dashboard
+  JIMMORIA HQ | provider | room | agent counts
+  토큰 사용: ~42.0k tokens | LLM 호출: 12 | 로그: 백단 저장
+  진행: 스카우터 -> 툴 실행: web_search - official project query | 대기: ...
+  전체 AI 에이전트 대시보드 - 현재 작업
+  [agent card grid with 대기/진행/완료/실패]
 ```
 
-`JIMMORIA_FORCE_RUNTIME_DOCK=1`과 `JIMMORIA_EVENT_STYLE=dock`을 같이 설정하면
-live dock을 opt-in으로 사용할 수 있다. 이 dock은 runtime event가 들어올 때마다
-다시 그려지고, 화면에는 최신 agent state만 dock으로 갱신된다. 이벤트는
+이 dock은 runtime event가 들어올 때마다 line-clear 방식으로 같은 위치에 다시
+그려지고, 화면에는 최신 agent state만 갱신된다. 이벤트는
 백그라운드에서 `data/runs/<room_id>/events.json`, `messages.json`,
 `tool_audit_log.json`에 저장된다.
 
 디버깅이 필요하면 `JIMMORIA_EVENT_STYLE=stream`을 설정해 raw tool/debug runtime
 log를 위로 흘려보낼 수 있다.
 
-Tool event도 compact 상태와 dock board를 갱신한다. 예를 들어 `discovery_agent`가
+Tool event도 dock board를 갱신한다. 예를 들어 `discovery_agent`가
 `web_search`를 호출하면 해당 row는 `대기: 공식 후보와 프로젝트 정체성을 찾는 중`에서
 `진행: 툴 실행: web_search - ...`로 바뀐다. Agent가 끝나면 `완료: ...`로 바뀐다.
 
@@ -206,12 +204,14 @@ Latest runtime dock behavior:
 
 ```text
 JIMMORIA HQ status line
+Token/call usage line
 Now: active_agent -> current work | Waiting: next agents
 Room running notice
-Live agent board - current work
-STATE  AGENT                         CURRENT WORK
-RUN    supervisor_agent              Now: Planning direction
-WAIT   ingestion_agent               Waiting: Extracting source metadata
+전체 AI 에이전트 대시보드 - 현재 작업
++------------------------------+  +------------------------------+
+| 슈퍼바이저 [진행] supervisor |  | 아카이비스트 [대기] ingest... |
+| 진행: Planning direction     |  | 대기: Extracting metadata     |
++------------------------------+  +------------------------------+
 ...
 > working...
 ```

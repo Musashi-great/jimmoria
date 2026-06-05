@@ -106,6 +106,7 @@ class JimmoriaConsole:
         self.runtime_dock_lines = 0
         self.runtime_dock_frame = 0
         self.last_runtime_metrics: dict[str, object] = {}
+        self.runtime_usage_totals: dict[str, object] = self.empty_runtime_usage()
         self.council_state = "idle"
         self.council_activity = "토론방 대기 중"
         self.council_participants: list[str] = []
@@ -278,6 +279,8 @@ class JimmoriaConsole:
             self.show_cursor()
 
     def use_stream_events(self) -> bool:
+        if self.event_style == "dock" and not self.use_runtime_dock():
+            return False
         return self.event_style not in {"card", "cards", "panel", "panels"}
 
     def show_event_log_lines(self) -> bool:
@@ -331,7 +334,11 @@ class JimmoriaConsole:
     def erase_runtime_dock(self) -> None:
         if not self.runtime_dock_lines:
             return
-        sys.stdout.write(f"\r\033[{self.runtime_dock_lines}A\033[{self.runtime_dock_lines}M\r")
+        lines = self.runtime_dock_lines
+        sys.stdout.write(f"\r\033[{lines}A")
+        for _ in range(lines):
+            sys.stdout.write("\033[2K\033[1B")
+        sys.stdout.write(f"\r\033[{lines}A")
         self.runtime_dock_lines = 0
 
     def print_runtime_dock(self) -> None:
@@ -341,6 +348,7 @@ class JimmoriaConsole:
         lines = [
             self.input_border_style(border),
             self.input_status_line_style(self.input_text_line(self.input_status_text())),
+            self.input_metrics_line_style(),
             self.input_active_summary_line_style(),
             self.input_hint_line_style(self.input_hint_line("리서치룸 실행 중입니다. 슈퍼바이저가 완료하면 입력창이 돌아옵니다.")),
             self.input_divider_line_style(),
@@ -504,6 +512,27 @@ class JimmoriaConsole:
         styled = styled.replace("완료:", f"{muted}완료:{reset}", 1)
         return styled
 
+    def input_metrics_line_style(self) -> str:
+        line = self.input_text_line(self.runtime_metric_summary())
+        if not supports_color():
+            return line
+        violet = "\033[38;2;211;95;255m"
+        pink = "\033[38;2;255;92;212m"
+        muted = "\033[38;2;160;132;188m"
+        reset = "\033[0m"
+        styled = line.replace("|", f"{violet}|{reset}", 2)
+        styled = styled.replace("토큰 사용:", f"{pink}토큰 사용:{reset}", 1)
+        styled = styled.replace("로그:", f"{muted}로그:{reset}", 1)
+        return styled
+
+    def runtime_metric_summary(self) -> str:
+        usage = self.runtime_usage_totals
+        calls = _safe_int(usage.get("calls"))
+        total_tokens = _safe_int(usage.get("total_tokens"))
+        estimated = bool(usage.get("estimated"))
+        token_text = format_token_count(total_tokens, estimated=estimated) if total_tokens else "0 tokens"
+        return f"토큰 사용: {token_text} | LLM 호출: {calls} | 로그: 백단 저장"
+
     def runtime_active_summary(self) -> str:
         if not self.agent_state:
             return "진행: 대기 중 | 다음 요청을 기다립니다"
@@ -553,15 +582,15 @@ class JimmoriaConsole:
         return ", ".join(self.agent_display_name(agent_id) for agent_id in shown) + suffix
 
     def input_board_title_line_style(self) -> str:
-        line = self.input_text_line("에이전트 작업 카드 - 현재 진행 상황")
+        line = self.input_text_line("전체 AI 에이전트 대시보드 - 현재 작업")
         if not supports_color():
             return line
         pink = "\033[38;2;255;92;212m"
         violet = "\033[38;2;211;95;255m"
         reset = "\033[0m"
         return line.replace("|", f"{violet}|{reset}", 2).replace(
-            "에이전트 작업 카드",
-            f"{pink}에이전트 작업 카드{reset}",
+            "전체 AI 에이전트 대시보드",
+            f"{pink}전체 AI 에이전트 대시보드{reset}",
             1,
         )
 
@@ -596,7 +625,7 @@ class JimmoriaConsole:
                 continue
             cards.append(self.agent_status_card(agent_id))
         lines = self.card_grid_lines(cards)
-        if self.council_state != "idle" or self.runtime_room_running:
+        if self.council_state not in {"idle", "queued"}:
             lines.extend(self.card_grid_lines([self.council_status_card(full_width=True)], columns=1))
         return lines
 
@@ -631,8 +660,7 @@ class JimmoriaConsole:
         inner = width - 4
         return [
             "+" + "-" * (width - 2) + "+",
-            "| " + pad_display(self.compact_text(title, inner), inner) + " |",
-            "| " + pad_display(self.compact_text(subtitle, inner), inner) + " |",
+            "| " + pad_display(self.compact_text(f"{title}  {subtitle}", inner), inner) + " |",
             "| " + pad_display(self.compact_text(body, inner), inner) + " |",
             "+" + "-" * (width - 2) + "+",
         ]
@@ -715,6 +743,7 @@ class JimmoriaConsole:
         if event_type == "room_created":
             self.runtime_room_running = True
             self.last_room_id = str(event.get("room_id", ""))
+            self.runtime_usage_totals = self.empty_runtime_usage()
             self.agent_state = {
                 str(agent_id): "queued"
                 for agent_id in event.get("agents", [])
@@ -772,6 +801,7 @@ class JimmoriaConsole:
             agent_id = str(event.get("agent_id", ""))
             self.agent_state[agent_id] = "done"
             self.agent_activity[agent_id] = f"Done: {event.get('summary')}"
+            self.update_runtime_usage_from_event(event)
             if self.use_stream_events():
                 summary = self.compact_text(str(event.get("summary", "")), 76)
                 self.print_event_line(
@@ -797,6 +827,7 @@ class JimmoriaConsole:
             agent_id = str(event.get("agent_id", ""))
             self.agent_state[agent_id] = "failed"
             self.agent_activity[agent_id] = f"Failed: {event.get('error')}"
+            self.update_runtime_usage_from_event(event)
             if self.use_stream_events():
                 error = self.compact_text(str(event.get("error", "")), 82)
                 self.print_event_line("에이전트", f"FAIL {self.agent_display_name(agent_id)} | {error}{self.event_metrics_suffix(event)}")
@@ -1011,6 +1042,7 @@ class JimmoriaConsole:
                 "duration_ms": event.get("duration_ms"),
                 "llm_usage": event.get("llm_usage"),
             }
+            self.update_runtime_usage_from_event(event, replace=True)
             if self.use_stream_events():
                 self.runtime_room_running = False
                 self.print_event_line(
@@ -1036,6 +1068,7 @@ class JimmoriaConsole:
                 "duration_ms": event.get("duration_ms"),
                 "llm_usage": event.get("llm_usage"),
             }
+            self.update_runtime_usage_from_event(event, replace=True)
             if self.use_stream_events():
                 self.runtime_room_running = False
                 reason = self.compact_text(str(event.get("summary", "")), 86)
@@ -1501,6 +1534,44 @@ class JimmoriaConsole:
                 lines.append(f"LLM: {usage_text}")
         return lines
 
+    def empty_runtime_usage(self) -> dict[str, object]:
+        return {
+            "calls": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "estimated": False,
+        }
+
+    def update_runtime_usage_from_event(self, event: dict[str, object], *, replace: bool = False) -> None:
+        usage = event.get("llm_usage")
+        if not isinstance(usage, dict):
+            return
+        incoming = self.normalized_llm_usage(usage)
+        if replace:
+            if _safe_int(incoming.get("total_tokens")) >= _safe_int(self.runtime_usage_totals.get("total_tokens")):
+                self.runtime_usage_totals = incoming
+            return
+        totals = dict(self.runtime_usage_totals)
+        for key in ("calls", "input_tokens", "output_tokens", "total_tokens"):
+            totals[key] = _safe_int(totals.get(key)) + _safe_int(incoming.get(key))
+        totals["estimated"] = bool(totals.get("estimated")) or bool(incoming.get("estimated"))
+        self.runtime_usage_totals = totals
+
+    def normalized_llm_usage(self, usage: dict[str, object]) -> dict[str, object]:
+        total_tokens = _safe_int(usage.get("total_tokens"))
+        input_tokens = _safe_int(usage.get("input_tokens"))
+        output_tokens = _safe_int(usage.get("output_tokens"))
+        if total_tokens <= 0 and (input_tokens or output_tokens):
+            total_tokens = input_tokens + output_tokens
+        return {
+            "calls": _safe_int(usage.get("calls")),
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": total_tokens,
+            "estimated": bool(usage.get("estimated")),
+        }
+
     def state_label(self, state: str) -> str:
         labels = {
             "queued": "WAIT",
@@ -1945,10 +2016,6 @@ def default_event_style() -> str:
     configured = os.getenv("JIMMORIA_EVENT_STYLE", "").strip().lower()
     if configured:
         return configured
-    # Windows terminals often leave stale lines when we use ANSI cursor-up and
-    # delete-line sequences for a live dock. Compact logs are boring, but solid.
-    if os.name == "nt" and not os.getenv("JIMMORIA_FORCE_RUNTIME_DOCK"):
-        return "compact"
     return "dock"
 
 
@@ -1957,7 +2024,7 @@ def runtime_dock_enabled() -> bool:
         return True
     if os.getenv("JIMMORIA_DISABLE_RUNTIME_DOCK"):
         return False
-    return os.name != "nt"
+    return True
 
 
 def ansi_input_box_enabled() -> bool:

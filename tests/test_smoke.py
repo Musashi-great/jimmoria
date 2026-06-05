@@ -835,7 +835,7 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("FAIL", text)
         self.assertIn("중단: Codex CLI provider failed", text)
 
-    def test_runtime_events_default_to_compact_log_on_windows(self) -> None:
+    def test_runtime_events_default_to_agent_dashboard_on_windows(self) -> None:
         output = StringIO()
         console = JimmoriaConsole()
 
@@ -875,12 +875,13 @@ class SmokeTest(unittest.TestCase):
             )
 
         text = output.getvalue()
-        self.assertIn("룸 > OPEN room_test", text)
-        self.assertIn("상태 > 대기: 슈퍼바이저, 아카이비스트", text)
-        self.assertIn("에이전트 > RUN 아카이비스트", text)
-        self.assertIn("에이전트 > DONE 아카이비스트", text)
+        self.assertIn("JIMMORIA opens a Research Room", text)
+        self.assertIn("Live agent board", text)
+        self.assertIn("The Archivist (ingestion_agent) started", text)
+        self.assertIn("The Archivist (ingestion_agent) finished", text)
+        self.assertIn("Metrics: time 1.2s | llm 2 calls / ~4.2k tokens", text)
+        self.assertNotIn("룸 > OPEN room_test", text)
         self.assertNotIn("Tool >", text)
-        self.assertNotIn("JIMMORIA HQ", text)
         self.assertEqual(console.runtime_dock_lines, 0)
         self.assertEqual(console.last_room_id, "room_test")
         self.assertEqual(console.agent_state["ingestion_agent"], "done")
@@ -1061,18 +1062,20 @@ class SmokeTest(unittest.TestCase):
         clean = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", output.getvalue())
         self.assertIn("JIMMORIA HQ", clean)
         self.assertIn("리서치룸 실행 중입니다. 슈퍼바이저가 완료하면 입력창이 돌아옵니다.", clean)
+        self.assertIn("토큰 사용: 0 tokens | LLM 호출: 0", clean)
         self.assertIn("진행: 아카이비스트 -> 입력 소스와 메타데이터를 정리하는 중", clean)
         self.assertIn("대기: 슈퍼바이저", clean)
-        self.assertIn("에이전트 작업 카드 - 현재 진행 상황", clean)
+        self.assertIn("전체 AI 에이전트 대시보드 - 현재 작업", clean)
         self.assertIn("상태", clean)
         self.assertIn("현재 작업", clean)
         self.assertIn("ingestion_agent", clean)
         self.assertIn("진행: 입력 소스와 메타데이터를 정리하는 중", clean)
         self.assertIn("> 작업중...", clean)
-        self.assertIn("\033[20A\033[20M", output.getvalue())
+        self.assertIn("\033[15A", output.getvalue())
+        self.assertIn("\033[2K", output.getvalue())
         self.assertIn("\033[?25l", output.getvalue())
         self.assertIn("\033[5m\033[38;2;255;92;212m...", output.getvalue())
-        self.assertEqual(console.runtime_dock_lines, 20)
+        self.assertEqual(console.runtime_dock_lines, 15)
 
     def test_runtime_dock_shows_full_agent_board_for_research_room(self) -> None:
         output = StringIO()
@@ -1122,7 +1125,7 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("obsidian_curator_agent", clean)
         self.assertIn("진행: 리서치 방향과 작업 순서를 정리하는 중", clean)
         self.assertIn("대기: 볼트 노트와 지식 기록을 동기화하는 중", clean)
-        self.assertEqual(console.runtime_dock_lines, 40)
+        self.assertEqual(console.runtime_dock_lines, 31)
 
 
     def test_runtime_dock_shows_council_room_card(self) -> None:
@@ -1190,10 +1193,62 @@ class SmokeTest(unittest.TestCase):
                     )
 
         clean = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", output.getvalue())
-        self.assertIn("에이전트 작업 카드 - 현재 진행 상황", clean)
+        self.assertIn("전체 AI 에이전트 대시보드 - 현재 작업", clean)
         self.assertIn("discovery_agent", clean)
         self.assertIn("진행: 툴 실행: web_search - pearl crypto project", clean)
         self.assertEqual(console.agent_state["discovery_agent"], "running")
+
+    def test_runtime_dock_accumulates_token_usage_in_header(self) -> None:
+        output = StringIO()
+
+        with patch.dict("os.environ", {"JIMMORIA_FORCE_RUNTIME_DOCK": "1", "JIMMORIA_EVENT_STYLE": "dock"}, clear=False):
+            console = JimmoriaConsole()
+            with patch("crypto_research_agents.console.supports_color", return_value=True):
+                with redirect_stdout(output):
+                    console.handle_event(
+                        {
+                            "type": "room_created",
+                            "room_id": "room_test",
+                            "topic": "token meter test",
+                            "goals": ["Track tokens."],
+                            "agents": ["ingestion_agent", "report_agent"],
+                        }
+                    )
+                    console.handle_event(
+                        {
+                            "type": "agent_done",
+                            "room_id": "room_test",
+                            "agent_id": "ingestion_agent",
+                            "summary": "Sources summarized.",
+                            "messages": 2,
+                            "findings": 3,
+                            "llm_usage": {
+                                "calls": 2,
+                                "total_tokens": 4200,
+                                "estimated": True,
+                            },
+                        }
+                    )
+                    console.handle_event(
+                        {
+                            "type": "agent_done",
+                            "room_id": "room_test",
+                            "agent_id": "report_agent",
+                            "summary": "Report drafted.",
+                            "messages": 3,
+                            "findings": 4,
+                            "llm_usage": {
+                                "calls": 1,
+                                "total_tokens": 1800,
+                                "estimated": True,
+                            },
+                        }
+                    )
+
+        clean = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", output.getvalue())
+        self.assertIn("토큰 사용: ~6.0k tokens | LLM 호출: 3 | 로그: 백단 저장", clean)
+        self.assertEqual(console.runtime_usage_totals["calls"], 3)
+        self.assertEqual(console.runtime_usage_totals["total_tokens"], 6000)
 
     def test_runtime_stream_clears_input_dock_when_room_finishes(self) -> None:
         output = StringIO()

@@ -48,33 +48,37 @@ After that, start the company from the same venv/shell:
 jimmoria
 ```
 
-The CLI runs as a chat-style Research HQ. On Windows PowerShell, Research Room
-progress uses stable compact event logs by default so ANSI cursor movement does
-not leave stale panels in the terminal:
+The CLI runs as a chat-style Research HQ. When a Research Room is active, the
+default runtime view is a fixed agent dashboard: the screen shows each AI agent's
+current work card, keeps raw events in the background run artifacts, and updates
+the total LLM call/token count in the header.
 
 ```text
-룸 > OPEN room_x | agents 10 | 3jane report
-상태 > 대기: 슈퍼바이저, 아카이비스트, 소셜/KOL, 내러티브, 스카우터 +5
-에이전트 > RUN 슈퍼바이저 | 리서치 방향과 작업 순서를 정리하는 중
-계획 > 슈퍼바이저 | 작업 9개 배정 | 체크포인트 3개 | plan ready
-에이전트 > DONE 슈퍼바이저 | plan ready | msg 4 / findings 1
-병렬 > START research_swarm | 7개 에이전트 실행 | max 7
-작업 > 스카우터 | RUN web_search - 3jane crypto project official
++--------------------------------------------------------------------------------+
+| JIMMORIA HQ | 슈퍼바이저 대화 | provider: codex_sdk | room: room_x | agents... |
+| 토큰 사용: ~42.0k tokens | LLM 호출: 12 | 로그: 백단 저장                  |
+| 진행: 스카우터 -> 툴 실행: web_search - official project query | 대기: ... |
+| 전체 AI 에이전트 대시보드 - 현재 작업                                      |
+| +------------------------------+  +------------------------------+          |
+| | 스카우터 [진행] discovery... |  | 아카이비스트 [완료] ingest... |          |
+| | 진행: 공식 후보를 확인하는 중 |  | 완료: 소스 정리 완료          |          |
+| +------------------------------+  +------------------------------+          |
+| > 작업중...                                                                 |
++--------------------------------------------------------------------------------+
 ```
 
 Saved room, agent, tool, and output events are still written under
-`data/runs/<room_id>/`. On terminals with reliable ANSI cursor controls, you can
-opt into the live dock with:
+`data/runs/<room_id>/`. For explicit user-facing compact logs on any platform,
+set `JIMMORIA_EVENT_STYLE=compact`. Use `JIMMORIA_EVENT_STYLE=stream` only when
+you want raw tool/debug event lines.
 
 ```powershell
-$env:JIMMORIA_FORCE_RUNTIME_DOCK = "1"
-$env:JIMMORIA_EVENT_STYLE = "dock"
+$env:JIMMORIA_EVENT_STYLE = "compact"
 jimmoria
 ```
 
-For explicit user-facing compact logs on any platform, set
-`JIMMORIA_EVENT_STYLE=compact`. Use `JIMMORIA_EVENT_STYLE=stream` only when you
-want raw tool/debug event lines.
+If a terminal has trouble with live cursor redraws, set
+`JIMMORIA_DISABLE_RUNTIME_DOCK=1` to fall back to framed non-live cards.
 
 Open the local web dashboard:
 

@@ -5,39 +5,49 @@ Current merged local-state handoff:
 
 ## Runtime Dock Update
 
-The current CLI uses safe compact runtime logs by default on Windows PowerShell.
-The lightweight TUI dock is still available, but it is opt-in because repeated
-ANSI cursor-up/delete-line redraws can leave stale panels in Windows terminals.
+The current CLI uses the live runtime dock by default. When a Research Room is
+running, the visible screen becomes a fixed agent dashboard: raw runtime/tool
+events stay in saved run artifacts, while the terminal shows each AI agent's
+current work card and a running LLM call/token total.
 
 ```powershell
-$env:JIMMORIA_FORCE_RUNTIME_DOCK = "1"
 $env:JIMMORIA_EVENT_STYLE = "dock"
 jimmoria
 ```
 
-Without those env vars, Research Room execution prints stable event lines:
+The default dock shape:
 
 ```text
-룸 > OPEN room_x | agents 10 | 3jane report
-상태 > 대기: 슈퍼바이저, 아카이비스트, 소셜/KOL, 내러티브, 스카우터 +5
-에이전트 > RUN 슈퍼바이저 | 리서치 방향과 작업 순서를 정리하는 중
-계획 > 슈퍼바이저 | 작업 9개 배정 | 체크포인트 3개 | plan ready
-에이전트 > DONE 슈퍼바이저 | plan ready
-병렬 > START research_swarm | 7개 에이전트 실행 | max 7
-작업 > 스카우터 | RUN web_search - 3jane crypto project official
++--------------------------------------------------------------------------------+
+| JIMMORIA HQ | 슈퍼바이저 대화 | provider: codex_sdk | room: room_x | agents... |
+| 토큰 사용: ~42.0k tokens | LLM 호출: 12 | 로그: 백단 저장                  |
+| 진행: 스카우터 -> 툴 실행: web_search - official project query | 대기: ... |
+| 리서치룸 실행 중입니다. 슈퍼바이저가 완료하면 입력창이 돌아옵니다.       |
+| 전체 AI 에이전트 대시보드 - 현재 작업                                      |
+| +------------------------------+  +------------------------------+          |
+| | 스카우터 [진행] discovery... |  | 아카이비스트 [완료] ingest... |          |
+| | 진행: 공식 후보를 확인하는 중 |  | 완료: 소스 정리 완료          |          |
+| +------------------------------+  +------------------------------+          |
+| > 작업중...                                                                 |
++--------------------------------------------------------------------------------+
 ```
 
 Behavior:
 
-- Windows default runtime logs scroll normally and do not redraw previous panels.
+- The default runtime screen is the agent dashboard, not a scrolling log.
 - Raw event records are still stored in run artifacts in the background.
+- The header shows cumulative LLM calls and total tokens as agent results arrive.
+- The dashboard redraw uses cursor-up plus per-line clear sequences so stale
+  card borders are less likely than with delete-line redraws.
+- Compact log mode is still available with `JIMMORIA_EVENT_STYLE=compact`.
 - Compact logs hide internal supervisor office tools such as
   `create_research_room`, `create_task`, `assign_task`, `agent_handoff`, and
   `update_task_status`; those details stay in saved run artifacts and
   `JIMMORIA_EVENT_STYLE=stream`.
-- Forced dock mode contains `JIMMORIA HQ`, provider, room id, aggregate agent progress, and a `Live agent board - current work` table.
-- Each agent row shows `WAIT`, `RUN`, `DONE`, or `FAIL`.
-- Each agent row shows the current assignment or the latest tool action.
+- Dock mode contains `JIMMORIA HQ`, provider, room id, aggregate agent progress,
+  token/call usage, and a full AI agent card grid.
+- Each agent card shows `대기`, `진행`, `완료`, or `실패`.
+- Each agent card shows the current assignment or the latest tool action.
 - Tool events update the fixed board and are saved to `events.json` / `tool_audit_log.json`.
 - The `> working...` line stays inside the panel, and only the dots blink.
 
@@ -69,12 +79,11 @@ JIMMORIA의 현재 CLI는 full-screen TUI가 아니라 line-oriented CLI다. 따
 - ANSI input mode를 명시적으로 켠 경우에는 제출 후 input dock을 지운다.
 - 제출된 문장은 큰 `You` 패널로 반복하지 않고 `You > ...` 로그로 위에 남긴다.
 - Supervisor는 바로 `Supervisor > ...` 진행 로그를 남긴 뒤 답변하거나 Research Room을 연다.
-- Research Room이 열리면 Windows 기본값에서는 stable compact event line을 출력한다. 내부 supervisor office tool은 숨기고, 에이전트 시작/완료와 외부 작업 tool만 보여준다.
-- Runtime metrics include elapsed time and LLM usage. `JIMMORIA_EVENT_STYLE=stream`을 켠 디버그 모드에서는 `time 1.2s | llm 2 calls / ~4.2k tokens`처럼 compact log로도 볼 수 있다.
-- `JIMMORIA_FORCE_RUNTIME_DOCK=1`과 `JIMMORIA_EVENT_STYLE=dock`을 같이 켠 경우에만 Research Room 실행 중 하단 dock을 유지한다.
-- Dock mode에서는 새 이벤트가 출력될 때 이전 dock을 지우고 이벤트를 찍은 뒤 다시 dock을 그려, 사용자가 계속 같은 회사 채팅창 안에 있는 느낌을 준다.
+- Research Room이 열리면 기본값에서는 stable compact event line이 아니라 전체 AI agent dashboard를 유지한다. 내부 supervisor office tool은 화면에 찍지 않고, 저장된 artifact와 debug stream에만 남긴다.
+- Runtime metrics include elapsed time and LLM usage. Dock header는 누적 token/call을 보여주고, `JIMMORIA_EVENT_STYLE=stream`을 켠 디버그 모드에서는 `time 1.2s | llm 2 calls / ~4.2k tokens`처럼 compact log로도 볼 수 있다.
+- Dock mode에서는 새 이벤트가 출력될 때 이전 dock을 line-clear 방식으로 지운 뒤 같은 위치에 다시 그려, 화면이 agent 상태판으로 유지되게 한다.
 - Dock mode에서는 실제 터미널 커서를 숨기고, dock 내부의 `> working...` 점만 blink 처리한다. 바깥 커서가 박스 밖에서 깜빡이면 안 된다.
-- 큰 `Live agent board`와 agent work card는 opt-in dock, `/board`, 또는 `JIMMORIA_EVENT_STYLE=cards`에서 사용한다.
+- 큰 agent work card는 기본 dock, `/board`, 또는 `JIMMORIA_EVENT_STYLE=cards`에서 사용한다.
 
 ## Target Shape
 
