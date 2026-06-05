@@ -3250,6 +3250,52 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(gateway.call_log[0]["provider_family"], "grok")
         self.assertEqual(gateway.call_log[1]["provider_family"], "codex")
 
+    def test_codex_grok_hybrid_falls_back_to_codex_when_grok_fails(self) -> None:
+        class FakeCodexProvider:
+            provider_name = "codex_cli"
+
+            def __init__(self) -> None:
+                self.requests: list[LLMRequest] = []
+
+            def complete(self, request: LLMRequest) -> LLMResponse:
+                self.requests.append(request)
+                return LLMResponse(text="codex fallback ok", model=request.model, provider=self.provider_name, usage={})
+
+        class FailingGrokProvider:
+            provider_name = "grok"
+
+            def __init__(self) -> None:
+                self.requests: list[LLMRequest] = []
+
+            def complete(self, request: LLMRequest) -> LLMResponse:
+                self.requests.append(request)
+                raise RuntimeError("Grok provider failed: HTTP 403: bad-credentials")
+
+        codex = FakeCodexProvider()
+        grok = FailingGrokProvider()
+        with patch.dict("os.environ", {"LLM_PROVIDER": "codex_grok"}, clear=True):
+            gateway = ModelGateway(providers={"codex": codex, "grok": grok})
+            response = gateway.complete(
+                agent_id="narrative_agent",
+                task_type="narrative_reasoning",
+                system_prompt="narrative",
+                user_prompt="map market narrative",
+                response_format="json",
+            )
+
+        self.assertEqual(response.provider, "codex_cli")
+        self.assertEqual(response.model, "gpt-5.5")
+        self.assertEqual(len(grok.requests), 1)
+        self.assertEqual(grok.requests[0].model, "grok-4.3")
+        self.assertEqual(len(codex.requests), 1)
+        self.assertEqual(codex.requests[0].model, "gpt-5.5")
+        self.assertEqual(response.usage["fallback_from_provider"], "grok")
+        self.assertEqual(response.usage["fallback_from_provider_family"], "grok")
+        self.assertIn("bad-credentials", response.usage["fallback_error"])
+        self.assertEqual(gateway.call_log[0]["requested_provider_family"], "grok")
+        self.assertEqual(gateway.call_log[0]["provider_family"], "codex")
+        self.assertEqual(gateway.call_log[0]["fallback_from_provider"], "grok")
+
     def test_codex_grok_hybrid_agent_override_can_route_one_worker(self) -> None:
         class FakeProvider:
             def __init__(self, provider_name: str) -> None:

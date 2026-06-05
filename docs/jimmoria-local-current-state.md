@@ -11,6 +11,7 @@ This note is the local operator handoff after merging
 - The default live model posture is `LLM_PROVIDER=codex_grok`.
 - Codex handles supervisor chat, orchestration, ingestion, product/docs, on-chain, funding/token, report writing, final synthesis, and Obsidian sync.
 - Grok/xAI handles social/KOL, narrative reasoning, and candidate discovery by default.
+- If a Grok route fails in hybrid mode, JIMMORIA retries the same task through Codex by default and records the fallback in `llm_call_log.json`.
 - The runtime UI uses a lightweight dock: raw room, agent, tool, and output events are saved under `data/runs/<room_id>/` instead of scrolling by default.
 - Tool access is now registry-backed through `config/tools/tool_registry.yaml` and policy-backed through `config/toolsets.yaml`.
 - Agents have explicit skills and hooks in `config/agents/*.yaml`, `config/skills/`, and `config/hooks/`.
@@ -83,6 +84,13 @@ Single-agent provider overrides:
 ```powershell
 $env:JIMMORIA_AGENT_PROVIDER_SOCIAL_KOL_AGENT = "grok"
 $env:JIMMORIA_AGENT_PROVIDER_REPORT_AGENT = "codex"
+```
+
+Hybrid Grok fallback controls:
+
+```powershell
+$env:JIMMORIA_GROK_FALLBACK_TO_CODEX = "0"     # disable automatic Codex retry
+$env:JIMMORIA_DISABLE_GROK_FALLBACK = "1"      # also disables automatic Codex retry
 ```
 
 ## Credential Rules

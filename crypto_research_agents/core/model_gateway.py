@@ -64,6 +64,9 @@ class ModelGateway:
 
     def select(self, *, agent_id: str, task_type: str) -> ModelDecision:
         provider_family = self.provider_family_for_task(agent_id=agent_id, task_type=task_type)
+        return self._select_for_family(agent_id=agent_id, task_type=task_type, provider_family=provider_family)
+
+    def _select_for_family(self, *, agent_id: str, task_type: str, provider_family: str) -> ModelDecision:
         if task_type == "supervisor_chat":
             return ModelDecision(
                 selected_model=_model_env("FAST_CHAT", provider_family=provider_family)
@@ -157,21 +160,52 @@ class ModelGateway:
         response_format: str = "text",
     ) -> LLMResponse:
         decision = self.select(agent_id=agent_id, task_type=task_type)
-        request = LLMRequest(
+        request = _request_from_decision(
+            decision,
             agent_id=agent_id,
             task_type=task_type,
-            model=decision.selected_model,
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            max_tokens=decision.max_tokens,
-            temperature=decision.temperature,
             response_format=response_format,
-            reasoning_effort=decision.reasoning_effort,
         )
         provider = self.providers.get(decision.provider_family) or self.provider
+        requested_decision = decision
+        fallback_error: str | None = None
+        fallback_provider_name: str | None = None
         started = perf_counter()
-        response = provider.complete(request)
+        try:
+            response = provider.complete(request)
+        except Exception as exc:
+            if not self._can_fallback_to_codex(decision.provider_family):
+                raise
+            fallback_error = str(exc)
+            fallback_provider_name = getattr(provider, "provider_name", decision.provider_family)
+            decision = self._select_for_family(agent_id=agent_id, task_type=task_type, provider_family="codex")
+            request = _request_from_decision(
+                decision,
+                agent_id=agent_id,
+                task_type=task_type,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                response_format=response_format,
+            )
+            provider = self.providers.get("codex") or self.provider
+            try:
+                response = provider.complete(request)
+            except Exception as fallback_exc:
+                raise RuntimeError(
+                    "Grok route failed and Codex fallback also failed: "
+                    f"grok_error={fallback_error}; codex_error={fallback_exc}"
+                ) from fallback_exc
         duration_ms = int((perf_counter() - started) * 1000)
+        if fallback_error:
+            response.usage = {
+                **response.usage,
+                "fallback_from_provider": fallback_provider_name or "grok",
+                "fallback_from_provider_family": requested_decision.provider_family,
+                "fallback_from_model": requested_decision.selected_model,
+                "fallback_error": fallback_error,
+            }
         response.usage = enrich_usage_with_estimates(
             response.usage,
             system_prompt=system_prompt,
@@ -189,6 +223,10 @@ class ModelGateway:
                     "reasoning_effort": decision.reasoning_effort,
                     "provider": response.provider,
                     "provider_family": decision.provider_family,
+                    "requested_provider_family": requested_decision.provider_family,
+                    "requested_model": requested_decision.selected_model,
+                    "fallback_from_provider": fallback_provider_name,
+                    "fallback_error": fallback_error,
                     "duration_ms": response.usage.get("duration_ms", duration_ms),
                     "token_usage": token_usage,
                     "usage": response.usage,
@@ -219,6 +257,47 @@ class ModelGateway:
             response_format="json",
         )
         return parse_json_response(response)
+
+    def _can_fallback_to_codex(self, provider_family: str) -> bool:
+        return (
+            self.provider_mode == "codex_grok"
+            and provider_family == "grok"
+            and "codex" in self.providers
+            and _grok_fallback_to_codex_enabled()
+        )
+
+
+def _request_from_decision(
+    decision: ModelDecision,
+    *,
+    agent_id: str,
+    task_type: str,
+    system_prompt: str,
+    user_prompt: str,
+    response_format: str,
+) -> LLMRequest:
+    return LLMRequest(
+        agent_id=agent_id,
+        task_type=task_type,
+        model=decision.selected_model,
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        max_tokens=decision.max_tokens,
+        temperature=decision.temperature,
+        response_format=response_format,
+        reasoning_effort=decision.reasoning_effort,
+    )
+
+
+def _grok_fallback_to_codex_enabled() -> bool:
+    raw = (
+        os.getenv("JIMMORIA_GROK_FALLBACK_TO_CODEX")
+        or os.getenv("JIMMORIA_HYBRID_GROK_FALLBACK")
+        or "1"
+    )
+    if os.getenv("JIMMORIA_DISABLE_GROK_FALLBACK"):
+        return False
+    return raw.strip().lower() not in {"0", "false", "no", "off", "disabled"}
 
 
 def _model_env(tier: str, *, provider_family: str = "codex") -> str | None:
