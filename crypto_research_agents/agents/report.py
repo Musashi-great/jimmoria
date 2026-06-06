@@ -17,6 +17,7 @@ from crypto_research_agents.agents.reporting.quality import ReportQuality, asses
 from crypto_research_agents.agents.base import AgentResult, BaseAgent
 from crypto_research_agents.core.bus import CollaborationBus
 from crypto_research_agents.core.company_settings import CompanySettings
+from crypto_research_agents.core.korean_style import korean_report_humanize_prompt
 from crypto_research_agents.core.memory import FindingRecord, SharedMemory
 from crypto_research_agents.core.project_profile import find_project_profile_in_text
 from crypto_research_agents.core.room import ResearchRoom
@@ -50,7 +51,12 @@ class ReportAgent(BaseAgent):
         claim_ledger = build_claim_evidence_ledger(primary, findings, source_log)
         room.project_card["claim_evidence_ledger"] = claim_ledger
         room.project_card["project_dossier_evidence_pack"] = build_project_dossier_evidence_pack(primary, findings, source_log)
-        llm_summary = self._write_llm_summary(room, memory, findings)
+        llm_summary = self._write_llm_summary(
+            room,
+            memory,
+            findings,
+            company_settings=company_settings,
+        )
         provider_name = self.model_gateway.provider_name_for_task(agent_id=self.agent_id, task_type=self.task_type)
         report = render_project_dossier(
             room,
@@ -131,6 +137,7 @@ class ReportAgent(BaseAgent):
         room: ResearchRoom,
         memory: SharedMemory,
         findings: list[FindingRecord],
+        company_settings: CompanySettings | None = None,
     ) -> str:
         candidate_lines = []
         for project in current_room_candidates(room, memory, findings):
@@ -138,15 +145,18 @@ class ReportAgent(BaseAgent):
                 f"- {project.name}: {', '.join(project.narratives)}; {project.reason_found}"
             )
         finding_lines = [f"- {finding.agent_id}: {finding.summary}" for finding in findings]
+        system_prompt = self.system_prompt(
+            "You are the Report Agent for a crypto research company. "
+            "Write a private editorial synthesis for the final renderer. "
+            "Do not output JSON, agent logs, Obsidian notes, or debate transcripts. "
+            "Do not invent live data. Clearly mention when connector data is not configured."
+        )
+        if company_settings is not None and company_settings.report_language == "ko":
+            system_prompt = f"{system_prompt}\n\n{korean_report_humanize_prompt()}"
         response = self.model_gateway.complete(
             agent_id=self.agent_id,
             task_type="final_synthesis",
-            system_prompt=self.system_prompt(
-                "You are the Report Agent for a crypto research company. "
-                "Write a private editorial synthesis for the final renderer. "
-                "Do not output JSON, agent logs, Obsidian notes, or debate transcripts. "
-                "Do not invent live data. Clearly mention when connector data is not configured."
-            ),
+            system_prompt=system_prompt,
             user_prompt=(
                 f"Topic: {room.topic}\n\n"
                 f"Goals:\n" + "\n".join(f"- {goal}" for goal in room.goals) + "\n\n"

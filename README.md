@@ -425,6 +425,8 @@ For high-signal projects, the report should be prose-rich enough to read like a 
 
 For Korean research requests, JIMMORIA writes Korean-first reports. Links are displayed with short labels such as `The Block`, `3Jane site`, or `x.com/3janexyz/status`, while the Markdown target keeps the full URL.
 
+Korean report localization also follows the `epoko77-ai/im-not-ai` humanize-korean principles: keep facts, numbers, dates, names, URLs, direct quotes, stance, and evidence limits unchanged, but remove translationese, passive-chain wording, AI-style filler, and mechanical connector repetition where it makes the memo easier to read.
+
 Completed project reports follow this shape:
 
 ```text

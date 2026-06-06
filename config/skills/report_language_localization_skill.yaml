@@ -1,0 +1,38 @@
+{
+  "skill_id": "report_language_localization_skill",
+  "name": "Report Language Localization Skill",
+  "owner": "report_agent",
+  "owner_agents": ["report_agent"],
+  "description": "Korean-first report localization skill using epoko77-ai/im-not-ai humanize-korean principles without changing facts, evidence, or stance.",
+  "steps": [
+    "detect_report_language",
+    "preserve_facts_numbers_names_quotes",
+    "preserve_crypto_terms_when_clearer",
+    "remove_korean_translationese",
+    "remove_ai_filler_and_mechanical_connectors",
+    "keep_report_genre_and_register",
+    "check_no_over_humanizing",
+    "check_uncertainty_and_source_limits_survived"
+  ],
+  "guardrails": [
+    "do_not_add_new_evidence",
+    "do_not_translate_proper_nouns_symbols_addresses_urls_or_quotes",
+    "do_not_hide_missing_evidence",
+    "do_not_convert_research_memo_into_blog_or_marketing_copy",
+    "do_not_use_hype_or_investment_advice_language"
+  ],
+  "quality_gates": [
+    "korean_first_output",
+    "fact_fidelity_check",
+    "translationese_reduction_check",
+    "technical_term_preservation_check",
+    "uncertainty_preservation_check",
+    "no_over_humanizing"
+  ],
+  "required_output": [
+    "natural_korean_report_body",
+    "preserved_claim_boundaries",
+    "source_limitations",
+    "technical_terms_kept_where_clearer"
+  ]
+}

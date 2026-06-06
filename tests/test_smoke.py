@@ -21,7 +21,7 @@ from crypto_research_agents.agents.social_kol import (
     build_who_said_what,
     extract_handles_from_social_results,
 )
-from crypto_research_agents.agents.report import assess_report_quality, build_claim_evidence_ledger, diligence_score
+from crypto_research_agents.agents.report import ReportAgent, assess_report_quality, build_claim_evidence_ledger, diligence_score
 from crypto_research_agents.agents.reporting.evidence_ledger import build_project_dossier_evidence_pack
 from crypto_research_agents.connectors import register_default_connectors
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
@@ -51,7 +51,9 @@ from crypto_research_agents.core.project_profile import find_project_profile
 from crypto_research_agents.core.dynamic_dispatch import DynamicCandidateDispatcher
 from crypto_research_agents.core.edge_conditions import evaluate_edge_condition
 from crypto_research_agents.core.hook_registry import HookRegistry, runtime_event_to_hook_event
+from crypto_research_agents.core.korean_style import korean_report_humanize_prompt
 from crypto_research_agents.core.quality_gate import review_report_quality
+from crypto_research_agents.core.room import ResearchRoom
 from crypto_research_agents.core.scheduler import CronRegistry
 from crypto_research_agents.core.skill_spec import SkillSpecRegistry
 from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
@@ -4024,6 +4026,81 @@ Usage: codex exec [OPTIONS] [PROMPT]
         assert market_signal is not None
         self.assertEqual(market_signal.owner_agents, ["social_kol_agent"])
         self.assertIn("build_who_said_what_rows", market_signal.steps)
+
+        localization = registry.get("report_language_localization_skill")
+        self.assertIsNotNone(localization)
+        assert localization is not None
+        self.assertIn("epoko77-ai/im-not-ai", localization.description)
+        self.assertIn("preserve_facts_numbers_names_quotes", localization.steps)
+        self.assertIn("remove_korean_translationese", localization.steps)
+        self.assertIn("no_over_humanizing", localization.quality_gates)
+
+    def test_korean_report_humanize_prompt_includes_im_not_ai_contract(self) -> None:
+        prompt = korean_report_humanize_prompt()
+
+        self.assertIn("epoko77-ai/im-not-ai", prompt)
+        self.assertIn("Korean report localization style contract", prompt)
+        self.assertIn("translationese", prompt)
+        self.assertIn("facts, numbers, dates", prompt)
+        self.assertIn("Do not over-humanize", prompt)
+
+    def test_report_agent_injects_korean_humanize_prompt_for_ko_reports(self) -> None:
+        class CapturingGateway:
+            def __init__(self) -> None:
+                self.system_prompts: list[str] = []
+
+            def complete(self, **kwargs: object) -> LLMResponse:
+                self.system_prompts.append(str(kwargs["system_prompt"]))
+                return LLMResponse(text="summary", model="test", provider="fake", usage={})
+
+        gateway = CapturingGateway()
+        agent = ReportAgent(model_gateway=gateway)  # type: ignore[arg-type]
+        room = ResearchRoom(topic="Zcash report", goals=["write a report"], agents=["report_agent"])
+
+        agent._write_llm_summary(
+            room,
+            SharedMemory(),
+            [],
+            company_settings=CompanySettings(report_language="ko"),
+        )
+
+        self.assertTrue(gateway.system_prompts)
+        self.assertIn("epoko77-ai/im-not-ai", gateway.system_prompts[-1])
+        self.assertIn("Korean report localization style contract", gateway.system_prompts[-1])
+
+    def test_report_agent_skips_korean_humanize_prompt_for_non_ko_reports(self) -> None:
+        class CapturingGateway:
+            def __init__(self) -> None:
+                self.system_prompts: list[str] = []
+
+            def complete(self, **kwargs: object) -> LLMResponse:
+                self.system_prompts.append(str(kwargs["system_prompt"]))
+                return LLMResponse(text="summary", model="test", provider="fake", usage={})
+
+        gateway = CapturingGateway()
+        agent = ReportAgent(model_gateway=gateway)  # type: ignore[arg-type]
+        room = ResearchRoom(topic="Zcash report", goals=["write a report"], agents=["report_agent"])
+
+        agent._write_llm_summary(
+            room,
+            SharedMemory(),
+            [],
+            company_settings=CompanySettings(report_language="en"),
+        )
+
+        self.assertTrue(gateway.system_prompts)
+        self.assertNotIn("epoko77-ai/im-not-ai", gateway.system_prompts[-1])
+
+    def test_report_agent_spec_uses_korean_humanize_rules(self) -> None:
+        spec = AgentSpecRegistry.load_dir("config/agents").get("report_agent")
+        self.assertIsNotNone(spec)
+        assert spec is not None
+
+        prompt = spec.system_prompt()
+
+        self.assertIn("report_language_localization_skill", spec.skills.secondary)
+        self.assertIn("epoko77-ai/im-not-ai", prompt)
+        self.assertIn("translationese", prompt)
 
     def test_hook_registry_loads_common_hooks_and_manifest_dirs(self) -> None:
         registry = HookRegistry.load_dir("config/hooks")

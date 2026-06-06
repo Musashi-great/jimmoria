@@ -716,6 +716,8 @@ ReportAgent의 persona는 `The Buy-Side Research Editor`다. 즉 이 에이전�
 - 모든 보고서는 한국어를 기본으로 하되, `Proof-of-Useful-Work`, `credit line`, `value-capture`처럼 기술적으로 더 명확한 영어 표현은 유지할 수 있다.
 - evidence packet과 source appendix는 감사 trail이고, 최종 보고서의 본문을 대체하지 않는다.
 
+Korean localization follows `epoko77-ai/im-not-ai` humanize-korean principles: preserve facts, numbers, names, URLs, direct quotes, stance, and evidence limits, while reducing translationese, passive chains, AI filler, and mechanical connector repetition.
+
 ### Current Reader-Friendly Report Shape
 
 `research_complete` report output is now written as a reader-friendly project dossier, not an internal agent activity log. The client-facing report uses this shape:
