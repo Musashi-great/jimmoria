@@ -56,8 +56,11 @@ from crypto_research_agents.core.quality_gate import review_report_quality
 from crypto_research_agents.core.room import ResearchRoom
 from crypto_research_agents.core.scheduler import CronRegistry
 from crypto_research_agents.core.skill_spec import SkillSpecRegistry
+from crypto_research_agents.core.supervisor_brain import SupervisorBrain
 from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
 from crypto_research_agents.core.supervisor_intake import decide_supervisor_intake
+from crypto_research_agents.core.supervisor_memory import SupervisorMemoryStore
+from crypto_research_agents.core.supervisor_session import SupervisorSessionStore
 from crypto_research_agents.core.capabilities import collect_capabilities
 from crypto_research_agents.core.playbook import ResearchPlaybookRegistry
 from crypto_research_agents.core.profile import WorkerProfileRegistry
@@ -477,6 +480,12 @@ class SmokeTest(unittest.TestCase):
 
             self.assertFalse((root / "reports").exists())
             self.assertFalse((root / "company_settings.json").exists())
+            session_path = root / "supervisor_session.json"
+            self.assertTrue(session_path.exists())
+            session = json.loads(session_path.read_text(encoding="utf-8"))
+            self.assertGreaterEqual(len(session["messages"]), 2)
+            self.assertEqual(session["messages"][-2]["role"], "user")
+            self.assertEqual(session["messages"][-1]["role"], "supervisor")
 
         text = output.getvalue()
         self.assertIn("슈퍼바이저", text)
@@ -523,6 +532,96 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(reply, ["좋아. 여기서는 내가 바로 답하고, 리서치가 필요하면 방을 열게."])
         self.assertEqual(provider.request.task_type, "supervisor_chat")
         self.assertIn("recent_dialogue", provider.request.user_prompt)
+
+    def test_supervisor_chat_prompt_includes_persistent_memory_context(self) -> None:
+        class FakeProvider:
+            provider_name = "fake_live"
+
+            def complete(self, request: LLMRequest) -> LLMResponse:
+                self.request = request
+                return LLMResponse(text="ok", model=request.model, provider=self.provider_name, usage={})
+
+        provider = FakeProvider()
+        gateway = ModelGateway(provider=provider)
+        settings = CompanySettings(report_language="ko")
+        decision = decide_supervisor_intake("what do you remember?", settings)
+
+        generate_supervisor_chat_reply(
+            "what do you remember?",
+            settings,
+            decision,
+            history=[{"role": "user", "content": "previous turn"}],
+            memory_context=["[preference] supervisor_memory_expected: keep memory across sessions"],
+            session_context=["Last Research Room: room_test (Zcash)"],
+            model_gateway=gateway,
+        )
+
+        self.assertIn("supervisor_memory", provider.request.user_prompt)
+        self.assertIn("keep memory across sessions", provider.request.user_prompt)
+        self.assertIn("Last Research Room", provider.request.user_prompt)
+
+    def test_supervisor_memory_store_persists_hermes_style_preferences(self) -> None:
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "supervisor_memory.json"
+            store = SupervisorMemoryStore.load(path)
+
+            captured = store.observe_user_message(
+                "Make the supervisor work like Hermes with memory and delegate_task to sub-agent workers.",
+                CompanySettings(report_language="ko"),
+            )
+            store.save()
+            loaded = SupervisorMemoryStore.load(path)
+
+        self.assertTrue(captured)
+        self.assertIn("supervisor_operating_model", loaded.items)
+        self.assertIn("supervisor_memory_expected", loaded.items)
+        self.assertIn("delegate_work_to_specialists", loaded.items)
+        self.assertTrue(any("Hermes-style" in item.value for item in loaded.items.values()))
+
+    def test_supervisor_session_store_persists_recent_dialogue_and_last_room(self) -> None:
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "supervisor_session.json"
+            store = SupervisorSessionStore.load(path)
+            store.record_turn(
+                user_message="hello",
+                supervisor_reply="hi, I am the Supervisor",
+                decision={"intent_type": "supervisor_chat"},
+            )
+            store.set_last_room("room_abc", "Zcash report")
+            store.save()
+            loaded = SupervisorSessionStore.load(path)
+
+        recent = loaded.recent_dialogue()
+        self.assertEqual(recent[-2]["role"], "user")
+        self.assertEqual(recent[-1]["role"], "supervisor")
+        self.assertEqual(loaded.last_room_id, "room_abc")
+        self.assertTrue(any("room_abc" in line for line in loaded.memory_summary_lines()))
+
+    def test_supervisor_brain_prepares_turn_with_memory_and_session_context(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            brain = SupervisorBrain.for_memory_path(root / "memory.json")
+            brain.session_store.record_turn(
+                user_message="previous",
+                supervisor_reply="previous reply",
+                decision={"intent_type": "supervisor_chat"},
+            )
+            brain.session_store.save()
+
+            turn = brain.prepare_turn(
+                "Make supervisor act like Hermes with memory.",
+                "Make supervisor act like Hermes with memory.",
+                CompanySettings(report_language="ko"),
+            )
+            brain.record_reply(turn, ["ok"], room_id="room_xyz", topic="Hermes supervisor")
+            reloaded = SupervisorBrain.for_memory_path(root / "memory.json")
+
+        self.assertFalse(turn.decision.needs_research_room)
+        self.assertTrue(turn.memory_context)
+        self.assertTrue(turn.recent_dialogue)
+        self.assertIn("supervisor_operating_model", turn.captured_memory_keys)
+        self.assertEqual(reloaded.session_store.last_room_id, "room_xyz")
+        self.assertIn("last_research_room", reloaded.memory_store.items)
 
     def test_chat_intake_status_shows_settings_without_report(self) -> None:
         output = StringIO()

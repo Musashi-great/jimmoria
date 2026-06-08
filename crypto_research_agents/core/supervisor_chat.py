@@ -13,6 +13,8 @@ def generate_supervisor_chat_reply(
     decision: SupervisorIntakeDecision,
     *,
     history: list[dict[str, str]] | None = None,
+    memory_context: list[str] | None = None,
+    session_context: list[str] | None = None,
     model_gateway: ModelGateway | None = None,
 ) -> list[str]:
     """Answer as the front-door Supervisor without opening a Research Room."""
@@ -25,7 +27,14 @@ def generate_supervisor_chat_reply(
                 agent_id="supervisor_agent",
                 task_type="supervisor_chat",
                 system_prompt=supervisor_chat_system_prompt(settings),
-                user_prompt=supervisor_chat_user_prompt(line, settings, decision, history or []),
+                user_prompt=supervisor_chat_user_prompt(
+                    line,
+                    settings,
+                    decision,
+                    history or [],
+                    memory_context=memory_context or [],
+                    session_context=session_context or [],
+                ),
             )
             text = response.text.strip()
             if text:
@@ -61,14 +70,23 @@ def supervisor_chat_user_prompt(
     settings: CompanySettings,
     decision: SupervisorIntakeDecision,
     history: list[dict[str, str]],
+    *,
+    memory_context: list[str] | None = None,
+    session_context: list[str] | None = None,
 ) -> str:
     history_tail = history[-8:]
     payload = {
         "user_message": line,
         "recent_dialogue": history_tail,
+        "supervisor_memory": memory_context or [],
+        "session_context": session_context or [],
         "settings": settings.to_dict(),
         "internal_decision": decision.to_dict(),
-        "instruction": "Reply as the Supervisor in 1-5 concise Korean sentences. Be conversational, useful, and context-aware.",
+        "instruction": (
+            "Reply as the Supervisor in 1-5 concise Korean sentences. "
+            "Use supervisor_memory and session_context for continuity, but do not expose hidden labels. "
+            "If the user gives executable work, explain that you will dispatch specialists through the research company path."
+        ),
     }
     return json.dumps(payload, ensure_ascii=False, indent=2)
 

@@ -28,6 +28,7 @@ from crypto_research_agents.core.supervisor_intake import (
     build_company_status_reply,
     build_supervisor_reply,
 )
+from crypto_research_agents.core.supervisor_brain import SupervisorBrain, SupervisorBrainTurn
 from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
 from crypto_research_agents.core.model_gateway import ModelGateway
 from crypto_research_agents.core.codex_models import (
@@ -818,7 +819,8 @@ def chat_command(args: argparse.Namespace) -> None:
         configure_model_panel(clear_before=False)
     console.print_help()
     last_room_id = ""
-    supervisor_history: list[dict[str, str]] = []
+    supervisor_brain = SupervisorBrain.for_memory_path(args.memory)
+    supervisor_history: list[dict[str, str]] = supervisor_brain.session_store.recent_dialogue()
     pending_report_creation_line = ""
 
     while True:
@@ -848,15 +850,19 @@ def chat_command(args: argparse.Namespace) -> None:
 
         settings_path = company_settings_path_for(args.memory)
         settings = load_company_settings(settings_path)
-        intake_decision = decide_supervisor_intake(route_line, settings)
+        supervisor_turn = supervisor_brain.prepare_turn(line, route_line, settings)
+        intake_decision = supervisor_turn.decision
+        supervisor_history = supervisor_turn.recent_dialogue
 
         if intake_decision.intent_type == "company_config":
             pending_report_creation_line = ""
             applied = apply_company_instruction(route_line, settings)
             save_company_settings(settings, settings_path)
+            if supervisor_brain.memory_store.observe_user_message(route_line, settings):
+                supervisor_brain.memory_store.save()
             reply = build_company_instruction_reply(applied, settings, settings_path)
             console.print_supervisor_reply(reply)
-            append_supervisor_history(supervisor_history, line, reply)
+            append_supervisor_history(supervisor_history, line, reply, brain=supervisor_brain, turn=supervisor_turn)
             continue
 
         if intake_decision.intent_type == "company_status":
@@ -864,13 +870,20 @@ def chat_command(args: argparse.Namespace) -> None:
             reply = build_company_status_reply(settings)
             console.print_supervisor_reply(reply)
             console.print_company_settings(settings, settings_path)
-            append_supervisor_history(supervisor_history, line, reply)
+            append_supervisor_history(supervisor_history, line, reply, brain=supervisor_brain, turn=supervisor_turn)
             continue
 
         if intake_decision.intent_type == "supervisor_chat":
-            reply = generate_supervisor_chat_reply(route_line, settings, intake_decision, history=supervisor_history)
+            reply = generate_supervisor_chat_reply(
+                route_line,
+                settings,
+                intake_decision,
+                history=supervisor_history,
+                memory_context=supervisor_turn.memory_context,
+                session_context=supervisor_turn.session_context,
+            )
             console.print_supervisor_reply(reply)
-            append_supervisor_history(supervisor_history, line, reply)
+            append_supervisor_history(supervisor_history, line, reply, brain=supervisor_brain, turn=supervisor_turn)
             continue
 
         if intake_decision.intent_type == "report_retrieval":
@@ -889,7 +902,7 @@ def chat_command(args: argparse.Namespace) -> None:
                 if pending_report_creation_line:
                     reply.append("새 보고서 작성 의도라면 '만들어' 또는 '작성해'라고 이어서 말하면 제가 직전 요청으로 Research Room을 열겠습니다.")
                 console.print_supervisor_reply(reply)
-                append_supervisor_history(supervisor_history, line, reply)
+                append_supervisor_history(supervisor_history, line, reply, brain=supervisor_brain, turn=supervisor_turn)
                 continue
             pending_report_creation_line = ""
             report_path, room_id, topic = report
@@ -903,13 +916,21 @@ def chat_command(args: argparse.Namespace) -> None:
             console.block("Saved report", report_path.read_text(encoding="utf-8").splitlines())
             last_room_id = room_id
             console.last_room_id = last_room_id
-            append_supervisor_history(supervisor_history, line, reply)
+            append_supervisor_history(
+                supervisor_history,
+                line,
+                reply,
+                brain=supervisor_brain,
+                turn=supervisor_turn,
+                room_id=room_id,
+                topic=topic,
+            )
             continue
 
         if not intake_decision.needs_research_room:
             reply = build_supervisor_reply(route_line, settings, intake_decision)
             console.print_supervisor_reply(reply)
-            append_supervisor_history(supervisor_history, line, reply)
+            append_supervisor_history(supervisor_history, line, reply, brain=supervisor_brain, turn=supervisor_turn)
             continue
 
         title, content, url = chat_input_to_source(route_line)
@@ -932,7 +953,7 @@ def chat_command(args: argparse.Namespace) -> None:
                 "문장을 고쳐서 다시 지시하거나, 기존 보고서 조회라면 '보고서 보여줘'처럼 말해 주세요.",
             ]
             console.print_supervisor_reply(reply)
-            append_supervisor_history(supervisor_history, line, reply)
+            append_supervisor_history(supervisor_history, line, reply, brain=supervisor_brain, turn=supervisor_turn)
             continue
 
         pending_report_creation_line = ""
@@ -950,7 +971,13 @@ def chat_command(args: argparse.Namespace) -> None:
                 )
             except RuntimeError as exc:
                 console.print_supervisor_reply(model_runtime_error_reply(exc))
-                append_supervisor_history(supervisor_history, line, model_runtime_error_reply(exc))
+                append_supervisor_history(
+                    supervisor_history,
+                    line,
+                    model_runtime_error_reply(exc),
+                    brain=supervisor_brain,
+                    turn=supervisor_turn,
+                )
                 continue
         else:
             try:
@@ -966,17 +993,47 @@ def chat_command(args: argparse.Namespace) -> None:
                 )
             except RuntimeError as exc:
                 console.print_supervisor_reply(model_runtime_error_reply(exc))
-                append_supervisor_history(supervisor_history, line, model_runtime_error_reply(exc))
+                append_supervisor_history(
+                    supervisor_history,
+                    line,
+                    model_runtime_error_reply(exc),
+                    brain=supervisor_brain,
+                    turn=supervisor_turn,
+                )
                 continue
         last_room_id = result.room.room_id
         console.last_room_id = last_room_id
         console.print_run_summary(result)
+        append_supervisor_history(
+            supervisor_history,
+            line,
+            [
+                "Research Room completed and saved.",
+                f"Room: {last_room_id}",
+                f"Topic: {title}",
+            ],
+            brain=supervisor_brain,
+            turn=supervisor_turn,
+            room_id=last_room_id,
+            topic=title,
+        )
 
 
-def append_supervisor_history(history: list[dict[str, str]], user_message: str, reply_lines: list[str]) -> None:
+def append_supervisor_history(
+    history: list[dict[str, str]],
+    user_message: str,
+    reply_lines: list[str],
+    *,
+    brain: SupervisorBrain | None = None,
+    turn: SupervisorBrainTurn | None = None,
+    room_id: str = "",
+    topic: str = "",
+) -> None:
     history.append({"role": "user", "content": user_message})
     history.append({"role": "supervisor", "content": "\n".join(reply_lines)})
     del history[:-16]
+    if brain is not None and turn is not None:
+        brain.record_reply(turn, reply_lines, room_id=room_id, topic=topic)
 
 
 def chat_run_retention_policy() -> str:

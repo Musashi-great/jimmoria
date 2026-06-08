@@ -151,6 +151,7 @@ flowchart LR
 | Tool Gateway | `core/tool_gateway.py` | tool 권한, connector 호출, audit log |
 | Model Gateway | `core/model_gateway.py` | task type별 Codex/Grok provider route, pro reasoning effort |
 | Usage Meter | `core/usage.py` | LLM duration/token usage extraction, fallback estimation, room/agent aggregation |
+| Supervisor Brain | `core/supervisor_brain.py`, `core/supervisor_memory.py`, `core/supervisor_session.py` | Hermes-style front-door memory, session continuity, and routing context |
 | Concurrency Policy | `core/concurrency.py`, `config/concurrency.yaml` | Phase 1-4 병렬화 정책 |
 | Storage | `storage/` | run snapshot, reports, vault notes |
 | Web Dashboard | `web/` | 로컬 구조/런타임 시각화 |

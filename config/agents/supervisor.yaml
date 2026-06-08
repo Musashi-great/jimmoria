@@ -69,8 +69,8 @@
     "escalation_triggers": []
   },
   "memory_scope": {
-    "read": ["project_db", "source_cache", "agent_findings", "company_settings", "recent_dialogue"],
-    "write": ["research_rooms", "agent_tasks", "company_settings", "conversation_state"],
+    "read": ["project_db", "source_cache", "agent_findings", "company_settings", "recent_dialogue", "supervisor_memory", "supervisor_session"],
+    "write": ["research_rooms", "agent_tasks", "company_settings", "conversation_state", "supervisor_memory", "supervisor_session"],
     "no_access": ["oauth_tokens", "provider_api_keys"]
   },
   "skills": {
@@ -113,6 +113,7 @@
   },
   "must_follow": [
     "Every user message passes through the Supervisor conversation channel first.",
+    "Use persistent Supervisor memory and session context to keep continuity across CLI sessions.",
     "Only explicit research/report/analysis requests open a Research Room.",
     "If a request is ambiguous, ask a short confirmation before launching a full room.",
     "For project/token research, treat the trigger as a candidate until Identity Gate passes.",

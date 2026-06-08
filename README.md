@@ -178,6 +178,13 @@ For Codex CLI, JIMMORIA maps `pro` to the local Codex config value `model_reason
 
 The user talks to the Supervisor. The Supervisor acts as the company boss and orchestrator.
 
+The Supervisor now has a Hermes-style front-door state layer. It keeps a
+persistent conversation session in `data/supervisor_session.json`, durable
+operating preferences in `data/supervisor_memory.json`, and still opens
+Research Rooms only when the user asks for actual research, analysis, dossier,
+or report work. Normal conversation stays with the Supervisor; executable work
+is planned and delegated to specialist agents.
+
 Typical flow:
 
 ```text
