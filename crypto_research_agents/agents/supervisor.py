@@ -19,6 +19,7 @@ class SupervisorAgent(BaseAgent):
         goals = kwargs.get("goals") or room.goals
         company_settings = kwargs.get("company_settings") if isinstance(kwargs.get("company_settings"), dict) else {}
         intake_decision = kwargs.get("intake_decision") if isinstance(kwargs.get("intake_decision"), dict) else {}
+        job_contract = kwargs.get("job_contract") if isinstance(kwargs.get("job_contract"), dict) else {}
         process = kwargs.get("process") if isinstance(kwargs.get("process"), dict) else {}
         supervisor_mode = company_settings.get("supervisor_mode", "research_director")
         summary = (
@@ -38,6 +39,7 @@ class SupervisorAgent(BaseAgent):
             process=process,
             delegation=delegation,
             supervisor_mode=supervisor_mode,
+            job_contract=job_contract,
         )
         llm_analysis = self.llm_analysis_pass(
             room=room,
@@ -51,6 +53,7 @@ class SupervisorAgent(BaseAgent):
                 "orchestration_plan": orchestration_plan,
                 "company_settings": company_settings,
                 "intake_decision": intake_decision,
+                "job_contract": job_contract,
                 "model_decision": asdict(decision),
             },
             fallback_summary=summary,
@@ -67,6 +70,7 @@ class SupervisorAgent(BaseAgent):
                 "model_decision": asdict(decision),
                 "company_settings": company_settings,
                 "intake_decision": intake_decision,
+                "job_contract": job_contract,
                 "llm_analysis": llm_analysis,
                 "delegation": delegation,
                 "orchestration_plan": orchestration_plan,
@@ -81,6 +85,7 @@ class SupervisorAgent(BaseAgent):
                 "finding_id": finding.finding_id,
                 "goals": goals,
                 "intake_decision": intake_decision,
+                "job_contract": job_contract,
                 "llm_analysis": llm_analysis,
                 "delegated_tasks": delegation.get("delegated_tasks", []),
                 "orchestration_plan": orchestration_plan,
@@ -268,10 +273,12 @@ def _build_orchestration_plan(
     process: dict[str, Any],
     delegation: dict[str, Any],
     supervisor_mode: str,
+    job_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     delegated_tasks = delegation.get("delegated_tasks", [])
     if not isinstance(delegated_tasks, list):
         delegated_tasks = []
+    contract = job_contract if isinstance(job_contract, dict) else {}
     coordination_checkpoints = [
         {
             "checkpoint": "intake_and_scope",
@@ -306,9 +313,13 @@ def _build_orchestration_plan(
         "topic": room.topic,
         "goals": goals,
         "process_id": process.get("process_id"),
+        "loop_mode": contract.get("loop_mode", "closed_fleet" if delegated_tasks else "single_agent_chat"),
+        "job_contract": contract,
         "delegated_count": len(delegated_tasks),
         "agent_order": [task.get("agent_id") for task in delegated_tasks if isinstance(task, dict)],
         "coordination_checkpoints": coordination_checkpoints,
+        "verification_gates": contract.get("verification_gates", []),
+        "iteration_policy": contract.get("iteration_policy", {}),
         "supervisor_decision_rights": [
             "decide whether to open a Research Room",
             "set room goals and priority",

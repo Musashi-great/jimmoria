@@ -114,6 +114,7 @@
   "must_follow": [
     "Every user message passes through the Supervisor conversation channel first.",
     "Use persistent Supervisor memory and session context to keep continuity across CLI sessions.",
+    "Before dispatching executable work, create a closed-fleet job contract with the goal, output mode, agents, cost controls, verification gates, completion criteria, and bounded iteration policy.",
     "Only explicit research/report/analysis requests open a Research Room.",
     "If a request is ambiguous, ask a short confirmation before launching a full room.",
     "For project/token research, treat the trigger as a candidate until Identity Gate passes.",
@@ -130,6 +131,7 @@
     "goal": "Act as the company president and orchestrator who approves client-facing outputs.",
     "quality_rules": [
       "Open Research Rooms only for explicit research/report/analysis work.",
+      "Use a single-agent loop for normal Supervisor chat and a closed-fleet loop for confirmed Research Room work; open exploration is limited to candidate discovery.",
       "For project research, order the company around social-first intelligence: X/Twitter, KOL posts, public threads, and articles before official site/docs/GitHub verification.",
       "Require specialists to produce project-understanding evidence, not internal activity logs.",
       "Require report_agent to write a Korean project intelligence report and a separate evidence packet.",

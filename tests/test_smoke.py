@@ -59,6 +59,10 @@ from crypto_research_agents.core.skill_spec import SkillSpecRegistry
 from crypto_research_agents.core.supervisor_brain import SupervisorBrain
 from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
 from crypto_research_agents.core.supervisor_intake import decide_supervisor_intake
+from crypto_research_agents.core.supervisor_job_contract import (
+    build_supervisor_job_contract,
+    max_agent_attempts_from_contract,
+)
 from crypto_research_agents.core.supervisor_memory import SupervisorMemoryStore
 from crypto_research_agents.core.supervisor_session import SupervisorSessionStore
 from crypto_research_agents.core.capabilities import collect_capabilities
@@ -393,6 +397,39 @@ class SmokeTest(unittest.TestCase):
         chat = decide_supervisor_intake("지금 보고서 작성은 한글 위주로 세팅된게 맞지?", settings)
         self.assertFalse(chat.needs_research_room)
         self.assertEqual(chat.output_mode, "supervisor_reply")
+
+    def test_supervisor_job_contract_distinguishes_chat_and_closed_fleet(self) -> None:
+        chat_contract = build_supervisor_job_contract(
+            line="hello, remember my UI preference",
+            decision={
+                "intent_type": "supervisor_chat",
+                "output_mode": "supervisor_reply",
+                "needs_research_room": False,
+            },
+            topic="hello",
+        ).to_dict()
+
+        research_contract = build_supervisor_job_contract(
+            line="write a Zcash project report https://z.cash/",
+            decision={
+                "intent_type": "research_request",
+                "output_mode": "research_dossier",
+                "needs_research_room": True,
+            },
+            process_id="project_research_room",
+            agent_ids=["supervisor_agent", "ingestion_agent", "report_agent"],
+            topic="Zcash",
+        ).to_dict()
+
+        self.assertEqual(chat_contract["loop_mode"], "single_agent_chat")
+        self.assertEqual(chat_contract["agent_ids"], ["supervisor_agent"])
+        self.assertEqual(max_agent_attempts_from_contract(chat_contract), 1)
+        self.assertFalse(chat_contract["iteration_policy"]["loop_until_goal_met"])
+        self.assertEqual(research_contract["loop_mode"], "closed_fleet")
+        self.assertEqual(research_contract["ui_policy"]["visible_mode"], "fixed_agent_dashboard")
+        self.assertTrue(research_contract["ui_policy"]["show_total_token_usage"])
+        self.assertIn("Identity Gate", " ".join(research_contract["verification_gates"]))
+        self.assertEqual(max_agent_attempts_from_contract(research_contract), 2)
 
     def test_project_research_input_resolver_requires_source_link_and_classifies_identity(self) -> None:
         resolved = resolve_research_input("$POD Dolphin 리서치 https://x.com/dolphin_xyz https://github.com/dolphin/protocol 0x1234567890abcdef1234567890abcdef12345678")
@@ -848,6 +885,9 @@ class SmokeTest(unittest.TestCase):
             self.assertEqual(kwargs["url"], "https://z.cash/")
             self.assertEqual(kwargs["intake_decision"]["intent_type"], "research_request")
             self.assertEqual(kwargs["intake_decision"]["output_mode"], "research_dossier")
+            self.assertEqual(kwargs["job_contract"]["loop_mode"], "closed_fleet")
+            self.assertEqual(kwargs["job_contract"]["ui_policy"]["visible_mode"], "fixed_agent_dashboard")
+            self.assertEqual(max_agent_attempts_from_contract(kwargs["job_contract"]), 2)
 
         text = output.getvalue()
         self.assertIn("보고서 작성 워크플로우", text)
@@ -874,6 +914,13 @@ class SmokeTest(unittest.TestCase):
             self.assertTrue(supervision)
             self.assertEqual(supervision[0].data["intake_decision"]["intent_type"], "research_request")
             self.assertEqual(supervision[0].data["intake_decision"]["output_mode"], "research_dossier")
+            contract = result.room.project_card["job_contract"]
+            self.assertEqual(contract["loop_mode"], "closed_fleet")
+            self.assertEqual(contract["process_id"], "project_research_room")
+            self.assertEqual(contract["output_mode"], "research_dossier")
+            self.assertEqual(contract["ui_policy"]["visible_mode"], "fixed_agent_dashboard")
+            self.assertEqual(supervision[0].data["job_contract"]["loop_mode"], "closed_fleet")
+            self.assertEqual(supervision[0].data["orchestration_plan"]["loop_mode"], "closed_fleet")
 
     def test_live_agent_board_shows_current_work(self) -> None:
         output = StringIO()
@@ -2557,6 +2604,8 @@ class SmokeTest(unittest.TestCase):
         assert supervisor is not None
         self.assertEqual(supervisor.persona_name, "The Company President")
         self.assertIn("company_settings", supervisor.memory_scope.write)
+        self.assertIn("supervisor_memory", supervisor.memory_scope.read)
+        self.assertIn("supervisor_session", supervisor.memory_scope.write)
         self.assertIn("skill_view", supervisor.tools.allow)
         self.assertIn("multi_tool_use.parallel", supervisor.tools.allow)
         self.assertIn("supervisor_orchestration", supervisor.skills)
@@ -2566,6 +2615,8 @@ class SmokeTest(unittest.TestCase):
         supervisor_prompt = supervisor.system_prompt()
         self.assertIn("Skills/playbooks: supervisor_orchestration", supervisor_prompt)
         self.assertIn("Runtime hooks:", supervisor_prompt)
+        self.assertTrue(any("closed-fleet job contract" in item for item in supervisor.must_follow))
+        self.assertTrue(any("single-agent loop" in item for item in supervisor.professional_output_contract.get("quality_rules", [])))
 
         product = registry.get("product_tech_agent")
         self.assertIsNotNone(product)
@@ -2685,6 +2736,9 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(result.room.status, "completed")
         self.assertEqual(room_created["concurrency"]["active_phase"]["phase"], 3)
         self.assertEqual(room_created["concurrency"]["active_phase"]["mode"], "full_parallel_agent_swarm")
+        self.assertEqual(room_created["job_contract"]["loop_mode"], "closed_fleet")
+        self.assertEqual(room_created["job_contract"]["output_mode"], "source_note")
+        self.assertEqual(result.room.project_card["job_contract"]["process_id"], "source_ingestion_room")
 
     def test_runtime_runs_research_agents_as_parallel_swarm(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -2763,6 +2817,9 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("agent_retry_done", event_types)
         self.assertIn("parallel_group_retry_done", event_types)
         self.assertNotIn("parallel_group_failed", event_types)
+        retry_start = [event for event in runtime.event_log if event["type"] == "agent_retry_start"][0]
+        self.assertEqual(retry_start["max_attempts"], 2)
+        self.assertEqual(result.room.project_card["job_contract"]["iteration_policy"]["max_agent_attempts"], 2)
 
     def test_process_specs_load_when_cli_runs_outside_project_root(self) -> None:
         original_cwd = Path.cwd()

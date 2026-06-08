@@ -185,11 +185,20 @@ Research Rooms only when the user asks for actual research, analysis, dossier,
 or report work. Normal conversation stays with the Supervisor; executable work
 is planned and delegated to specialist agents.
 
+Before dispatch, the Supervisor writes a Job Contract. Normal chat uses a
+single-agent loop: answer directly, update memory/settings if needed, and keep
+the room closed. Confirmed research/report work uses a closed fleet loop:
+define the goal, output mode, specialist roster, source requirements, cost
+controls, verification gates, completion criteria, and bounded retry policy.
+Open exploration is limited to candidate discovery; the room itself retries
+only failed or missing-evidence slices instead of looping indefinitely.
+
 Typical flow:
 
 ```text
 User request
 -> Supervisor intake and confirmation
+-> Supervisor writes a bounded Job Contract
 -> Research Room opens for /research, /dossier, or explicit report/dossier creation
 -> Supervisor creates a plan and delegates tasks
 -> Ingestion stores the request/source

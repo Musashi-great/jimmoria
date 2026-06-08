@@ -151,7 +151,7 @@ flowchart LR
 | Tool Gateway | `core/tool_gateway.py` | tool 권한, connector 호출, audit log |
 | Model Gateway | `core/model_gateway.py` | task type별 Codex/Grok provider route, pro reasoning effort |
 | Usage Meter | `core/usage.py` | LLM duration/token usage extraction, fallback estimation, room/agent aggregation |
-| Supervisor Brain | `core/supervisor_brain.py`, `core/supervisor_memory.py`, `core/supervisor_session.py` | Hermes-style front-door memory, session continuity, and routing context |
+| Supervisor Brain | `core/supervisor_brain.py`, `core/supervisor_memory.py`, `core/supervisor_session.py`, `core/supervisor_job_contract.py` | Hermes-style front-door memory, session continuity, routing context, and bounded job contracts |
 | Concurrency Policy | `core/concurrency.py`, `config/concurrency.yaml` | Phase 1-4 병렬화 정책 |
 | Storage | `storage/` | run snapshot, reports, vault notes |
 | Web Dashboard | `web/` | 로컬 구조/런타임 시각화 |
@@ -317,6 +317,12 @@ $env:JIMMORIA_AGENT_PROVIDER_REPORT_AGENT = "codex"
 ```
 
 ## 6. Supervisor Role
+
+Loop policy:
+
+- Normal Supervisor conversation uses a single-agent loop: answer directly, update memory/settings when needed, and keep the room closed.
+- Confirmed research/report work uses a closed-fleet loop: create `SupervisorJobContract`, lock the goal/output mode/agents/source requirements/cost controls/verification gates/completion criteria, and dispatch bounded specialist work.
+- Open exploration is limited to candidate discovery; retries target failed agents or missing-evidence slices instead of looping indefinitely.
 
 Supervisor는 단순 라우터가 아니라 회사의 boss/orchestrator다.
 
@@ -542,10 +548,11 @@ Current runtime is a full parallel research swarm.
 ```text
 1. Supervisor intake
 2. User confirmation when needed
-3. Research Room creation
-4. Supervisor planning
-5. Supervisor seeds shared source and primary candidate context
-6. Parallel research_swarm
+3. Supervisor Job Contract locks goal, output mode, agents, verification gates, and bounded retry limits
+4. Research Room creation
+5. Supervisor planning
+6. Supervisor seeds shared source and primary candidate context
+7. Parallel research_swarm
    - Ingestion
    - Social/KOL market and candidate verification
    - Narrative
@@ -553,11 +560,11 @@ Current runtime is a full parallel research swarm.
    - Contract/On-chain verification
    - Product/Tech verification
    - Funding/Token verification
-7. Agent Council joins specialist findings
-8. Report writing
-9. Supervisor final review
-10. Obsidian sync
-11. Run snapshot and replay events saved
+8. Agent Council joins specialist findings
+9. Report writing
+10. Supervisor final review
+11. Obsidian sync
+12. Run snapshot and replay events saved
 ```
 
 ## 10. Concurrency Roadmap

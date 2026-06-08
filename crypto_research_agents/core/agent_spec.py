@@ -125,10 +125,12 @@ class AgentSpec:
     collaboration: dict[str, list[str]] = field(default_factory=dict)
     must_follow: list[str] = field(default_factory=list)
     must_not: list[str] = field(default_factory=list)
+    professional_output_contract: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AgentSpec":
         output_schema = data.get("output_schema")
+        output_contract = data.get("professional_output_contract")
         return cls(
             agent_id=data["agent_id"],
             name=data["name"],
@@ -148,6 +150,7 @@ class AgentSpec:
             collaboration=data.get("collaboration", {}),
             must_follow=data.get("must_follow", []),
             must_not=data.get("must_not", []),
+            professional_output_contract=output_contract if isinstance(output_contract, dict) else {},
         )
 
     def system_prompt(self) -> str:
@@ -203,6 +206,15 @@ class AgentSpec:
         if self.must_follow:
             lines.append("Must follow:")
             lines.extend(f"- {item}" for item in self.must_follow)
+        if self.professional_output_contract:
+            goal = self.professional_output_contract.get("goal")
+            quality_rules = self.professional_output_contract.get("quality_rules", [])
+            lines.append("Professional output contract:")
+            if goal:
+                lines.append(f"- goal: {goal}")
+            if isinstance(quality_rules, list) and quality_rules:
+                lines.append("- quality rules:")
+                lines.extend(f"  - {item}" for item in quality_rules)
         combined_must_not = [*self.role.must_not, *self.must_not]
         if combined_must_not:
             lines.append("Must not:")

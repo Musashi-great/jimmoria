@@ -34,6 +34,10 @@ from crypto_research_agents.core.project_profile import find_project_profile
 from crypto_research_agents.core.process_spec import load_process_spec
 from crypto_research_agents.core.room import ResearchRoom
 from crypto_research_agents.core.runtime_state import RuntimeState
+from crypto_research_agents.core.supervisor_job_contract import (
+    build_supervisor_job_contract,
+    max_agent_attempts_from_contract,
+)
 from crypto_research_agents.core.time import utc_now
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 from crypto_research_agents.core.usage import aggregate_llm_usage
@@ -132,15 +136,28 @@ class ResearchRuntime:
         reports_dir: str | Path = "reports",
         memory_path: str | Path | None = "data/memory.json",
         intake_decision: dict[str, Any] | None = None,
+        job_contract: dict[str, Any] | None = None,
         retention_policy: str | None = None,
     ) -> ResearchRunResult:
         company_settings = load_company_settings(company_settings_path_for(memory_path))
         process = load_process_spec("project_research_room", self.process_spec_dir)
+        contract = job_contract or build_supervisor_job_contract(
+            line=content or title,
+            decision=intake_decision or {
+                "intent_type": "research_request",
+                "output_mode": "research_dossier",
+                "needs_research_room": True,
+            },
+            process_id=process.process_id,
+            agent_ids=process.agent_ids,
+            topic=title,
+        ).to_dict()
         room = ResearchRoom(
             topic=title,
             goals=process.goals,
             agents=process.agent_ids,
         )
+        room.project_card["job_contract"] = contract
         self._mark_room_started(room)
         room.set_status(RuntimeState.ASSIGNED)
         self._emit(
@@ -150,6 +167,7 @@ class ResearchRuntime:
             goals=room.goals,
             agents=room.agents,
             process=process.event_payload(),
+            job_contract=contract,
             concurrency=self.concurrency_policy.event_payload(),
         )
 
@@ -160,6 +178,7 @@ class ResearchRuntime:
                 goals=room.goals,
                 company_settings=company_settings.to_dict(),
                 intake_decision=intake_decision,
+                job_contract=contract,
                 process=process.event_payload(),
             )
             room.set_status(RuntimeState.RUNNING)
@@ -215,14 +234,27 @@ class ResearchRuntime:
         vault_dir: str | Path = "vault",
         memory_path: str | Path | None = "data/memory.json",
         intake_decision: dict[str, Any] | None = None,
+        job_contract: dict[str, Any] | None = None,
     ) -> ResearchRunResult:
         company_settings = load_company_settings(company_settings_path_for(memory_path))
         process = load_process_spec("source_ingestion_room", self.process_spec_dir)
+        contract = job_contract or build_supervisor_job_contract(
+            line=content or title,
+            decision=intake_decision or {
+                "intent_type": "source_ingestion",
+                "output_mode": "source_note",
+                "needs_research_room": True,
+            },
+            process_id=process.process_id,
+            agent_ids=process.agent_ids,
+            topic=title,
+        ).to_dict()
         room = ResearchRoom(
             topic=title,
             goals=process.goals,
             agents=process.agent_ids,
         )
+        room.project_card["job_contract"] = contract
         self._mark_room_started(room)
         room.set_status(RuntimeState.ASSIGNED)
         self._emit(
@@ -232,6 +264,7 @@ class ResearchRuntime:
             goals=room.goals,
             agents=room.agents,
             process=process.event_payload(),
+            job_contract=contract,
             concurrency=self.concurrency_policy.event_payload(),
         )
 
@@ -242,6 +275,7 @@ class ResearchRuntime:
                 goals=room.goals,
                 company_settings=company_settings.to_dict(),
                 intake_decision=intake_decision,
+                job_contract=contract,
                 process=process.event_payload(),
             )
             room.set_status(RuntimeState.RUNNING)
@@ -502,6 +536,7 @@ class ResearchRuntime:
                 except Exception as exc:
                     failures.append((agent_id, str(exc)))
 
+        retry_failures = failures
         if failures:
             retry_failures = self._retry_failed_swarm_agents(
                 room,
@@ -523,13 +558,14 @@ class ResearchRuntime:
                 failures = []
 
         if failures:
+            max_attempts = max_agent_attempts_from_contract(room.project_card.get("job_contract"))
             self._emit(
                 "parallel_group_failed",
                 room_id=room.room_id,
                 group_id="research_swarm",
                 agents=agent_ids,
                 failures=[{"agent_id": agent_id, "error": error} for agent_id, error in retry_failures],
-                summary=f"{len(retry_failures)} full parallel research swarm agent(s) failed after retry.",
+                summary=f"{len(retry_failures)} full parallel research swarm agent(s) failed after {max_attempts} bounded attempt(s).",
             )
             failed = "; ".join(f"{agent_id}: {error}" for agent_id, error in retry_failures)
             raise RuntimeError(f"Parallel research swarm failed: {failed}")
@@ -560,44 +596,53 @@ class ResearchRuntime:
         content: str,
         url: str | None,
     ) -> list[tuple[str, str]]:
-        retry_failures: list[tuple[str, str]] = []
-        for agent_id, error in failures:
-            self._emit(
-                "agent_retry_start",
-                room_id=room.room_id,
-                agent_id=agent_id,
-                reason=error,
-                attempt=2,
-                max_attempts=2,
-                summary=f"Retrying failed swarm agent: {agent_id}.",
-            )
-            try:
-                self._run_agent(
-                    agent_id,
-                    room,
-                    **_swarm_agent_kwargs(agent_id, title=title, content=content, url=url),
-                )
-            except Exception as exc:
-                retry_failures.append((agent_id, str(exc)))
+        max_attempts = max_agent_attempts_from_contract(room.project_card.get("job_contract"))
+        if max_attempts <= 1:
+            return failures
+
+        current_failures = list(failures)
+        for attempt in range(2, max_attempts + 1):
+            retry_failures: list[tuple[str, str]] = []
+            for agent_id, error in current_failures:
                 self._emit(
-                    "agent_retry_failed",
+                    "agent_retry_start",
                     room_id=room.room_id,
                     agent_id=agent_id,
-                    reason=str(exc),
-                    attempt=2,
-                    max_attempts=2,
-                    summary=f"Retry failed for swarm agent: {agent_id}.",
+                    reason=error,
+                    attempt=attempt,
+                    max_attempts=max_attempts,
+                    summary=f"Retrying failed swarm agent: {agent_id}.",
                 )
-                continue
-            self._emit(
-                "agent_retry_done",
-                room_id=room.room_id,
-                agent_id=agent_id,
-                attempt=2,
-                max_attempts=2,
-                summary=f"Retry completed for swarm agent: {agent_id}.",
-            )
-        return retry_failures
+                try:
+                    self._run_agent(
+                        agent_id,
+                        room,
+                        **_swarm_agent_kwargs(agent_id, title=title, content=content, url=url),
+                    )
+                except Exception as exc:
+                    retry_failures.append((agent_id, str(exc)))
+                    self._emit(
+                        "agent_retry_failed",
+                        room_id=room.room_id,
+                        agent_id=agent_id,
+                        reason=str(exc),
+                        attempt=attempt,
+                        max_attempts=max_attempts,
+                        summary=f"Retry failed for swarm agent: {agent_id}.",
+                    )
+                    continue
+                self._emit(
+                    "agent_retry_done",
+                    room_id=room.room_id,
+                    agent_id=agent_id,
+                    attempt=attempt,
+                    max_attempts=max_attempts,
+                    summary=f"Retry completed for swarm agent: {agent_id}.",
+                )
+            if not retry_failures:
+                return []
+            current_failures = retry_failures
+        return current_failures
 
     def _run_agent_council(self, room: ResearchRoom) -> None:
         participants = [agent_id for agent_id in COUNCIL_AGENTS if agent_id in room.agents]

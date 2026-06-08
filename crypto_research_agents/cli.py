@@ -30,6 +30,7 @@ from crypto_research_agents.core.supervisor_intake import (
 )
 from crypto_research_agents.core.supervisor_brain import SupervisorBrain, SupervisorBrainTurn
 from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
+from crypto_research_agents.core.supervisor_job_contract import build_supervisor_job_contract
 from crypto_research_agents.core.model_gateway import ModelGateway
 from crypto_research_agents.core.codex_models import (
     SUPPORTED_CODEX_MODEL_IDS,
@@ -343,6 +344,13 @@ def main(argv: list[str] | None = None) -> None:
     runtime = ResearchRuntime(memory)
 
     if args.command == "demo":
+        job_contract = build_supervisor_job_contract(
+            line=DEMO_TEXT,
+            decision={"intent_type": "research_request", "output_mode": "research_dossier", "needs_research_room": True},
+            process_id="project_research_room",
+            agent_ids=DEFAULT_AGENTS,
+            topic="AI Wallet Automation Early Projects",
+        ).to_dict()
         result = runtime.run_article_research(
             title="AI Wallet Automation Early Projects",
             content=DEMO_TEXT,
@@ -350,19 +358,35 @@ def main(argv: list[str] | None = None) -> None:
             vault_dir=args.vault,
             reports_dir=args.reports,
             memory_path=args.memory,
+            job_contract=job_contract,
         )
     else:
         title, content, url = read_source_input(args)
         if args.command == "add-source":
+            job_contract = build_supervisor_job_contract(
+                line=content or title,
+                decision={"intent_type": "source_ingestion", "output_mode": "source_note", "needs_research_room": True},
+                process_id="source_ingestion_room",
+                agent_ids=["supervisor_agent", "ingestion_agent", "obsidian_curator_agent"],
+                topic=title,
+            ).to_dict()
             result = runtime.run_source_ingestion(
                 title=title,
                 content=content,
                 url=url,
                 vault_dir=args.vault,
                 memory_path=args.memory,
+                job_contract=job_contract,
             )
         else:
             require_research_source_link(title, content, url)
+            job_contract = build_supervisor_job_contract(
+                line=content or title,
+                decision={"intent_type": "research_request", "output_mode": "research_dossier", "needs_research_room": True},
+                process_id="project_research_room",
+                agent_ids=DEFAULT_AGENTS,
+                topic=title,
+            ).to_dict()
             result = runtime.run_article_research(
                 title=title,
                 content=content,
@@ -370,6 +394,7 @@ def main(argv: list[str] | None = None) -> None:
                 vault_dir=args.vault,
                 reports_dir=args.reports,
                 memory_path=args.memory,
+                job_contract=job_contract,
             )
             workflow_id = getattr(args, "workflow", None)
             if workflow_id:
@@ -537,6 +562,13 @@ def workflow_command(args: argparse.Namespace) -> None:
         title, content, url = read_source_input(args)
         require_research_source_link(title, content, url)
         runtime = ResearchRuntime(load_memory(args.memory))
+        job_contract = build_supervisor_job_contract(
+            line=content or title,
+            decision={"intent_type": "research_request", "output_mode": "research_dossier", "needs_research_room": True},
+            process_id="project_research_room",
+            agent_ids=DEFAULT_AGENTS,
+            topic=title,
+        ).to_dict()
         result = runtime.run_article_research(
             title=title,
             content=content,
@@ -544,6 +576,7 @@ def workflow_command(args: argparse.Namespace) -> None:
             vault_dir=args.vault,
             reports_dir=args.reports,
             memory_path=args.memory,
+            job_contract=job_contract,
         )
         artifact_dir = archive_workflow_for_result(
             workflow_id=spec.workflow_id,
@@ -943,6 +976,17 @@ def chat_command(args: argparse.Namespace) -> None:
         if previous_context:
             content = f"{content}\n\n{previous_context}"
         agent_count = 3 if intake_decision.intent_type == "source_ingestion" else len(DEFAULT_AGENTS)
+        job_contract = build_supervisor_job_contract(
+            line=route_line,
+            decision=intake_decision,
+            process_id="source_ingestion_room" if intake_decision.intent_type == "source_ingestion" else "project_research_room",
+            agent_ids=(
+                ["supervisor_agent", "ingestion_agent", "obsidian_curator_agent"]
+                if intake_decision.intent_type == "source_ingestion"
+                else DEFAULT_AGENTS
+            ),
+            topic=title,
+        ).to_dict()
         if not console.confirm_dispatch(
             intent_type=intake_decision.intent_type,
             title=title,
@@ -968,6 +1012,7 @@ def chat_command(args: argparse.Namespace) -> None:
                     vault_dir=args.vault,
                     memory_path=args.memory,
                     intake_decision=intake_decision.to_dict(),
+                    job_contract=job_contract,
                 )
             except RuntimeError as exc:
                 console.print_supervisor_reply(model_runtime_error_reply(exc))
@@ -989,6 +1034,7 @@ def chat_command(args: argparse.Namespace) -> None:
                     reports_dir=args.reports,
                     memory_path=args.memory,
                     intake_decision=intake_decision.to_dict(),
+                    job_contract=job_contract,
                     retention_policy=chat_run_retention_policy(),
                 )
             except RuntimeError as exc:
@@ -1241,6 +1287,17 @@ def handle_chat_command(
             print("Usage: /add <source text or URL>")
             return False, last_room_id
         title, content, url = chat_input_to_source(rest)
+        job_contract = build_supervisor_job_contract(
+            line=rest,
+            decision={
+                "intent_type": "source_ingestion",
+                "output_mode": "source_note",
+                "needs_research_room": True,
+            },
+            process_id="source_ingestion_room",
+            agent_ids=["supervisor_agent", "ingestion_agent", "obsidian_curator_agent"],
+            topic=title,
+        ).to_dict()
         runtime = ResearchRuntime(load_memory(args.memory))
         console.print_user_message(rest)
         console.print_supervisor_working("소스 저장 작업으로 처리하고 아카이비스트에게 배정하는 중입니다.")
@@ -1251,6 +1308,7 @@ def handle_chat_command(
             url=url,
             vault_dir=args.vault,
             memory_path=args.memory,
+            job_contract=job_contract,
         )
         last_room_id = result.room.room_id
         console.last_room_id = last_room_id
@@ -1293,6 +1351,13 @@ def run_chat_report_workflow(
             "next_step": "Confirm, run the Research Room, then write and save the report.",
         }
     )
+    job_contract = build_supervisor_job_contract(
+        line=route_line,
+        decision=intake_payload,
+        process_id="project_research_room",
+        agent_ids=DEFAULT_AGENTS,
+        topic=title,
+    ).to_dict()
 
     console.print_user_message(f"{command_name} {request}")
     console.print_supervisor_working("보고서 작성 명령을 단계별 Research Room 작업으로 준비하는 중입니다.")
@@ -1331,6 +1396,7 @@ def run_chat_report_workflow(
             reports_dir=args.reports,
             memory_path=args.memory,
             intake_decision=intake_payload,
+            job_contract=job_contract,
             retention_policy=chat_run_retention_policy(),
         )
     except RuntimeError as exc:
