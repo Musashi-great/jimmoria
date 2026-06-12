@@ -34,7 +34,28 @@ Telegram and Discord are intentionally not part of the default connector stack. 
 
 ## Quick Start
 
-Fresh clone install is one-time; it creates the `jimmoria` console command for that user/venv:
+Fresh clone install is one-time. On WSL/Linux, run the bundled installer to
+create a local venv and expose the `jimmoria` command through `~/.local/bin`:
+
+```bash
+git clone <repo-url> jimmoria
+cd jimmoria
+bash scripts/install-wsl.sh
+```
+
+After that, start the company from any new shell:
+
+```bash
+jimmoria
+```
+
+If the current shell was already open before install, reload the shell config:
+
+```bash
+source ~/.bashrc
+```
+
+Manual install is also supported when you want to manage the venv/PATH yourself:
 
 ```powershell
 git clone <repo-url> jimmoria
@@ -42,7 +63,7 @@ cd jimmoria
 python -m pip install -e ".[all]"
 ```
 
-After that, start the company from the same venv/shell:
+Then start the company from the same venv/shell:
 
 ```powershell
 jimmoria

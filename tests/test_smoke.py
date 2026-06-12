@@ -184,11 +184,12 @@ class SmokeTest(unittest.TestCase):
         output = StringIO()
         console = JimmoriaConsole()
 
-        with patch("sys.stdin.isatty", return_value=True):
-            with patch("crypto_research_agents.console.supports_color", return_value=True):
-                with patch("builtins.input", return_value="/quit") as mocked_input:
-                    with redirect_stdout(output):
-                        value = console.read_chat_input()
+        with patch.dict("os.environ", {"JIMMORIA_DISABLE_ANSI_INPUT": "1"}, clear=False):
+            with patch("sys.stdin.isatty", return_value=True):
+                with patch("crypto_research_agents.console.supports_color", return_value=True):
+                    with patch("builtins.input", return_value="/quit") as mocked_input:
+                        with redirect_stdout(output):
+                            value = console.read_chat_input()
 
         self.assertEqual(value, "/quit")
         self.assertEqual(mocked_input.call_args[0][0], "\033[2A\033[4C")
@@ -269,8 +270,9 @@ class SmokeTest(unittest.TestCase):
     def test_chat_help_does_not_show_static_agent_roster(self) -> None:
         output = StringIO()
 
-        with redirect_stdout(output):
-            JimmoriaConsole().print_help()
+        with patch.dict("os.environ", {"JIMMORIA_NO_RICH": "1"}, clear=False):
+            with redirect_stdout(output):
+                JimmoriaConsole().print_help()
 
         text = output.getvalue()
         self.assertIn("JIMMORIA 명령어", text)
@@ -3395,8 +3397,9 @@ Usage: codex exec [OPTIONS] [PROMPT]
             reasoning_effort="pro",
         )
 
-        with patch("crypto_research_agents.core.llm_provider.subprocess.run", side_effect=fake_run):
-            response = CodexCliProvider().complete(request)
+        with patch("crypto_research_agents.core.llm_provider.shutil.which", return_value="/usr/local/bin/codex"):
+            with patch("crypto_research_agents.core.llm_provider.subprocess.run", side_effect=fake_run):
+                response = CodexCliProvider().complete(request)
 
         exec_command = commands[1]
         self.assertEqual(response.text, '{"summary": "ok"}')
@@ -3432,11 +3435,13 @@ Usage: codex exec [OPTIONS] [PROMPT]
                         with patch("builtins.input", return_value="1"):
                             with redirect_stdout(output):
                                 configure_model_panel()
-                self.assertEqual(os.environ["LLM_PROVIDER"], "codex_grok")
+                self.assertEqual(os.environ["LLM_PROVIDER"], "multi")
+                self.assertEqual(os.environ["JIMMORIA_MODEL_FAMILIES"], "codex,grok")
                 self.assertEqual(os.environ["JIMMORIA_CODEX_PROVIDER"], "codex_api")
                 self.assertEqual(os.environ["JIMMORIA_GROK_AUTH_PROVIDER"], "api_key")
                 settings = json.loads(Path(settings_path).read_text(encoding="utf-8"))
-                self.assertEqual(settings["LLM_PROVIDER"], "codex_grok")
+                self.assertEqual(settings["LLM_PROVIDER"], "multi")
+                self.assertEqual(settings["JIMMORIA_MODEL_FAMILIES"], "codex,grok")
                 self.assertEqual(settings["JIMMORIA_CODEX_PROVIDER"], "codex_api")
                 self.assertEqual(settings["JIMMORIA_GROK_AUTH_PROVIDER"], "api_key")
                 self.assertNotIn("OPENAI_API_KEY", settings)
@@ -3451,8 +3456,12 @@ Usage: codex exec [OPTIONS] [PROMPT]
         output = StringIO()
         with TemporaryDirectory() as tmp:
             settings_path = str(Path(tmp) / "model_settings.json")
-            with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path}, clear=True):
-                with patch("builtins.input", return_value="5"):
+            with patch.dict(
+                "os.environ",
+                {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path, "GROK_OAUTH_TOKEN": "session-secret"},
+                clear=True,
+            ):
+                with patch("builtins.input", return_value="6"):
                     with redirect_stdout(output):
                         configure_model_panel()
                 self.assertEqual(os.environ["LLM_PROVIDER"], "offline")
@@ -3463,24 +3472,30 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertIn("[Model Setup]", text)
         self.assertIn("[Offline diagnostic fallback]", text)
 
-    def test_model_setup_hybrid_choice_saves_codex_grok_provider(self) -> None:
+    def test_model_setup_claude_api_choice_saves_provider_without_raw_token(self) -> None:
         output = StringIO()
         with TemporaryDirectory() as tmp:
             settings_path = str(Path(tmp) / "model_settings.json")
-            with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path}, clear=True):
-                with patch("builtins.input", side_effect=["4", ""]):
+            with patch.dict(
+                "os.environ",
+                {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path, "ANTHROPIC_API_KEY": "anthropic-secret"},
+                clear=True,
+            ):
+                with patch("builtins.input", side_effect=["4", "1", ""]):
                     with redirect_stdout(output):
                         configure_model_panel()
-                self.assertEqual(os.environ["LLM_PROVIDER"], "codex_grok")
-                self.assertEqual(os.environ["JIMMORIA_GROK_AUTH_PROVIDER"], "xai_oauth")
+                self.assertEqual(os.environ["LLM_PROVIDER"], "claude_api")
+                self.assertEqual(os.environ["JIMMORIA_MODEL_FAMILIES"], "claude")
+                self.assertEqual(os.environ["JIMMORIA_CLAUDE_AUTH_PROVIDER"], "api_key")
                 settings = json.loads(Path(settings_path).read_text(encoding="utf-8"))
-                self.assertEqual(settings["LLM_PROVIDER"], "codex_grok")
-                self.assertEqual(settings["JIMMORIA_GROK_AUTH_PROVIDER"], "xai_oauth")
-                self.assertNotIn("GROK_OAUTH_TOKEN", settings)
+                self.assertEqual(settings["LLM_PROVIDER"], "claude_api")
+                self.assertEqual(settings["JIMMORIA_MODEL_FAMILIES"], "claude")
+                self.assertEqual(settings["JIMMORIA_CLAUDE_AUTH_PROVIDER"], "api_key")
+                self.assertNotIn("ANTHROPIC_API_KEY", settings)
 
         text = output.getvalue()
-        self.assertIn("[Codex + Grok hybrid]", text)
-        self.assertIn("Grok agents: Social/KOL, Narrative, Discovery.", text)
+        self.assertIn("[Claude / Anthropic]", text)
+        self.assertIn("Supported models are fixed to the Claude model list.", text)
 
     def test_model_setup_grok_choice_saves_provider_without_raw_token(self) -> None:
         output = StringIO()
@@ -3507,7 +3522,11 @@ Usage: codex exec [OPTIONS] [PROMPT]
         output = StringIO()
         with TemporaryDirectory() as tmp:
             settings_path = str(Path(tmp) / "model_settings.json")
-            with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path}, clear=True):
+            with patch.dict(
+                "os.environ",
+                {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path, "GROK_OAUTH_TOKEN": "session-secret"},
+                clear=True,
+            ):
                 with patch("builtins.input", side_effect=["3", "2", ""]):
                     with redirect_stdout(output):
                         configure_model_panel()
@@ -3540,6 +3559,11 @@ Usage: codex exec [OPTIONS] [PROMPT]
                     with patch("crypto_research_agents.cli.codex_login_status", return_value="Codex login status unknown"):
                         self.assertFalse(configured_model_provider_ready())
 
+    def test_stale_codex_cli_settings_are_not_ready_without_codex_command(self) -> None:
+        with patch.dict("os.environ", {"LLM_PROVIDER": "codex_cli"}, clear=True):
+            with patch("crypto_research_agents.cli.codex_login_status", return_value="Codex CLI not found"):
+                self.assertFalse(configured_model_provider_ready())
+
     def test_codex_setup_can_use_default_model_routes_without_model_names(self) -> None:
         output = StringIO()
         with TemporaryDirectory() as tmp:
@@ -3549,9 +3573,11 @@ Usage: codex exec [OPTIONS] [PROMPT]
                 "CODEX_MODEL_FAST": "bad-manual-value",
             }
             with patch.dict("os.environ", env, clear=True):
-                with patch("builtins.input", side_effect=["2", "1", "", ""]):
-                    with redirect_stdout(output):
-                        configure_model_panel()
+                with patch("crypto_research_agents.cli.codex_login_status", return_value="Logged in using ChatGPT"):
+                    with patch("crypto_research_agents.cli.codex_sdk_available", return_value=True):
+                        with patch("builtins.input", side_effect=["2", "1", "", ""]):
+                            with redirect_stdout(output):
+                                configure_model_panel()
                 self.assertEqual(os.environ["LLM_PROVIDER"], "codex_sdk")
                 self.assertNotIn("CODEX_MODEL_FAST", os.environ)
                 settings = json.loads(Path(settings_path).read_text(encoding="utf-8"))
@@ -3786,6 +3812,32 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(len(codex.requests), 1)
         self.assertEqual(gateway.call_log[0]["provider_family"], "grok")
         self.assertEqual(gateway.call_log[1]["provider_family"], "codex")
+
+    def test_multi_model_families_route_agents_internally(self) -> None:
+        class FakeProvider:
+            def __init__(self, provider_name: str) -> None:
+                self.provider_name = provider_name
+                self.requests: list[LLMRequest] = []
+
+            def complete(self, request: LLMRequest) -> LLMResponse:
+                self.requests.append(request)
+                return LLMResponse(text=f"{self.provider_name} ok", model=request.model, provider=self.provider_name, usage={})
+
+        codex = FakeProvider("codex_api")
+        grok = FakeProvider("grok")
+        claude = FakeProvider("claude_api")
+        with patch.dict("os.environ", {"LLM_PROVIDER": "multi", "JIMMORIA_MODEL_FAMILIES": "codex,grok,claude"}, clear=True):
+            gateway = ModelGateway(providers={"codex": codex, "grok": grok, "claude": claude})
+            supervisor = gateway.select(agent_id="supervisor_agent", task_type="supervisor_chat")
+            social = gateway.select(agent_id="social_kol_agent", task_type="social_summary")
+            product = gateway.select(agent_id="product_tech_agent", task_type="product_docs")
+            report = gateway.select(agent_id="report_agent", task_type="final_synthesis")
+
+        self.assertEqual(supervisor.provider_family, "codex")
+        self.assertEqual(social.provider_family, "grok")
+        self.assertEqual(product.provider_family, "claude")
+        self.assertEqual(report.provider_family, "claude")
+        self.assertEqual(report.selected_model, "claude-sonnet-4-5")
 
     def test_codex_grok_hybrid_falls_back_to_codex_when_grok_fails(self) -> None:
         class FakeCodexProvider:

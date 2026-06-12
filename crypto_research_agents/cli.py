@@ -32,6 +32,11 @@ from crypto_research_agents.core.supervisor_brain import SupervisorBrain, Superv
 from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
 from crypto_research_agents.core.supervisor_job_contract import build_supervisor_job_contract
 from crypto_research_agents.core.model_gateway import ModelGateway
+from crypto_research_agents.core.claude_models import (
+    SUPPORTED_CLAUDE_MODEL_IDS,
+    claude_model_by_index,
+    supported_claude_model_lines,
+)
 from crypto_research_agents.core.codex_models import (
     SUPPORTED_CODEX_MODEL_IDS,
     model_by_index,
@@ -42,7 +47,13 @@ from crypto_research_agents.core.grok_models import (
     grok_model_by_index,
     supported_grok_model_lines,
 )
-from crypto_research_agents.core.llm_provider import codex_api_status, codex_sdk_available, grok_auth_status
+from crypto_research_agents.core.llm_provider import (
+    claude_api_status,
+    claude_cli_status,
+    codex_api_status,
+    codex_sdk_available,
+    grok_auth_status,
+)
 from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 from crypto_research_agents.core.playbook import ResearchPlaybookRegistry
 from crypto_research_agents.core.profile import WorkerProfileRegistry
@@ -84,10 +95,12 @@ MODEL_ROUTE_TIERS = [
 ]
 MODEL_SETTING_ENV_NAMES = [
     "LLM_PROVIDER",
+    "JIMMORIA_MODEL_FAMILIES",
     "JIMMORIA_CODEX_PROVIDER",
     "JIMMORIA_CODEX_AUTH_PROVIDER",
     "CODEX_PROVIDER",
     "JIMMORIA_GROK_AUTH_PROVIDER",
+    "JIMMORIA_CLAUDE_AUTH_PROVIDER",
     "JIMMORIA_GROK_TASKS",
     "JIMMORIA_GROK_AGENTS",
     "JIMMORIA_AGENT_PROVIDER_SUPERVISOR_AGENT",
@@ -134,6 +147,21 @@ MODEL_SETTING_ENV_NAMES = [
     "XAI_MODEL_REASONING",
     "XAI_MODEL_WRITING",
     "XAI_MODEL_STRONG",
+    "CLAUDE_BASE_URL",
+    "ANTHROPIC_BASE_URL",
+    "ANTHROPIC_VERSION",
+    "CLAUDE_CLI_COMMAND",
+    "CLAUDE_CLI_TIMEOUT",
+    "CLAUDE_MODEL_FAST_CHAT",
+    "CLAUDE_MODEL_FAST",
+    "CLAUDE_MODEL_REASONING",
+    "CLAUDE_MODEL_WRITING",
+    "CLAUDE_MODEL_STRONG",
+    "ANTHROPIC_MODEL_FAST_CHAT",
+    "ANTHROPIC_MODEL_FAST",
+    "ANTHROPIC_MODEL_REASONING",
+    "ANTHROPIC_MODEL_WRITING",
+    "ANTHROPIC_MODEL_STRONG",
 ]
 
 
@@ -841,6 +869,14 @@ def inspect_command(args: argparse.Namespace) -> None:
 def chat_command(args: argparse.Namespace) -> None:
     apply_saved_model_settings()
     if os.getenv("LLM_PROVIDER") and not configured_model_provider_ready():
+        print_screen(
+            "Model Setup Required",
+            [
+                "Saved model settings are not runnable in this shell.",
+                model_readiness_summary(),
+                "JIMMORIA will ask you to attach a working model before opening Research HQ.",
+            ],
+        )
         clear_model_provider_env()
     auto_configure_codex_provider_if_logged_in()
     console = JimmoriaConsole(
@@ -848,8 +884,8 @@ def chat_command(args: argparse.Namespace) -> None:
         runs_dir=Path(args.memory).parent / "runs",
     )
     console.print_intro()
-    if not args.skip_model_setup and sys.stdin.isatty() and not os.getenv("LLM_PROVIDER"):
-        configure_model_panel(clear_before=False)
+    if not args.skip_model_setup and sys.stdin.isatty():
+        ensure_interactive_model_ready(clear_before=False)
     console.print_help()
     last_room_id = ""
     supervisor_brain = SupervisorBrain.for_memory_path(args.memory)
@@ -1016,6 +1052,9 @@ def chat_command(args: argparse.Namespace) -> None:
                 )
             except RuntimeError as exc:
                 console.print_supervisor_reply(model_runtime_error_reply(exc))
+                if model_runtime_error_needs_setup(exc) and sys.stdin.isatty() and not args.skip_model_setup:
+                    clear_model_provider_env()
+                    ensure_interactive_model_ready(clear_before=True)
                 append_supervisor_history(
                     supervisor_history,
                     line,
@@ -1039,6 +1078,9 @@ def chat_command(args: argparse.Namespace) -> None:
                 )
             except RuntimeError as exc:
                 console.print_supervisor_reply(model_runtime_error_reply(exc))
+                if model_runtime_error_needs_setup(exc) and sys.stdin.isatty() and not args.skip_model_setup:
+                    clear_model_provider_env()
+                    ensure_interactive_model_ready(clear_before=True)
                 append_supervisor_history(
                     supervisor_history,
                     line,
@@ -1827,6 +1869,22 @@ def print_agent_table(*, active_only: bool = False) -> None:
         print(f"       {one_liner}")
 
 
+def ensure_interactive_model_ready(*, clear_before: bool = True) -> None:
+    while not configured_model_provider_ready():
+        configure_model_panel(clear_before=clear_before)
+        clear_before = True
+        if configured_model_provider_ready():
+            return
+        print_screen(
+            "Model Setup Required",
+            [
+                "No runnable live model is attached yet.",
+                model_readiness_summary(),
+                "Attach Codex, Grok, or Claude with a working OAuth/local login or API key.",
+            ],
+        )
+
+
 def configure_model_panel(*, clear_before: bool = True) -> None:
     apply_saved_model_settings()
     if clear_before:
@@ -1834,23 +1892,33 @@ def configure_model_panel(*, clear_before: bool = True) -> None:
     print_screen(
         "Model Setup",
         [
-            f"Current provider: {os.getenv('LLM_PROVIDER') or 'offline_fallback'}",
+            f"Attached model families: {attached_model_family_label()}",
+            f"Runtime provider: {os.getenv('LLM_PROVIDER') or 'none'}",
             "",
-            "1. Apply all logged-in Codex + Grok models (Recommended)",
-            "2. Codex only (OAuth/local login or API key)",
-            "3. Grok only (OAuth or API key)",
-            "4. Codex + Grok role routing (manual review)",
-            "5. Offline diagnostic fallback",
-            "Enter. Keep current",
+            "1. Auto-attach detected models (Recommended)",
+            "2. Attach Codex",
+            "3. Attach Grok",
+            "4. Attach Claude",
+            "5. Done / keep current",
+            "6. Offline diagnostic fallback",
+            "",
+            "Attach more than one family and JIMMORIA will route agents internally.",
         ]
     )
-    choice = input("Choose provider [1/2/3/4/5/Enter]: ").strip().lower()
+    choice = input("Choose model family [1/2/3/4/5/6/Enter]: ").strip().lower()
     if not choice:
+        if not configured_model_provider_ready():
+            configure_all_logged_in_models()
         clear_screen()
         print_current_model_config()
         return
 
     if choice in {"1", "all", "auto", "recommended", "logged_in", "logged-in"}:
+        configure_all_logged_in_models()
+        print_current_model_config()
+        return
+
+    if choice in {"hybrid", "dual", "multi", "codex_grok", "grok_codex", "codex+grok"}:
         configure_all_logged_in_models()
         print_current_model_config()
         return
@@ -1865,12 +1933,17 @@ def configure_model_panel(*, clear_before: bool = True) -> None:
         print_current_model_config()
         return
 
-    if choice in {"4", "hybrid", "dual", "codex_grok", "grok_codex", "codex+grok"}:
-        configure_codex_grok_hybrid()
+    if choice in {"4", "claude", "anthropic", "claude_api", "claude_cli"}:
+        configure_claude()
         print_current_model_config()
         return
 
-    if choice in {"5", "offline", "fallback"}:
+    if choice in {"5", "done", "keep", "current"}:
+        clear_screen()
+        print_current_model_config()
+        return
+
+    if choice in {"6", "offline", "fallback"}:
         configure_offline()
         print_current_model_config()
         return
@@ -1880,39 +1953,123 @@ def configure_model_panel(*, clear_before: bool = True) -> None:
     print_current_model_config()
 
 
+MODEL_FAMILY_ORDER = ("codex", "grok", "claude")
+
+
+def attached_model_families() -> list[str]:
+    families = []
+    raw = os.getenv("JIMMORIA_MODEL_FAMILIES", "")
+    for item in raw.split(","):
+        family = normalize_model_family(item)
+        if family and family not in families:
+            families.append(family)
+
+    provider = (os.getenv("LLM_PROVIDER") or "").strip().lower().replace("-", "_")
+    inferred: list[str] = []
+    if provider in {"codex_sdk", "codex_cli", "codex_api", "codex"}:
+        inferred = ["codex"]
+    elif provider in {"grok", "xai", "grok_oauth", "xai_oauth"}:
+        inferred = ["grok"]
+    elif provider in {"claude", "anthropic", "claude_api", "anthropic_api", "claude_cli", "claude_oauth"}:
+        inferred = ["claude"]
+    elif provider in {"codex_grok", "grok_codex"}:
+        inferred = ["codex", "grok"]
+    elif provider in {"multi", "hybrid", "dual"} and not families:
+        inferred = ["codex", "grok"]
+    for family in inferred:
+        if family not in families:
+            families.append(family)
+    return [family for family in MODEL_FAMILY_ORDER if family in families]
+
+
+def normalize_model_family(value: str) -> str:
+    normalized = value.strip().lower().replace("-", "_")
+    if normalized in {"codex", "openai", "openai_codex", "codex_sdk", "codex_cli", "codex_api"}:
+        return "codex"
+    if normalized in {"grok", "xai", "grok_oauth", "xai_oauth", "grok_api", "xai_api"}:
+        return "grok"
+    if normalized in {"claude", "anthropic", "claude_api", "anthropic_api", "claude_cli", "claude_oauth"}:
+        return "claude"
+    return ""
+
+
+def attached_model_family_label() -> str:
+    families = attached_model_families()
+    return ", ".join(families) if families else "none"
+
+
+def attach_model_family(family: str) -> None:
+    normalized = normalize_model_family(family)
+    if not normalized:
+        return
+    families = attached_model_families()
+    if normalized not in families:
+        families.append(normalized)
+    set_attached_model_families(families)
+
+
+def set_attached_model_families(families: list[str]) -> None:
+    normalized = [family for family in MODEL_FAMILY_ORDER if family in {normalize_model_family(item) for item in families}]
+    if not normalized:
+        os.environ.pop("JIMMORIA_MODEL_FAMILIES", None)
+        os.environ.pop("LLM_PROVIDER", None)
+        return
+    os.environ["JIMMORIA_MODEL_FAMILIES"] = ",".join(normalized)
+    if len(normalized) > 1:
+        os.environ["LLM_PROVIDER"] = "multi"
+        return
+    family = normalized[0]
+    if family == "codex":
+        os.environ["LLM_PROVIDER"] = preferred_codex_provider()
+    elif family == "grok":
+        os.environ["LLM_PROVIDER"] = "xai_oauth" if preferred_grok_auth_provider() in {"xai_oauth", "grok_oauth"} else "grok"
+    elif family == "claude":
+        os.environ["LLM_PROVIDER"] = preferred_claude_provider()
+
+
+def model_readiness_summary() -> str:
+    return (
+        f"Codex: {codex_multi_auth_status()} | "
+        f"Grok: {grok_auth_status()} | "
+        f"Claude: {claude_multi_auth_status()}"
+    )
+
 
 def configure_all_logged_in_models() -> None:
     """Apply every authenticated model family without asking for another login."""
 
     clear_legacy_model_session_env()
-    codex_available = codex_sdk_available() or codex_is_logged_in() or codex_api_key_configured()
+    codex_available = any(codex_provider_ready(provider) for provider in ("codex_sdk", "codex_cli", "codex_api"))
     grok_available = grok_is_configured()
-    if codex_available and grok_available:
-        os.environ["LLM_PROVIDER"] = "codex_grok"
+    claude_available = claude_is_configured()
+    families: list[str] = []
+    if codex_available:
+        families.append("codex")
         os.environ["JIMMORIA_CODEX_PROVIDER"] = preferred_codex_provider()
+        os.environ["JIMMORIA_CODEX_AUTH_PROVIDER"] = "api_key" if os.environ["JIMMORIA_CODEX_PROVIDER"] == "codex_api" else "oauth"
+    if grok_available:
+        families.append("grok")
         os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = preferred_grok_auth_provider()
-    elif codex_available:
-        provider = preferred_codex_provider()
-        os.environ["LLM_PROVIDER"] = provider
-        os.environ["JIMMORIA_CODEX_PROVIDER"] = provider
-    elif grok_available:
-        os.environ["LLM_PROVIDER"] = "xai_oauth" if preferred_grok_auth_provider() in {"xai_oauth", "grok_oauth"} else "grok"
-        os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = preferred_grok_auth_provider()
-    else:
-        os.environ["LLM_PROVIDER"] = "offline"
+    if claude_available:
+        families.append("claude")
+        os.environ["JIMMORIA_CLAUDE_AUTH_PROVIDER"] = preferred_claude_auth_provider()
+    set_attached_model_families(families)
     clear_screen()
     print_screen(
         "All logged-in models",
         [
             "로그인/키가 감지된 Codex와 Grok 모델 패밀리를 모두 적용했습니다.",
             "다시 로그인하지 않고 기존 OAuth session, local Codex login, API key env/file/command를 재사용합니다.",
+            f"Attached: {attached_model_family_label()}",
             f"Codex OAuth/local: {codex_login_status()}",
             f"Codex API: {codex_api_status()}",
             f"Grok OAuth/API: {grok_auth_status()}",
+            f"Claude API/CLI: {claude_multi_auth_status()}",
             "Raw OAuth/API tokens are not saved in model_settings.json.",
         ],
     )
-    save_model_settings()
+    if families:
+        save_model_settings()
 
 
 def configure_codex() -> None:
@@ -1921,22 +2078,20 @@ def configure_codex() -> None:
     print_screen(
         "Codex",
         [
-            "Codex can use OAuth/local login or an API key.",
-            "1. Use Codex SDK / local app-server OAuth session",
-            "2. Use Codex CLI exec OAuth/local login",
-            "3. Use OPENAI_API_KEY / CODEX_API_KEY API key",
-            "4. Apply whichever Codex credential is already available",
-            "Enter. Apply available Codex credential",
+            "Attach Codex with either OAuth/local login or an API key.",
+            "JIMMORIA will choose SDK or CLI internally when OAuth/local is used.",
+            "",
+            "1. OAuth / local login",
+            "2. API key",
+            "3. Apply existing Codex credential",
+            "Enter. Apply existing Codex credential",
         ],
     )
-    choice = input("Choose Codex credential [1/2/3/4/Enter]: ").strip().lower()
-    if choice in {"1", "sdk"}:
-        configure_codex_sdk()
+    choice = input("Choose Codex auth [1/2/3/Enter]: ").strip().lower()
+    if choice in {"1", "oauth", "login", "local", "sdk", "cli"}:
+        configure_codex_oauth()
         return
-    if choice in {"2", "cli", "oauth", "login"}:
-        configure_codex_cli()
-        return
-    if choice in {"3", "api", "api_key", "key", "openai"}:
+    if choice in {"2", "api", "api_key", "key", "openai"}:
         configure_codex_api()
         return
     provider = preferred_codex_provider()
@@ -1948,9 +2103,18 @@ def configure_codex() -> None:
         configure_codex_sdk()
 
 
+def configure_codex_oauth() -> None:
+    if not codex_is_logged_in():
+        run_codex_device_login()
+    provider = "codex_sdk" if codex_sdk_available() else "codex_cli"
+    if provider == "codex_sdk":
+        configure_codex_sdk()
+    else:
+        configure_codex_cli(prompt_for_auth=False)
+
+
 def configure_codex_sdk() -> None:
     clear_legacy_model_session_env()
-    os.environ["LLM_PROVIDER"] = "codex_sdk"
     os.environ["JIMMORIA_CODEX_AUTH_PROVIDER"] = "oauth"
     os.environ["JIMMORIA_CODEX_PROVIDER"] = "codex_sdk"
     clear_screen()
@@ -1966,13 +2130,25 @@ def configure_codex_sdk() -> None:
         ],
     )
     input("Continue [Enter]: ")
+    if not codex_provider_ready("codex_sdk"):
+        clear_screen()
+        print_screen(
+            "Codex SDK not ready",
+            [
+                "Codex SDK/local auth is not runnable in this shell yet.",
+                f"SDK package: {'available' if codex_sdk_available() else 'not installed'}",
+                f"Login status: {codex_login_status()}",
+                "Attach Codex again after logging in, or choose API key.",
+            ],
+        )
+        return
+    attach_model_family("codex")
     configure_model_routes(prefix="CODEX_MODEL")
     save_model_settings()
 
 
-def configure_codex_cli() -> None:
+def configure_codex_cli(*, prompt_for_auth: bool = True) -> None:
     clear_legacy_model_session_env()
-    os.environ["LLM_PROVIDER"] = "codex_cli"
     os.environ["JIMMORIA_CODEX_AUTH_PROVIDER"] = "oauth"
     os.environ["JIMMORIA_CODEX_PROVIDER"] = "codex_cli"
     clear_screen()
@@ -1986,12 +2162,25 @@ def configure_codex_cli() -> None:
             "Enter. Use existing Codex login",
         ],
     )
-    source_choice = input("Choose Codex CLI auth method [1/Enter]: ").strip().lower()
-    if source_choice == "1":
-        run_codex_device_login()
-    elif source_choice in {"2", "api", "api_key", "key"}:
-        configure_codex_api()
+    if prompt_for_auth:
+        source_choice = input("Choose Codex CLI auth method [1/2/Enter]: ").strip().lower()
+        if source_choice == "1":
+            run_codex_device_login()
+        elif source_choice in {"2", "api", "api_key", "key"}:
+            configure_codex_api()
+            return
+    if not codex_provider_ready("codex_cli"):
+        clear_screen()
+        print_screen(
+            "Codex CLI not ready",
+            [
+                "Codex CLI is not runnable or not logged in in this shell.",
+                codex_login_status(),
+                "Install/login Codex or choose Codex API key.",
+            ],
+        )
         return
+    attach_model_family("codex")
     configure_model_routes(prefix="CODEX_CLI_MODEL")
     save_model_settings()
 
@@ -1999,7 +2188,6 @@ def configure_codex_cli() -> None:
 
 def configure_codex_api(*, prompt_for_key: bool = True) -> None:
     clear_legacy_model_session_env()
-    os.environ["LLM_PROVIDER"] = "codex_api"
     os.environ["JIMMORIA_CODEX_AUTH_PROVIDER"] = "api_key"
     os.environ["JIMMORIA_CODEX_PROVIDER"] = "codex_api"
     clear_screen()
@@ -2017,13 +2205,23 @@ def configure_codex_api(*, prompt_for_key: bool = True) -> None:
             token = getpass.getpass("Paste OPENAI/Codex API key (not saved): ").strip()
             if token:
                 os.environ["OPENAI_API_KEY"] = token
+    if not codex_provider_ready("codex_api"):
+        clear_screen()
+        print_screen(
+            "Codex API not ready",
+            [
+                "Codex API needs OPENAI_API_KEY or CODEX_API_KEY in this shell.",
+                codex_api_status(),
+            ],
+        )
+        return
+    attach_model_family("codex")
     configure_model_routes(prefix="CODEX_MODEL")
     save_model_settings()
 
 
 def configure_grok() -> None:
     clear_legacy_model_session_env()
-    os.environ["LLM_PROVIDER"] = "grok"
     os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = "api_key"
     clear_screen()
     print_screen(
@@ -2068,6 +2266,18 @@ def configure_grok() -> None:
             os.environ["GROK_OAUTH_TOKEN_COMMAND"] = command
             os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = "token_command"
 
+    if not grok_is_configured():
+        set_attached_model_families([family for family in attached_model_families() if family != "grok"])
+        clear_screen()
+        print_screen(
+            "Grok not ready",
+            [
+                "Grok/xAI needs a working OAuth session, API key, token file, or token command.",
+                grok_auth_status(),
+            ],
+        )
+        return
+    attach_model_family("grok")
     configure_model_routes(
         prefix="GROK_MODEL",
         provider_label="Grok/xAI",
@@ -2075,6 +2285,57 @@ def configure_grok() -> None:
         supported_model_ids=SUPPORTED_GROK_MODEL_IDS,
         supported_model_lines=supported_grok_model_lines,
         model_by_index_fn=grok_model_by_index,
+    )
+    save_model_settings()
+
+
+def configure_claude() -> None:
+    clear_legacy_model_session_env()
+    os.environ["JIMMORIA_CLAUDE_AUTH_PROVIDER"] = "api_key"
+    clear_screen()
+    print_screen(
+        "Claude / Anthropic",
+        [
+            "Attach Claude with either an Anthropic API key or a local Claude CLI login.",
+            "Raw API keys are never saved in model_settings.json.",
+            "",
+            "1. API key",
+            "2. OAuth / local Claude CLI",
+            "3. Apply existing Claude credential",
+            "Enter. Apply existing Claude credential",
+        ],
+    )
+    source_choice = input("Choose Claude auth [1/2/3/Enter]: ").strip().lower()
+    if source_choice in {"1", "api", "api_key", "key", "anthropic"}:
+        os.environ["JIMMORIA_CLAUDE_AUTH_PROVIDER"] = "api_key"
+        if not claude_api_key_configured():
+            token = getpass.getpass("Paste Anthropic/Claude API key (not saved): ").strip()
+            if token:
+                os.environ["ANTHROPIC_API_KEY"] = token
+    elif source_choice in {"2", "oauth", "login", "local", "cli", "claude_cli"}:
+        os.environ["JIMMORIA_CLAUDE_AUTH_PROVIDER"] = "claude_cli"
+    elif source_choice in {"3", "existing", ""}:
+        os.environ["JIMMORIA_CLAUDE_AUTH_PROVIDER"] = preferred_claude_auth_provider()
+
+    if not claude_is_configured():
+        set_attached_model_families([family for family in attached_model_families() if family != "claude"])
+        clear_screen()
+        print_screen(
+            "Claude not ready",
+            [
+                "Claude needs ANTHROPIC_API_KEY/CLAUDE_API_KEY or a local Claude CLI on PATH.",
+                claude_multi_auth_status(),
+            ],
+        )
+        return
+    attach_model_family("claude")
+    configure_model_routes(
+        prefix="CLAUDE_MODEL",
+        provider_label="Claude",
+        default_description="Default: Claude Sonnet for reasoning/writing, Claude Haiku for fast chat/extraction.",
+        supported_model_ids=SUPPORTED_CLAUDE_MODEL_IDS,
+        supported_model_lines=supported_claude_model_lines,
+        model_by_index_fn=claude_model_by_index,
     )
     save_model_settings()
 
@@ -2160,6 +2421,7 @@ def run_hermes_xai_oauth_login() -> None:
 
 def configure_offline() -> None:
     os.environ["LLM_PROVIDER"] = "offline"
+    os.environ.pop("JIMMORIA_MODEL_FAMILIES", None)
     clear_legacy_model_session_env()
     clear_screen()
     print_screen("Offline diagnostic fallback", ["Live Codex calls disabled for this session. Tests and local diagnostics only."])
@@ -2218,7 +2480,11 @@ def configure_model_routes(
         model = model_by_index_fn(selected) if callable(model_by_index_fn) else None
         model = model or selected
         clear_model_route_env(prefix)
-        if model and (model in supported_model_ids or (provider_label.startswith("Grok") and model.startswith("grok-"))):
+        if model and (
+            model in supported_model_ids
+            or (provider_label.startswith("Grok") and model.startswith("grok-"))
+            or (provider_label.startswith("Claude") and model.startswith("claude-"))
+        ):
             for tier, _label in MODEL_ROUTE_TIERS:
                 os.environ[f"{prefix}_{tier}"] = model
         return
@@ -2261,7 +2527,11 @@ def configure_model_routes_advanced(
         value = input_with_default(f"{env_name} ({label})", os.getenv(env_name, ""))
         selected = model_by_index_fn(value) if callable(model_by_index_fn) else None
         selected = selected or value
-        if selected and (selected in supported_model_ids or (provider_label.startswith("Grok") and selected.startswith("grok-"))):
+        if selected and (
+            selected in supported_model_ids
+            or (provider_label.startswith("Grok") and selected.startswith("grok-"))
+            or (provider_label.startswith("Claude") and selected.startswith("claude-"))
+        ):
             os.environ[env_name] = selected
 
 
@@ -2310,19 +2580,32 @@ def print_current_model_config() -> None:
         token_source = codex_api_status()
     elif provider in {"grok", "xai", "grok_oauth", "xai_oauth"}:
         token_source = grok_auth_status()
+    elif provider in {"claude", "anthropic", "claude_api", "anthropic_api", "claude_cli", "claude_oauth"}:
+        token_source = claude_multi_auth_status()
     elif provider in {"codex_grok", "grok_codex", "codex+grok", "grok+codex", "hybrid", "dual", "multi"}:
         token_source = (
             "Codex: "
             + codex_multi_auth_status()
             + " | Grok: "
             + grok_auth_status()
+            + " | Claude: "
+            + claude_multi_auth_status()
         )
     else:
         token_source = "offline diagnostic fallback"
     supported_models = (
         ", ".join(SUPPORTED_GROK_MODEL_IDS)
         if provider in {"grok", "xai", "grok_oauth", "xai_oauth"}
-        else ("Codex: " + ", ".join(SUPPORTED_CODEX_MODEL_IDS) + " | Grok: " + ", ".join(SUPPORTED_GROK_MODEL_IDS))
+        else ", ".join(SUPPORTED_CLAUDE_MODEL_IDS)
+        if provider in {"claude", "anthropic", "claude_api", "anthropic_api", "claude_cli", "claude_oauth"}
+        else (
+            "Codex: "
+            + ", ".join(SUPPORTED_CODEX_MODEL_IDS)
+            + " | Grok: "
+            + ", ".join(SUPPORTED_GROK_MODEL_IDS)
+            + " | Claude: "
+            + ", ".join(SUPPORTED_CLAUDE_MODEL_IDS)
+        )
         if provider in {"codex_grok", "grok_codex", "codex+grok", "grok+codex", "hybrid", "dual", "multi"}
         else ", ".join(SUPPORTED_CODEX_MODEL_IDS)
     )
@@ -2331,6 +2614,7 @@ def print_current_model_config() -> None:
         "Model Config",
         [
             f"Provider: {provider}",
+            f"Attached families: {attached_model_family_label()}",
             f"Supervisor model: {supervisor_decision.selected_model} ({supervisor_decision.provider_family})",
             f"Narrative model: {narrative_decision.selected_model} ({narrative_decision.provider_family})",
             f"Discovery model: {discovery_decision.selected_model} ({discovery_decision.provider_family})",
@@ -2352,9 +2636,53 @@ def grok_is_configured() -> bool:
     return "missing" not in grok_auth_status().lower()
 
 
+def claude_api_key_configured() -> bool:
+    return bool(os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY"))
+
+
+def claude_cli_available() -> bool:
+    command = os.getenv("CLAUDE_CLI_COMMAND", "claude")
+    return shutil.which(command) is not None
+
+
+def claude_is_configured() -> bool:
+    auth = preferred_claude_auth_provider()
+    if auth in {"claude_cli", "claude_oauth", "oauth", "cli"}:
+        return claude_cli_available()
+    return claude_api_key_configured()
+
+
+def preferred_claude_auth_provider() -> str:
+    configured = (os.getenv("JIMMORIA_CLAUDE_AUTH_PROVIDER") or "").strip().lower().replace("-", "_")
+    if configured in {"api_key", "claude_api", "anthropic_api", "claude_cli", "claude_oauth", "oauth", "cli"}:
+        return "claude_cli" if configured in {"claude_cli", "claude_oauth", "oauth", "cli"} else "api_key"
+    if claude_api_key_configured():
+        return "api_key"
+    if claude_cli_available():
+        return "claude_cli"
+    return "api_key"
+
+
+def preferred_claude_provider() -> str:
+    return "claude_cli" if preferred_claude_auth_provider() == "claude_cli" else "claude_api"
+
+
+def claude_provider_ready(provider: str) -> bool:
+    normalized = provider.strip().lower().replace("-", "_")
+    if normalized in {"claude_cli", "claude_oauth", "oauth", "cli"}:
+        return claude_cli_available()
+    if normalized in {"claude", "claude_api", "anthropic", "anthropic_api", "api", "api_key"}:
+        return claude_api_key_configured()
+    return claude_is_configured()
+
+
+def claude_multi_auth_status() -> str:
+    return f"{claude_api_status()} / {claude_cli_status()}"
+
+
 def preferred_codex_provider() -> str:
     configured = (os.getenv("JIMMORIA_CODEX_PROVIDER") or os.getenv("CODEX_PROVIDER") or "").strip().lower()
-    if configured in {"codex_sdk", "codex_cli", "codex_api"}:
+    if configured in {"codex_sdk", "codex_cli", "codex_api"} and codex_provider_ready(configured):
         return configured
     logged_in = codex_is_logged_in()
     if codex_sdk_available() and logged_in:
@@ -2394,9 +2722,11 @@ def codex_multi_auth_status() -> str:
 def clear_model_provider_env() -> None:
     for name in [
         "LLM_PROVIDER",
+        "JIMMORIA_MODEL_FAMILIES",
         "JIMMORIA_CODEX_PROVIDER",
         "JIMMORIA_CODEX_AUTH_PROVIDER",
         "JIMMORIA_GROK_AUTH_PROVIDER",
+        "JIMMORIA_CLAUDE_AUTH_PROVIDER",
     ]:
         os.environ.pop(name, None)
 
@@ -2415,8 +2745,24 @@ def configured_model_provider_ready() -> bool:
         return codex_api_key_configured()
     if provider in {"grok", "xai", "grok_oauth", "xai_oauth", "grok-oauth", "xai-oauth"}:
         return grok_is_configured()
+    if provider in {"claude", "anthropic", "claude_api", "anthropic_api", "claude_cli", "claude_oauth"}:
+        return claude_provider_ready(provider)
     if provider in {"codex_grok", "grok_codex", "codex+grok", "grok+codex", "hybrid", "dual", "multi"}:
-        return codex_provider_ready(preferred_codex_provider()) and grok_is_configured()
+        families = attached_model_families()
+        if not families:
+            return False
+        return all(model_family_ready(family) for family in families)
+    return False
+
+
+def model_family_ready(family: str) -> bool:
+    normalized = normalize_model_family(family)
+    if normalized == "codex":
+        return codex_provider_ready(preferred_codex_provider())
+    if normalized == "grok":
+        return grok_is_configured()
+    if normalized == "claude":
+        return claude_provider_ready(preferred_claude_provider())
     return False
 
 
@@ -2437,6 +2783,19 @@ def model_runtime_error_reply(exc: RuntimeError) -> list[str]:
         "다른 사용자/다른 로컬의 저장된 모델 설정을 그대로 쓰지 않도록, /models에서 본인 OAuth 또는 API key 기준으로 다시 적용해 주세요.",
         f"오류: {exc}",
     ]
+
+
+def model_runtime_error_needs_setup(exc: RuntimeError) -> bool:
+    text = str(exc).lower()
+    markers = [
+        "not found on path",
+        "no such file or directory",
+        "missing a bearer token",
+        "not runnable",
+        "not logged in",
+        "provider failed",
+    ]
+    return any(marker in text for marker in markers)
 
 
 def model_settings_path() -> Path:
@@ -2465,9 +2824,20 @@ def apply_saved_model_settings() -> None:
 def auto_configure_codex_provider_if_logged_in() -> None:
     if os.getenv("LLM_PROVIDER"):
         return
-    if not codex_is_logged_in():
+    families = []
+    if any(codex_provider_ready(provider) for provider in ("codex_sdk", "codex_cli", "codex_api")):
+        families.append("codex")
+        os.environ["JIMMORIA_CODEX_PROVIDER"] = preferred_codex_provider()
+        os.environ["JIMMORIA_CODEX_AUTH_PROVIDER"] = "api_key" if os.environ["JIMMORIA_CODEX_PROVIDER"] == "codex_api" else "oauth"
+    if grok_is_configured():
+        families.append("grok")
+        os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = preferred_grok_auth_provider()
+    if claude_is_configured():
+        families.append("claude")
+        os.environ["JIMMORIA_CLAUDE_AUTH_PROVIDER"] = preferred_claude_auth_provider()
+    if not families:
         return
-    os.environ["LLM_PROVIDER"] = "codex_sdk" if codex_sdk_available() else "codex_cli"
+    set_attached_model_families(families)
     save_model_settings()
 
 

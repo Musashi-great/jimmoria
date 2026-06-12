@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shlex
+import shutil
 import subprocess
 import tempfile
 import urllib.error
@@ -92,6 +93,8 @@ class CodexCliProvider:
         self._exec_help_text: str | None = None
 
     def complete(self, request: LLMRequest) -> LLMResponse:
+        if shutil.which(self.command) is None:
+            raise RuntimeError(f"Codex CLI provider is not runnable: `{self.command}` was not found on PATH.")
         prompt = _codex_cli_prompt(request)
         with tempfile.TemporaryDirectory() as tmp:
             output_path = Path(tmp) / "last_message.txt"
@@ -324,6 +327,88 @@ class GrokProvider:
         )
 
 
+class ClaudeApiProvider:
+    """Anthropic Claude provider using the Messages API."""
+
+    provider_name = "claude_api"
+
+    def __init__(self, *, api_key: str | None = None, base_url: str | None = None) -> None:
+        self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY") or ""
+        self.auth_source = (
+            "constructor"
+            if api_key
+            else "ANTHROPIC_API_KEY"
+            if os.getenv("ANTHROPIC_API_KEY")
+            else "CLAUDE_API_KEY"
+            if os.getenv("CLAUDE_API_KEY")
+            else "missing"
+        )
+        self.base_url = (base_url or os.getenv("ANTHROPIC_BASE_URL") or os.getenv("CLAUDE_BASE_URL") or "https://api.anthropic.com").rstrip("/")
+        self.version = os.getenv("ANTHROPIC_VERSION", "2023-06-01")
+        self.timeout = float(os.getenv("CLAUDE_API_TIMEOUT") or os.getenv("ANTHROPIC_API_TIMEOUT") or "360")
+
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.api_key)
+
+    def complete(self, request: LLMRequest) -> LLMResponse:
+        if not self.api_key:
+            raise RuntimeError("Claude API provider is missing a bearer token. Set ANTHROPIC_API_KEY or CLAUDE_API_KEY.")
+        raw = _post_json(
+            f"{self.base_url}/v1/messages",
+            _claude_messages_payload(request),
+            headers={
+                "x-api-key": self.api_key,
+                "anthropic-version": self.version,
+                "content-type": "application/json",
+            },
+            timeout=self.timeout,
+        )
+        text = _extract_claude_text(raw)
+        usage = raw.get("usage") if isinstance(raw.get("usage"), dict) else {}
+        usage = {
+            **usage,
+            "mode": "claude_api",
+            "base_url": self.base_url,
+            "auth_source": self.auth_source,
+            "reasoning_effort": request.reasoning_effort,
+        }
+        return LLMResponse(text=text.strip(), model=request.model, provider=self.provider_name, usage=usage, raw=raw)
+
+
+class ClaudeCliProvider:
+    """Claude provider backed by a local Claude CLI OAuth/login session."""
+
+    provider_name = "claude_cli"
+
+    def __init__(self, *, command: str | None = None) -> None:
+        self.command = command or os.getenv("CLAUDE_CLI_COMMAND", "claude")
+        self.timeout = float(os.getenv("CLAUDE_CLI_TIMEOUT", "360"))
+
+    def complete(self, request: LLMRequest) -> LLMResponse:
+        if shutil.which(self.command) is None:
+            raise RuntimeError(f"Claude CLI provider is not runnable: `{self.command}` was not found on PATH.")
+        prompt = _claude_cli_prompt(request)
+        completed = subprocess.run(
+            [self.command, "-p", prompt],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=self.timeout,
+        )
+        if completed.returncode != 0:
+            raise RuntimeError(
+                "Claude CLI provider failed: "
+                + ((completed.stderr or "").strip() or (completed.stdout or "").strip())
+            )
+        return LLMResponse(
+            text=(completed.stdout or "").strip(),
+            model=request.model,
+            provider=self.provider_name,
+            usage={"mode": "claude_cli", "reasoning_effort": request.reasoning_effort},
+        )
+
+
 def provider_from_env() -> LLMProvider:
     provider = os.getenv("LLM_PROVIDER", "").strip().lower()
     if provider in {"offline", "fallback", "none"}:
@@ -340,6 +425,10 @@ def provider_from_env() -> LLMProvider:
         return GrokProvider()
     if provider in {"grok_oauth", "xai_oauth", "grok-oauth", "xai-oauth"}:
         return GrokProvider(prefer_hermes_oauth=True)
+    if provider in {"claude", "anthropic", "claude_api", "anthropic_api"}:
+        return ClaudeApiProvider()
+    if provider in {"claude_cli", "claude_oauth", "anthropic_oauth"}:
+        return ClaudeCliProvider()
     return OfflineLLMProvider()
 
 
@@ -356,6 +445,21 @@ def grok_auth_status() -> str:
     if token:
         return f"Grok/xAI bearer token from {source}"
     return "missing Grok/xAI token; run `hermes auth add xai-oauth` or set XAI_API_KEY"
+
+
+def claude_api_status() -> str:
+    if os.getenv("ANTHROPIC_API_KEY"):
+        return "Claude API key from ANTHROPIC_API_KEY"
+    if os.getenv("CLAUDE_API_KEY"):
+        return "Claude API key from CLAUDE_API_KEY"
+    return "missing Claude API key; set ANTHROPIC_API_KEY or CLAUDE_API_KEY"
+
+
+def claude_cli_status() -> str:
+    command = os.getenv("CLAUDE_CLI_COMMAND", "claude")
+    if shutil.which(command) is None:
+        return "Claude CLI not found"
+    return f"Claude CLI available: {command}"
 
 
 def codex_sdk_available() -> bool:
@@ -720,6 +824,48 @@ def _grok_responses_payload(request: LLMRequest) -> dict[str, Any]:
     if request.response_format == "json":
         payload["text"] = {"format": {"type": "json_object"}}
     return payload
+
+
+def _claude_messages_payload(request: LLMRequest) -> dict[str, Any]:
+    user_prompt = request.user_prompt
+    if request.response_format == "json":
+        user_prompt = (
+            f"{request.user_prompt}\n\n"
+            "Return only a valid JSON object. Do not include markdown fences."
+        )
+    return {
+        "model": request.model,
+        "max_tokens": request.max_tokens,
+        "temperature": request.temperature,
+        "system": request.system_prompt,
+        "messages": [{"role": "user", "content": user_prompt}],
+    }
+
+
+def _extract_claude_text(raw: dict[str, Any]) -> str:
+    content = raw.get("content")
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict) and item.get("type") == "text":
+                parts.append(str(item.get("text") or ""))
+        if parts:
+            return "\n".join(part for part in parts if part).strip()
+    return str(raw.get("text") or raw.get("output_text") or "")
+
+
+def _claude_cli_prompt(request: LLMRequest) -> str:
+    response_rule = ""
+    if request.response_format == "json":
+        response_rule = "\nReturn only a valid JSON object. Do not include markdown fences."
+    return (
+        "You are serving as a Claude worker inside JIMMORIA, a crypto research-only "
+        "multi-agent company. Follow the system prompt and answer from the provided context."
+        f"\nReasoning effort requested: {request.reasoning_effort.upper()}."
+        f"{response_rule}\n\n"
+        f"System prompt:\n{request.system_prompt}\n\n"
+        f"User prompt:\n{request.user_prompt}\n"
+    )
 
 
 def _grok_chat_payload(request: LLMRequest) -> dict[str, Any]:

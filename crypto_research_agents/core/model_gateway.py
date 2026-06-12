@@ -6,9 +6,12 @@ from dataclasses import dataclass
 from time import perf_counter
 from typing import Any
 
+from .claude_models import claude_model_for_tier, claude_model_from_env_value
 from .codex_models import codex_model_for_tier, codex_model_from_env_value
 from .grok_models import grok_model_for_tier, grok_model_from_env_value
 from .llm_provider import (
+    ClaudeApiProvider,
+    ClaudeCliProvider,
     CodexApiProvider,
     CodexCliProvider,
     CodexSdkProvider,
@@ -51,9 +54,9 @@ class ModelGateway:
             self.providers = _hybrid_providers_from_env()
         else:
             self.providers = {}
-        self.provider = self.providers.get("codex") or configured_provider
+        self.provider = self.providers.get("codex") or next(iter(self.providers.values()), configured_provider)
         self.provider_name = "codex_grok" if self.provider_mode == "codex_grok" else getattr(self.provider, "provider_name", "unknown")
-        self.provider_family = "codex" if self.provider_mode == "codex_grok" else _provider_family(self.provider)
+        self.provider_family = _default_provider_family(self.providers) if self.provider_mode == "codex_grok" else _provider_family(self.provider)
         default_model = default_model or _model_env("FAST", provider_family=self.provider_family) or _default_model_for_tier(
             "FAST",
             provider_family=self.provider_family,
@@ -133,14 +136,15 @@ class ModelGateway:
         if self.provider_mode != "codex_grok":
             return self.provider_family
         override = _agent_provider_override(agent_id)
-        if override:
+        if override and override in self.providers:
             return override
-        agent_family = _hybrid_agent_provider_families().get(agent_id)
+        agent_family = _hybrid_agent_provider_families(set(self.providers)).get(agent_id)
         if agent_family:
             return agent_family
-        if task_type in _grok_task_types() or agent_id in _grok_agent_ids():
-            return "grok"
-        return "codex"
+        task_family = _hybrid_task_provider_families(set(self.providers)).get(task_type)
+        if task_family:
+            return task_family
+        return _default_provider_family(self.providers)
 
     def provider_for_task(self, *, agent_id: str, task_type: str) -> LLMProvider:
         family = self.provider_family_for_task(agent_id=agent_id, task_type=task_type)
@@ -308,6 +312,13 @@ def _model_env(tier: str, *, provider_family: str = "codex") -> str | None:
             or os.getenv("GROK_MODEL")
             or os.getenv("XAI_MODEL"),
         )
+    if provider_family == "claude":
+        return claude_model_from_env_value(
+            os.getenv(f"CLAUDE_MODEL_{tier}")
+            or os.getenv(f"ANTHROPIC_MODEL_{tier}")
+            or os.getenv("CLAUDE_MODEL")
+            or os.getenv("ANTHROPIC_MODEL"),
+        )
     return codex_model_from_env_value(
         os.getenv(f"CODEX_MODEL_{tier}") or os.getenv(f"CODEX_CLI_MODEL_{tier}"),
     )
@@ -317,9 +328,13 @@ def _provider_family(provider: LLMProvider) -> str:
     provider_name = getattr(provider, "provider_name", "").lower()
     if provider_name in {"grok", "xai", "grok_oauth", "xai_oauth"}:
         return "grok"
+    if provider_name in {"claude", "claude_api", "claude_cli", "anthropic"}:
+        return "claude"
     configured = os.getenv("LLM_PROVIDER", "").strip().lower()
     if configured in {"grok", "xai", "grok_oauth", "xai_oauth"}:
         return "grok"
+    if configured in {"claude", "claude_api", "claude_cli", "claude_oauth", "anthropic", "anthropic_api"}:
+        return "claude"
     return "codex"
 
 
@@ -345,10 +360,40 @@ _HYBRID_PROVIDER_NAMES = {
 def _hybrid_providers_from_env() -> dict[str, LLMProvider]:
     grok_auth = os.getenv("JIMMORIA_GROK_AUTH_PROVIDER", "xai_oauth").strip().lower().replace("-", "_")
     prefer_hermes_oauth = grok_auth in {"", "xai_oauth", "grok_oauth", "hermes", "oauth", "hermes_xai_oauth"}
-    return {
-        "codex": _codex_provider_from_env(),
-        "grok": GrokProvider(prefer_hermes_oauth=prefer_hermes_oauth),
-    }
+    families = _configured_model_families()
+    providers: dict[str, LLMProvider] = {}
+    if "codex" in families:
+        providers["codex"] = _codex_provider_from_env()
+    if "grok" in families:
+        providers["grok"] = GrokProvider(prefer_hermes_oauth=prefer_hermes_oauth)
+    if "claude" in families:
+        providers["claude"] = _claude_provider_from_env()
+    if providers:
+        return providers
+    return {"codex": _codex_provider_from_env(), "grok": GrokProvider(prefer_hermes_oauth=prefer_hermes_oauth)}
+
+
+def _configured_model_families() -> set[str]:
+    raw = os.getenv("JIMMORIA_MODEL_FAMILIES", "").strip()
+    families = {_normalize_family_name(item) for item in raw.split(",") if item.strip()}
+    families.discard("")
+    provider = os.getenv("LLM_PROVIDER", "").strip().lower().replace("-", "_")
+    if provider in {"codex_grok", "grok_codex"}:
+        families.update({"codex", "grok"})
+    elif provider in {"multi", "hybrid", "dual", "codex+grok", "grok+codex"} and not families:
+        families.update({"codex", "grok"})
+    return {family for family in families if family in {"codex", "grok", "claude"}}
+
+
+def _normalize_family_name(value: str) -> str:
+    normalized = value.strip().lower().replace("-", "_")
+    if normalized in {"codex", "openai", "openai_codex", "codex_cli", "codex_sdk", "codex_api"}:
+        return "codex"
+    if normalized in {"grok", "xai", "grok_oauth", "xai_oauth", "grok_api", "xai_api"}:
+        return "grok"
+    if normalized in {"claude", "anthropic", "claude_api", "anthropic_api", "claude_cli", "claude_oauth"}:
+        return "claude"
+    return ""
 
 
 def _codex_provider_from_env() -> LLMProvider:
@@ -365,6 +410,13 @@ def _codex_provider_from_env() -> LLMProvider:
     if preferred in {"codex_sdk", "sdk"}:
         return CodexSdkProvider()
     return CodexSdkProvider() if codex_sdk_available() else CodexCliProvider()
+
+
+def _claude_provider_from_env() -> LLMProvider:
+    preferred = (os.getenv("JIMMORIA_CLAUDE_AUTH_PROVIDER") or "").strip().lower().replace("-", "_")
+    if preferred in {"cli", "oauth", "claude_cli", "claude_oauth"}:
+        return ClaudeCliProvider()
+    return ClaudeApiProvider()
 
 
 def _grok_task_types() -> set[str]:
@@ -387,21 +439,56 @@ def _grok_agent_ids() -> set[str]:
     }
 
 
-def _hybrid_agent_provider_families() -> dict[str, str]:
+def _hybrid_agent_provider_families(available: set[str]) -> dict[str, str]:
     """Default role-based provider split for the research company."""
 
+    choose = _family_chooser(available)
     return {
-        "supervisor_agent": "codex",
-        "ingestion_agent": "codex",
-        "narrative_agent": "grok",
-        "discovery_agent": "grok",
-        "social_kol_agent": "grok",
-        "contract_onchain_agent": "codex",
-        "product_tech_agent": "codex",
-        "funding_token_agent": "codex",
-        "report_agent": "codex",
-        "obsidian_curator_agent": "codex",
+        "supervisor_agent": choose("codex", "claude", "grok"),
+        "ingestion_agent": choose("codex", "claude", "grok"),
+        "narrative_agent": choose("grok", "claude", "codex"),
+        "discovery_agent": choose("grok", "claude", "codex"),
+        "social_kol_agent": choose("grok", "claude", "codex"),
+        "contract_onchain_agent": choose("codex", "claude", "grok"),
+        "product_tech_agent": choose("claude", "codex", "grok"),
+        "funding_token_agent": choose("codex", "claude", "grok"),
+        "report_agent": choose("claude", "codex", "grok"),
+        "obsidian_curator_agent": choose("codex", "claude", "grok"),
     }
+
+
+def _hybrid_task_provider_families(available: set[str]) -> dict[str, str]:
+    choose = _family_chooser(available)
+    return {
+        "supervisor_chat": choose("codex", "claude", "grok"),
+        "source_ingestion": choose("codex", "claude", "grok"),
+        "narrative_reasoning": choose("grok", "claude", "codex"),
+        "candidate_discovery": choose("grok", "claude", "codex"),
+        "social_summary": choose("grok", "claude", "codex"),
+        "contract_info": choose("codex", "claude", "grok"),
+        "product_docs": choose("claude", "codex", "grok"),
+        "funding_token": choose("codex", "claude", "grok"),
+        "obsidian_sync": choose("codex", "claude", "grok"),
+        "report_writing": choose("claude", "codex", "grok"),
+        "final_synthesis": choose("claude", "codex", "grok"),
+    }
+
+
+def _family_chooser(available: set[str]):
+    def choose(*candidates: str) -> str:
+        for family in candidates:
+            if family in available:
+                return family
+        return next(iter(sorted(available)), "codex")
+
+    return choose
+
+
+def _default_provider_family(providers: dict[str, LLMProvider]) -> str:
+    for family in ("codex", "claude", "grok"):
+        if family in providers:
+            return family
+    return "codex"
 
 
 def _agent_provider_override(agent_id: str) -> str | None:
@@ -420,12 +507,16 @@ def _normalize_provider_family(raw: str) -> str | None:
         return "codex"
     if normalized in {"grok", "xai", "xai_oauth", "grok_oauth", "xai_api", "grok_api"}:
         return "grok"
+    if normalized in {"claude", "anthropic", "claude_api", "anthropic_api", "claude_cli", "claude_oauth"}:
+        return "claude"
     return None
 
 
 def _default_model_for_tier(tier: str, *, provider_family: str) -> str:
     if provider_family == "grok":
         return grok_model_for_tier(tier)
+    if provider_family == "claude":
+        return claude_model_for_tier(tier)
     return codex_model_for_tier(tier)
 
 

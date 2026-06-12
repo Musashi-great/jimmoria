@@ -3,14 +3,18 @@
   "official_docs": {
     "codex_sdk": "https://developers.openai.com/codex/sdk",
     "codex_models": "https://developers.openai.com/codex/models",
+    "anthropic_messages_api": "https://docs.anthropic.com/en/api/messages",
     "xai_rest_api": "https://docs.x.ai/developers/rest-api-reference",
     "xai_models": "https://docs.x.ai/docs/models/",
     "xai_reasoning": "https://docs.x.ai/developers/model-capabilities/text/reasoning"
   },
   "runtime_order": [
     "codex_grok",
+    "multi",
     "codex_sdk",
     "codex_cli",
+    "claude_api",
+    "claude_cli",
     "xai_oauth",
     "grok",
     "offline_diagnostic_fallback"
@@ -18,7 +22,9 @@
   "env": {
     "provider": "LLM_PROVIDER",
     "hybrid_codex_provider": "JIMMORIA_CODEX_PROVIDER",
+    "model_families": "JIMMORIA_MODEL_FAMILIES",
     "hybrid_grok_auth_provider": "JIMMORIA_GROK_AUTH_PROVIDER",
+    "claude_auth_provider": "JIMMORIA_CLAUDE_AUTH_PROVIDER",
     "hybrid_grok_tasks": "JIMMORIA_GROK_TASKS",
     "hybrid_grok_agents": "JIMMORIA_GROK_AGENTS",
     "hybrid_grok_fallback_to_codex": "JIMMORIA_GROK_FALLBACK_TO_CODEX",
@@ -56,7 +62,15 @@
     "grok_fast_model": "GROK_MODEL_FAST",
     "grok_reasoning_model": "GROK_MODEL_REASONING",
     "grok_writing_model": "GROK_MODEL_WRITING",
-    "grok_strong_model": "GROK_MODEL_STRONG"
+    "grok_strong_model": "GROK_MODEL_STRONG",
+    "claude_api_key": "ANTHROPIC_API_KEY",
+    "claude_alt_api_key": "CLAUDE_API_KEY",
+    "claude_cli_command": "CLAUDE_CLI_COMMAND",
+    "claude_fast_chat_model": "CLAUDE_MODEL_FAST_CHAT",
+    "claude_fast_model": "CLAUDE_MODEL_FAST",
+    "claude_reasoning_model": "CLAUDE_MODEL_REASONING",
+    "claude_writing_model": "CLAUDE_MODEL_WRITING",
+    "claude_strong_model": "CLAUDE_MODEL_STRONG"
   },
   "supported_models": {
     "codex": [
@@ -73,6 +87,11 @@
       "grok-4.20",
       "grok-4.20-reasoning",
       "grok-4.20-multi-agent"
+    ],
+    "claude": [
+      "claude-sonnet-4-5",
+      "claude-opus-4-1",
+      "claude-haiku-4-5"
     ]
   },
   "defaults": {
@@ -89,6 +108,13 @@
       "reasoning_model": "grok-4.3",
       "writing_model": "grok-4.3",
       "strong_model": "grok-4.3"
+    },
+    "claude": {
+      "fast_chat_model": "claude-haiku-4-5",
+      "fast_model": "claude-haiku-4-5",
+      "reasoning_model": "claude-sonnet-4-5",
+      "writing_model": "claude-sonnet-4-5",
+      "strong_model": "claude-opus-4-1"
     },
     "reasoning_effort": "pro"
   },
