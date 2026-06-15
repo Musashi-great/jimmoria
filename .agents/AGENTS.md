@@ -13,3 +13,12 @@ Core operating rules:
 - Prefer `Unclear Points` and `Next Watch Points` over heavy risk-register language unless a fatal issue exists.
 - Never produce trading advice, price targets, or buy/sell instructions.
 
+Hermes Atlas design rules to preserve:
+
+- Keep the core a narrow waist. Prefer config, skills, toolsets, connectors, MCP edges, or Job Contract policy before changing Supervisor/Runtime core behavior.
+- Use the lightest extension rung that solves the job: existing config/skill, CLI+skill, service-gated tool/toolset, MCP/connector edge, then core runtime only when the contract truly requires it.
+- Use progressive disclosure. Keep skill/tool indexes compact; load detailed procedures only when the task needs them.
+- Treat durable Supervisor memory as a small high-signal notebook. Store preferences and stable room pointers, not raw logs.
+- Search prior sessions/runs on demand for deep recall instead of injecting old transcripts into every prompt.
+- When delegating, assume subagents start with fresh context. Pass the task ID, objective, expected output, source requirements, verification gates, completion criteria, and artifacts explicitly.
+

@@ -115,6 +115,9 @@
     "Every user message passes through the Supervisor conversation channel first.",
     "Use persistent Supervisor memory and session context to keep continuity across CLI sessions.",
     "Before dispatching executable work, create a closed-fleet job contract with the goal, output mode, agents, cost controls, verification gates, completion criteria, and bounded iteration policy.",
+    "Keep the runtime core as a narrow waist: prefer config, skills, toolsets, connectors, MCP edges, or job-contract policy before changing core behavior.",
+    "Use progressive disclosure: keep skill/tool indexes compact and load detailed procedures only when the task needs them.",
+    "When delegating, assume each specialist starts with fresh context; pass task ID, objective, expected output, source requirements, verification gates, and completion criteria explicitly.",
     "Only explicit research/report/analysis requests open a Research Room.",
     "If a request is ambiguous, ask a short confirmation before launching a full room.",
     "For project/token research, treat the trigger as a candidate until Identity Gate passes.",
@@ -132,6 +135,8 @@
     "quality_rules": [
       "Open Research Rooms only for explicit research/report/analysis work.",
       "Use a single-agent loop for normal Supervisor chat and a closed-fleet loop for confirmed Research Room work; open exploration is limited to candidate discovery.",
+      "Apply the lightest-footprint extension that solves the work before adding new core runtime surface.",
+      "Keep durable Supervisor memory small and high-signal; search saved sessions/runs on demand for deep recall.",
       "For project research, order the company around social-first intelligence: X/Twitter, KOL posts, public threads, and articles before official site/docs/GitHub verification.",
       "Require specialists to produce project-understanding evidence, not internal activity logs.",
       "Require report_agent to write a Korean project intelligence report and a separate evidence packet.",

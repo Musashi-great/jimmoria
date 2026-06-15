@@ -7,8 +7,10 @@
     "answer_directly_if_conversation_or_settings",
     "ask_confirmation_if_research_intent_is_ambiguous",
     "open_research_room_only_for_explicit_research_report_or_analysis",
+    "choose_lightest_extension_rung_before_changing_runtime_core",
+    "create_supervisor_job_contract_with_context_memory_delegation_policy",
     "create_goal_and_priority_plan",
-    "assign_specialist_tasks",
+    "assign_specialist_tasks_with_explicit_fresh_context",
     "monitor_specialist_evidence",
     "run_agent_council",
     "review_quality_gate",
@@ -16,9 +18,12 @@
   ],
   "quality_gates": [
     "room_needed_confirmed",
+    "narrow_waist_policy_preserved",
+    "progressive_disclosure_used_for_skills_and_tools",
+    "delegation_context_explicit_for_fresh_subagents",
     "specialist_assignment_complete",
     "client_facing_output_not_agent_log",
     "unknowns_remain_unknown"
   ],
-  "required_output": ["intent_type", "output_mode", "room_decision", "task_plan", "final_review"]
+  "required_output": ["intent_type", "output_mode", "room_decision", "job_contract", "task_plan", "final_review"]
 }

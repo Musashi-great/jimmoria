@@ -430,6 +430,11 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(research_contract["loop_mode"], "closed_fleet")
         self.assertEqual(research_contract["ui_policy"]["visible_mode"], "fixed_agent_dashboard")
         self.assertTrue(research_contract["ui_policy"]["show_total_token_usage"])
+        self.assertEqual(research_contract["extension_policy"]["architecture_rule"], "narrow_waist")
+        self.assertIn("progressive_disclosure", research_contract["context_policy"])
+        self.assertIn("deep_recall", research_contract["memory_policy"])
+        self.assertTrue(research_contract["delegation_policy"]["subagents_start_fresh"])
+        self.assertIn("verification_gates", research_contract["delegation_policy"]["required_handoff_fields"])
         self.assertIn("Identity Gate", " ".join(research_contract["verification_gates"]))
         self.assertEqual(max_agent_attempts_from_contract(research_contract), 2)
 
@@ -923,6 +928,17 @@ class SmokeTest(unittest.TestCase):
             self.assertEqual(contract["ui_policy"]["visible_mode"], "fixed_agent_dashboard")
             self.assertEqual(supervision[0].data["job_contract"]["loop_mode"], "closed_fleet")
             self.assertEqual(supervision[0].data["orchestration_plan"]["loop_mode"], "closed_fleet")
+            self.assertEqual(supervision[0].data["orchestration_plan"]["extension_policy"]["architecture_rule"], "narrow_waist")
+            specialist_requests = [
+                message
+                for message in result.bus.messages
+                if message.from_agent == "supervisor_agent" and message.to_agent != "supervisor_agent"
+            ]
+            self.assertTrue(specialist_requests)
+            first_context = specialist_requests[0].context
+            self.assertEqual(first_context["job_contract"]["loop_mode"], "closed_fleet")
+            self.assertTrue(first_context["delegation_policy"]["requires_explicit_handoff_context"])
+            self.assertIn("verification_gates", first_context)
 
     def test_live_agent_board_shows_current_work(self) -> None:
         output = StringIO()
@@ -2618,7 +2634,9 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("Skills/playbooks: supervisor_orchestration", supervisor_prompt)
         self.assertIn("Runtime hooks:", supervisor_prompt)
         self.assertTrue(any("closed-fleet job contract" in item for item in supervisor.must_follow))
+        self.assertTrue(any("fresh context" in item for item in supervisor.must_follow))
         self.assertTrue(any("single-agent loop" in item for item in supervisor.professional_output_contract.get("quality_rules", [])))
+        self.assertTrue(any("lightest-footprint" in item for item in supervisor.professional_output_contract.get("quality_rules", [])))
 
         product = registry.get("product_tech_agent")
         self.assertIsNotNone(product)

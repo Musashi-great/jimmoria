@@ -32,6 +32,7 @@ class SupervisorAgent(BaseAgent):
             bus=bus,
             process=process,
             supervisor_mode=supervisor_mode,
+            job_contract=job_contract,
         )
         orchestration_plan = _build_orchestration_plan(
             room=room,
@@ -109,8 +110,10 @@ class SupervisorAgent(BaseAgent):
         bus: CollaborationBus,
         process: dict[str, Any],
         supervisor_mode: str,
+        job_contract: dict[str, Any],
     ) -> dict[str, Any]:
         process_id = str(process.get("process_id") or "")
+        contract_context = _delegation_contract_context(job_contract)
         tasks = _task_payloads(process, room)
         office_results: list[dict[str, Any]] = []
         delegated_tasks: list[dict[str, Any]] = []
@@ -180,6 +183,7 @@ class SupervisorAgent(BaseAgent):
                     "requires": task["requires"],
                     "process_id": process_id,
                     "supervisor_mode": supervisor_mode,
+                    **contract_context,
                 },
                 priority=_priority_for_task(task),
             )
@@ -193,7 +197,11 @@ class SupervisorAgent(BaseAgent):
                 to_agent=first_task["agent_id"],
                 task_id=first_task["task_id"],
                 context_summary="Supervisor finished room planning and opened the first specialist assignment.",
-                artifacts={"delegated_task_count": len(delegated_tasks), "process_id": process_id},
+                artifacts={
+                    "delegated_task_count": len(delegated_tasks),
+                    "process_id": process_id,
+                    "delegation_policy": contract_context.get("delegation_policy", {}),
+                },
             )
             office_results.append({"tool": "agent_handoff", "task_id": first_task["task_id"], "result": handoff_result})
             bus.handoff(
@@ -201,7 +209,11 @@ class SupervisorAgent(BaseAgent):
                 from_agent=self.agent_id,
                 to_agent=first_task["agent_id"],
                 summary="Supervisor completed office planning; start the first assigned task.",
-                payload={"first_task": first_task, "delegated_task_count": len(delegated_tasks)},
+                payload={
+                    "first_task": first_task,
+                    "delegated_task_count": len(delegated_tasks),
+                    **contract_context,
+                },
             )
 
         return {
@@ -320,6 +332,10 @@ def _build_orchestration_plan(
         "coordination_checkpoints": coordination_checkpoints,
         "verification_gates": contract.get("verification_gates", []),
         "iteration_policy": contract.get("iteration_policy", {}),
+        "extension_policy": contract.get("extension_policy", {}),
+        "context_policy": contract.get("context_policy", {}),
+        "memory_policy": contract.get("memory_policy", {}),
+        "delegation_policy": contract.get("delegation_policy", {}),
         "supervisor_decision_rights": [
             "decide whether to open a Research Room",
             "set room goals and priority",
@@ -327,4 +343,25 @@ def _build_orchestration_plan(
             "coordinate Agent Council",
             "approve final delivery mode",
         ],
+    }
+
+
+def _delegation_contract_context(job_contract: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(job_contract, dict) or not job_contract:
+        return {}
+    return {
+        "job_contract": {
+            "loop_mode": job_contract.get("loop_mode"),
+            "output_mode": job_contract.get("output_mode"),
+            "goal": job_contract.get("goal"),
+            "topic": job_contract.get("topic"),
+            "source_requirements": job_contract.get("source_requirements", []),
+            "verification_gates": job_contract.get("verification_gates", []),
+            "completion_criteria": job_contract.get("completion_criteria", []),
+        },
+        "source_requirements": job_contract.get("source_requirements", []),
+        "verification_gates": job_contract.get("verification_gates", []),
+        "completion_criteria": job_contract.get("completion_criteria", []),
+        "context_policy": job_contract.get("context_policy", {}),
+        "delegation_policy": job_contract.get("delegation_policy", {}),
     }

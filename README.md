@@ -214,6 +214,13 @@ controls, verification gates, completion criteria, and bounded retry policy.
 Open exploration is limited to candidate discovery; the room itself retries
 only failed or missing-evidence slices instead of looping indefinitely.
 
+Hermes-inspired optimization rules are part of that contract: keep the core
+loop as a narrow waist, choose the lightest extension rung that solves the job,
+use compact skill/tool indexes before loading details, keep durable Supervisor
+memory small and high-signal, search old sessions/runs only on demand, and pass
+fresh subagents explicit task context instead of assuming they remember the
+parent conversation.
+
 Typical flow:
 
 ```text

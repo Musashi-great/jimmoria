@@ -323,6 +323,7 @@ Loop policy:
 - Normal Supervisor conversation uses a single-agent loop: answer directly, update memory/settings when needed, and keep the room closed.
 - Confirmed research/report work uses a closed-fleet loop: create `SupervisorJobContract`, lock the goal/output mode/agents/source requirements/cost controls/verification gates/completion criteria, and dispatch bounded specialist work.
 - Open exploration is limited to candidate discovery; retries target failed agents or missing-evidence slices instead of looping indefinitely.
+- Hermes Atlas rules applied here: keep the core loop a narrow waist, prefer config/skills/toolsets/connectors/MCP before core changes, use progressive disclosure for skill/tool detail, keep durable Supervisor memory small, search prior sessions/runs on demand, and pass explicit fresh context to each delegated agent.
 
 Supervisor는 단순 라우터가 아니라 회사의 boss/orchestrator다.
 
