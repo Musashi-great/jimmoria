@@ -3293,6 +3293,24 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(getattr(provider, "api_key", ""), "oauth-access-token")
         self.assertIn("Hermes", getattr(provider, "auth_source", ""))
 
+    def test_grok_oauth_provider_does_not_fallback_to_api_key(self) -> None:
+        with TemporaryDirectory() as tmp:
+            with patch.dict(
+                "os.environ",
+                {
+                    "LLM_PROVIDER": "xai_oauth",
+                    "HERMES_HOME": tmp,
+                    "XAI_API_KEY": "api-key-should-not-win",
+                },
+                clear=True,
+            ):
+                provider = provider_from_env()
+
+        self.assertEqual(provider.provider_name, "grok")
+        self.assertEqual(getattr(provider, "api_key", ""), "")
+        self.assertEqual(getattr(provider, "auth_source", ""), "missing")
+        self.assertFalse(getattr(provider, "is_configured", True))
+
     def test_grok_plain_provider_prefers_api_key_before_hermes_oauth(self) -> None:
         with TemporaryDirectory() as tmp:
             hermes_home = Path(tmp) / ".hermes"
@@ -3445,30 +3463,35 @@ Usage: codex exec [OPTIONS] [PROMPT]
                     "JIMMORIA_MODEL_SETTINGS_PATH": settings_path,
                     "OPENAI_API_KEY": "openai-secret",
                     "XAI_API_KEY": "xai-secret",
+                    "GROK_OAUTH_TOKEN": "oauth-secret",
                 },
                 clear=True,
             ):
                 with patch("crypto_research_agents.cli.codex_sdk_available", return_value=False):
-                    with patch("crypto_research_agents.cli.codex_login_status", return_value="Codex login status unknown"):
-                        with patch("builtins.input", return_value="1"):
-                            with redirect_stdout(output):
-                                configure_model_panel()
+                    with patch("crypto_research_agents.cli.codex_login_status", return_value="Codex logged in"):
+                        with patch("crypto_research_agents.cli.claude_cli_available", return_value=False):
+                            with patch("builtins.input", return_value="1"):
+                                with redirect_stdout(output):
+                                    configure_model_panel()
                 self.assertEqual(os.environ["LLM_PROVIDER"], "multi")
                 self.assertEqual(os.environ["JIMMORIA_MODEL_FAMILIES"], "codex,grok")
-                self.assertEqual(os.environ["JIMMORIA_CODEX_PROVIDER"], "codex_api")
-                self.assertEqual(os.environ["JIMMORIA_GROK_AUTH_PROVIDER"], "api_key")
+                self.assertEqual(os.environ["JIMMORIA_CODEX_PROVIDER"], "codex_cli")
+                self.assertEqual(os.environ["JIMMORIA_CODEX_AUTH_PROVIDER"], "oauth")
+                self.assertEqual(os.environ["JIMMORIA_GROK_AUTH_PROVIDER"], "xai_oauth")
                 settings = json.loads(Path(settings_path).read_text(encoding="utf-8"))
                 self.assertEqual(settings["LLM_PROVIDER"], "multi")
                 self.assertEqual(settings["JIMMORIA_MODEL_FAMILIES"], "codex,grok")
-                self.assertEqual(settings["JIMMORIA_CODEX_PROVIDER"], "codex_api")
-                self.assertEqual(settings["JIMMORIA_GROK_AUTH_PROVIDER"], "api_key")
+                self.assertEqual(settings["JIMMORIA_CODEX_PROVIDER"], "codex_cli")
+                self.assertEqual(settings["JIMMORIA_CODEX_AUTH_PROVIDER"], "oauth")
+                self.assertEqual(settings["JIMMORIA_GROK_AUTH_PROVIDER"], "xai_oauth")
                 self.assertNotIn("OPENAI_API_KEY", settings)
                 self.assertNotIn("XAI_API_KEY", settings)
+                self.assertNotIn("GROK_OAUTH_TOKEN", settings)
 
         text = output.getvalue()
         self.assertIn("[All logged-in models]", text)
-        self.assertIn("Codex API", text)
-        self.assertIn("Grok OAuth/API", text)
+        self.assertIn("API keys are ignored", text)
+        self.assertIn("Grok OAuth", text)
 
     def test_model_setup_offline_choice_uses_screen_flow(self) -> None:
         output = StringIO()
@@ -3490,7 +3513,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertIn("[Model Setup]", text)
         self.assertIn("[Offline diagnostic fallback]", text)
 
-    def test_model_setup_claude_api_choice_saves_provider_without_raw_token(self) -> None:
+    def test_model_setup_claude_cli_choice_saves_provider_without_raw_token(self) -> None:
         output = StringIO()
         with TemporaryDirectory() as tmp:
             settings_path = str(Path(tmp) / "model_settings.json")
@@ -3499,16 +3522,17 @@ Usage: codex exec [OPTIONS] [PROMPT]
                 {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path, "ANTHROPIC_API_KEY": "anthropic-secret"},
                 clear=True,
             ):
-                with patch("builtins.input", side_effect=["4", "1", ""]):
-                    with redirect_stdout(output):
-                        configure_model_panel()
-                self.assertEqual(os.environ["LLM_PROVIDER"], "claude_api")
+                with patch("crypto_research_agents.cli.claude_cli_available", return_value=True):
+                    with patch("builtins.input", side_effect=["4", "", ""]):
+                        with redirect_stdout(output):
+                            configure_model_panel()
+                self.assertEqual(os.environ["LLM_PROVIDER"], "claude_cli")
                 self.assertEqual(os.environ["JIMMORIA_MODEL_FAMILIES"], "claude")
-                self.assertEqual(os.environ["JIMMORIA_CLAUDE_AUTH_PROVIDER"], "api_key")
+                self.assertEqual(os.environ["JIMMORIA_CLAUDE_AUTH_PROVIDER"], "claude_cli")
                 settings = json.loads(Path(settings_path).read_text(encoding="utf-8"))
-                self.assertEqual(settings["LLM_PROVIDER"], "claude_api")
+                self.assertEqual(settings["LLM_PROVIDER"], "claude_cli")
                 self.assertEqual(settings["JIMMORIA_MODEL_FAMILIES"], "claude")
-                self.assertEqual(settings["JIMMORIA_CLAUDE_AUTH_PROVIDER"], "api_key")
+                self.assertEqual(settings["JIMMORIA_CLAUDE_AUTH_PROVIDER"], "claude_cli")
                 self.assertNotIn("ANTHROPIC_API_KEY", settings)
 
         text = output.getvalue()
@@ -3524,12 +3548,14 @@ Usage: codex exec [OPTIONS] [PROMPT]
                 {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path, "GROK_OAUTH_TOKEN": "session-secret"},
                 clear=True,
             ):
-                with patch("builtins.input", side_effect=["3", "3", ""]):
+                with patch("builtins.input", side_effect=["3", "", ""]):
                     with redirect_stdout(output):
                         configure_model_panel()
-                self.assertEqual(os.environ["LLM_PROVIDER"], "grok")
+                self.assertEqual(os.environ["LLM_PROVIDER"], "xai_oauth")
+                self.assertEqual(os.environ["JIMMORIA_GROK_AUTH_PROVIDER"], "xai_oauth")
                 settings = json.loads(Path(settings_path).read_text(encoding="utf-8"))
-                self.assertEqual(settings["LLM_PROVIDER"], "grok")
+                self.assertEqual(settings["LLM_PROVIDER"], "xai_oauth")
+                self.assertEqual(settings["JIMMORIA_GROK_AUTH_PROVIDER"], "xai_oauth")
                 self.assertNotIn("GROK_OAUTH_TOKEN", settings)
 
         text = output.getvalue()
@@ -4066,7 +4092,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
     def test_model_router_contains_supervisor_chat_route(self) -> None:
         router = json.loads(Path("config/models/model_router.yaml").read_text(encoding="utf-8"))
 
-        self.assertEqual(router["provider"], "codex_or_grok")
+        self.assertEqual(router["provider"], "multi_model")
         self.assertIn("gpt-5.5", router["supported_models"]["codex"])
         self.assertIn("grok-4.3", router["supported_models"]["grok"])
         self.assertIn("codex_grok", router["runtime_order"])

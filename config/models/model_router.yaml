@@ -1,5 +1,5 @@
 {
-  "provider": "codex_or_grok",
+  "provider": "multi_model",
   "official_docs": {
     "codex_sdk": "https://developers.openai.com/codex/sdk",
     "codex_models": "https://developers.openai.com/codex/models",
@@ -9,13 +9,13 @@
     "xai_reasoning": "https://docs.x.ai/developers/model-capabilities/text/reasoning"
   },
   "runtime_order": [
-    "codex_grok",
     "multi",
+    "codex_grok",
     "codex_sdk",
     "codex_cli",
-    "claude_api",
     "claude_cli",
     "xai_oauth",
+    "claude_api",
     "grok",
     "offline_diagnostic_fallback"
   ],
@@ -202,10 +202,13 @@
     "behavior": "deterministic local extraction and summarization for tests only"
   },
   "notes": [
-    "Codex remains the recommended default because it can reuse the local ChatGPT/Codex login.",
-    "Grok/xAI is available through Hermes xAI OAuth (LLM_PROVIDER=xai_oauth) and through the OpenAI-compatible xAI API at https://api.x.ai/v1.",
+    "Recommended setup uses OAuth/local sessions only: Codex local login, Hermes xAI OAuth, and Claude CLI login.",
+    "When more than one family is attached, JIMMORIA sets LLM_PROVIDER=multi and Supervisor/ModelGateway routes agents by role automatically.",
+    "Codex remains the recommended orchestration/final-writing family because it can reuse the local ChatGPT/Codex login.",
+    "Grok/xAI is available through Hermes xAI OAuth (LLM_PROVIDER=xai_oauth) and through the legacy OpenAI-compatible xAI API at https://api.x.ai/v1.",
     "Hermes xAI OAuth uses accounts.x.ai and stores tokens in ~/.hermes/auth.json; JIMMORIA imports the runtime bearer without persisting token material.",
-    "JIMMORIA also accepts explicit bearer token env/file/command sources for operator workflows.",
+    "JIMMORIA also accepts explicit OAuth bearer token env/file/command sources for operator workflows.",
+    "API-key providers remain available as explicit legacy fallback paths, but /models does not auto-attach them from the recommended flow.",
     "Raw Grok/XAI bearer tokens are not persisted in data/model_settings.json; only file paths, commands, base URL, API mode, and model route preferences are saved.",
     "Grok defaults to the Responses API so reasoning.effort can be mapped from JIMMORIA pro/high/standard/fast effort levels."
   ]

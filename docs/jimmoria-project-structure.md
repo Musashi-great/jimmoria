@@ -260,6 +260,19 @@ Grok defaults
   report/final writing  grok-4.3, pro -> reasoning.effort high
 ```
 
+Recommended model attachment:
+
+```text
+/models
+  1. Auto-attach OAuth/local logged-in models
+
+If two or more families are found, JIMMORIA stores:
+  LLM_PROVIDER=multi
+  JIMMORIA_MODEL_FAMILIES=codex,grok,claude
+```
+
+This recommended path uses OAuth/local sessions only. It checks Codex local login, Hermes xAI OAuth or OAuth token env/file/command, and local Claude CLI login. API-key providers are still available as explicit legacy fallback paths, but they are not auto-attached by the recommended setup flow.
+
 Grok credential sources:
 
 ```text
@@ -268,21 +281,23 @@ Hermes xAI OAuth session
   LLM_PROVIDER=xai_oauth
   stored by Hermes in ~/.hermes/auth.json
 
-XAI_API_KEY
-GROK_API_KEY
 GROK_OAUTH_TOKEN / XAI_OAUTH_TOKEN
 GROK_OAUTH_TOKEN_FILE / XAI_OAUTH_TOKEN_FILE
 GROK_OAUTH_TOKEN_COMMAND / XAI_OAUTH_TOKEN_COMMAND
+
+Legacy explicit fallback:
+  XAI_API_KEY / GROK_API_KEY with LLM_PROVIDER=grok
 ```
 
-`LLM_PROVIDER=xai_oauth` prefers the Hermes OAuth session over API-key env vars. `LLM_PROVIDER=grok` keeps API-key/env sources first and falls back to Hermes OAuth if no explicit bearer exists.
+`LLM_PROVIDER=xai_oauth` requires OAuth sources and does not silently fall back to `XAI_API_KEY` or `GROK_API_KEY`. `LLM_PROVIDER=grok` keeps API-key/env sources available as an explicit legacy fallback.
 
 Hybrid credential flow:
 
 ```text
-LLM_PROVIDER=codex_grok
+LLM_PROVIDER=multi
   Codex side: Codex SDK if available, otherwise Codex CLI
-  Grok side: Hermes xAI OAuth first, then explicit Grok/XAI token sources
+  Grok side: Hermes xAI OAuth or explicit OAuth token source
+  Claude side: local Claude CLI login when attached
 ```
 
 Raw Grok/XAI bearer tokens are not saved in `data/model_settings.json`. Only provider choice, file paths, commands, base URL, API mode, and model route preferences are persisted. When Hermes is installed in the same Python environment, JIMMORIA asks `hermes_cli.auth.resolve_xai_oauth_runtime_credentials()` for a refreshed runtime bearer. If that module is not importable, it falls back to reading `~/.hermes/auth.json` directly without printing token values.

@@ -265,7 +265,10 @@ class GrokProvider:
         token, source, auth_base_url = (
             (api_key, "constructor", None)
             if api_key
-            else _grok_bearer_token(prefer_hermes_oauth=prefer_hermes_oauth)
+            else _grok_bearer_token(
+                prefer_hermes_oauth=prefer_hermes_oauth,
+                oauth_only=prefer_hermes_oauth,
+            )
         )
         self.api_key = token or ""
         self.auth_source = source
@@ -286,9 +289,10 @@ class GrokProvider:
     def complete(self, request: LLMRequest) -> LLMResponse:
         if not self.api_key:
             raise RuntimeError(
-                "Grok provider is missing a bearer token. Set XAI_API_KEY, GROK_API_KEY, "
-                "GROK_OAUTH_TOKEN, XAI_OAUTH_TOKEN, GROK_OAUTH_TOKEN_FILE, "
-                "GROK_OAUTH_TOKEN_COMMAND, or run `hermes auth add xai-oauth`."
+                "Grok provider is missing a bearer token. Run `hermes auth add xai-oauth` "
+                "or provide GROK_OAUTH_TOKEN, XAI_OAUTH_TOKEN, GROK_OAUTH_TOKEN_FILE, "
+                "or GROK_OAUTH_TOKEN_COMMAND. XAI_API_KEY/GROK_API_KEY are legacy fallback "
+                "sources for LLM_PROVIDER=grok only."
             )
 
         if self.api_mode in {"chat", "chat_completions", "chat-completions"}:
@@ -444,7 +448,14 @@ def grok_auth_status() -> str:
     token, source, _base_url = _grok_bearer_token(prefer_hermes_oauth=True)
     if token:
         return f"Grok/xAI bearer token from {source}"
-    return "missing Grok/xAI token; run `hermes auth add xai-oauth` or set XAI_API_KEY"
+    return "missing Grok/xAI token; run `hermes auth add xai-oauth`"
+
+
+def grok_oauth_status() -> str:
+    token, source, _base_url = _grok_bearer_token(prefer_hermes_oauth=True, oauth_only=True)
+    if token:
+        return f"Grok/xAI OAuth token from {source}"
+    return "missing Grok/xAI OAuth token; run `hermes auth add xai-oauth`"
 
 
 def claude_api_status() -> str:
@@ -630,11 +641,21 @@ def _is_real_model_name(model: str) -> bool:
     return bool(model and model not in placeholders)
 
 
-def _grok_bearer_token(*, prefer_hermes_oauth: bool = False) -> tuple[str | None, str, str | None]:
+def _grok_bearer_token(
+    *,
+    prefer_hermes_oauth: bool = False,
+    oauth_only: bool = False,
+) -> tuple[str | None, str, str | None]:
     if prefer_hermes_oauth:
         hermes_token, hermes_source, hermes_base_url = _hermes_xai_oauth_bearer_token()
         if hermes_token:
             return hermes_token, hermes_source, hermes_base_url
+
+        oauth_token, oauth_source, oauth_base_url = _explicit_grok_oauth_bearer_token()
+        if oauth_token:
+            return oauth_token, oauth_source, oauth_base_url
+        if oauth_only:
+            return None, "missing", None
 
     for name in ["GROK_OAUTH_TOKEN", "XAI_OAUTH_TOKEN", "GROK_API_KEY", "XAI_API_KEY"]:
         value = os.getenv(name)
@@ -675,6 +696,45 @@ def _grok_bearer_token(*, prefer_hermes_oauth: bool = False) -> tuple[str | None
         hermes_token, hermes_source, hermes_base_url = _hermes_xai_oauth_bearer_token()
         if hermes_token:
             return hermes_token, hermes_source, hermes_base_url
+    return None, "missing", None
+
+
+def _explicit_grok_oauth_bearer_token() -> tuple[str | None, str, str | None]:
+    for name in ["GROK_OAUTH_TOKEN", "XAI_OAUTH_TOKEN"]:
+        value = os.getenv(name)
+        if value:
+            return value.strip(), name, None
+
+    for name in ["GROK_OAUTH_TOKEN_FILE", "XAI_OAUTH_TOKEN_FILE"]:
+        path = os.getenv(name)
+        if not path:
+            continue
+        try:
+            value = Path(path).expanduser().read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if value:
+            return value, name, None
+
+    for name in ["GROK_OAUTH_TOKEN_COMMAND", "XAI_OAUTH_TOKEN_COMMAND"]:
+        command = os.getenv(name)
+        if not command:
+            continue
+        try:
+            completed = subprocess.run(
+                shlex.split(command, posix=os.name != "nt"),
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if completed.returncode == 0:
+            value = completed.stdout.strip()
+            if value:
+                return value, name, None
+
     return None, "missing", None
 
 

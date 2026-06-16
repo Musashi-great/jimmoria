@@ -120,15 +120,15 @@ jimmoria demo
 
 ## Model Setup
 
-JIMMORIA can run Codex-only, Grok-only, or Codex+Grok hybrid routing. The recommended production setup is hybrid: Codex keeps orchestration/final writing stable, while Grok/xAI is used for social, narrative, and candidate-discovery work.
+JIMMORIA can run Codex-only, Grok-only, Claude-only, or multi-model routing. The recommended production setup is OAuth/local multi-model routing: Codex keeps orchestration/final writing stable, Grok/xAI handles social/narrative/candidate-discovery work, and Claude can be added through a local Claude CLI login.
 
 Recommended setup panel choice:
 
 ```text
-1. Apply all logged-in Codex + Grok models
+1. Auto-attach OAuth/local logged-in models
 ```
 
-This auto-applies every credential JIMMORIA can already see: Codex SDK/CLI OAuth login, Codex/OpenAI API key, Hermes xAI OAuth, Grok/xAI API key, token file, or token command. You do not need to pick and re-login each model family one by one.
+This applies only model families that are already authenticated through OAuth/local sessions: Codex SDK/CLI login, Hermes xAI OAuth, Grok OAuth token env/file/command, and Claude CLI. API keys are not auto-attached from the recommended flow. If more than one family is found, JIMMORIA sets `LLM_PROVIDER=multi` and the Supervisor/ModelGateway distributes work by role automatically.
 
 Install Codex SDK support:
 
@@ -136,9 +136,9 @@ Install Codex SDK support:
 python -m pip install -e ".[codex]"
 ```
 
-If Codex login already exists locally, JIMMORIA can reuse it. Codex can also run through `OPENAI_API_KEY` or `CODEX_API_KEY` with `LLM_PROVIDER=codex_api`. JIMMORIA stores provider/model preferences in the current user config file, normally `~/.config/jimmoria/model_settings.json` on Linux/macOS or `%APPDATA%\JIMMORIA\model_settings.json` on Windows, not raw OAuth or API tokens.
+If Codex login already exists locally, JIMMORIA can reuse it. JIMMORIA stores provider/model preferences in the current user config file, normally `~/.config/jimmoria/model_settings.json` on Linux/macOS or `%APPDATA%\JIMMORIA\model_settings.json` on Windows, not raw OAuth tokens.
 
-Optional Grok/xAI provider:
+Grok/xAI OAuth provider:
 
 ```powershell
 hermes auth add xai-oauth
@@ -146,9 +146,9 @@ $env:LLM_PROVIDER = "xai_oauth"
 jimmoria
 ```
 
-This uses the Hermes xAI OAuth session stored in `~/.hermes/auth.json`. Hermes opens `accounts.x.ai`, stores the xAI OAuth tokens, refreshes them when needed, and JIMMORIA reuses that session without saving raw tokens.
+This uses the Hermes xAI OAuth session stored in `~/.hermes/auth.json`. Hermes opens `accounts.x.ai`, stores the xAI OAuth tokens, refreshes them when needed, and JIMMORIA reuses that session without saving raw tokens. With `LLM_PROVIDER=xai_oauth`, API-key env vars are ignored so OAuth failures are visible instead of silently falling back.
 
-API-key and explicit bearer-token sources are still accepted for fallback/operator workflows:
+API-key and explicit bearer-token sources are still accepted for explicit fallback/operator workflows:
 
 ```powershell
 $env:LLM_PROVIDER = "grok"
@@ -158,18 +158,21 @@ $env:GROK_OAUTH_TOKEN_FILE = "C:\path\to\xai-token.txt"
 $env:GROK_OAUTH_TOKEN_COMMAND = "op read op://vault/xai/token"
 ```
 
-The xAI API uses an OpenAI-compatible endpoint at `https://api.x.ai/v1`. The Codex API provider uses `https://api.openai.com/v1` by default. JIMMORIA does not save raw Codex/OpenAI/Grok/XAI tokens in the user model settings file; it only saves provider/model preferences, token file paths, or token commands. With `LLM_PROVIDER=xai_oauth`, Hermes OAuth is preferred over `XAI_API_KEY`. With `LLM_PROVIDER=grok`, API key/env sources are preferred and Hermes OAuth is used as a fallback.
+The xAI API uses an OpenAI-compatible endpoint at `https://api.x.ai/v1`. The Codex API provider uses `https://api.openai.com/v1` by default. JIMMORIA does not save raw Codex/OpenAI/Grok/XAI tokens in the user model settings file; it only saves provider/model preferences, token file paths, or token commands. With `LLM_PROVIDER=xai_oauth`, OAuth sources are required. With `LLM_PROVIDER=grok`, API key/env sources remain available as a legacy fallback path.
 
-Important: `xai_oauth` is a Grok credential mode. For role-based company routing, use `LLM_PROVIDER=codex_grok`; JIMMORIA will still use Hermes xAI OAuth for the Grok side.
+Important: `xai_oauth` is a Grok credential mode. For role-based company routing, use `/models` option 1 or set `LLM_PROVIDER=multi` with `JIMMORIA_MODEL_FAMILIES=codex,grok`. JIMMORIA will still use Hermes xAI OAuth for the Grok side.
 
-Hybrid Codex + Grok mode:
+Multi-model mode:
 
 ```powershell
-$env:LLM_PROVIDER = "codex_grok"
+$env:LLM_PROVIDER = "multi"
+$env:JIMMORIA_MODEL_FAMILIES = "codex,grok"
 jimmoria
 ```
 
-Default hybrid routing:
+`codex_grok` still works as a compatibility alias for Codex+Grok only, but `/models` now prefers `multi` so Claude can join the same routing layer.
+
+Default multi-model routing:
 
 ```text
 Codex: supervisor, ingestion, contract/on-chain, product/tech, funding/token, report, Obsidian
@@ -190,7 +193,7 @@ Default model routing:
 Codex supervisor chat:        gpt-5.4-mini
 Codex specialist reasoning:   gpt-5.5 + pro reasoning
 Grok-only chat/reasoning:     grok-4.3 + high reasoning effort
-Hybrid report synthesis:      Codex writing model + pro reasoning
+Multi-model report synthesis: Codex writing model + pro reasoning
 ```
 
 For Codex CLI, JIMMORIA maps `pro` to the local Codex config value `model_reasoning_effort="xhigh"` when the installed `codex exec` supports `--config`.

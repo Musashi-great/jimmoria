@@ -100,15 +100,20 @@ Codex sources:
 
 - Codex SDK/local app-server login
 - Codex CLI login through `codex exec`
-- `OPENAI_API_KEY` or `CODEX_API_KEY` through the Codex API provider
+- legacy explicit fallback: `OPENAI_API_KEY` or `CODEX_API_KEY` through the Codex API provider
 
 Grok/xAI sources:
 
 - Hermes xAI OAuth session from `hermes auth add xai-oauth`
-- `XAI_API_KEY` or `GROK_API_KEY`
 - `GROK_OAUTH_TOKEN` / `XAI_OAUTH_TOKEN`
 - token file env vars
 - token command env vars
+- legacy explicit fallback: `XAI_API_KEY` or `GROK_API_KEY` with `LLM_PROVIDER=grok`
+
+Claude sources:
+
+- Claude CLI local login
+- legacy explicit fallback: `ANTHROPIC_API_KEY` or `CLAUDE_API_KEY`
 
 Raw OAuth/API tokens are not persisted in JIMMORIA model settings. The settings
 file stores provider choice, model preferences, token file paths, token commands,
@@ -116,8 +121,8 @@ base URLs, and API mode only.
 
 Important distinction:
 
-- `LLM_PROVIDER=xai_oauth` means Grok-only, preferring Hermes OAuth credentials.
-- `LLM_PROVIDER=codex_grok` means role-based hybrid routing; the Grok side can still use Hermes OAuth.
+- `LLM_PROVIDER=xai_oauth` means Grok-only OAuth and does not fall back to API keys.
+- `LLM_PROVIDER=multi` means role-based multi-model routing; the Grok side can still use Hermes OAuth.
 
 ## Tool And Safety Policy
 
