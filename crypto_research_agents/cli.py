@@ -1871,6 +1871,9 @@ def print_agent_table(*, active_only: bool = False) -> None:
 
 
 def ensure_interactive_model_ready(*, clear_before: bool = True) -> None:
+    auto_configure_codex_provider_if_logged_in()
+    if configured_model_provider_ready():
+        return
     while not configured_model_provider_ready():
         configure_model_panel(clear_before=clear_before)
         clear_before = True
@@ -1888,6 +1891,7 @@ def ensure_interactive_model_ready(*, clear_before: bool = True) -> None:
 
 def configure_model_panel(*, clear_before: bool = True) -> None:
     apply_saved_model_settings()
+    auto_configure_codex_provider_if_logged_in()
     if clear_before:
         clear_screen()
     print_screen(
@@ -1896,25 +1900,22 @@ def configure_model_panel(*, clear_before: bool = True) -> None:
             f"Attached model families: {attached_model_family_label()}",
             f"Runtime provider: {os.getenv('LLM_PROVIDER') or 'none'}",
             "",
-            "1. Auto-attach OAuth/local logged-in models (Recommended)",
-            "2. Attach Codex OAuth/local",
-            "3. Attach Grok xAI OAuth",
-            "4. Attach Claude OAuth/local",
-            "5. Done / keep current",
-            "6. Offline diagnostic fallback",
+            "1. Codex",
+            "2. Grok / xAI",
+            "3. Claude",
             "",
-            "Attach more than one family and JIMMORIA switches to multi-model role routing automatically.",
+            "Enter. Re-scan saved/local credentials and keep current",
+            "Attach more than one family by opening /models again.",
         ]
     )
-    choice = input("Choose model family [1/2/3/4/5/6/Enter]: ").strip().lower()
+    choice = input("Choose model [1/2/3/Enter]: ").strip().lower()
     if not choice:
-        if not configured_model_provider_ready():
-            configure_all_logged_in_models()
+        auto_configure_codex_provider_if_logged_in()
         clear_screen()
         print_current_model_config()
         return
 
-    if choice in {"1", "all", "auto", "recommended", "logged_in", "logged-in"}:
+    if choice in {"all", "auto", "recommended", "logged_in", "logged-in"}:
         configure_all_logged_in_models()
         print_current_model_config()
         return
@@ -1924,28 +1925,28 @@ def configure_model_panel(*, clear_before: bool = True) -> None:
         print_current_model_config()
         return
 
-    if choice in {"2", "codex", "codex_sdk", "sdk", "codex_cli", "cli", "codex_api", "openai_api"}:
+    if choice in {"1", "codex", "codex_sdk", "sdk", "codex_cli", "cli"}:
         configure_codex()
         print_current_model_config()
         return
 
-    if choice in {"3", "grok", "xai", "grok_oauth", "xai_oauth"}:
+    if choice in {"codex_api", "openai_api", "openai", "codex api", "api codex"}:
+        configure_codex_api(prompt_for_key=True)
+        print_current_model_config()
+        return
+
+    if choice in {"2", "grok", "xai", "grok_oauth", "xai_oauth"}:
         configure_grok()
         print_current_model_config()
         return
 
-    if choice in {"4", "claude", "anthropic", "claude_api", "claude_cli"}:
+    if choice in {"grok_api", "xai_api", "grok api", "xai api"}:
+        configure_grok_api(prompt_for_key=True)
+        print_current_model_config()
+        return
+
+    if choice in {"3", "claude", "anthropic", "claude_api", "claude_cli"}:
         configure_claude()
-        print_current_model_config()
-        return
-
-    if choice in {"5", "done", "keep", "current"}:
-        clear_screen()
-        print_current_model_config()
-        return
-
-    if choice in {"6", "offline", "fallback"}:
-        configure_offline()
         print_current_model_config()
         return
 
@@ -2073,29 +2074,30 @@ def configure_all_logged_in_models() -> None:
         save_model_settings()
 
 
+def finish_model_attachment(family: str, *, route_prefixes: list[str], title: str, lines: list[str]) -> None:
+    attach_model_family(family)
+    for prefix in route_prefixes:
+        clear_model_route_env(prefix)
+    save_model_settings()
+    clear_screen()
+    print_screen(title, [*lines, f"Attached families: {attached_model_family_label()}"])
+
+
 def configure_codex() -> None:
     clear_legacy_model_session_env()
     clear_screen()
     print_screen(
         "Codex",
         [
-            "Attach Codex through your local OAuth/login session.",
-            "JIMMORIA chooses SDK or CLI internally.",
-            "API-key setup is a hidden legacy fallback only.",
-            "",
-            "1. Start/use Codex OAuth/local login",
-            "2. Use existing Codex OAuth/local login",
-            "Enter. Start/use Codex OAuth/local login",
+            "Attaching Codex with the simplest available credential.",
+            "Order: local OAuth/login first, then OPENAI_API_KEY/CODEX_API_KEY if already present.",
+            "JIMMORIA chooses SDK, CLI, or API internally.",
         ],
     )
-    choice = input("Choose Codex auth [1/2/Enter]: ").strip().lower()
-    if choice in {"", "1", "2", "oauth", "login", "local", "sdk", "cli", "existing"}:
+    if codex_oauth_provider_ready() or not codex_api_key_configured():
         configure_codex_oauth()
         return
-    if choice in {"api", "api_key", "key", "openai", "codex_api", "openai_api"}:
-        configure_codex_api()
-        return
-    configure_codex_oauth()
+    configure_codex_api(prompt_for_key=False)
 
 
 def configure_codex_oauth() -> None:
@@ -2119,12 +2121,9 @@ def configure_codex_sdk() -> None:
             "JIMMORIA will use the Codex Python SDK and local Codex app-server.",
             "Install path: pip install openai-codex",
             f"SDK package: {'available' if codex_sdk_available() else 'not installed yet'}",
-            "",
-            "If you have not signed in, run Codex once and complete the ChatGPT login flow.",
-            "Press Enter to continue with Codex model routes.",
+            f"Login status: {codex_login_status()}",
         ],
     )
-    input("Continue [Enter]: ")
     if not codex_provider_ready("codex_sdk"):
         clear_screen()
         print_screen(
@@ -2137,9 +2136,12 @@ def configure_codex_sdk() -> None:
             ],
         )
         return
-    attach_model_family("codex")
-    configure_model_routes(prefix="CODEX_MODEL")
-    save_model_settings()
+    finish_model_attachment(
+        "codex",
+        route_prefixes=["CODEX_MODEL"],
+        title="Codex attached",
+        lines=["Provider: codex_sdk", "Model routes: provider defaults"],
+    )
 
 
 def configure_codex_cli(*, prompt_for_auth: bool = True) -> None:
@@ -2151,18 +2153,11 @@ def configure_codex_cli(*, prompt_for_auth: bool = True) -> None:
         "Codex CLI",
         [
             "JIMMORIA will call `codex exec` through your local Codex login.",
-            "",
-            "1. Start Codex device login",
-            "Enter. Use existing Codex login",
+            codex_login_status(),
         ],
     )
-    if prompt_for_auth:
-        source_choice = input("Choose Codex CLI auth method [1/Enter]: ").strip().lower()
-        if source_choice == "1":
-            run_codex_device_login()
-        elif source_choice in {"api", "api_key", "key", "openai", "codex_api", "openai_api"}:
-            configure_codex_api()
-            return
+    if prompt_for_auth and not codex_is_logged_in():
+        run_codex_device_login()
     if not codex_provider_ready("codex_cli"):
         clear_screen()
         print_screen(
@@ -2174,9 +2169,12 @@ def configure_codex_cli(*, prompt_for_auth: bool = True) -> None:
             ],
         )
         return
-    attach_model_family("codex")
-    configure_model_routes(prefix="CODEX_CLI_MODEL")
-    save_model_settings()
+    finish_model_attachment(
+        "codex",
+        route_prefixes=["CODEX_CLI_MODEL"],
+        title="Codex attached",
+        lines=["Provider: codex_cli", "Model routes: provider defaults"],
+    )
 
 
 
@@ -2209,9 +2207,12 @@ def configure_codex_api(*, prompt_for_key: bool = True) -> None:
             ],
         )
         return
-    attach_model_family("codex")
-    configure_model_routes(prefix="CODEX_MODEL")
-    save_model_settings()
+    finish_model_attachment(
+        "codex",
+        route_prefixes=["CODEX_MODEL"],
+        title="Codex attached",
+        lines=["Provider: codex_api", "Model routes: provider defaults"],
+    )
 
 
 def configure_grok() -> None:
@@ -2222,39 +2223,15 @@ def configure_grok() -> None:
     print_screen(
         "Grok / xAI",
         [
-            "JIMMORIA will call the xAI OpenAI-compatible API with OAuth bearer credentials.",
-            "Recommended auth: Hermes xAI OAuth (SuperGrok / X Premium+) via accounts.x.ai.",
-            "API-key setup is a hidden legacy fallback only.",
-            "",
-            "1. Start Hermes xAI OAuth browser login (Recommended)",
-            "2. Use existing Hermes xAI OAuth / OAuth token source",
-            "Enter. Use existing OAuth session",
+            "Attaching Grok with the simplest available credential.",
+            "Order: Hermes xAI OAuth first, then XAI_API_KEY/GROK_API_KEY if already present.",
         ],
     )
-    source_choice = input("Choose Grok OAuth source [1/2/Enter]: ").strip().lower()
-    if source_choice in {"1", "hermes", "oauth", "login", "xai_oauth"}:
+    if not grok_oauth_configured() and "missing" not in grok_auth_status().lower():
+        configure_grok_api(prompt_for_key=False)
+        return
+    if not grok_oauth_configured():
         run_hermes_xai_oauth_login()
-    elif source_choice in {"", "2", "existing", "session"}:
-        pass
-    elif source_choice in {"api", "api_key", "key", "xai_api", "grok_api"}:
-        os.environ["LLM_PROVIDER"] = "grok"
-        os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = "api_key"
-    elif source_choice in {"token", "paste", "bearer"}:
-        token = getpass.getpass("Paste Grok/xAI bearer token (not saved): ").strip()
-        if token:
-            os.environ["GROK_OAUTH_TOKEN"] = token
-            os.environ["LLM_PROVIDER"] = "xai_oauth"
-            os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = "xai_oauth"
-    elif source_choice in {"file", "token_file"}:
-        path = input("Token file path: ").strip()
-        if path:
-            os.environ["GROK_OAUTH_TOKEN_FILE"] = path
-            os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = "token_file"
-    elif source_choice in {"command", "token_command", "cmd"}:
-        command = input("Token command: ").strip()
-        if command:
-            os.environ["GROK_OAUTH_TOKEN_COMMAND"] = command
-            os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = "token_command"
 
     if not grok_is_configured():
         set_attached_model_families([family for family in attached_model_families() if family != "grok"])
@@ -2267,41 +2244,57 @@ def configure_grok() -> None:
             ],
         )
         return
-    attach_model_family("grok")
-    configure_model_routes(
-        prefix="GROK_MODEL",
-        provider_label="Grok/xAI",
-        default_description="Default: grok-4.3 for chat, reasoning, and writing.",
-        supported_model_ids=SUPPORTED_GROK_MODEL_IDS,
-        supported_model_lines=supported_grok_model_lines,
-        model_by_index_fn=grok_model_by_index,
+    finish_model_attachment(
+        "grok",
+        route_prefixes=["GROK_MODEL", "XAI_MODEL"],
+        title="Grok attached",
+        lines=["Provider: xai_oauth", "Model routes: provider defaults"],
     )
-    save_model_settings()
+
+
+def configure_grok_api(*, prompt_for_key: bool = True) -> None:
+    clear_legacy_model_session_env()
+    os.environ["LLM_PROVIDER"] = "grok"
+    os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = "api_key"
+    clear_screen()
+    lines = [
+        "JIMMORIA will call the xAI OpenAI-compatible API.",
+        "Supported credentials: XAI_API_KEY or GROK_API_KEY.",
+        "Raw API keys are never saved in model_settings.json.",
+    ]
+    if "missing" in grok_auth_status().lower() and prompt_for_key:
+        lines.extend(["", "1. Paste API key for this session only", "Enter. Continue and rely on existing env/key injection"])
+    print_screen("Grok API", lines)
+    if "missing" in grok_auth_status().lower() and prompt_for_key:
+        choice = input("Choose Grok API credential [1/Enter]: ").strip().lower()
+        if choice in {"1", "paste", "key", "api"}:
+            token = getpass.getpass("Paste xAI/Grok API key (not saved): ").strip()
+            if token:
+                os.environ["XAI_API_KEY"] = token
+    if "missing" in grok_auth_status().lower():
+        clear_screen()
+        print_screen("Grok API not ready", [grok_auth_status()])
+        return
+    finish_model_attachment(
+        "grok",
+        route_prefixes=["GROK_MODEL", "XAI_MODEL"],
+        title="Grok attached",
+        lines=["Provider: grok", "Model routes: provider defaults"],
+    )
 
 
 def configure_claude() -> None:
     clear_legacy_model_session_env()
-    os.environ["JIMMORIA_CLAUDE_AUTH_PROVIDER"] = "claude_cli"
+    os.environ["JIMMORIA_CLAUDE_AUTH_PROVIDER"] = preferred_claude_auth_provider()
     clear_screen()
     print_screen(
         "Claude / Anthropic",
         [
-            "Attach Claude through your local Claude CLI login.",
-            "API-key setup is a hidden legacy fallback only.",
-            "",
-            "1. Use local Claude CLI login",
-            "Enter. Use local Claude CLI login",
+            "Attaching Claude with the simplest available credential.",
+            "Order: local Claude CLI first, then ANTHROPIC_API_KEY/CLAUDE_API_KEY if already present.",
+            claude_multi_auth_status(),
         ],
     )
-    source_choice = input("Choose Claude auth [1/Enter]: ").strip().lower()
-    if source_choice in {"api", "api_key", "key", "anthropic", "claude_api"}:
-        os.environ["JIMMORIA_CLAUDE_AUTH_PROVIDER"] = "api_key"
-        if not claude_api_key_configured():
-            token = getpass.getpass("Paste Anthropic/Claude API key (not saved): ").strip()
-            if token:
-                os.environ["ANTHROPIC_API_KEY"] = token
-    else:
-        os.environ["JIMMORIA_CLAUDE_AUTH_PROVIDER"] = "claude_cli"
 
     if not claude_is_configured():
         set_attached_model_families([family for family in attached_model_families() if family != "claude"])
@@ -2309,21 +2302,17 @@ def configure_claude() -> None:
         print_screen(
             "Claude not ready",
             [
-                "Claude needs a local Claude CLI on PATH for the recommended OAuth/local path.",
+                "Claude needs a local Claude CLI on PATH or an Anthropic/Claude API key in this shell.",
                 claude_multi_auth_status(),
             ],
         )
         return
-    attach_model_family("claude")
-    configure_model_routes(
-        prefix="CLAUDE_MODEL",
-        provider_label="Claude",
-        default_description="Default: Claude Sonnet for reasoning/writing, Claude Haiku for fast chat/extraction.",
-        supported_model_ids=SUPPORTED_CLAUDE_MODEL_IDS,
-        supported_model_lines=supported_claude_model_lines,
-        model_by_index_fn=claude_model_by_index,
+    finish_model_attachment(
+        "claude",
+        route_prefixes=["CLAUDE_MODEL", "ANTHROPIC_MODEL"],
+        title="Claude attached",
+        lines=[f"Provider: {preferred_claude_provider()}", "Model routes: provider defaults"],
     )
-    save_model_settings()
 
 
 def configure_codex_grok_hybrid() -> None:
@@ -2367,7 +2356,6 @@ def run_hermes_xai_oauth_login() -> None:
                 "JIMMORIA will still try to reuse ~/.hermes/auth.json if it exists.",
             ],
         )
-        input("Continue [Enter]: ")
         return
 
     clear_screen()
@@ -2382,7 +2370,6 @@ def run_hermes_xai_oauth_login() -> None:
             "hermes auth add xai-oauth --manual-paste",
         ],
     )
-    input("Start login [Enter]: ")
     completed = subprocess.run([hermes_command, "auth", "add", "xai-oauth"], check=False)
     clear_screen()
     if completed.returncode == 0:
@@ -2402,7 +2389,6 @@ def run_hermes_xai_oauth_login() -> None:
                 grok_auth_status(),
             ],
         )
-    input("Continue [Enter]: ")
 
 
 def configure_offline() -> None:
@@ -2739,7 +2725,7 @@ def configured_model_provider_ready() -> bool:
     if not provider:
         return False
     if provider in {"offline", "fallback", "none"}:
-        return True
+        return False
     if provider == "codex_sdk":
         return codex_sdk_available() and codex_is_logged_in()
     if provider == "codex_cli":
@@ -2828,18 +2814,30 @@ def apply_saved_model_settings() -> None:
 
 def auto_configure_codex_provider_if_logged_in() -> None:
     if os.getenv("LLM_PROVIDER"):
-        return
+        if configured_model_provider_ready():
+            return
+        clear_model_provider_env()
     families = []
     if codex_oauth_provider_ready():
         families.append("codex")
         os.environ["JIMMORIA_CODEX_PROVIDER"] = preferred_codex_oauth_provider()
         os.environ["JIMMORIA_CODEX_AUTH_PROVIDER"] = "oauth"
+    elif codex_api_key_configured():
+        families.append("codex")
+        os.environ["JIMMORIA_CODEX_PROVIDER"] = "codex_api"
+        os.environ["JIMMORIA_CODEX_AUTH_PROVIDER"] = "api_key"
     if grok_oauth_configured():
         families.append("grok")
         os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = "xai_oauth"
+    elif "missing" not in grok_auth_status().lower():
+        families.append("grok")
+        os.environ["JIMMORIA_GROK_AUTH_PROVIDER"] = "api_key"
     if claude_cli_available():
         families.append("claude")
         os.environ["JIMMORIA_CLAUDE_AUTH_PROVIDER"] = "claude_cli"
+    elif claude_api_key_configured():
+        families.append("claude")
+        os.environ["JIMMORIA_CLAUDE_AUTH_PROVIDER"] = "api_key"
     if not families:
         return
     set_attached_model_families(families)

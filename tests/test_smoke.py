@@ -30,8 +30,10 @@ from crypto_research_agents.cli import (
     chat_command,
     classify_chat_input,
     chat_input_to_source,
+    configure_all_logged_in_models,
     configure_model_panel,
     configured_model_provider_ready,
+    ensure_interactive_model_ready,
     find_saved_report_for_request,
     model_settings_path,
     main as cli_main,
@@ -3470,9 +3472,8 @@ Usage: codex exec [OPTIONS] [PROMPT]
                 with patch("crypto_research_agents.cli.codex_sdk_available", return_value=False):
                     with patch("crypto_research_agents.cli.codex_login_status", return_value="Codex logged in"):
                         with patch("crypto_research_agents.cli.claude_cli_available", return_value=False):
-                            with patch("builtins.input", return_value="1"):
-                                with redirect_stdout(output):
-                                    configure_model_panel()
+                            with redirect_stdout(output):
+                                configure_all_logged_in_models()
                 self.assertEqual(os.environ["LLM_PROVIDER"], "multi")
                 self.assertEqual(os.environ["JIMMORIA_MODEL_FAMILIES"], "codex,grok")
                 self.assertEqual(os.environ["JIMMORIA_CODEX_PROVIDER"], "codex_cli")
@@ -3493,25 +3494,28 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertIn("API keys are ignored", text)
         self.assertIn("Grok OAuth", text)
 
-    def test_model_setup_offline_choice_uses_screen_flow(self) -> None:
+    def test_model_setup_menu_hides_auto_and_offline_choices(self) -> None:
         output = StringIO()
         with TemporaryDirectory() as tmp:
             settings_path = str(Path(tmp) / "model_settings.json")
             with patch.dict(
                 "os.environ",
-                {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path, "GROK_OAUTH_TOKEN": "session-secret"},
+                {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path},
                 clear=True,
             ):
-                with patch("builtins.input", return_value="6"):
+                with patch("builtins.input", return_value="q"):
                     with redirect_stdout(output):
                         configure_model_panel()
-                self.assertEqual(os.environ["LLM_PROVIDER"], "offline")
-                settings = json.loads(Path(settings_path).read_text(encoding="utf-8"))
-                self.assertEqual(settings["LLM_PROVIDER"], "offline")
+                self.assertNotIn("LLM_PROVIDER", os.environ)
 
         text = output.getvalue()
         self.assertIn("[Model Setup]", text)
-        self.assertIn("[Offline diagnostic fallback]", text)
+        self.assertIn("1. Codex", text)
+        self.assertIn("2. Grok / xAI", text)
+        self.assertIn("3. Claude", text)
+        self.assertIn("Enter. Re-scan saved/local credentials and keep current", text)
+        self.assertNotIn("Auto-attach", text)
+        self.assertNotIn("Offline diagnostic fallback", text)
 
     def test_model_setup_claude_cli_choice_saves_provider_without_raw_token(self) -> None:
         output = StringIO()
@@ -3523,7 +3527,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
                 clear=True,
             ):
                 with patch("crypto_research_agents.cli.claude_cli_available", return_value=True):
-                    with patch("builtins.input", side_effect=["4", "", ""]):
+                    with patch("builtins.input", side_effect=["3"]):
                         with redirect_stdout(output):
                             configure_model_panel()
                 self.assertEqual(os.environ["LLM_PROVIDER"], "claude_cli")
@@ -3537,7 +3541,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
 
         text = output.getvalue()
         self.assertIn("[Claude / Anthropic]", text)
-        self.assertIn("Supported models are fixed to the Claude model list.", text)
+        self.assertIn("[Claude attached]", text)
 
     def test_model_setup_grok_choice_saves_provider_without_raw_token(self) -> None:
         output = StringIO()
@@ -3548,7 +3552,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
                 {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path, "GROK_OAUTH_TOKEN": "session-secret"},
                 clear=True,
             ):
-                with patch("builtins.input", side_effect=["3", "", ""]):
+                with patch("builtins.input", side_effect=["2"]):
                     with redirect_stdout(output):
                         configure_model_panel()
                 self.assertEqual(os.environ["LLM_PROVIDER"], "xai_oauth")
@@ -3560,7 +3564,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
 
         text = output.getvalue()
         self.assertIn("[Grok / xAI]", text)
-        self.assertIn("Supported models are fixed to the Grok/xAI model list.", text)
+        self.assertIn("[Grok attached]", text)
 
     def test_model_setup_grok_oauth_choice_uses_hermes_session_without_raw_token(self) -> None:
         output = StringIO()
@@ -3571,7 +3575,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
                 {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path, "GROK_OAUTH_TOKEN": "session-secret"},
                 clear=True,
             ):
-                with patch("builtins.input", side_effect=["3", "2", ""]):
+                with patch("builtins.input", side_effect=["2"]):
                     with redirect_stdout(output):
                         configure_model_panel()
                 self.assertEqual(os.environ["LLM_PROVIDER"], "xai_oauth")
@@ -3580,7 +3584,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
                 self.assertNotIn("GROK_OAUTH_TOKEN", settings)
 
         text = output.getvalue()
-        self.assertIn("Hermes xAI OAuth", text)
+        self.assertIn("[Grok attached]", text)
         self.assertIn("Provider: xai_oauth", text)
 
     def test_chat_input_promotes_first_url_without_fetching_mixed_instruction(self) -> None:
@@ -3608,6 +3612,29 @@ Usage: codex exec [OPTIONS] [PROMPT]
             with patch("crypto_research_agents.cli.codex_login_status", return_value="Codex CLI not found"):
                 self.assertFalse(configured_model_provider_ready())
 
+    def test_offline_fallback_is_not_startup_ready(self) -> None:
+        with patch.dict("os.environ", {"LLM_PROVIDER": "offline"}, clear=True):
+            self.assertFalse(configured_model_provider_ready())
+
+    def test_startup_model_setup_exits_after_successful_attach(self) -> None:
+        calls = 0
+
+        def attach_codex(*, clear_before: bool = True) -> None:
+            nonlocal calls
+            calls += 1
+            os.environ["LLM_PROVIDER"] = "codex_cli"
+            os.environ["JIMMORIA_MODEL_FAMILIES"] = "codex"
+            os.environ["JIMMORIA_CODEX_PROVIDER"] = "codex_cli"
+            os.environ["JIMMORIA_CODEX_AUTH_PROVIDER"] = "oauth"
+
+        with patch.dict("os.environ", {}, clear=True):
+            with patch("crypto_research_agents.cli.auto_configure_codex_provider_if_logged_in"):
+                with patch("crypto_research_agents.cli.codex_login_status", return_value="Codex logged in"):
+                    with patch("crypto_research_agents.cli.configure_model_panel", side_effect=attach_codex):
+                        ensure_interactive_model_ready(clear_before=False)
+
+        self.assertEqual(calls, 1)
+
     def test_codex_setup_can_use_default_model_routes_without_model_names(self) -> None:
         output = StringIO()
         with TemporaryDirectory() as tmp:
@@ -3619,7 +3646,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
             with patch.dict("os.environ", env, clear=True):
                 with patch("crypto_research_agents.cli.codex_login_status", return_value="Logged in using ChatGPT"):
                     with patch("crypto_research_agents.cli.codex_sdk_available", return_value=True):
-                        with patch("builtins.input", side_effect=["2", "1", "", ""]):
+                        with patch("builtins.input", side_effect=["1"]):
                             with redirect_stdout(output):
                                 configure_model_panel()
                 self.assertEqual(os.environ["LLM_PROVIDER"], "codex_sdk")
@@ -3629,8 +3656,10 @@ Usage: codex exec [OPTIONS] [PROMPT]
                 self.assertNotIn("CODEX_MODEL_FAST", settings)
 
         text = output.getvalue()
-        self.assertIn("Supported models are fixed to the Codex model list.", text)
-        self.assertIn("Using provider default for every agent.", text)
+        self.assertIn("[Codex]", text)
+        self.assertIn("[Codex attached]", text)
+        self.assertNotIn("Use existing Codex OAuth/local login", text)
+        self.assertIn("Model routes: provider defaults", text)
 
     def test_chat_skips_startup_model_setup_when_provider_is_saved(self) -> None:
         output = StringIO()
