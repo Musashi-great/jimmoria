@@ -1,0 +1,117 @@
+workflow:
+  id: early_radar_v2
+  description: Read-only early public signal workflow that routes monitor hits through identity, diligence, thesis card creation, radar board writing, and outcome scheduling.
+  metadata:
+    domain: crypto_research
+    output: radar_board_and_thesis_cards
+    mode: radar
+    safety:
+      - read_only_public_sources
+      - no_trading
+      - no_wallet_actions
+      - source_backed_output_only
+  nodes:
+    - id: Monitor
+      type: agent
+      agent_ref: monitor_24h_agent
+      context_window: 0
+
+    - id: Signal Triage
+      type: agent
+      agent_ref: signal_triage_agent
+      context_window: 10
+
+    - id: Memory Retrieval
+      type: agent
+      agent_ref: memory_retrieval_agent
+      context_window: 20
+
+    - id: Identity Gate
+      type: agent
+      agent_ref: contract_onchain_agent
+      context_window: 20
+
+    - id: Candidate Diligence
+      type: subgraph
+      workflow_ref: candidate_diligence_v1
+
+    - id: Thesis Card Writer
+      type: agent
+      agent_ref: thesis_engine_agent
+      context_window: 30
+
+    - id: Stance Board Writer
+      type: agent
+      agent_ref: report_agent
+      context_window: 30
+
+    - id: Outcome Scheduler
+      type: agent
+      agent_ref: outcome_labeler_agent
+      context_window: 20
+
+    - id: Evidence QA Loop
+      type: loop_counter
+      config:
+        max_iterations: 2
+        reset_on_emit: true
+
+  edges:
+    - from: Monitor
+      to: Signal Triage
+      trigger: true
+      condition: true
+      carry_data: true
+
+    - from: Signal Triage
+      to: Memory Retrieval
+      trigger: true
+      condition:
+        type: suggested_action_in
+        values: ["watchlist", "research_room", "identity_conflict"]
+      carry_data: true
+
+    - from: Memory Retrieval
+      to: Identity Gate
+      trigger: true
+      condition: true
+      carry_data: true
+
+    - from: Identity Gate
+      to: Candidate Diligence
+      trigger: true
+      condition:
+        type: identity_not_excluded
+      dynamic:
+        type: map
+        input_key: candidates
+        max_parallel: 5
+      carry_data: true
+
+    - from: Candidate Diligence
+      to: Thesis Card Writer
+      trigger: true
+      condition:
+        type: has_findings
+      carry_data: true
+
+    - from: Thesis Card Writer
+      to: Stance Board Writer
+      trigger: true
+      condition:
+        type: thesis_card_ready
+      carry_data: true
+
+    - from: Stance Board Writer
+      to: Outcome Scheduler
+      trigger: true
+      condition:
+        type: board_row_has_next_check
+      carry_data: true
+
+    - from: Stance Board Writer
+      to: Evidence QA Loop
+      trigger: true
+      condition:
+        type: missing_source_backing
+      carry_data: true

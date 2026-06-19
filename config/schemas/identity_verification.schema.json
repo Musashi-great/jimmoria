@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jimmoria.local/schemas/identity_verification.schema.json",
+  "title": "JIMMORIA Identity Verification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "project",
+    "identity_status",
+    "official_website",
+    "official_x",
+    "ticker",
+    "chain",
+    "contract_address",
+    "conflicts",
+    "source_ids"
+  ],
+  "properties": {
+    "project": {"type": "string"},
+    "identity_status": {"type": "string", "enum": ["confirmed", "partial", "conflict", "unknown"]},
+    "official_website": {"type": ["string", "null"]},
+    "official_x": {"type": ["string", "null"]},
+    "docs": {"type": ["string", "null"]},
+    "github": {"type": ["string", "null"]},
+    "ticker": {"type": ["string", "null"]},
+    "chain": {"type": ["string", "null"]},
+    "contract_address": {"type": ["string", "null"]},
+    "dex_pair": {"type": ["string", "null"]},
+    "metadata_refs": {
+      "type": "object",
+      "additionalProperties": {"type": "string"}
+    },
+    "conflicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "description"],
+        "properties": {
+          "type": {"type": "string", "enum": ["ticker_collision", "fake_ca", "unofficial_link", "impersonation", "missing_official_source", "chain_conflict", "metadata_conflict"]},
+          "description": {"type": "string"},
+          "source_ids": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "source_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+  }
+}

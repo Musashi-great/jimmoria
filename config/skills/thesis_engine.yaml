@@ -1,0 +1,34 @@
+{
+  "skill_id": "thesis_engine",
+  "description": "Create source-backed thesis cards from verified candidate findings, related memory, and counter-thesis reasoning.",
+  "owner_agents": ["thesis_engine_agent"],
+  "steps": [
+    "read_candidate_findings_and_identity_status",
+    "load_related_thesis_memory",
+    "separate_narrative_tag_from_actual_thesis",
+    "write_what_must_be_true_conditions",
+    "write_counter_thesis_and_invalidation_paths",
+    "assign_research_stance_label",
+    "schedule_next_check_date",
+    "write_thesis_card"
+  ],
+  "quality_gates": [
+    "source_ids_required",
+    "identity_status_required",
+    "no_buy_sell_language",
+    "counter_thesis_required",
+    "next_check_date_required"
+  ],
+  "required_output": [
+    "thesis_id",
+    "project",
+    "primary_narrative",
+    "identity_status",
+    "token_status",
+    "evidence_strength",
+    "stance",
+    "what_must_be_true",
+    "counter_thesis",
+    "source_ids"
+  ]
+}

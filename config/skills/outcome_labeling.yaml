@@ -1,0 +1,30 @@
+{
+  "skill_id": "outcome_labeling",
+  "description": "Review due thesis cards and append evidence-backed outcome labels without price-only judgment.",
+  "owner_agents": ["outcome_labeler_agent"],
+  "steps": [
+    "load_due_thesis_cards",
+    "collect_current_public_evidence",
+    "compare_identity_product_social_funding_token_github_changes",
+    "classify_outcome_labels",
+    "write_evidence_delta",
+    "schedule_next_review_if_unresolved",
+    "append_outcome_label_record"
+  ],
+  "quality_gates": [
+    "review_window_required",
+    "source_ids_required",
+    "price_not_sole_basis",
+    "no_original_thesis_overwrite",
+    "next_step_required"
+  ],
+  "required_output": [
+    "thesis_id",
+    "review_date",
+    "review_window_days",
+    "labels",
+    "evidence_delta",
+    "next_check_date",
+    "source_ids"
+  ]
+}

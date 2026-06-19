@@ -1,9 +1,10 @@
 # JIMMORIA Local Current State
 
-Updated: 2026-06-05
+Updated: 2026-06-20
 
 This note is the local operator handoff after merging
-`origin/codex/review-and-suggest-code-improvements` into `main`.
+`origin/codex/review-and-suggest-code-improvements` into `main` and adding
+the read-only early-signal research desk direction.
 
 ## What Changed
 
@@ -22,18 +23,22 @@ This note is the local operator handoff after merging
 
 Current local repo inventory:
 
-- 14 agent config files in `config/agents/`
-- 16 local skill config files in `config/skills/`
-- 95 registered skill workflows in `config/skills/skill_registry.yaml`
+- 16 agent config files in `config/agents/`
+- 18 local skill config files in `config/skills/`, plus `skill_registry.yaml`
+- 95 generated skill workflows in `config/skills/skill_registry.yaml`
+- 112 loaded skill specs through `SkillSpecRegistry`
 - 70 registered tools in `config/tools/tool_registry.yaml`
 - 22 tools in the minimum viable live stack
 - 10 toolsets in `config/toolsets.yaml`
-- 3 workflow manifests in `config/workflows/`
+- 4 workflow manifests in `config/workflows/`
+- 4 JSON schema drafts in `config/schemas/`
 
 Primary local references:
 
 - `README.md`: quick start, model setup, agent list, and operator commands
 - `docs/jimmoria-project-structure.md`: architecture, routing, storage, and roadmap
+- `docs/jimmoria-product-direction.md`: read-only research desk direction, product modes, Radar Board, thesis memory, and safety contract
+- `docs/samples/radar_board_sample.md`: sample `early_radar_v2` board output
 - `docs/jimmoria-cli-ui-reference-notes.md`: runtime dock and CLI UX notes
 - `config/models/model_router.yaml`: provider order, model defaults, routing, effort mapping
 - `config/tools/tool_registry.yaml`: tool categories, tool metadata, safety status
@@ -154,6 +159,7 @@ external connectors in agent runtime policy.
 
 Current workflow manifests:
 
+- `early_radar_v2`: read-only public signal workflow for Radar Board and thesis card creation
 - `project_diligence_v1`: deeper diligence for one project, URL, or contract address
 - `candidate_diligence_v1`: candidate-level diligence for one Web3 project
 - `early_radar_v1`: broad candidate discovery and evidence-first triage

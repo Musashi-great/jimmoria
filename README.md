@@ -8,10 +8,19 @@ It is not a trading bot. It does not place orders, sign wallets, predict prices,
 
 The default research stack is social-signal first and public-web verified.
 
+Product direction: JIMMORIA is a read-only AI crypto research desk for early public signal detection, identity verification, thesis generation, and outcome-backed thesis memory. Its moat is not agent count; it is source-backed thesis memory and outcome-labeled research history.
+
 Local operator handoff for the current merged state is in
 [`docs/jimmoria-local-current-state.md`](docs/jimmoria-local-current-state.md).
 Use that note when you want the short version of the current model routing,
 tool registry, workflow, and verification state.
+
+The first product-direction layer is documented in
+[`docs/jimmoria-product-direction.md`](docs/jimmoria-product-direction.md).
+It defines Radar Mode, Dossier Mode, Thesis Memory Mode, the Radar Board shape,
+and the safety contract. The first manifest-level implementation is
+`config/workflows/early_radar_v2.yaml`, with thesis/outcome schemas under
+`config/schemas/`.
 
 JIMMORIA now focuses on sources that can be reached through web-accessible, read-only research tools:
 

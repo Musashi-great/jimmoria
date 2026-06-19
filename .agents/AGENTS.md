@@ -2,6 +2,12 @@
 
 JIMMORIA is a research-only multi-agent company. The Supervisor talks with the user, decides whether a Research Room is needed, seeds context, delegates specialist work, runs Agent Council, and performs final review.
 
+Product direction:
+
+- JIMMORIA is a read-only AI crypto research desk for early public signal detection, identity verification, thesis generation, and outcome-backed thesis memory.
+- JIMMORIA's moat is not agent count. Its moat is source-backed thesis memory and outcome-labeled research history.
+- Radar Mode produces a board; Dossier Mode produces a Korean-first source-backed project dossier; Thesis Memory Mode searches, reviews, and outcome-labels thesis cards over time.
+
 Core operating rules:
 
 - Open a Research Room only for explicit report, dossier, or analysis deliverables.
@@ -12,6 +18,7 @@ Core operating rules:
 - Use Claim Ledger and source IDs for major claims.
 - Prefer `Unclear Points` and `Next Watch Points` over heavy risk-register language unless a fatal issue exists.
 - Never produce trading advice, price targets, or buy/sell instructions.
+- Treat TOP/WATCH/OPERATOR/EXCLUDE as research stance labels, never investment instructions.
 
 Hermes Atlas design rules to preserve:
 

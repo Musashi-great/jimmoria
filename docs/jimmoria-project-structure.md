@@ -62,6 +62,8 @@ jimmoria/
     tools/
     processes/
     models/
+    workflows/
+    schemas/
     concurrency.yaml
     toolsets.yaml
     profiles.yaml
@@ -69,6 +71,8 @@ jimmoria/
 
   docs/
     jimmoria-project-structure.md
+    jimmoria-product-direction.md
+    samples/
 
   research_playbooks/
   templates/
@@ -368,6 +372,43 @@ The first profile is:
 ```text
 config/project_profiles/3jane.yaml
 ```
+
+## 6.2 Read-Only Research Desk Direction
+
+Product direction is now captured in `docs/jimmoria-product-direction.md`.
+
+Core positioning:
+
+```text
+JIMMORIA is a read-only AI crypto research desk for early public signal detection,
+identity verification, thesis generation, and outcome-backed thesis memory.
+```
+
+The product modes are:
+
+- Radar Mode: public signal detection and Radar Board routing.
+- Dossier Mode: Korean-first source-backed project dossiers.
+- Thesis Memory Mode: thesis card search, review, and outcome labeling.
+
+The first config-only implementation layer is:
+
+```text
+config/workflows/early_radar_v2.yaml
+config/agents/thesis_engine_agent.yaml
+config/agents/outcome_labeler_agent.yaml
+config/skills/thesis_engine.yaml
+config/skills/outcome_labeling.yaml
+config/schemas/thesis_card.schema.json
+config/schemas/signal.schema.json
+config/schemas/identity_verification.schema.json
+config/schemas/outcome_label.schema.json
+docs/samples/radar_board_sample.md
+```
+
+`early_radar_v2` intentionally reuses existing Monitor, Signal Triage, Memory Retrieval,
+Identity Gate, Candidate Diligence, and Report agents, then adds Thesis Card Writer and
+Outcome Scheduler stages. This keeps the current runtime path stable while defining the
+next product surface.
 
 A profile can contain:
 

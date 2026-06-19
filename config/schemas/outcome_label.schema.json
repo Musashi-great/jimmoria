@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jimmoria.local/schemas/outcome_label.schema.json",
+  "title": "JIMMORIA Outcome Label",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "thesis_id",
+    "review_date",
+    "review_window_days",
+    "labels",
+    "evidence_delta",
+    "next_check_date",
+    "source_ids"
+  ],
+  "properties": {
+    "thesis_id": {"type": "string", "minLength": 1},
+    "review_date": {"type": "string", "format": "date"},
+    "review_window_days": {"type": "integer", "enum": [7, 30, 90]},
+    "labels": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "identity_confirmed_later",
+          "ticker_collision_resolved",
+          "fake_or_impersonation_detected",
+          "docs_updated",
+          "github_activity_increased",
+          "github_activity_declined",
+          "testnet_launched",
+          "app_live",
+          "kol_mentions_broadened",
+          "coordinated_shill_suspected",
+          "funding_confirmed",
+          "tge_announced",
+          "token_live",
+          "liquidity_appeared",
+          "liquidity_vanished",
+          "thesis_strengthened",
+          "thesis_weakened",
+          "thesis_invalidated",
+          "thesis_unresolved",
+          "no_change_observed"
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "evidence_delta": {"type": "string"},
+    "next_check_date": {"type": ["string", "null"], "format": "date"},
+    "source_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+  }
+}

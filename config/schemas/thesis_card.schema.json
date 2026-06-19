@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jimmoria.local/schemas/thesis_card.schema.json",
+  "title": "JIMMORIA Thesis Card",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "thesis_id",
+    "project",
+    "signal_date",
+    "source_layer",
+    "primary_narrative",
+    "identity_status",
+    "token_status",
+    "evidence_strength",
+    "stance",
+    "what_must_be_true",
+    "counter_thesis",
+    "similar_past_theses",
+    "next_check_date",
+    "outcome_labels",
+    "source_ids"
+  ],
+  "properties": {
+    "thesis_id": {"type": "string", "minLength": 1},
+    "project": {"type": "string", "minLength": 1},
+    "signal_date": {"type": "string", "format": "date"},
+    "source_layer": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["X", "rss", "web", "docs", "github", "dex", "rootdata", "coingecko", "defillama", "explorer", "rpc", "manual_public_source"]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "primary_narrative": {"type": "string"},
+    "claimed_catalyst": {"type": "string"},
+    "identity_status": {"type": "string", "enum": ["confirmed", "partial", "conflict", "unknown"]},
+    "token_status": {"type": "string", "enum": ["no_token", "token_live", "rumored", "unknown"]},
+    "evidence_strength": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+    "stance": {"type": "string", "enum": ["TOP", "WATCH", "OPERATOR", "EXCLUDE"]},
+    "what_must_be_true": {"type": "array", "items": {"type": "string"}},
+    "counter_thesis": {"type": "array", "items": {"type": "string"}},
+    "similar_past_theses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["thesis_id", "project", "similarity_reason"],
+        "properties": {
+          "thesis_id": {"type": "string"},
+          "project": {"type": "string"},
+          "similarity_reason": {"type": "string"},
+          "outcome_summary": {"type": "string"}
+        }
+      }
+    },
+    "next_check_date": {"type": "string", "format": "date"},
+    "outcome_labels": {"type": "array", "items": {"type": "string"}},
+    "source_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+  }
+}

@@ -2682,6 +2682,27 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("signal_dedup_skill", triage.skills.secondary)
         self.assertIn("route_to_archive_watchlist_or_supervisor", triage.hooks["after_run"])
 
+        thesis = registry.get("thesis_engine_agent")
+        self.assertIsNotNone(thesis)
+        assert thesis is not None
+        self.assertIn("thesis_engine", thesis.skills)
+        self.assertIn("related_memory_search_skill", thesis.skills.secondary)
+        self.assertEqual(thesis.output_schema.type if thesis.output_schema else "", "thesis_card")
+        self.assertIn("counter_thesis", thesis.output_schema.required if thesis.output_schema else [])
+        self.assertIn("vector_search", thesis.tools.allow)
+        self.assertIn("wallet_sign", thesis.tools.deny)
+        self.assertTrue(any("research routing label" in item for item in thesis.must_follow))
+
+        outcome = registry.get("outcome_labeler_agent")
+        self.assertIsNotNone(outcome)
+        assert outcome is not None
+        self.assertIn("outcome_labeling", outcome.skills)
+        self.assertIn("prior_report_lookup_skill", outcome.skills.secondary)
+        self.assertEqual(outcome.output_schema.type if outcome.output_schema else "", "outcome_label")
+        self.assertIn("next_check_date", outcome.output_schema.required if outcome.output_schema else [])
+        self.assertIn("cronjob", outcome.tools.allow)
+        self.assertIn("contract_write", outcome.tools.deny)
+
     def test_llm_analysis_normalizes_risks_to_unclear_points(self) -> None:
         normalized = normalize_llm_analysis(
             {
@@ -2860,15 +2881,49 @@ class SmokeTest(unittest.TestCase):
     def test_workflow_yaml_loads(self) -> None:
         registry = WorkflowSpecRegistry.load_dir("config/workflows")
         early = registry.get("early_radar_v1")
+        radar = registry.get("early_radar_v2")
         candidate = registry.get("candidate_diligence_v1")
         project = registry.get("project_diligence_v1")
 
         self.assertIsNotNone(early)
+        self.assertIsNotNone(radar)
         self.assertIsNotNone(candidate)
         self.assertIsNotNone(project)
         assert early is not None
+        assert radar is not None
         self.assertEqual(early.workflow_id, "early_radar_v1")
         self.assertTrue(any(edge.dynamic.get("type") == "map" for edge in early.edges))
+        self.assertEqual(radar.workflow_id, "early_radar_v2")
+        self.assertIn("read_only_public_sources", radar.metadata["safety"])
+        self.assertIn("Thesis Card Writer", radar.node_ids)
+        self.assertIn("Outcome Scheduler", radar.node_ids)
+        self.assertTrue(any(edge.to_node == "Candidate Diligence" and edge.dynamic.get("type") == "map" for edge in radar.edges))
+
+    def test_read_only_radar_schema_files_load(self) -> None:
+        schema_root = Path("config/schemas")
+        schemas = {
+            path.name: json.loads(path.read_text(encoding="utf-8"))
+            for path in schema_root.glob("*.schema.json")
+        }
+
+        self.assertTrue(
+            {
+                "identity_verification.schema.json",
+                "outcome_label.schema.json",
+                "signal.schema.json",
+                "thesis_card.schema.json",
+            }.issubset(schemas)
+        )
+        thesis = schemas["thesis_card.schema.json"]
+        signal = schemas["signal.schema.json"]
+        outcome = schemas["outcome_label.schema.json"]
+        identity = schemas["identity_verification.schema.json"]
+        self.assertIn("TOP", thesis["properties"]["stance"]["enum"])
+        self.assertIn("OPERATOR", thesis["properties"]["stance"]["enum"])
+        self.assertIn("research_room", signal["properties"]["suggested_action"]["enum"])
+        self.assertIn("identity_confirmed_later", outcome["properties"]["labels"]["items"]["enum"])
+        self.assertIn("next_check_date", outcome["required"])
+        self.assertIn("identity_status", identity["required"])
 
     def test_workflow_graph_validates_edges(self) -> None:
         workflow = load_workflow_spec("early_radar_v1")
