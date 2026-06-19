@@ -2544,43 +2544,8 @@ def print_current_model_config() -> None:
     narrative_decision = gateway.select(agent_id="narrative_agent", task_type="narrative_reasoning")
     social_decision = gateway.select(agent_id="social_kol_agent", task_type="social_summary")
     writing_decision = gateway.select(agent_id="report_agent", task_type="final_synthesis")
-    if provider == "codex_sdk":
-        token_source = "Codex SDK app-server" + (" available" if codex_sdk_available() else " package not installed")
-    elif provider == "codex_cli":
-        token_source = codex_login_status()
-    elif provider == "codex_api":
-        token_source = codex_api_status()
-    elif provider in {"grok", "xai", "grok_oauth", "xai_oauth"}:
-        token_source = grok_auth_status()
-    elif provider in {"claude", "anthropic", "claude_api", "anthropic_api", "claude_cli", "claude_oauth"}:
-        token_source = claude_multi_auth_status()
-    elif provider in {"codex_grok", "grok_codex", "codex+grok", "grok+codex", "hybrid", "dual", "multi"}:
-        token_source = (
-            "Codex: "
-            + codex_multi_auth_status()
-            + " | Grok: "
-            + grok_auth_status()
-            + " | Claude: "
-            + claude_multi_auth_status()
-        )
-    else:
-        token_source = "offline diagnostic fallback"
-    supported_models = (
-        ", ".join(SUPPORTED_GROK_MODEL_IDS)
-        if provider in {"grok", "xai", "grok_oauth", "xai_oauth"}
-        else ", ".join(SUPPORTED_CLAUDE_MODEL_IDS)
-        if provider in {"claude", "anthropic", "claude_api", "anthropic_api", "claude_cli", "claude_oauth"}
-        else (
-            "Codex: "
-            + ", ".join(SUPPORTED_CODEX_MODEL_IDS)
-            + " | Grok: "
-            + ", ".join(SUPPORTED_GROK_MODEL_IDS)
-            + " | Claude: "
-            + ", ".join(SUPPORTED_CLAUDE_MODEL_IDS)
-        )
-        if provider in {"codex_grok", "grok_codex", "codex+grok", "grok+codex", "hybrid", "dual", "multi"}
-        else ", ".join(SUPPORTED_CODEX_MODEL_IDS)
-    )
+    token_source = model_credential_summary(provider)
+    supported_models = supported_models_summary(provider)
 
     print_screen(
         "Model Config",
@@ -2597,6 +2562,84 @@ def print_current_model_config() -> None:
             f"Supported models: {supported_models}",
         ]
     )
+
+
+def model_credential_summary(provider: str) -> str:
+    families = attached_model_families()
+    normalized_provider = provider.strip().lower().replace("-", "_")
+    if normalized_provider in {"codex_grok", "grok_codex", "codex+grok", "grok+codex", "hybrid", "dual", "multi"}:
+        families = families or ["codex", "grok"]
+    elif normalized_provider in {"codex_sdk", "codex_cli", "codex_api", "codex"}:
+        families = ["codex"]
+    elif normalized_provider in {"grok", "xai", "grok_oauth", "xai_oauth"}:
+        families = ["grok"]
+    elif normalized_provider in {"claude", "anthropic", "claude_api", "anthropic_api", "claude_cli", "claude_oauth"}:
+        families = ["claude"]
+    else:
+        return "offline diagnostic fallback"
+
+    parts = []
+    for family in families:
+        if family == "codex":
+            parts.append("Codex: " + codex_attached_auth_status())
+        elif family == "grok":
+            parts.append("Grok: " + grok_attached_auth_status())
+        elif family == "claude":
+            parts.append("Claude: " + claude_attached_auth_status())
+    return " | ".join(parts) if parts else "offline diagnostic fallback"
+
+
+def codex_attached_auth_status() -> str:
+    provider = (os.getenv("JIMMORIA_CODEX_PROVIDER") or os.getenv("CODEX_PROVIDER") or preferred_codex_provider()).strip().lower()
+    if provider == "codex_api":
+        return codex_api_status()
+    if provider == "codex_sdk":
+        sdk_status = "SDK available" if codex_sdk_available() else "SDK package missing"
+        return f"{sdk_status} / {codex_login_status()}"
+    if provider == "codex_cli":
+        return codex_login_status()
+    if codex_oauth_provider_ready():
+        return codex_oauth_status()
+    return codex_api_status() if codex_api_key_configured() else codex_login_status()
+
+
+def grok_attached_auth_status() -> str:
+    auth = preferred_grok_auth_provider()
+    if auth == "api_key":
+        return grok_auth_status()
+    return grok_oauth_status()
+
+
+def claude_attached_auth_status() -> str:
+    provider = preferred_claude_provider()
+    if provider == "claude_cli":
+        return claude_cli_status()
+    return claude_api_status()
+
+
+def supported_models_summary(provider: str) -> str:
+    families = attached_model_families()
+    normalized_provider = provider.strip().lower().replace("-", "_")
+    if normalized_provider in {"codex_grok", "grok_codex", "codex+grok", "grok+codex", "hybrid", "dual", "multi"}:
+        families = families or ["codex", "grok"]
+    elif normalized_provider in {"codex_sdk", "codex_cli", "codex_api", "codex"}:
+        families = ["codex"]
+    elif normalized_provider in {"grok", "xai", "grok_oauth", "xai_oauth"}:
+        families = ["grok"]
+    elif normalized_provider in {"claude", "anthropic", "claude_api", "anthropic_api", "claude_cli", "claude_oauth"}:
+        families = ["claude"]
+    else:
+        families = []
+
+    parts = []
+    for family in families:
+        if family == "codex":
+            parts.append("Codex: " + ", ".join(SUPPORTED_CODEX_MODEL_IDS))
+        elif family == "grok":
+            parts.append("Grok: " + ", ".join(SUPPORTED_GROK_MODEL_IDS))
+        elif family == "claude":
+            parts.append("Claude: " + ", ".join(SUPPORTED_CLAUDE_MODEL_IDS))
+    return " | ".join(parts) if parts else "offline diagnostic fallback"
 
 
 
@@ -2696,16 +2739,6 @@ def preferred_grok_auth_provider() -> str:
     if configured in {"xai_oauth", "grok_oauth", "api_key", "token_file", "token_command"}:
         return configured
     return "xai_oauth"
-
-
-def codex_multi_auth_status() -> str:
-    parts = []
-    sdk_status = "SDK available" if codex_sdk_available() else "SDK package missing"
-    parts.append(sdk_status)
-    parts.append(codex_login_status())
-    parts.append(codex_api_status())
-    return " / ".join(parts)
-
 
 
 def clear_model_provider_env() -> None:

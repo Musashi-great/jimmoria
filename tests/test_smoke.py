@@ -40,6 +40,7 @@ from crypto_research_agents.cli import (
     message_summary,
     previous_report_context,
     print_banner,
+    print_current_model_config,
 )
 from crypto_research_agents.console import JimmoriaConsole, display_width, print_jimmoria_logo
 from crypto_research_agents.core.company_settings import CompanySettings
@@ -3586,6 +3587,33 @@ Usage: codex exec [OPTIONS] [PROMPT]
         text = output.getvalue()
         self.assertIn("[Grok attached]", text)
         self.assertIn("Provider: xai_oauth", text)
+
+    def test_model_config_summary_only_shows_attached_family_credentials(self) -> None:
+        output = StringIO()
+        env = {
+            "LLM_PROVIDER": "multi",
+            "JIMMORIA_MODEL_FAMILIES": "codex,grok",
+            "JIMMORIA_CODEX_PROVIDER": "codex_sdk",
+            "JIMMORIA_CODEX_AUTH_PROVIDER": "oauth",
+            "JIMMORIA_GROK_AUTH_PROVIDER": "xai_oauth",
+        }
+        with patch.dict("os.environ", env, clear=True):
+            with patch("crypto_research_agents.cli.codex_sdk_available", return_value=True):
+                with patch("crypto_research_agents.cli.codex_login_status", return_value="Logged in using ChatGPT"):
+                    with patch(
+                        "crypto_research_agents.cli.grok_oauth_status",
+                        return_value="Grok/xAI OAuth token from Hermes credential_pool",
+                    ):
+                        with redirect_stdout(output):
+                            print_current_model_config()
+
+        text = output.getvalue()
+        self.assertIn("Credential: Codex: SDK available / Logged in using ChatGPT | Grok: Grok/xAI OAuth token", text)
+        self.assertIn("Supported models: Codex:", text)
+        self.assertIn("| Grok:", text)
+        self.assertNotIn("missing Codex/OpenAI API key", text)
+        self.assertNotIn("missing Claude API key", text)
+        self.assertNotIn("Claude:", text)
 
     def test_chat_input_promotes_first_url_without_fetching_mixed_instruction(self) -> None:
         with patch("crypto_research_agents.cli.fetch_url_text", side_effect=AssertionError("should not fetch mixed chat input")):
