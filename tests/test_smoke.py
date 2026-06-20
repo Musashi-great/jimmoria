@@ -59,6 +59,7 @@ from crypto_research_agents.core.quality_gate import review_report_quality
 from crypto_research_agents.core.room import ResearchRoom
 from crypto_research_agents.core.scheduler import CronRegistry
 from crypto_research_agents.core.skill_spec import SkillSpecRegistry
+from crypto_research_agents.core.thesis_memory import OutcomeLabel, ThesisCard, ThesisMemoryStore
 from crypto_research_agents.core.supervisor_brain import SupervisorBrain
 from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
 from crypto_research_agents.core.supervisor_intake import decide_supervisor_intake
@@ -2963,6 +2964,58 @@ class SmokeTest(unittest.TestCase):
         self.assertTrue(evaluate_edge_condition({"type": "no_kill_switch"}, {"kill_switch": False}))
         self.assertFalse(evaluate_edge_condition({"type": "has_kill_switch"}, {"kill_switch": False}))
 
+    def test_early_radar_v2_edge_conditions(self) -> None:
+        self.assertTrue(
+            evaluate_edge_condition(
+                {"type": "suggested_action_in", "values": ["research_room", "watchlist"]},
+                {"signal": {"suggested_action": "research_room"}},
+            )
+        )
+        self.assertTrue(evaluate_edge_condition({"type": "identity_not_excluded"}, {"identity_status": "partial"}))
+        self.assertFalse(evaluate_edge_condition({"type": "identity_not_excluded"}, {"identity_status": "red_flag"}))
+        self.assertTrue(evaluate_edge_condition({"type": "thesis_card_ready"}, {"thesis_card": {"thesis_id": "t1"}}))
+        self.assertTrue(
+            evaluate_edge_condition(
+                {"type": "board_row_has_next_check"},
+                {"thesis_card": {"next_check_date": "2026-06-27"}},
+            )
+        )
+        self.assertTrue(
+            evaluate_edge_condition(
+                {"type": "missing_source_backing"},
+                {"thesis_cards": [{"thesis_id": "t1", "source_ids": []}]},
+            )
+        )
+
+    def test_early_radar_v2_workflow_executor_uses_new_conditions(self) -> None:
+        workflow = load_workflow_spec("early_radar_v2")
+        result = WorkflowExecutor().execute(
+            workflow,
+            {
+                "run_id": "radar_test",
+                "signals": [{"suggested_action": "research_room"}],
+                "identity_status": "partial",
+                "candidates": [{"project": "Example Credit Network"}],
+                "findings": [{"summary": "docs and GitHub moved"}],
+                "thesis_card": {
+                    "thesis_id": "thesis_example",
+                    "next_check_date": "2026-06-27",
+                    "source_ids": ["src_docs_001"],
+                },
+            },
+        )
+
+        passed_edges = [
+            (item["from"], item["to"])
+            for item in result.trace
+            if item.get("type") == "edge" and item.get("condition_passed")
+        ]
+        self.assertIn(("Signal Triage", "Memory Retrieval"), passed_edges)
+        self.assertIn(("Identity Gate", "Candidate Diligence"), passed_edges)
+        self.assertIn(("Thesis Card Writer", "Stance Board Writer"), passed_edges)
+        self.assertIn(("Stance Board Writer", "Outcome Scheduler"), passed_edges)
+        self.assertEqual(result.candidate_results[0].status, "planned")
+
     def test_loop_counter_stops_after_max_iterations(self) -> None:
         counter = LoopCounter(counter_id="Citation QA Loop", max_iterations=2, reset_on_emit=True)
 
@@ -3033,6 +3086,112 @@ class SmokeTest(unittest.TestCase):
             self.assertEqual(payload["workflow_id"], "project_diligence_v1")
             self.assertTrue((Path(payload["artifact_dir"]) / "workflow_trace.json").exists())
             self.assertTrue((Path(payload["artifact_dir"]) / "report.json").exists())
+
+    def test_thesis_memory_store_search_due_and_outcomes(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = ThesisMemoryStore(root / "thesis_memory.json")
+            card = ThesisCard(
+                thesis_id="thesis_credit_2026_06_20",
+                project="Example Credit Network",
+                signal_date="2026-06-20",
+                source_layer=["docs", "github"],
+                primary_narrative="on-chain private credit",
+                identity_status="partial",
+                token_status="unknown",
+                evidence_strength=0.62,
+                stance="WATCH",
+                what_must_be_true=["Docs and GitHub must belong to the same entity."],
+                counter_thesis=["KOL discussion may not reflect product substance."],
+                next_check_date="2026-06-20",
+                source_ids=["src_docs_001"],
+            )
+
+            self.assertEqual(store.upsert_card(card), "created")
+            self.assertEqual(store.search("private credit")[0].thesis_id, card.thesis_id)
+            self.assertEqual(store.due_cards(today="2026-06-20")[0].thesis_id, card.thesis_id)
+            store.add_outcome(
+                OutcomeLabel(
+                    thesis_id=card.thesis_id,
+                    review_date="2026-06-20",
+                    review_window_days=7,
+                    labels=["thesis_strengthened"],
+                    evidence_delta="Docs stayed consistent and GitHub activity increased.",
+                    next_check_date="2026-06-27",
+                    source_ids=["src_docs_001", "src_github_014"],
+                )
+            )
+            store.save()
+            loaded = ThesisMemoryStore.load(root / "thesis_memory.json")
+
+        review = loaded.review("Example Credit Network")
+        self.assertIsNotNone(review)
+        assert review is not None
+        loaded_card, outcomes = review
+        self.assertEqual(loaded_card.next_check_date, "2026-06-27")
+        self.assertEqual(outcomes[0].labels, ["thesis_strengthened"])
+
+    def test_thesis_cli_add_search_review_and_due(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store_path = root / "thesis_memory.json"
+            card_path = root / "card.json"
+            outcome_path = root / "outcome.json"
+            card_path.write_text(
+                json.dumps(
+                    {
+                        "thesis_id": "thesis_credit_2026_06_20",
+                        "project": "Example Credit Network",
+                        "signal_date": "2026-06-20",
+                        "source_layer": ["docs", "github"],
+                        "primary_narrative": "on-chain private credit",
+                        "identity_status": "partial",
+                        "token_status": "unknown",
+                        "evidence_strength": 0.62,
+                        "stance": "WATCH",
+                        "what_must_be_true": ["Docs and GitHub must belong to the same entity."],
+                        "counter_thesis": ["KOL discussion may not reflect product substance."],
+                        "next_check_date": "2026-06-20",
+                        "outcome_labels": [],
+                        "source_ids": ["src_docs_001"],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            outcome_path.write_text(
+                json.dumps(
+                    {
+                        "thesis_id": "thesis_credit_2026_06_20",
+                        "review_date": "2026-06-20",
+                        "review_window_days": 7,
+                        "labels": ["thesis_strengthened"],
+                        "evidence_delta": "Docs stayed consistent.",
+                        "next_check_date": "2026-06-27",
+                        "source_ids": ["src_docs_001"],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            with redirect_stdout(StringIO()):
+                cli_main(["thesis", "add-card", "--store", str(store_path), "--file", str(card_path)])
+            due_output = StringIO()
+            with redirect_stdout(due_output):
+                cli_main(["thesis", "outcomes", "--due", "--today", "2026-06-20", "--store", str(store_path)])
+            with redirect_stdout(StringIO()):
+                cli_main(["thesis", "add-outcome", "--store", str(store_path), "--file", str(outcome_path)])
+            search_output = StringIO()
+            with redirect_stdout(search_output):
+                cli_main(["thesis", "search", "credit", "--store", str(store_path)])
+            review_output = StringIO()
+            with redirect_stdout(review_output):
+                cli_main(["thesis", "review", "Example Credit Network", "--store", str(store_path)])
+
+        self.assertIn("thesis_credit_2026_06_20", due_output.getvalue())
+        self.assertIn("Example Credit Network", search_output.getvalue())
+        self.assertIn("thesis_strengthened", review_output.getvalue())
 
     def test_quality_gate_rejects_missing_citation(self) -> None:
         result = review_report_quality("Project looks promising. Evidence URLs: 0")
@@ -3929,11 +4088,14 @@ Usage: codex exec [OPTIONS] [PROMPT]
             discovery_decision = gateway.select(agent_id="discovery_agent", task_type="candidate_discovery")
             narrative_decision = gateway.select(agent_id="narrative_agent", task_type="narrative_reasoning")
             social_decision = gateway.select(agent_id="social_kol_agent", task_type="social_summary")
+            triage_decision = gateway.select(agent_id="signal_triage_agent", task_type="signal_triage")
             supervisor_decision = gateway.select(agent_id="supervisor_agent", task_type="supervisor_chat")
             ingestion_decision = gateway.select(agent_id="ingestion_agent", task_type="source_ingestion")
             contract_decision = gateway.select(agent_id="contract_onchain_agent", task_type="contract_info")
             product_decision = gateway.select(agent_id="product_tech_agent", task_type="product_docs")
             funding_decision = gateway.select(agent_id="funding_token_agent", task_type="funding_token")
+            thesis_decision = gateway.select(agent_id="thesis_engine_agent", task_type="thesis_card")
+            outcome_decision = gateway.select(agent_id="outcome_labeler_agent", task_type="outcome_labeling")
             report_decision = gateway.select(agent_id="report_agent", task_type="final_synthesis")
             obsidian_decision = gateway.select(agent_id="obsidian_curator_agent", task_type="obsidian_sync")
             social = gateway.complete(
@@ -3953,11 +4115,14 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(discovery_decision.provider_family, "grok")
         self.assertEqual(narrative_decision.provider_family, "grok")
         self.assertEqual(social_decision.provider_family, "grok")
+        self.assertEqual(triage_decision.provider_family, "grok")
         self.assertEqual(supervisor_decision.provider_family, "codex")
         self.assertEqual(ingestion_decision.provider_family, "codex")
         self.assertEqual(contract_decision.provider_family, "codex")
         self.assertEqual(product_decision.provider_family, "codex")
         self.assertEqual(funding_decision.provider_family, "codex")
+        self.assertEqual(thesis_decision.provider_family, "codex")
+        self.assertEqual(outcome_decision.provider_family, "codex")
         self.assertEqual(discovery_decision.selected_model, "grok-4.3")
         self.assertEqual(report_decision.provider_family, "codex")
         self.assertEqual(obsidian_decision.provider_family, "codex")
@@ -3987,11 +4152,15 @@ Usage: codex exec [OPTIONS] [PROMPT]
             supervisor = gateway.select(agent_id="supervisor_agent", task_type="supervisor_chat")
             social = gateway.select(agent_id="social_kol_agent", task_type="social_summary")
             product = gateway.select(agent_id="product_tech_agent", task_type="product_docs")
+            thesis = gateway.select(agent_id="thesis_engine_agent", task_type="thesis_card")
+            outcome = gateway.select(agent_id="outcome_labeler_agent", task_type="outcome_labeling")
             report = gateway.select(agent_id="report_agent", task_type="final_synthesis")
 
         self.assertEqual(supervisor.provider_family, "codex")
         self.assertEqual(social.provider_family, "grok")
         self.assertEqual(product.provider_family, "claude")
+        self.assertEqual(thesis.provider_family, "codex")
+        self.assertEqual(outcome.provider_family, "codex")
         self.assertEqual(report.provider_family, "claude")
         self.assertEqual(report.selected_model, "claude-sonnet-4-5")
 
@@ -4137,6 +4306,8 @@ Usage: codex exec [OPTIONS] [PROMPT]
         reasoning = gateway.select(agent_id="discovery_agent", task_type="candidate_discovery")
         ingestion = gateway.select(agent_id="ingestion_agent", task_type="source_ingestion")
         obsidian = gateway.select(agent_id="obsidian_curator_agent", task_type="obsidian_sync")
+        thesis = gateway.select(agent_id="thesis_engine_agent", task_type="thesis_card")
+        outcome = gateway.select(agent_id="outcome_labeler_agent", task_type="outcome_labeling")
         writing = gateway.select(agent_id="report_agent", task_type="final_synthesis")
 
         fast = gateway.select(agent_id="supervisor_agent", task_type="supervisor_chat")
@@ -4145,6 +4316,8 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(ingestion.selected_model, "gpt-5.5")
         self.assertEqual(reasoning.selected_model, "gpt-5.5")
         self.assertEqual(obsidian.selected_model, "gpt-5.5")
+        self.assertEqual(thesis.selected_model, "gpt-5.5")
+        self.assertEqual(outcome.selected_model, "gpt-5.5")
         self.assertEqual(writing.selected_model, "gpt-5.5")
         self.assertEqual(fast.reasoning_effort, "standard")
         self.assertEqual(ingestion.reasoning_effort, "pro")
@@ -4224,10 +4397,14 @@ Usage: codex exec [OPTIONS] [PROMPT]
             "source_ingestion",
             "narrative_reasoning",
             "candidate_discovery",
+            "signal_triage",
             "social_summary",
             "contract_info",
+            "identity_verification",
             "product_docs",
             "funding_token",
+            "thesis_card",
+            "outcome_labeling",
             "obsidian_sync",
         ]:
             self.assertEqual(router["routes"][task_type], "reasoning_model")
@@ -4242,8 +4419,14 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(router["hybrid_provider_routes"]["agent_provider_families"]["narrative_agent"], "grok")
         self.assertEqual(router["hybrid_provider_routes"]["agent_provider_families"]["discovery_agent"], "grok")
         self.assertEqual(router["hybrid_provider_routes"]["agent_provider_families"]["social_kol_agent"], "grok")
+        self.assertEqual(router["hybrid_provider_routes"]["agent_provider_families"]["signal_triage_agent"], "grok")
+        self.assertEqual(router["hybrid_provider_routes"]["agent_provider_families"]["thesis_engine_agent"], "codex")
+        self.assertEqual(router["hybrid_provider_routes"]["agent_provider_families"]["outcome_labeler_agent"], "codex")
         self.assertEqual(router["hybrid_provider_routes"]["agent_provider_families"]["report_agent"], "codex")
+        self.assertIn("signal_triage", router["hybrid_provider_routes"]["grok_task_types"])
         self.assertIn("social_summary", router["hybrid_provider_routes"]["grok_task_types"])
+        self.assertIn("thesis_card", router["hybrid_provider_routes"]["codex_task_types"])
+        self.assertIn("outcome_labeling", router["hybrid_provider_routes"]["codex_task_types"])
         self.assertIn("report_writing", router["hybrid_provider_routes"]["codex_task_types"])
         self.assertEqual(router["reasoning_effort"]["codex_cli_pro_value"], "xhigh")
 

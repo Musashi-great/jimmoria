@@ -47,6 +47,8 @@ Useful command direction:
 - `jimmoria thesis search <query>`
 - `jimmoria thesis review <project>`
 - `jimmoria thesis outcomes --due`
+- `jimmoria thesis add-card --file thesis_card.json`
+- `jimmoria thesis add-outcome --file outcome_label.json`
 
 ## Core Data Products
 

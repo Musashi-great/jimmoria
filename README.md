@@ -447,6 +447,9 @@ jimmoria events <room_id> --after-seq 40
 jimmoria fork <room_id> --seq 40
                             Fork a saved room from an event checkpoint
 jimmoria report <room_id>   Print saved report
+jimmoria thesis search <query>
+jimmoria thesis review <project-or-thesis-id>
+jimmoria thesis outcomes --due
 ```
 
 Inside `jimmoria`:

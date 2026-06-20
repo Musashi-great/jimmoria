@@ -39,6 +39,7 @@ Primary local references:
 - `docs/jimmoria-project-structure.md`: architecture, routing, storage, and roadmap
 - `docs/jimmoria-product-direction.md`: read-only research desk direction, product modes, Radar Board, thesis memory, and safety contract
 - `docs/samples/radar_board_sample.md`: sample `early_radar_v2` board output
+- `data/thesis_memory.json`: local thesis card and outcome-label store used by `jimmoria thesis ...`
 - `docs/jimmoria-cli-ui-reference-notes.md`: runtime dock and CLI UX notes
 - `config/models/model_router.yaml`: provider order, model defaults, routing, effort mapping
 - `config/tools/tool_registry.yaml`: tool categories, tool metadata, safety status

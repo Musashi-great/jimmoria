@@ -59,6 +59,13 @@ from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
 from crypto_research_agents.core.playbook import ResearchPlaybookRegistry
 from crypto_research_agents.core.profile import WorkerProfileRegistry
 from crypto_research_agents.core.scheduler import CronRegistry, create_local_job
+from crypto_research_agents.core.thesis_memory import (
+    OutcomeLabel,
+    ThesisCard,
+    ThesisMemoryStore,
+    card_summary_line,
+    render_card_review,
+)
 from crypto_research_agents.core.workflow_executor import WorkflowExecutor
 from crypto_research_agents.core.workflow_loader import (
     WorkflowSpecRegistry,
@@ -321,6 +328,29 @@ def main(argv: list[str] | None = None) -> None:
     sessions_search_parser.add_argument("--runs-dir", default=default_project_path("data/runs"))
     sessions_search_parser.add_argument("--json", action="store_true")
 
+    thesis_parser = subparsers.add_parser("thesis", help="Search and review local thesis memory.")
+    thesis_subparsers = thesis_parser.add_subparsers(dest="thesis_command")
+    thesis_search_parser = thesis_subparsers.add_parser("search", help="Search thesis cards by project, narrative, source, or stance.")
+    thesis_search_parser.add_argument("query")
+    add_thesis_store_args(thesis_search_parser)
+    thesis_search_parser.add_argument("--limit", type=int, default=10)
+    thesis_search_parser.add_argument("--json", action="store_true")
+    thesis_review_parser = thesis_subparsers.add_parser("review", help="Show one thesis card and its outcome history.")
+    thesis_review_parser.add_argument("query")
+    add_thesis_store_args(thesis_review_parser)
+    thesis_review_parser.add_argument("--json", action="store_true")
+    thesis_outcomes_parser = thesis_subparsers.add_parser("outcomes", help="List outcome labels or due thesis reviews.")
+    add_thesis_store_args(thesis_outcomes_parser)
+    thesis_outcomes_parser.add_argument("--due", action="store_true", help="Show thesis cards whose next_check_date is due.")
+    thesis_outcomes_parser.add_argument("--today", help="Override today's date as YYYY-MM-DD.")
+    thesis_outcomes_parser.add_argument("--json", action="store_true")
+    thesis_add_card_parser = thesis_subparsers.add_parser("add-card", help="Import or update a thesis card JSON object.")
+    add_thesis_store_args(thesis_add_card_parser)
+    add_json_payload_args(thesis_add_card_parser)
+    thesis_add_outcome_parser = thesis_subparsers.add_parser("add-outcome", help="Append an outcome label JSON object.")
+    add_thesis_store_args(thesis_add_outcome_parser)
+    add_json_payload_args(thesis_add_outcome_parser)
+
     args = parser.parse_args(argv)
     if args.command is None:
         if sys.stdin.isatty():
@@ -359,6 +389,10 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.command == "sessions":
         sessions_command(args)
+        return
+
+    if args.command == "thesis":
+        thesis_command(args)
         return
 
     if args.command in {"runs", "rooms", "status", "messages", "events", "fork", "show-report", "report"}:
@@ -460,6 +494,16 @@ def add_run_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--vault", default=default_project_path("vault"), help="Obsidian-style vault output directory.")
     parser.add_argument("--reports", default=default_project_path("reports"), help="Report output directory.")
     parser.add_argument("--memory", default=default_project_path("data/memory.json"), help="Shared memory JSON path.")
+
+
+def add_thesis_store_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--store", default=default_project_path("data/thesis_memory.json"), help="Thesis memory JSON path.")
+
+
+def add_json_payload_args(parser: argparse.ArgumentParser) -> None:
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--file", help="JSON file to read.")
+    source.add_argument("--json", help="Inline JSON object.")
 
 
 def default_chat_args() -> argparse.Namespace:
@@ -750,6 +794,100 @@ def sessions_command(args: argparse.Namespace) -> None:
             print(f"{item.room_id} | {item.matched_file} | {item.snippet}")
         return
     raise SystemExit(f"Unknown sessions command: {args.sessions_command}")
+
+
+def thesis_command(args: argparse.Namespace) -> None:
+    if not args.thesis_command:
+        raise SystemExit("Provide a thesis command: search, review, outcomes, add-card, or add-outcome.")
+    store = ThesisMemoryStore.load(args.store)
+
+    if args.thesis_command == "search":
+        results = store.search(args.query, limit=args.limit)
+        if args.json:
+            print(json.dumps([card.to_dict() for card in results], ensure_ascii=False, indent=2))
+            return
+        if not results:
+            print("No thesis cards found.")
+            return
+        for card in results:
+            print(card_summary_line(card))
+        return
+
+    if args.thesis_command == "review":
+        review = store.review(args.query)
+        if review is None:
+            print("No thesis card found.")
+            return
+        card, outcomes = review
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "thesis_card": card.to_dict(),
+                        "outcome_labels": [outcome.to_dict() for outcome in outcomes],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            return
+        print(render_card_review(card, outcomes))
+        return
+
+    if args.thesis_command == "outcomes":
+        if args.due:
+            cards = store.due_cards(today=args.today)
+            if args.json:
+                print(json.dumps([card.to_dict() for card in cards], ensure_ascii=False, indent=2))
+                return
+            if not cards:
+                print("No thesis reviews due.")
+                return
+            for card in cards:
+                print(card_summary_line(card))
+            return
+        if args.json:
+            print(json.dumps([outcome.to_dict() for outcome in store.outcomes], ensure_ascii=False, indent=2))
+            return
+        if not store.outcomes:
+            print("No outcome labels found.")
+            return
+        for outcome in store.outcomes:
+            print(
+                f"{outcome.thesis_id} | {outcome.review_date} | "
+                f"{outcome.review_window_days}d | {', '.join(outcome.labels)}"
+            )
+        return
+
+    if args.thesis_command == "add-card":
+        card = ThesisCard.from_dict(read_json_payload(args))
+        status = store.upsert_card(card)
+        store.save()
+        print(f"{status}: {card.thesis_id} -> {store.path}")
+        return
+
+    if args.thesis_command == "add-outcome":
+        outcome = OutcomeLabel.from_dict(read_json_payload(args))
+        store.add_outcome(outcome)
+        store.save()
+        print(f"added: {outcome.thesis_id} -> {store.path}")
+        return
+
+    raise SystemExit(f"Unknown thesis command: {args.thesis_command}")
+
+
+def read_json_payload(args: argparse.Namespace) -> dict[str, object]:
+    if getattr(args, "file", None):
+        raw = Path(args.file).read_text(encoding="utf-8")
+    else:
+        raw = str(getattr(args, "json", "") or "")
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"JSON payload is invalid: {exc}") from exc
+    if not isinstance(data, dict):
+        raise SystemExit("JSON payload must be an object.")
+    return data
 
 
 def workflow_context_from_result(result: object) -> dict[str, object]:
