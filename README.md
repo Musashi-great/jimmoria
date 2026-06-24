@@ -1,6 +1,6 @@
 # JIMMORIA
 
-JIMMORIA is a multi-agent crypto research company that runs from a CLI and a local web dashboard.
+JIMMORIA is a Hermes-led personal crypto research agent that runs from a CLI and a local web dashboard.
 
 It is not a trading bot. It does not place orders, sign wallets, predict prices, or manage assets. The system is built for research: source collection, early project discovery, KOL/social context, docs/GitHub checks, on-chain identity checks, funding/token hints, report writing, and Obsidian-style knowledge storage.
 
@@ -8,7 +8,21 @@ It is not a trading bot. It does not place orders, sign wallets, predict prices,
 
 The default research stack is social-signal first and public-web verified.
 
-Product direction: JIMMORIA is a read-only AI crypto research desk for early public signal detection, identity verification, thesis generation, and outcome-backed thesis memory. Its moat is not agent count; it is source-backed thesis memory and outcome-labeled research history.
+Product direction: JIMMORIA is a read-only personal AI crypto research stack for early public signal detection, identity verification, thesis generation, and outcome-backed thesis memory. Its moat is not agent count; it is source-backed thesis memory and outcome-labeled research history.
+
+## Personal Agent Stack
+
+Hermes Agent is the single front door and central orchestrator. The user is the owner/operator, not a client of a company. Specialist agents are internal subroutines that Hermes uses only when the request needs deeper work.
+
+The intended full stack is:
+
+- Hermes Agent: agent harness, conversation, planning, delegation, and final review
+- Honcho: behavior analysis and long-term memory
+- Obsidian: knowledge vault and durable notes
+- QMD: local device text/vector search
+- Browser harness: CDP browser automation for human-like public web exploration
+- Tavily: search API for source discovery and query expansion
+- Codex: local project/code/file work and structured implementation
 
 Local operator handoff for the current merged state is in
 [`docs/jimmoria-local-current-state.md`](docs/jimmoria-local-current-state.md).
@@ -52,7 +66,7 @@ cd jimmoria
 bash scripts/install-wsl.sh
 ```
 
-After that, start the company from any new shell:
+After that, start the personal agent from any new shell:
 
 ```bash
 jimmoria
@@ -72,7 +86,7 @@ cd jimmoria
 python -m pip install -e ".[all]"
 ```
 
-Then start the company from the same venv/shell:
+Then start the personal agent from the same venv/shell:
 
 ```powershell
 jimmoria
@@ -169,7 +183,7 @@ $env:GROK_OAUTH_TOKEN_COMMAND = "op read op://vault/xai/token"
 
 The xAI API uses an OpenAI-compatible endpoint at `https://api.x.ai/v1`. The Codex API provider uses `https://api.openai.com/v1` by default. JIMMORIA does not save raw Codex/OpenAI/Grok/XAI tokens in the user model settings file; it only saves provider/model preferences, token file paths, or token commands. With `LLM_PROVIDER=xai_oauth`, OAuth sources are required. With `LLM_PROVIDER=grok`, API key/env sources remain available as a legacy fallback path.
 
-Important: `xai_oauth` is a Grok credential mode. For role-based company routing, use `/models` option 1 or set `LLM_PROVIDER=multi` with `JIMMORIA_MODEL_FAMILIES=codex,grok`. JIMMORIA will still use Hermes xAI OAuth for the Grok side.
+Important: `xai_oauth` is a Grok credential mode. For role-based personal-agent routing, use `/models` option 1 or set `LLM_PROVIDER=multi` with `JIMMORIA_MODEL_FAMILIES=codex,grok`. JIMMORIA will still use Hermes xAI OAuth for the Grok side.
 
 Multi-model mode:
 
@@ -207,16 +221,16 @@ Multi-model report synthesis: Codex writing model + pro reasoning
 
 For Codex CLI, JIMMORIA maps `pro` to the local Codex config value `model_reasoning_effort="xhigh"` when the installed `codex exec` supports `--config`.
 
-## How The Company Works
+## How The Personal Agent Works
 
-The user talks to Hermes Agent. Hermes Agent acts as the company boss, memory keeper, and orchestrator.
+The user talks to Hermes Agent. Hermes Agent acts as the personal-agent harness, memory keeper, and central orchestrator.
 
 Hermes Agent is the front-door state layer. It keeps a
 persistent conversation session in `data/supervisor_session.json`, durable
 operating preferences in `data/supervisor_memory.json`, and still opens
 Research Rooms only when the user asks for actual research, analysis, dossier,
 or report work. Normal conversation stays with Hermes Agent; executable work
-is planned and delegated to specialist agents.
+is planned and delegated to specialist subroutines.
 
 Before dispatch, Hermes Agent writes a Job Contract. Normal chat uses a
 single-agent loop: answer directly, update memory/settings if needed, and keep
@@ -252,11 +266,11 @@ User request
 -> CLI/web output, report file, and Obsidian notes are saved
 ```
 
-For ordinary conversation, configuration requests, source-only notes, or loose "research this" messages, Hermes Agent answers directly and keeps the room closed. Ask for a report or dossier when you want the full multi-agent room.
+For ordinary conversation, configuration requests, memory/search/source-only notes, or loose "research this" messages, Hermes Agent answers directly and keeps the room closed. Ask for a report or dossier when you want the full specialist room.
 
 Project-specific seed evidence is kept outside agent code in `config/project_profiles/`. These profiles can hold aliases, official site/X/docs, search seeds, address registry hints, funding context, and article notes. Agents can use them as starting evidence, but the report still labels what is confirmed, partial, or unverified.
 
-## Core Agents
+## Internal Subroutines
 
 ```text
 supervisor_agent          Hermes Agent compatibility id; plans, routes, confirms, and final-reviews work

@@ -1,0 +1,82 @@
+{
+  "stack_id": "jimmoria_personal_agent_stack",
+  "product_frame": "personal_agent_os",
+  "display_name": "JIMMORIA Personal Agent",
+  "orchestrator": {
+    "name": "Hermes Agent",
+    "internal_agent_id": "supervisor_agent",
+    "role": "single personal agent harness and central orchestrator"
+  },
+  "principles": [
+    "The user is the owner, not a client of a company.",
+    "Hermes Agent is the only front door: conversation, memory, planning, browsing, search, notes, and Codex work are routed through Hermes.",
+    "Use specialist agents as internal skills or subroutines, not as a visible company org chart.",
+    "Keep raw logs in artifacts; keep the visible UI focused on what Hermes and each tool layer are doing now.",
+    "Never trade, sign wallets, manage assets, or provide buy/sell instructions."
+  ],
+  "layers": [
+    {
+      "id": "hermes_harness",
+      "name": "Hermes Agent",
+      "kind": "agent_harness",
+      "status": "implemented",
+      "purpose": "Own the conversation, decide the next action, delegate subroutines, and approve final output.",
+      "tools": ["create_research_room", "create_task", "assign_task", "agent_handoff", "read_agent_status", "delegate_task"],
+      "required_env": []
+    },
+    {
+      "id": "honcho_memory",
+      "name": "Honcho",
+      "kind": "behavior_memory",
+      "status": "external_connector_required",
+      "purpose": "Long-term behavioral memory and user preference modeling.",
+      "tools": ["honcho_memory_search", "honcho_observation_write"],
+      "required_env": ["HONCHO_API_KEY"]
+    },
+    {
+      "id": "obsidian_vault",
+      "name": "Obsidian",
+      "kind": "knowledge_vault",
+      "status": "implemented",
+      "purpose": "Local knowledge vault for durable notes, dossiers, source notes, and thesis memory.",
+      "tools": ["write_note", "artifact_store", "source_cache_write"],
+      "required_env": []
+    },
+    {
+      "id": "qmd_search",
+      "name": "QMD",
+      "kind": "device_search",
+      "status": "external_connector_required",
+      "purpose": "Device search engine for local text and vector retrieval.",
+      "tools": ["qmd_text_search", "qmd_vector_search", "qmd_vector_upsert"],
+      "required_env": ["QMD_ENDPOINT"]
+    },
+    {
+      "id": "browser_harness",
+      "name": "Browser Harness",
+      "kind": "cdp_browser_automation",
+      "status": "external_connector_required",
+      "purpose": "CDP browser automation so Hermes can browse public web pages like a human operator.",
+      "tools": ["browser_cdp_navigate", "browser_cdp_snapshot", "browser_cdp_click"],
+      "required_env": ["BROWSER_CDP_ENDPOINT"]
+    },
+    {
+      "id": "tavily_search",
+      "name": "Tavily",
+      "kind": "search_api",
+      "status": "external_connector_required",
+      "purpose": "Search API for web discovery, citations, and query expansion.",
+      "tools": ["tavily_search"],
+      "required_env": ["TAVILY_API_KEY"]
+    },
+    {
+      "id": "codex_runtime",
+      "name": "Codex",
+      "kind": "coding_and_reasoning_runtime",
+      "status": "implemented",
+      "purpose": "Code editing, tests, model routing, and local implementation work.",
+      "tools": ["execute_code", "read_file", "search_files", "write_file"],
+      "required_env": []
+    }
+  ]
+}

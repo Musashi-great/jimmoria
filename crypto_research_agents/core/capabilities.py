@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .agent_spec import AgentSpecRegistry
+from .agent_stack import load_agent_stack
 from .concurrency import load_concurrency_policy
 from .llm_provider import codex_sdk_available, grok_auth_status, provider_from_env
 from .model_gateway import ModelGateway
@@ -42,6 +43,7 @@ def collect_capabilities(
     provider = provider_from_env()
     agent_spec_status = _agent_spec_status(agent_spec_dir)
     tool_registry = load_tool_registry()
+    agent_stack = load_agent_stack()
     concurrency_policy = load_concurrency_policy()
     cron_registry = CronRegistry.load()
     profile_registry = WorkerProfileRegistry.load()
@@ -94,6 +96,11 @@ def collect_capabilities(
             grok_auth_status(),
         ),
         CapabilityStatus(
+            "Personal agent stack",
+            "configured",
+            f"{agent_stack.display_name} ({agent_stack.product_frame}); orchestrator={agent_stack.orchestrator.name}",
+        ),
+        CapabilityStatus(
             "Tool registry",
             "configured" if tool_registry.definitions else "missing",
             f"{len(tool_registry.definitions)} tools, {len(tool_registry.toolsets)} toolsets",
@@ -118,6 +125,15 @@ def collect_capabilities(
         ),
         _writable_directory_status(Path(runs_dir), "Artifact directory"),
     ]
+    for layer in agent_stack.layers:
+        missing = f"; missing env: {', '.join(layer.missing_env)}" if layer.missing_env else ""
+        capabilities.append(
+            CapabilityStatus(
+                f"Stack layer: {layer.name}",
+                layer.runtime_status,
+                f"{layer.kind}: {layer.purpose}{missing}",
+            )
+        )
 
     tool_specs = [
         ("Hermes room opener", "create_research_room"),
@@ -125,6 +141,15 @@ def collect_capabilities(
         ("Hermes task assignment", "assign_task"),
         ("Hermes handoff", "agent_handoff"),
         ("Hermes task status", "update_task_status"),
+        ("Honcho memory search", "honcho_memory_search"),
+        ("Honcho observation write", "honcho_observation_write"),
+        ("QMD text search", "qmd_text_search"),
+        ("QMD vector search", "qmd_vector_search"),
+        ("QMD vector upsert", "qmd_vector_upsert"),
+        ("Browser CDP navigate", "browser_cdp_navigate"),
+        ("Browser CDP snapshot", "browser_cdp_snapshot"),
+        ("Browser CDP click", "browser_cdp_click"),
+        ("Tavily search", "tavily_search"),
         ("Public web search", "web_search"),
         ("X/Twitter search", "x_search_posts"),
         ("X/KOL timeline", "x_get_user_timeline"),

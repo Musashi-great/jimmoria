@@ -31,7 +31,7 @@ def build_supervisor_reply(
     settings: CompanySettings,
     decision: SupervisorIntakeDecision,
 ) -> list[str]:
-    """Build a direct CEO-style reply when no agent room is needed."""
+    """Build a direct Hermes personal-agent reply when no agent room is needed."""
 
     lowered = line.lower()
     report_language = settings.report_language
@@ -54,7 +54,7 @@ def build_supervisor_reply(
     elif _looks_like_small_talk(line.strip(), lowered):
         lines = [
             "안녕하세요. JIMMORIA Hermes Agent입니다.",
-            "리서치 지시, 회사 설정 변경, 상태 확인 중 무엇을 원하는지 말해주면 제가 먼저 분류해서 처리하겠습니다.",
+            "리서치 지시, 개인 에이전트 설정 변경, 상태 확인 중 무엇을 원하는지 말해주면 제가 먼저 분류해서 처리하겠습니다.",
         ]
     elif any(term in line for term in ["보고서", "리포트", "레포트", "한글", "한국어", "세팅", "설정"]):
         lines = []
@@ -81,7 +81,7 @@ def build_company_instruction_reply(
     settings_path: object,
 ) -> list[str]:
     lines = [
-        "좋습니다. 이건 리서치 방을 열 일이 아니라 회사 운영 지시로 보고 바로 반영했습니다.",
+        "좋습니다. 이건 리서치 방을 열 일이 아니라 개인 에이전트 운영 지시로 보고 바로 반영했습니다.",
         f"설정 파일: {settings_path}",
         "",
         "반영한 내용:",
@@ -112,7 +112,7 @@ def build_supervisor_dispatch_reply(decision: SupervisorIntakeDecision, agent_co
 
 def build_company_status_reply(settings: CompanySettings) -> list[str]:
     return [
-        "현재 회사 설정을 보여드리겠습니다.",
+        "현재 개인 에이전트 설정을 보여드리겠습니다.",
         f"Hermes mode는 `{settings.supervisor_mode}`이고, 보고서 언어는 `{settings.report_language}`입니다.",
     ]
 
@@ -154,7 +154,7 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
             output_mode="settings_panel",
             needs_research_room=False,
             confidence=0.82,
-            rationale="The client is asking to inspect the company or current operating state.",
+            rationale="The user is asking to inspect the personal-agent stack or current operating state.",
             next_step="Show settings, routing policy, and Hermes authority.",
             supervisor_authority=authority,
         )
@@ -258,8 +258,8 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
             output_mode="settings_update",
             needs_research_room=False,
             confidence=0.86,
-            rationale="The client is changing how the company should operate, not asking for a dossier.",
-            next_step="Persist the instruction in company settings.",
+            rationale="The user is changing how the personal-agent stack should operate, not asking for a dossier.",
+            next_step="Persist the instruction in personal-agent settings.",
             supervisor_authority=authority,
         )
 
@@ -410,6 +410,14 @@ META_INSTRUCTION_TERMS = [
     "대표",
     "외주",
     "회사에다가",
+    "개인 에이전트",
+    "개인에이전트",
+    "하네스",
+    "Honcho",
+    "QMD",
+    "옵시디언",
+    "브라우저 하네스",
+    "Tavily",
     "권한",
     "오케스트레이터",
     "오케스트레이션",
@@ -422,6 +430,11 @@ COMPANY_STATUS_TERMS = [
     "현재 세팅",
     "설정 보여",
     "회사 상태",
+    "개인 에이전트 상태",
+    "에이전트 상태",
+    "스택 상태",
+    "stack status",
+    "personal agent status",
     "상태 보여",
     "누가 뭘",
     "누가 무엇",

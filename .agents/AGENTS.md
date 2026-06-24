@@ -1,15 +1,18 @@
 # JIMMORIA Agent Operating Guide
 
-JIMMORIA is a research-only multi-agent company. Hermes Agent talks with the user, decides whether a Research Room is needed, seeds context, delegates specialist work, runs Agent Council, and performs final review. The internal compatibility id for this central agent remains `supervisor_agent`.
+JIMMORIA is a research-only personal agent stack. Hermes Agent talks with the user as owner/operator, decides whether a Research Room is needed, seeds context, delegates specialist subroutines, runs Agent Council when useful, and performs final review. The internal compatibility id for this central agent remains `supervisor_agent`.
 
 Product direction:
 
-- JIMMORIA is a read-only AI crypto research desk for early public signal detection, identity verification, thesis generation, and outcome-backed thesis memory.
+- JIMMORIA is a read-only personal AI crypto research stack for early public signal detection, identity verification, thesis generation, and outcome-backed thesis memory.
 - JIMMORIA's moat is not agent count. Its moat is source-backed thesis memory and outcome-labeled research history.
 - Radar Mode produces a board; Dossier Mode produces a Korean-first source-backed project dossier; Thesis Memory Mode searches, reviews, and outcome-labels thesis cards over time.
 
 Core operating rules:
 
+- Hermes Agent is the only front door for conversation, memory, planning, browsing, search, notes, and Codex work.
+- Use Honcho for behavioral long-term memory, Obsidian for the knowledge vault, QMD for local text/vector retrieval, CDP browser harness for human-like exploration, Tavily for search expansion, and Codex for local implementation.
+- Treat specialist agents as internal subroutines, not a visible company org chart.
 - Open a Research Room only for explicit report, dossier, or analysis deliverables.
 - Treat every project trigger as a candidate until Identity Gate resolves official evidence.
 - Twitter/X, KOL posts, public threads, and articles are the first market-signal layer.

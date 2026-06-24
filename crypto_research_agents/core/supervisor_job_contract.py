@@ -116,7 +116,7 @@ def _closed_fleet_contract(
         ]
         completion_criteria = [
             "Source artifact is persisted.",
-            "No client-facing project dossier is created unless explicitly requested.",
+            "No owner-facing project dossier is created unless explicitly requested.",
         ]
         max_llm_calls = 6
         max_agent_attempts = 2

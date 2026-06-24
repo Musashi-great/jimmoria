@@ -83,7 +83,7 @@ INTERNAL_TOOL_ACTIVITY = {
 
 
 class JimmoriaConsole:
-    """Chat-like CLI surface for the multi-agent research company."""
+    """Chat-like CLI surface for the Hermes personal agent stack."""
 
     def __init__(
         self,
@@ -121,8 +121,10 @@ class JimmoriaConsole:
             ("/dossier <topic-or-url>", "리서치 보고서 작성 alias"),
             ("/models", "LLM provider/model 설정"),
             ("/doctor", "연결 가능한 도구와 placeholder 상태 확인"),
-            ("/company", "활성/예정 에이전트 보기"),
-            ("/settings", "회사 운영 설정 보기"),
+            ("/stack", "개인 에이전트 스택 보기"),
+            ("/agents", "내부 에이전트/서브루틴 보기"),
+            ("/company", "내부 에이전트/서브루틴 보기 alias"),
+            ("/settings", "개인 에이전트 운영 설정 보기"),
             ("/board", "현재 에이전트 작업 보드 보기"),
             ("/context", "공유 메모리와 최근 실행 컨텍스트 보기"),
             ("/rooms", "여러 리서치룸 워크로드 보기"),
@@ -136,14 +138,33 @@ class JimmoriaConsole:
             ("/quit", "종료"),
         ]
         lines = [
-            "메시지를 입력하면 Hermes Agent가 대화/설정/소스저장/리서치룸 실행 여부를 판단합니다.",
-            "진행 중에는 raw tool 로그 대신 에이전트별 작업 상태와 compact event line이 업데이트됩니다.",
+            "메시지를 입력하면 Hermes Agent가 개인 에이전트 스택의 대화/기억/검색/리서치 실행 여부를 판단합니다.",
+            "진행 중에는 raw tool 로그 대신 고정 대시보드에 에이전트별 현재 작업과 누적 토큰을 표시합니다.",
             "",
             "COMMAND                         설명",
             "-------                         ----",
             *self.format_columns(command_rows, left_width=30),
         ]
         self.block("JIMMORIA 명령어", lines)
+
+    def print_agent_stack(self, stack: Any) -> None:
+        lines = [
+            f"Frame: {getattr(stack, 'display_name', 'JIMMORIA Personal Agent')}",
+            f"Mode: {getattr(stack, 'product_frame', 'personal_agent_os')}",
+            f"Orchestrator: {getattr(getattr(stack, 'orchestrator', None), 'name', 'Hermes Agent')}",
+            "User role: owner / operator",
+            "",
+            "LAYER                 STATUS          PURPOSE",
+            "-----                 ------          -------",
+        ]
+        for layer in getattr(stack, "layers", []) or []:
+            status = getattr(layer, "runtime_status", "unknown")
+            missing = getattr(layer, "missing_env", [])
+            suffix = f" (missing: {', '.join(missing)})" if missing else ""
+            name = str(getattr(layer, "name", "layer"))
+            purpose = str(getattr(layer, "purpose", ""))
+            lines.append(f"{name:<21} {status:<15} {purpose}{suffix}")
+        self.block("Personal agent stack", lines)
 
     def print_company(self, *, active_only: bool = False) -> None:
         agent_ids = DEFAULT_AGENTS if active_only else sorted(self.registry.specs)
@@ -156,7 +177,7 @@ class JimmoriaConsole:
             if spec:
                 one_liner = spec.identity.one_liner or spec.role.description
             rows.append(f"{agent_id:<28} {persona:<34} {status:<8} {one_liner}")
-        self.block("Company roster", rows)
+        self.block("Personal agent subroutines", rows)
 
     def print_company_settings(self, settings: Any, path: str | Path) -> None:
         principles = list(getattr(settings, "operating_principles", []) or [])
@@ -166,7 +187,7 @@ class JimmoriaConsole:
             f"English technical terms: {'allowed' if getattr(settings, 'allow_english_terms', True) else 'restricted'}",
             f"Hermes mode: {getattr(settings, 'supervisor_mode', 'research_director')}",
             f"Client relationship: {getattr(settings, 'client_relationship', 'user')}",
-            f"Auto-apply company instructions: {getattr(settings, 'auto_apply_company_instructions', True)}",
+            f"Auto-apply agent instructions: {getattr(settings, 'auto_apply_company_instructions', True)}",
         ]
         if principles:
             lines.extend(["", "Operating principles:"])
@@ -175,7 +196,7 @@ class JimmoriaConsole:
         if authority:
             lines.extend(["", "Hermes authority:"])
             lines.extend(f"- {item}" for item in authority[-10:])
-        self.block("Company settings", lines)
+        self.block("Personal agent settings", lines)
 
     def print_supervisor_intake(self, decision: Any) -> None:
         lines = [
@@ -223,7 +244,7 @@ class JimmoriaConsole:
     def print_company_settings_updated(self, settings: Any, applied: list[str], path: str | Path) -> None:
         lines = [
             "No Research Room opened.",
-            "This was treated as a company operating instruction.",
+            "This was treated as a personal-agent operating instruction.",
             f"Settings file: {path}",
             "",
             "Applied:",
@@ -236,7 +257,7 @@ class JimmoriaConsole:
                 f"Hermes mode: {getattr(settings, 'supervisor_mode', 'research_director')}",
             ]
         )
-        self.block("Company instruction applied", lines)
+        self.block("Personal agent instruction applied", lines)
 
     def print_user_message(self, text: str) -> None:
         self.print_log_line("사용자", text)
@@ -1963,9 +1984,9 @@ def print_color_hero(width: int) -> None:
     muted = "\033[38;2;126;96;154m"
     line = "=" * width
     logo = jimmoria_3d_logo_layers()
-    subtitle = "Multi-agent crypto research company"
-    korean_subtitle = "Hermes Agent가 이끄는 온체인 리서치 HQ"
-    workflow = "tmux-friendly TUI  /  agent cards  /  council room  /  obsidian memory"
+    subtitle = "Hermes-led personal crypto research agent"
+    korean_subtitle = "Hermes Agent가 이끄는 개인 리서치 스택"
+    workflow = "Honcho memory  /  Obsidian vault  /  QMD search  /  browser + Tavily  /  Codex"
 
     print(f"{violet}{line}{reset}")
     print("")
@@ -1987,9 +2008,9 @@ def print_plain_hero(width: int) -> None:
         print(center_text(row, width))
     print("")
     print(center_text(f"JIMMORIA v{__version__}", width))
-    print(center_text("Multi-agent crypto research company", width))
-    print(center_text("Hermes Agent가 이끄는 온체인 리서치 HQ", width))
-    print(center_text("tmux-friendly TUI  /  agent cards  /  council room  /  obsidian memory", width))
+    print(center_text("Hermes-led personal crypto research agent", width))
+    print(center_text("Hermes Agent가 이끄는 개인 리서치 스택", width))
+    print(center_text("Honcho memory  /  Obsidian vault  /  QMD search  /  browser + Tavily  /  Codex", width))
     print(line)
 
 

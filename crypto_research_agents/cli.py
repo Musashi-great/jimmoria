@@ -15,6 +15,7 @@ from crypto_research_agents.console import JimmoriaConsole, format_duration_ms, 
 from crypto_research_agents.runtime import ResearchRuntime
 from crypto_research_agents.runtime import DEFAULT_AGENTS
 from crypto_research_agents.core.capabilities import collect_capabilities
+from crypto_research_agents.core.agent_stack import load_agent_stack
 from crypto_research_agents.core.company_settings import (
     CompanySettings,
     company_settings_path_for,
@@ -1385,6 +1386,10 @@ def handle_chat_command(
         console.print_company(active_only=False)
         return False, last_room_id
 
+    if command == "/stack":
+        console.print_agent_stack(load_agent_stack())
+        return False, last_room_id
+
     if command == "/context":
         console.print_context()
         return False, last_room_id
@@ -1705,12 +1710,45 @@ def apply_company_instruction(line: str, settings: CompanySettings) -> list[str]
         settings.allow_english_terms = True
         applied.append("English technical terms allowed")
 
-    if any(term in line for term in ["Hermes", "hermes", "헤르메스", "슈퍼바이저", "수퍼바이저", "사장", "대표", "CEO", "외주", "회사에다가", "광범위", "권한", "오케스트레이터", "오케스트레이션", "조율"]):
-        settings.supervisor_mode = "company_ceo"
-        settings.client_relationship = "outsourcing_client"
-        _add_unique(settings.operating_principles, "Hermes Agent acts as company CEO: classify intent before opening a Research Room.")
-        _add_unique(settings.operating_principles, "Treat the user as an outsourcing client giving company-level work orders.")
+    personal_stack_terms = [
+        "Hermes",
+        "hermes",
+        "헤르메스",
+        "슈퍼바이저",
+        "수퍼바이저",
+        "개인 에이전트",
+        "개인에이전트",
+        "에이전트 하네스",
+        "하네스",
+        "Honcho",
+        "honcho",
+        "QMD",
+        "qmd",
+        "옵시디언",
+        "Obsidian",
+        "브라우저 하네스",
+        "Tavily",
+        "tavily",
+        "코덱스",
+        "Codex",
+        "사장",
+        "대표",
+        "CEO",
+        "외주",
+        "회사에다가",
+        "광범위",
+        "권한",
+        "오케스트레이터",
+        "오케스트레이션",
+        "조율",
+    ]
+    if any(term in line for term in personal_stack_terms):
+        settings.supervisor_mode = "personal_agent_orchestrator"
+        settings.client_relationship = "owner_operator"
+        _add_unique(settings.operating_principles, "Hermes Agent acts as the personal-agent orchestrator, not a company front desk.")
+        _add_unique(settings.operating_principles, "Treat the user as the owner/operator and keep specialist agents as internal subroutines.")
         _add_unique(settings.operating_principles, "Every plain chat input passes through Hermes intake before any agent room is opened.")
+        _add_unique(settings.operating_principles, "Hermes Agent routes across Honcho memory, Obsidian vault, QMD search, browser harness, Tavily, Codex, and specialist agents.")
         _add_unique(settings.operating_principles, "Hermes Agent acts as the orchestrator: plan, delegate, coordinate specialist agents, convene council, and final-review delivery.")
         _add_unique(settings.supervisor_authority, "route_all_plain_chat_inputs")
         _add_unique(settings.supervisor_authority, "choose_response_shape_per_request")
@@ -1718,21 +1756,23 @@ def apply_company_instruction(line: str, settings: CompanySettings) -> list[str]
         _add_unique(settings.supervisor_authority, "orchestrate_specialist_workflow")
         _add_unique(settings.supervisor_authority, "coordinate_agent_council")
         _add_unique(settings.supervisor_authority, "perform_final_delivery_review")
-        applied.append("Hermes mode: company CEO / outsourcing intake")
+        _add_unique(settings.supervisor_authority, "route_personal_agent_stack")
+        _add_unique(settings.supervisor_authority, "use_long_term_memory_when_relevant")
+        applied.append("Hermes mode: personal agent orchestrator")
         applied.append("Hermes role: orchestrator / specialist coordinator")
 
     if any(term in line for term in ["설정 변경", "자체 반영", "아닐경우", "그러지말고", "출력하는게 달라", "입력하는거에 따라서"]):
         settings.auto_apply_company_instructions = True
         _add_unique(settings.operating_principles, "Only open a Research Room for explicit report or dossier creation requests.")
-        _add_unique(settings.operating_principles, "Apply company configuration instructions directly instead of creating reports.")
+        _add_unique(settings.operating_principles, "Apply personal-agent configuration instructions directly instead of creating reports.")
         settings.intake_policy["company_config"] = "apply settings directly without report generation"
-        settings.intake_policy["company_status"] = "show status/settings panel without report generation"
+        settings.intake_policy["company_status"] = "show personal-agent status/settings panel without report generation"
         settings.intake_policy["research_request"] = "open Research Room only for explicit report or dossier creation requests"
         applied.append("Chat routing: settings instructions are applied directly")
 
     if not applied:
         _add_unique(settings.operating_principles, line.strip())
-        applied.append("Saved as company operating instruction")
+        applied.append("Saved as personal-agent operating instruction")
 
     _add_unique(settings.raw_instructions, line.strip())
     return applied

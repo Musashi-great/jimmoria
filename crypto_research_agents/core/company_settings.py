@@ -13,8 +13,10 @@ def default_supervisor_authority() -> list[str]:
     return [
         "classify_every_plain_chat_input",
         "choose_output_mode",
-        "apply_company_settings_without_research_room",
+        "apply_personal_agent_settings_without_research_room",
         "open_research_room_for_explicit_research",
+        "route_personal_agent_stack",
+        "use_long_term_memory_when_relevant",
         "assign_specialist_agents",
         "orchestrate_specialist_workflow",
         "coordinate_agent_council",
@@ -27,15 +29,15 @@ def default_intake_policy() -> dict[str, str]:
     return {
         "research_request": "open full Research Room and produce a dossier",
         "source_ingestion": "open small ingestion room and save notes",
-        "company_config": "apply settings directly without a report",
-        "company_status": "show company state without a report",
+        "company_config": "apply personal-agent settings directly without a report",
+        "company_status": "show personal-agent state without a report",
         "supervisor_chat": "answer directly without opening a Research Room",
     }
 
 
 @dataclass(slots=True)
 class CompanySettings:
-    """Persistent operating preferences for JIMMORIA as a research company."""
+    """Persistent operating preferences for JIMMORIA's Hermes personal agent stack."""
 
     report_language: str = "en"
     allow_english_terms: bool = True

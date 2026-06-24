@@ -45,6 +45,17 @@
     "task_retry",
     "task_cancel"
   ],
+  "personal_agent_stack": [
+    "honcho_memory_search",
+    "honcho_observation_write",
+    "qmd_text_search",
+    "qmd_vector_search",
+    "qmd_vector_upsert",
+    "browser_cdp_navigate",
+    "browser_cdp_snapshot",
+    "browser_cdp_click",
+    "tavily_search"
+  ],
   "operator_bridge": [
     "skill_view",
     "read_file",
@@ -58,6 +69,9 @@
     "browser_snapshot",
     "browser_scroll",
     "browser_click",
+    "browser_cdp_navigate",
+    "browser_cdp_snapshot",
+    "browser_cdp_click",
     "browser_vision",
     "vision_analyze",
     "delegate_task",
@@ -72,6 +86,11 @@
     "db_write_kol_profile",
     "vector_search",
     "vector_upsert",
+    "honcho_memory_search",
+    "honcho_observation_write",
+    "qmd_text_search",
+    "qmd_vector_search",
+    "qmd_vector_upsert",
     "entity_graph_read",
     "entity_graph_write",
     "source_cache_read",
@@ -83,6 +102,7 @@
   "source_ingestion": [
     "fetch_url",
     "web_search",
+    "tavily_search",
     "parse_html",
     "parse_pdf",
     "parse_markdown",
@@ -107,6 +127,7 @@
   "market_narrative": [
     "coingecko_coin_metadata",
     "web_search",
+    "tavily_search",
     "coingecko_latest_listings",
     "coingecko_category_markets",
     "defillama_protocol_search",
@@ -291,6 +312,87 @@
       "provider_options": ["local Hermes office connector"],
       "required_secrets": [],
       "source_docs": ["https://github.com/NousResearch/hermes-agent"]
+    },
+    "honcho_memory_search": {
+      "priority": "recommended",
+      "owner_agent": "supervisor_agent,report_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Search Honcho behavioral memory so Hermes can preserve long-term user preferences and recurring operating patterns.",
+      "provider_options": ["Honcho API"],
+      "required_secrets": ["HONCHO_API_KEY"],
+      "source_docs": ["config/agent_stack.yaml"]
+    },
+    "honcho_observation_write": {
+      "priority": "recommended",
+      "owner_agent": "supervisor_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Write stable user behavior and preference observations into Honcho after Hermes decides they are durable memory.",
+      "provider_options": ["Honcho API"],
+      "required_secrets": ["HONCHO_API_KEY"],
+      "source_docs": ["config/agent_stack.yaml"]
+    },
+    "qmd_text_search": {
+      "priority": "recommended",
+      "owner_agent": "supervisor_agent,ingestion_agent,report_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Search local device text through QMD before asking external web tools for already-owned knowledge.",
+      "provider_options": ["QMD endpoint"],
+      "required_secrets": ["QMD_ENDPOINT"],
+      "source_docs": ["config/agent_stack.yaml"]
+    },
+    "qmd_vector_search": {
+      "priority": "recommended",
+      "owner_agent": "supervisor_agent,ingestion_agent,report_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Search QMD vector memory for semantically related local files, notes, and prior artifacts.",
+      "provider_options": ["QMD endpoint"],
+      "required_secrets": ["QMD_ENDPOINT"],
+      "source_docs": ["config/agent_stack.yaml"]
+    },
+    "qmd_vector_upsert": {
+      "priority": "optional",
+      "owner_agent": "obsidian_curator_agent,report_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Upsert finished notes, evidence packets, and durable text into the QMD vector index.",
+      "provider_options": ["QMD endpoint"],
+      "required_secrets": ["QMD_ENDPOINT"],
+      "source_docs": ["config/agent_stack.yaml"]
+    },
+    "browser_cdp_navigate": {
+      "priority": "recommended",
+      "owner_agent": "ingestion_agent,product_tech_agent,social_kol_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Drive a CDP browser harness to navigate public pages when human-like browsing is needed.",
+      "provider_options": ["CDP browser harness"],
+      "required_secrets": ["BROWSER_CDP_ENDPOINT"],
+      "source_docs": ["config/agent_stack.yaml"]
+    },
+    "browser_cdp_snapshot": {
+      "priority": "recommended",
+      "owner_agent": "ingestion_agent,product_tech_agent,social_kol_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Capture a browser-harness DOM/text snapshot for public pages, with stateless browser fallback when CDP is not attached.",
+      "provider_options": ["CDP browser harness"],
+      "required_secrets": ["BROWSER_CDP_ENDPOINT"],
+      "source_docs": ["config/agent_stack.yaml"]
+    },
+    "browser_cdp_click": {
+      "priority": "optional",
+      "owner_agent": "ingestion_agent,product_tech_agent,social_kol_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Follow a public link through the browser harness when the investigation needs page-to-page exploration.",
+      "provider_options": ["CDP browser harness"],
+      "required_secrets": ["BROWSER_CDP_ENDPOINT"],
+      "source_docs": ["config/agent_stack.yaml"]
+    },
+    "tavily_search": {
+      "priority": "recommended",
+      "owner_agent": "ingestion_agent,discovery_agent,social_kol_agent",
+      "implementation_status": "external_connector_required",
+      "purpose": "Use Tavily search for source discovery and query expansion, falling back to public web search when the API key is absent.",
+      "provider_options": ["Tavily API"],
+      "required_secrets": ["TAVILY_API_KEY"],
+      "source_docs": ["config/agent_stack.yaml"]
     },
     "skill_view": {
       "priority": "recommended",

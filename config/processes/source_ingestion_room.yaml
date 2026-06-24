@@ -2,7 +2,7 @@
   "process_id": "source_ingestion_room",
   "name": "Source Ingestion Room",
   "process_type": "source_only_controlled_p2p",
-  "supervisor_mode": "company_ceo_manager",
+  "supervisor_mode": "personal_agent_orchestrator",
   "inspired_by": [
     "crewAI task-specific role/task separation",
     "ChatDev phase-limited workflow",

@@ -25,6 +25,7 @@ from crypto_research_agents.agents.report import ReportAgent, assess_report_qual
 from crypto_research_agents.agents.reporting.evidence_ledger import build_project_dossier_evidence_pack
 from crypto_research_agents.connectors import register_default_connectors
 from crypto_research_agents.core.agent_spec import AgentSpecRegistry
+from crypto_research_agents.core.agent_stack import load_agent_stack
 from crypto_research_agents.cli import (
     apply_company_instruction,
     chat_command,
@@ -95,6 +96,10 @@ def _offline_no_secret_env() -> dict[str, str]:
         "DUNE_API_KEY": "",
         "THEGRAPH_API_KEY": "",
         "GITHUB_TOKEN": "",
+        "HONCHO_API_KEY": "",
+        "QMD_ENDPOINT": "",
+        "BROWSER_CDP_ENDPOINT": "",
+        "TAVILY_API_KEY": "",
     }
 
 
@@ -106,7 +111,7 @@ class SmokeTest(unittest.TestCase):
 
         text = output.getvalue()
         self.assertIn("JIMMORIA v0.1.0", text)
-        self.assertIn("Multi-agent crypto research company", text)
+        self.assertIn("Hermes-led personal crypto research agent", text)
         self.assertNotIn("JJJJJJJ", text)
         self.assertNotIn("Company roster", text)
 
@@ -329,7 +334,7 @@ class SmokeTest(unittest.TestCase):
 
         text = output.getvalue()
         self.assertIn("Hermes", text)
-        self.assertIn("회사 운영 지시", text)
+        self.assertIn("개인 에이전트 운영 지시", text)
         self.assertIn("반영한 내용", text)
 
     def test_chat_intake_classifies_research_vs_settings(self) -> None:
@@ -356,13 +361,13 @@ class SmokeTest(unittest.TestCase):
             settings,
         )
 
-        self.assertEqual(settings.supervisor_mode, "company_ceo")
-        self.assertEqual(settings.client_relationship, "outsourcing_client")
+        self.assertEqual(settings.supervisor_mode, "personal_agent_orchestrator")
+        self.assertEqual(settings.client_relationship, "owner_operator")
         self.assertIn("route_all_plain_chat_inputs", settings.supervisor_authority)
         self.assertIn("choose_response_shape_per_request", settings.supervisor_authority)
         self.assertIn("orchestrate_specialist_workflow", settings.supervisor_authority)
         self.assertIn("coordinate_agent_council", settings.supervisor_authority)
-        self.assertIn("Hermes mode: company CEO / outsourcing intake", applied)
+        self.assertIn("Hermes mode: personal agent orchestrator", applied)
         self.assertIn("Hermes role: orchestrator / specialist coordinator", applied)
 
     def test_company_instruction_sets_supervisor_as_orchestrator(self) -> None:
@@ -373,8 +378,8 @@ class SmokeTest(unittest.TestCase):
             settings,
         )
 
-        self.assertEqual(settings.supervisor_mode, "company_ceo")
-        self.assertEqual(settings.client_relationship, "outsourcing_client")
+        self.assertEqual(settings.supervisor_mode, "personal_agent_orchestrator")
+        self.assertEqual(settings.client_relationship, "owner_operator")
         self.assertIn("orchestrate_specialist_workflow", settings.supervisor_authority)
         self.assertIn("coordinate_agent_council", settings.supervisor_authority)
         self.assertTrue(any("orchestrator" in item for item in settings.operating_principles))
@@ -692,7 +697,7 @@ class SmokeTest(unittest.TestCase):
         text = output.getvalue()
         self.assertIn("Hermes", text)
         self.assertNotIn("Hermes intake", text)
-        self.assertIn("Company settings", text)
+        self.assertIn("Personal agent settings", text)
 
     def test_chat_saved_report_request_prints_existing_report_without_room(self) -> None:
         output = StringIO()
@@ -4348,7 +4353,44 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(statuses["DEX Screener pair search"], "configured")
         self.assertEqual(statuses["Dune query execution"], "missing_secret")
         self.assertEqual(statuses["The Graph subgraph query"], "missing_secret")
+        self.assertEqual(statuses["Personal agent stack"], "configured")
+        self.assertEqual(statuses["Stack layer: Hermes Agent"], "configured")
+        self.assertEqual(statuses["Stack layer: Honcho"], "missing_secret")
+        self.assertEqual(statuses["Stack layer: QMD"], "missing_secret")
+        self.assertEqual(statuses["Stack layer: Browser Harness"], "missing_secret")
+        self.assertEqual(statuses["Stack layer: Tavily"], "missing_secret")
+        self.assertEqual(statuses["Stack layer: Codex"], "configured")
+        self.assertEqual(statuses["Honcho memory search"], "missing_secret")
+        self.assertEqual(statuses["QMD text search"], "missing_secret")
+        self.assertEqual(statuses["Browser CDP snapshot"], "missing_secret")
+        self.assertEqual(statuses["Tavily search"], "missing_secret")
         self.assertEqual(statuses["Overall"], "placeholder")
+
+    def test_personal_agent_stack_config_loads_layers(self) -> None:
+        stack = load_agent_stack()
+
+        self.assertEqual(stack.display_name, "JIMMORIA Personal Agent")
+        self.assertEqual(stack.product_frame, "personal_agent_os")
+        self.assertEqual(stack.orchestrator.name, "Hermes Agent")
+        self.assertIsNotNone(stack.layer("honcho_memory"))
+        self.assertIsNotNone(stack.layer("qmd_search"))
+        self.assertIsNotNone(stack.layer("browser_harness"))
+        self.assertIsNotNone(stack.layer("tavily_search"))
+
+    def test_console_prints_personal_agent_stack_panel(self) -> None:
+        output = StringIO()
+        console = JimmoriaConsole()
+        console.use_rich = False
+
+        with redirect_stdout(output):
+            console.print_agent_stack(load_agent_stack())
+
+        text = output.getvalue()
+        self.assertIn("Personal agent stack", text)
+        self.assertIn("Hermes Agent", text)
+        self.assertIn("Honcho", text)
+        self.assertIn("QMD", text)
+        self.assertIn("Tavily", text)
 
     def test_tool_registry_contains_required_research_stack(self) -> None:
         registry = json.loads(Path("config/tools/tool_registry.yaml").read_text(encoding="utf-8"))
@@ -4366,6 +4408,10 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertIn("snapshot_get_proposals", registry["minimum_viable_live_stack"])
         self.assertIn("skill_view", registry["operator_bridge"])
         self.assertIn("browser_navigate", registry["operator_bridge"])
+        self.assertIn("browser_cdp_snapshot", registry["operator_bridge"])
+        self.assertIn("honcho_memory_search", registry["personal_agent_stack"])
+        self.assertIn("qmd_vector_search", registry["personal_agent_stack"])
+        self.assertIn("tavily_search", registry["personal_agent_stack"])
         self.assertIn("multi_tool_use.parallel", registry["operator_bridge"])
         self.assertEqual(registry["tool_meta"]["github_get_repo_activity"]["implementation_status"], "implemented")
         self.assertEqual(registry["tool_meta"]["defillama_protocol_search"]["implementation_status"], "implemented")
@@ -4504,6 +4550,10 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertEqual(registry.get("skill_view").implementation_status, "implemented")
         self.assertEqual(registry.get("browser_console").implementation_status, "implemented")
         self.assertEqual(registry.get("write_file").implementation_status, "implemented")
+        self.assertEqual(registry.get("honcho_memory_search").implementation_status, "external_connector_required")
+        self.assertEqual(registry.get("qmd_text_search").implementation_status, "external_connector_required")
+        self.assertEqual(registry.get("browser_cdp_snapshot").implementation_status, "external_connector_required")
+        self.assertEqual(registry.get("tavily_search").implementation_status, "external_connector_required")
         self.assertEqual(registry.get("terminal").mode, "dangerous")
         self.assertEqual(registry.get("send_message").mode, "write")
         self.assertEqual(registry.get("browser_vision").implementation_status, "external_connector_required")
@@ -4523,6 +4573,13 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertNotIn("terminal", bridge_tools)
         self.assertNotIn("send_message", bridge_tools)
         registry.assert_toolsets_research_safe(["operator_research_bridge"])
+
+        stack_tools = registry.allowed_tools_for_toolsets(["personal_agent_stack"])
+        self.assertIn("honcho_memory_search", stack_tools)
+        self.assertIn("qmd_vector_search", stack_tools)
+        self.assertIn("browser_cdp_snapshot", stack_tools)
+        self.assertIn("tavily_search", stack_tools)
+        registry.assert_toolsets_research_safe(["personal_agent_stack"])
 
     def test_supervisor_office_toolset_is_research_safe(self) -> None:
         registry = load_tool_registry()
@@ -4754,11 +4811,11 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertNotIn("Discord read", capabilities)
         self.assertIn("Public web search", capabilities)
 
-    def test_web_dashboard_html_exposes_company_structure(self) -> None:
+    def test_web_dashboard_html_exposes_personal_agent_stack(self) -> None:
         html = render_dashboard_html()
 
         self.assertIn("JIMMORIA Web Research HQ", html)
-        self.assertIn("Company Structure", html)
+        self.assertIn("Personal Agent Stack", html)
         self.assertIn("Agent Council", html)
         self.assertIn("Hermes Final Review", html)
 

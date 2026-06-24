@@ -2,7 +2,7 @@
   "process_id": "project_research_room",
   "name": "Representative Web3 Project Research Room",
   "process_type": "controlled_p2p_full_parallel_research_swarm",
-  "supervisor_mode": "company_ceo_manager",
+  "supervisor_mode": "personal_agent_orchestrator",
   "execution_strategy": {
     "current_phase": 3,
     "current_mode": "full_parallel_agent_swarm",
@@ -37,7 +37,7 @@
       "task_id": "orchestrate_room",
       "agent_id": "supervisor_agent",
       "phase": "management",
-      "description": "Act as company CEO/orchestrator: confirm this is a report request, set the diligence plan, apply the representative Web3 profile, assign specialists, and define final review gates.",
+      "description": "Act as Hermes personal-agent orchestrator: confirm this is a report request, set the diligence plan, apply the representative Web3 profile, assign specialist subroutines, and define final review gates.",
       "expected_output": "Orchestration plan with intent, Identity Gate, task delegation, debate checkpoints, final report mode, and evidence packet requirement.",
       "output_channels": ["finding", "event"]
     },

@@ -211,7 +211,7 @@
       "Set JIMMORIA_GROK_FALLBACK_TO_CODEX=0 or JIMMORIA_DISABLE_GROK_FALLBACK=1 to disable the hybrid fallback.",
       "Agent-level provider families are applied before task-type fallbacks.",
       "Override a single agent with JIMMORIA_AGENT_PROVIDER_<AGENT_ID>=codex or grok.",
-      "Use LLM_PROVIDER=codex_grok for role routing; xai_oauth is a Grok credential mode, not the hybrid company mode."
+      "Use LLM_PROVIDER=multi for role routing; xai_oauth is a Grok credential mode, not the full personal-agent routing mode."
     ]
   },
   "fallback": {

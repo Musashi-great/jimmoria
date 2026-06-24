@@ -19,7 +19,7 @@ from crypto_research_agents.storage.run_store import list_run_summaries, normali
 
 
 AGENT_WORK = {
-    "supervisor_agent": "Plan, delegate, route, and final-review the company output.",
+    "supervisor_agent": "Plan, delegate, route stack layers, and final-review the owner-facing output.",
     "ingestion_agent": "Store source material and extract entities, keywords, and metadata.",
     "social_kol_agent": "Collect X/KOL/article market signals first, then verify candidate social identity.",
     "narrative_agent": "Map the project and social signals into market narratives and thesis categories.",
@@ -34,13 +34,13 @@ AGENT_WORK = {
 WORKFLOW_NODES = [
     {
         "id": "user",
-        "label": "User Brief",
-        "description": "You chat with Hermes Agent and decide whether a Research Room should open.",
+        "label": "Owner Request",
+        "description": "You chat with Hermes Agent and decide whether memory, search, browser, Codex, or a Research Room is needed.",
     },
     {
         "id": "supervisor",
-        "label": "Hermes CEO",
-        "description": "Classifies intent, creates the plan, delegates tasks, and owns final quality.",
+        "label": "Hermes Agent",
+        "description": "Classifies intent, consults stack layers, creates the plan, delegates specialist subroutines, and owns final quality.",
     },
     {
         "id": "room",
@@ -49,18 +49,18 @@ WORKFLOW_NODES = [
     },
     {
         "id": "agents",
-        "label": "Specialist Agents",
+        "label": "Specialist Subroutines",
         "description": "Ingestion, social-first market signal intake, narrative, discovery, on-chain, product, funding, report, and vault work.",
     },
     {
         "id": "agent_council",
         "label": "Agent Council",
-        "description": "Specialists compare findings before report writing and surface uncertainty.",
+        "description": "Specialist subroutines compare findings before report writing and surface uncertainty.",
     },
     {
         "id": "final_review",
         "label": "Hermes Final Review",
-        "description": "Hermes Agent reviews evidence quality and delivery mode before the user receives output.",
+        "description": "Hermes Agent reviews evidence quality and delivery mode before the owner receives output.",
     },
     {
         "id": "delivery",
@@ -94,7 +94,7 @@ def build_overview_payload(
     return {
         "app": APP_NAME,
         "version": __version__,
-        "mode": "Web Research HQ",
+        "mode": "Personal Agent HQ",
         "workflow": WORKFLOW_NODES,
         "processes": [
             _process_card(project_process),
@@ -395,7 +395,7 @@ def render_dashboard_html() -> str:
     <section class="hero">
       <div>
         <div class="brand">JIMMORIA</div>
-        <div class="subtitle">Web Research HQ. Watch Hermes Agent, Research Room, specialist agents, Agent Council, final review, reports, and vault artifacts from one local dashboard.</div>
+        <div class="subtitle">Personal Agent HQ. Watch Hermes Agent, stack routing, Research Rooms, specialist subroutines, Agent Council, final review, reports, and vault artifacts from one local dashboard.</div>
       </div>
       <div class="status-grid">
         <div class="metric"><b>Runtime</b><span id="runtimeStatus">loading</span></div>
@@ -414,7 +414,7 @@ def render_dashboard_html() -> str:
       </aside>
       <div>
         <section class="panel">
-          <h2>Company Structure</h2>
+          <h2>Personal Agent Stack</h2>
           <div class="panel-body">
             <div class="workflow" id="workflow"><div class="empty">Loading workflow: Agent Council, Hermes Final Review.</div></div>
           </div>

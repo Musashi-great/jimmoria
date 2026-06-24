@@ -36,6 +36,17 @@ from crypto_research_agents.connectors.operator_bridge import (
     vision_analyze,
     write_file,
 )
+from crypto_research_agents.connectors.personal_stack import (
+    browser_cdp_click,
+    browser_cdp_navigate,
+    browser_cdp_snapshot,
+    honcho_memory_search,
+    honcho_observation_write,
+    qmd_text_search,
+    qmd_vector_search,
+    qmd_vector_upsert,
+    tavily_search,
+)
 from crypto_research_agents.connectors.research_guardrails import (
     source_relevance_filter,
     tool_call_guardrail,
@@ -95,6 +106,9 @@ def register_default_connectors(tool_gateway: ToolGateway) -> None:
     tool_gateway.register("browser_snapshot", browser_snapshot)
     tool_gateway.register("browser_scroll", browser_scroll)
     tool_gateway.register("browser_click", browser_click)
+    tool_gateway.register("browser_cdp_navigate", browser_cdp_navigate)
+    tool_gateway.register("browser_cdp_snapshot", browser_cdp_snapshot)
+    tool_gateway.register("browser_cdp_click", browser_cdp_click)
     tool_gateway.register("browser_vision", browser_vision)
     tool_gateway.register("vision_analyze", vision_analyze)
     tool_gateway.register("cronjob", cronjob)
@@ -105,6 +119,12 @@ def register_default_connectors(tool_gateway: ToolGateway) -> None:
     tool_gateway.register("crawl_website", crawl_website)
     tool_gateway.register("crawl_docs", crawl_docs)
     tool_gateway.register("web_search", web_search)
+    tool_gateway.register("tavily_search", tavily_search)
+    tool_gateway.register("honcho_memory_search", honcho_memory_search)
+    tool_gateway.register("honcho_observation_write", honcho_observation_write)
+    tool_gateway.register("qmd_text_search", qmd_text_search)
+    tool_gateway.register("qmd_vector_search", qmd_vector_search)
+    tool_gateway.register("qmd_vector_upsert", qmd_vector_upsert)
     tool_gateway.register("github_search_repos", github_search_repos)
     tool_gateway.register("read_github_repo", read_github_repo)
     tool_gateway.register("github_get_repo_activity", github_get_repo_activity)

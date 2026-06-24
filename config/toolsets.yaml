@@ -15,6 +15,44 @@ toolsets:
       - read_agent_status
       - task_retry
       - task_cancel
+  personal_agent_stack:
+    description: "Personal agent OS stack controlled by Hermes: Honcho memory, Obsidian vault, QMD search, CDP browser harness, Tavily search, and Codex local work."
+    tools:
+      - honcho_memory_search
+      - honcho_observation_write
+      - qmd_text_search
+      - qmd_vector_search
+      - qmd_vector_upsert
+      - browser_cdp_navigate
+      - browser_cdp_snapshot
+      - browser_cdp_click
+      - tavily_search
+      - skill_view
+      - read_file
+      - search_files
+      - write_file
+      - execute_code
+  honcho_memory:
+    description: Honcho behavioral memory bridge for long-term user preference and behavior recall.
+    tools:
+      - honcho_memory_search
+      - honcho_observation_write
+  qmd_search:
+    description: QMD device search bridge for local text and vector search.
+    tools:
+      - qmd_text_search
+      - qmd_vector_search
+      - qmd_vector_upsert
+  browser_cdp:
+    description: CDP browser harness tools for human-like public web exploration.
+    tools:
+      - browser_cdp_navigate
+      - browser_cdp_snapshot
+      - browser_cdp_click
+  tavily_search:
+    description: Tavily search API bridge for source discovery and query expansion.
+    tools:
+      - tavily_search
   research_basic:
     description: Public read-only research connectors.
     tools:
@@ -160,6 +198,69 @@ tools:
     mode: artifact_write
     implementation_status: implemented
     description: Hermes-style delegation alias that records an internal assignment through Hermes office.
+  honcho_memory_search:
+    connector_name: honcho_memory_search
+    category: honcho_memory
+    mode: read_only
+    implementation_status: external_connector_required
+    required_secrets: [HONCHO_API_KEY]
+    description: Search Honcho behavioral memory for user preferences and long-term interaction patterns.
+  honcho_observation_write:
+    connector_name: honcho_observation_write
+    category: honcho_memory
+    mode: artifact_write
+    implementation_status: external_connector_required
+    required_secrets: [HONCHO_API_KEY]
+    description: Write a durable behavioral observation to Honcho after Hermes decides it is stable memory.
+  qmd_text_search:
+    connector_name: qmd_text_search
+    category: qmd_search
+    mode: read_only
+    implementation_status: external_connector_required
+    required_secrets: [QMD_ENDPOINT]
+    description: Search local device text through QMD.
+  qmd_vector_search:
+    connector_name: qmd_vector_search
+    category: qmd_search
+    mode: read_only
+    implementation_status: external_connector_required
+    required_secrets: [QMD_ENDPOINT]
+    description: Search local vector memory through QMD.
+  qmd_vector_upsert:
+    connector_name: qmd_vector_upsert
+    category: qmd_search
+    mode: artifact_write
+    implementation_status: external_connector_required
+    required_secrets: [QMD_ENDPOINT]
+    description: Upsert text into the QMD vector index.
+  browser_cdp_navigate:
+    connector_name: browser_cdp_navigate
+    category: browser_cdp
+    mode: read_only
+    implementation_status: external_connector_required
+    required_secrets: [BROWSER_CDP_ENDPOINT]
+    description: Navigate a CDP browser session to a public URL.
+  browser_cdp_snapshot:
+    connector_name: browser_cdp_snapshot
+    category: browser_cdp
+    mode: read_only
+    implementation_status: external_connector_required
+    required_secrets: [BROWSER_CDP_ENDPOINT]
+    description: Capture page text, links, and DOM snapshot through the CDP browser harness.
+  browser_cdp_click:
+    connector_name: browser_cdp_click
+    category: browser_cdp
+    mode: read_only
+    implementation_status: external_connector_required
+    required_secrets: [BROWSER_CDP_ENDPOINT]
+    description: Click or navigate to a public link through the CDP browser harness.
+  tavily_search:
+    connector_name: tavily_search
+    category: tavily_search
+    mode: read_only
+    implementation_status: external_connector_required
+    required_secrets: [TAVILY_API_KEY]
+    description: Search the public web through Tavily when an API key is configured.
   skill_view:
     connector_name: skill_view
     category: operator_bridge

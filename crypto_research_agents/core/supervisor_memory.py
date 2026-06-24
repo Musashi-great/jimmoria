@@ -129,8 +129,8 @@ class SupervisorMemoryStore:
                 self.remember(
                     key="supervisor_operating_model",
                     value=(
-                        "Hermes Agent should behave like a Hermes-style conversational boss: "
-                        "answer normal chat directly, remember preferences, and delegate real work to sub-agents."
+                        "Hermes Agent should behave like a Hermes-style personal-agent harness: "
+                        "answer normal chat directly, remember preferences, and delegate real work to specialist subroutines."
                     ),
                     category="operating_principle",
                     source="user",
