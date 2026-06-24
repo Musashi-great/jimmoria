@@ -11,7 +11,7 @@ from crypto_research_agents.core.room import ResearchRoom
 
 class SupervisorAgent(BaseAgent):
     agent_id = "supervisor_agent"
-    name = "Supervisor Agent"
+    name = "Hermes Agent"
     task_type = "supervision"
 
     def run(self, room: ResearchRoom, memory: SharedMemory, bus: CollaborationBus, **kwargs: Any) -> AgentResult:
@@ -23,7 +23,7 @@ class SupervisorAgent(BaseAgent):
         process = kwargs.get("process") if isinstance(kwargs.get("process"), dict) else {}
         supervisor_mode = company_settings.get("supervisor_mode", "research_director")
         summary = (
-            "Research room initialized by CEO-style supervisor orchestration."
+            "Research room initialized by CEO-style Hermes orchestration."
             if supervisor_mode == "company_ceo"
             else "Research room initialized with controlled P2P orchestration."
         )
@@ -81,7 +81,7 @@ class SupervisorAgent(BaseAgent):
         bus.update(
             room_id=room.room_id,
             from_agent=self.agent_id,
-            summary="Supervisor created the orchestration plan, delegated specialist tasks, and set council/final-review checkpoints.",
+            summary="Hermes created the orchestration plan, delegated specialist tasks, and set council/final-review checkpoints.",
             payload={
                 "finding_id": finding.finding_id,
                 "goals": goals,
@@ -150,7 +150,7 @@ class SupervisorAgent(BaseAgent):
                     task_id=task_id,
                     agent_id=agent_id,
                     status="done",
-                    summary="Supervisor planning task completed and downstream tasks prepared.",
+                    summary="Hermes planning task completed and downstream tasks prepared.",
                 )
                 office_results.append({"tool": "update_task_status", "task_id": task_id, "result": status_result})
                 continue
@@ -196,7 +196,7 @@ class SupervisorAgent(BaseAgent):
                 from_agent=self.agent_id,
                 to_agent=first_task["agent_id"],
                 task_id=first_task["task_id"],
-                context_summary="Supervisor finished room planning and opened the first specialist assignment.",
+                context_summary="Hermes finished room planning and opened the first specialist assignment.",
                 artifacts={
                     "delegated_task_count": len(delegated_tasks),
                     "process_id": process_id,
@@ -208,7 +208,7 @@ class SupervisorAgent(BaseAgent):
                 room_id=room.room_id,
                 from_agent=self.agent_id,
                 to_agent=first_task["agent_id"],
-                summary="Supervisor completed office planning; start the first assigned task.",
+                summary="Hermes completed office planning; start the first assigned task.",
                 payload={
                     "first_task": first_task,
                     "delegated_task_count": len(delegated_tasks),
@@ -300,7 +300,7 @@ def _build_orchestration_plan(
         {
             "checkpoint": "task_delegation",
             "owner": "supervisor_agent",
-            "purpose": "Create specialist tasks, assign owners, and record handoffs through Supervisor Office tools.",
+            "purpose": "Create specialist tasks, assign owners, and record handoffs through Hermes office tools.",
         },
         {
             "checkpoint": "specialist_execution",
@@ -319,7 +319,7 @@ def _build_orchestration_plan(
         },
     ]
     return {
-        "mode": "supervisor_orchestrator",
+        "mode": "hermes_orchestrator",
         "supervisor_mode": supervisor_mode,
         "room_id": room.room_id,
         "topic": room.topic,

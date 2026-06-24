@@ -41,7 +41,7 @@ class SupervisorMemoryItem:
 
 
 class SupervisorMemoryStore:
-    """Persistent Hermes-style memory for the front-door Supervisor."""
+    """Persistent Hermes-style memory; class name stays for compatibility."""
 
     def __init__(self, path: str | Path | None = None, *, items: dict[str, SupervisorMemoryItem] | None = None) -> None:
         self.path = Path(path) if path is not None else supervisor_memory_path_for()
@@ -115,7 +115,7 @@ class SupervisorMemoryStore:
         return existing
 
     def observe_user_message(self, line: str, settings: CompanySettings) -> list[SupervisorMemoryItem]:
-        """Extract durable Supervisor preferences from a user message."""
+        """Extract durable Hermes Agent preferences from a user message."""
 
         text = line.strip()
         lowered = text.lower()
@@ -129,7 +129,7 @@ class SupervisorMemoryStore:
                 self.remember(
                     key="supervisor_operating_model",
                     value=(
-                        "Supervisor should behave like a Hermes-style conversational boss: "
+                        "Hermes Agent should behave like a Hermes-style conversational boss: "
                         "answer normal chat directly, remember preferences, and delegate real work to sub-agents."
                     ),
                     category="operating_principle",
@@ -143,7 +143,7 @@ class SupervisorMemoryStore:
             captured.append(
                 self.remember(
                     key="supervisor_memory_expected",
-                    value="Supervisor is expected to keep persistent memory across CLI sessions.",
+                    value="Hermes Agent is expected to keep persistent memory across CLI sessions.",
                     category="preference",
                     source="user",
                     confidence=0.9,
@@ -155,7 +155,7 @@ class SupervisorMemoryStore:
             captured.append(
                 self.remember(
                     key="delegate_work_to_specialists",
-                    value="When the user gives executable work, Supervisor should plan and assign specialist agents instead of only chatting.",
+                    value="When the user gives executable work, Hermes Agent should plan and assign specialist agents instead of only chatting.",
                     category="operating_principle",
                     source="user",
                     confidence=0.9,

@@ -33,7 +33,7 @@ class SupervisorBrainTurn:
 
 
 class SupervisorBrain:
-    """Hermes-style front-door state layer for JIMMORIA Supervisor."""
+    """Hermes Agent front-door state layer; class name stays for compatibility."""
 
     def __init__(
         self,

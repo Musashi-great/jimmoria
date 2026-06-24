@@ -14,7 +14,7 @@
       "name": "full_parallel_research_swarm",
       "status": "active",
       "mode": "full_parallel_agent_swarm",
-      "description": "After the Supervisor seeds source and candidate context, ingestion, social/KOL, narrative, discovery, contract/on-chain, product/tech, and funding/token agents run at the same time. The council, report, final review, and Obsidian sync run only after the swarm joins.",
+      "description": "After Hermes Agent seeds source and candidate context, ingestion, social/KOL, narrative, discovery, contract/on-chain, product/tech, and funding/token agents run at the same time. The council, report, final review, and Obsidian sync run only after the swarm joins.",
       "max_parallel": 7,
       "parallel_groups": [
         {

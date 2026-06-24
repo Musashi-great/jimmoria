@@ -215,8 +215,8 @@
       "priority": "required",
       "owner_agent": "supervisor_agent",
       "implementation_status": "implemented",
-      "purpose": "Record Research Room creation as an auditable Supervisor office action before specialists run.",
-      "provider_options": ["local Supervisor Office connector"],
+      "purpose": "Record Research Room creation as an auditable Hermes office action before specialists run.",
+      "provider_options": ["local Hermes office connector"],
       "required_secrets": [],
       "source_docs": ["https://github.com/NousResearch/hermes-agent"]
     },
@@ -225,7 +225,7 @@
       "owner_agent": "supervisor_agent",
       "implementation_status": "implemented",
       "purpose": "Create task ledger entries from process manifests so specialist work is explicit.",
-      "provider_options": ["local Supervisor Office connector"],
+      "provider_options": ["local Hermes office connector"],
       "required_secrets": [],
       "source_docs": ["https://github.com/NousResearch/hermes-agent"]
     },
@@ -234,7 +234,7 @@
       "owner_agent": "supervisor_agent",
       "implementation_status": "implemented",
       "purpose": "Assign room tasks to specialist agents through the controlled P2P bus.",
-      "provider_options": ["local Supervisor Office connector"],
+      "provider_options": ["local Hermes office connector"],
       "required_secrets": [],
       "source_docs": ["https://github.com/NousResearch/hermes-agent"]
     },
@@ -242,8 +242,8 @@
       "priority": "required",
       "owner_agent": "supervisor_agent",
       "implementation_status": "implemented",
-      "purpose": "Record auditable handoff context between Supervisor and downstream specialist agents.",
-      "provider_options": ["local Supervisor Office connector"],
+      "purpose": "Record auditable handoff context between Hermes Agent and downstream specialist agents.",
+      "provider_options": ["local Hermes office connector"],
       "required_secrets": [],
       "source_docs": ["https://github.com/NousResearch/hermes-agent"]
     },
@@ -252,7 +252,7 @@
       "owner_agent": "supervisor_agent",
       "implementation_status": "implemented",
       "purpose": "Record task state transitions without giving agents filesystem or shell control.",
-      "provider_options": ["local Supervisor Office connector"],
+      "provider_options": ["local Hermes office connector"],
       "required_secrets": [],
       "source_docs": ["https://github.com/NousResearch/hermes-agent"]
     },
@@ -260,8 +260,8 @@
       "priority": "recommended",
       "owner_agent": "supervisor_agent",
       "implementation_status": "implemented",
-      "purpose": "Read a compact room status snapshot for Supervisor chat and future dashboards.",
-      "provider_options": ["local Supervisor Office connector"],
+      "purpose": "Read a compact room status snapshot for Hermes chat and future dashboards.",
+      "provider_options": ["local Hermes office connector"],
       "required_secrets": [],
       "source_docs": ["https://github.com/NousResearch/hermes-agent"]
     },
@@ -270,7 +270,7 @@
       "owner_agent": "supervisor_agent",
       "implementation_status": "implemented",
       "purpose": "Queue an internal task retry decision for future workflow executors.",
-      "provider_options": ["local Supervisor Office connector"],
+      "provider_options": ["local Hermes office connector"],
       "required_secrets": [],
       "source_docs": ["https://github.com/NousResearch/hermes-agent"]
     },
@@ -279,7 +279,7 @@
       "owner_agent": "supervisor_agent",
       "implementation_status": "implemented",
       "purpose": "Record an internal task cancellation decision for future workflow executors.",
-      "provider_options": ["local Supervisor Office connector"],
+      "provider_options": ["local Hermes office connector"],
       "required_secrets": [],
       "source_docs": ["https://github.com/NousResearch/hermes-agent"]
     },
@@ -287,8 +287,8 @@
       "priority": "recommended",
       "owner_agent": "supervisor_agent",
       "implementation_status": "implemented",
-      "purpose": "Hermes-style delegation alias that records a Supervisor assignment without opening arbitrary execution.",
-      "provider_options": ["local Supervisor Office connector"],
+      "purpose": "Hermes-style delegation alias that records a Hermes assignment without opening arbitrary execution.",
+      "provider_options": ["local Hermes office connector"],
       "required_secrets": [],
       "source_docs": ["https://github.com/NousResearch/hermes-agent"]
     },

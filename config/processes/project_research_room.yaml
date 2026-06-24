@@ -6,7 +6,7 @@
   "execution_strategy": {
     "current_phase": 3,
     "current_mode": "full_parallel_agent_swarm",
-    "phase_3": "Supervisor seeds the source/candidate context, then the research_swarm runs together. Social/KOL carries two roles inside the swarm: market_signal_intake as the first public-signal layer and candidate_social_verification after candidate context exists.",
+    "phase_3": "Hermes Agent seeds the source/candidate context, then the research_swarm runs together. Social/KOL carries two roles inside the swarm: market_signal_intake as the first public-signal layer and candidate_social_verification after candidate context exists.",
     "phase_4": "Run multiple candidate Research Rooms in parallel and merge room-level summaries."
   },
   "inspired_by": [
@@ -173,9 +173,9 @@
     "default_event_style": "stream",
     "dock": "JIMMORIA HQ runtime dock remains visible while a room runs",
     "board_command": "/board",
-    "supervisor_office": "Supervisor creates and assigns task records before specialist agents run",
+    "supervisor_office": "Hermes Agent creates and assigns task records before specialist agents run",
     "agent_council": "Specialist findings are deliberated before report writing",
-    "final_review": "Supervisor reviews report quality, evidence packet, and delivery mode before Obsidian sync"
+    "final_review": "Hermes Agent reviews report quality, evidence packet, and delivery mode before Obsidian sync"
   },
   "memory_policy": {
     "save_run": true,

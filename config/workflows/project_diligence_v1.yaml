@@ -5,7 +5,7 @@ workflow:
     domain: crypto_research
     output: source_backed_project_report
   nodes:
-    - id: Supervisor
+    - id: Hermes
       type: agent
       agent_ref: supervisor_agent
 
@@ -48,7 +48,7 @@ workflow:
         reset_on_emit: true
 
   edges:
-    - from: Supervisor
+    - from: Hermes
       to: Ingestion
       trigger: true
       condition: true

@@ -168,7 +168,7 @@ Current workflow manifests:
 The main project diligence path is:
 
 ```text
-Supervisor
+Hermes
 -> Ingestion
 -> Social and KOL
 -> Product and Docs

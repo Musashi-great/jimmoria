@@ -220,7 +220,7 @@
   },
   "notes": [
     "Recommended setup uses OAuth/local sessions only: Codex local login, Hermes xAI OAuth, and Claude CLI login.",
-    "When more than one family is attached, JIMMORIA sets LLM_PROVIDER=multi and Supervisor/ModelGateway routes agents by role automatically.",
+    "When more than one family is attached, JIMMORIA sets LLM_PROVIDER=multi and Hermes Agent/ModelGateway routes agents by role automatically.",
     "Codex remains the recommended orchestration/final-writing family because it can reuse the local ChatGPT/Codex login.",
     "Grok/xAI is available through Hermes xAI OAuth (LLM_PROVIDER=xai_oauth) and through the legacy OpenAI-compatible xAI API at https://api.x.ai/v1.",
     "Hermes xAI OAuth uses accounts.x.ai and stores tokens in ~/.hermes/auth.json; JIMMORIA imports the runtime bearer without persisting token material.",

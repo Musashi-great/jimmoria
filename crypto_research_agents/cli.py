@@ -1549,7 +1549,7 @@ def run_chat_report_workflow(
             f"1. 입력 해석: {title}",
             f"2. 기준 소스: {source_line}",
             "3. 확인: Enter/y를 받으면 Research Room을 엽니다.",
-            f"4. 실행: 슈퍼바이저 + 전문 에이전트 {len(DEFAULT_AGENTS)}개가 근거를 수집합니다.",
+            f"4. 실행: Hermes Agent + 전문 에이전트 {len(DEFAULT_AGENTS)}개가 근거를 수집합니다.",
             "5. 산출물: 리서치 보고서, room 기록, event/tool audit을 저장합니다.",
         ],
     )
@@ -1621,6 +1621,9 @@ def legacy_classify_chat_input(line: str) -> str:
         "한글로",
         "한국어",
         "영어단어",
+        "Hermes",
+        "hermes",
+        "헤르메스",
         "슈퍼바이저",
         "supervisor",
         "사장",
@@ -1702,21 +1705,21 @@ def apply_company_instruction(line: str, settings: CompanySettings) -> list[str]
         settings.allow_english_terms = True
         applied.append("English technical terms allowed")
 
-    if any(term in line for term in ["슈퍼바이저", "수퍼바이저", "사장", "대표", "CEO", "외주", "회사에다가", "광범위", "권한", "오케스트레이터", "오케스트레이션", "조율"]):
+    if any(term in line for term in ["Hermes", "hermes", "헤르메스", "슈퍼바이저", "수퍼바이저", "사장", "대표", "CEO", "외주", "회사에다가", "광범위", "권한", "오케스트레이터", "오케스트레이션", "조율"]):
         settings.supervisor_mode = "company_ceo"
         settings.client_relationship = "outsourcing_client"
-        _add_unique(settings.operating_principles, "Supervisor acts as company CEO: classify intent before opening a Research Room.")
+        _add_unique(settings.operating_principles, "Hermes Agent acts as company CEO: classify intent before opening a Research Room.")
         _add_unique(settings.operating_principles, "Treat the user as an outsourcing client giving company-level work orders.")
-        _add_unique(settings.operating_principles, "Every plain chat input passes through Supervisor intake before any agent room is opened.")
-        _add_unique(settings.operating_principles, "Supervisor acts as the orchestrator: plan, delegate, coordinate specialist agents, convene council, and final-review delivery.")
+        _add_unique(settings.operating_principles, "Every plain chat input passes through Hermes intake before any agent room is opened.")
+        _add_unique(settings.operating_principles, "Hermes Agent acts as the orchestrator: plan, delegate, coordinate specialist agents, convene council, and final-review delivery.")
         _add_unique(settings.supervisor_authority, "route_all_plain_chat_inputs")
         _add_unique(settings.supervisor_authority, "choose_response_shape_per_request")
         _add_unique(settings.supervisor_authority, "block_unnecessary_report_generation")
         _add_unique(settings.supervisor_authority, "orchestrate_specialist_workflow")
         _add_unique(settings.supervisor_authority, "coordinate_agent_council")
         _add_unique(settings.supervisor_authority, "perform_final_delivery_review")
-        applied.append("Supervisor mode: company CEO / outsourcing intake")
-        applied.append("Supervisor role: orchestrator / specialist coordinator")
+        applied.append("Hermes mode: company CEO / outsourcing intake")
+        applied.append("Hermes role: orchestrator / specialist coordinator")
 
     if any(term in line for term in ["설정 변경", "자체 반영", "아닐경우", "그러지말고", "출력하는게 달라", "입력하는거에 따라서"]):
         settings.auto_apply_company_instructions = True
@@ -2200,7 +2203,7 @@ def configure_all_logged_in_models() -> None:
         [
             "Detected OAuth/local model sessions were applied.",
             "API keys are ignored by this recommended path.",
-            "When several families are attached, Supervisor/ModelGateway routes agents automatically.",
+            "When several families are attached, Hermes Agent/ModelGateway routes agents automatically.",
             f"Attached: {attached_model_family_label()}",
             f"Codex OAuth/local: {codex_login_status()}",
             f"Grok OAuth: {grok_oauth_status()}",
@@ -2465,7 +2468,7 @@ def configure_codex_grok_hybrid() -> None:
         [
             "JIMMORIA will use both OAuth/local model families in one Research Room.",
             "",
-            "Codex agents: Supervisor, Ingestion, Contract/On-chain, Product/Tech, Funding/Token, Report, Obsidian.",
+            "Codex agents: Hermes, Ingestion, Contract/On-chain, Product/Tech, Funding/Token, Report, Obsidian.",
             "Grok agents: Social/KOL, Narrative, Discovery.",
             "",
             "Codex auth: SDK/CLI OAuth local login.",
@@ -2690,7 +2693,7 @@ def print_current_model_config() -> None:
         [
             f"Provider: {provider}",
             f"Attached families: {attached_model_family_label()}",
-            f"Supervisor model: {supervisor_decision.selected_model} ({supervisor_decision.provider_family})",
+            f"Hermes model: {supervisor_decision.selected_model} ({supervisor_decision.provider_family})",
             f"Narrative model: {narrative_decision.selected_model} ({narrative_decision.provider_family})",
             f"Discovery model: {discovery_decision.selected_model} ({discovery_decision.provider_family})",
             f"Social/KOL model: {social_decision.selected_model} ({social_decision.provider_family})",

@@ -70,7 +70,7 @@ def tool_call_guardrail(
     reason = "read-only research tool call is allowed"
     if repeated_failures >= 3:
         decision = "pause"
-        reason = "same tool failed repeatedly; route back to Supervisor before another attempt"
+        reason = "same tool failed repeatedly; route back to Hermes Agent before another attempt"
     return success(
         "tool_call_guardrail",
         {

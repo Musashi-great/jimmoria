@@ -35,11 +35,11 @@ WORKFLOW_NODES = [
     {
         "id": "user",
         "label": "User Brief",
-        "description": "You chat with the Supervisor and decide whether a Research Room should open.",
+        "description": "You chat with Hermes Agent and decide whether a Research Room should open.",
     },
     {
         "id": "supervisor",
-        "label": "Supervisor CEO",
+        "label": "Hermes CEO",
         "description": "Classifies intent, creates the plan, delegates tasks, and owns final quality.",
     },
     {
@@ -59,8 +59,8 @@ WORKFLOW_NODES = [
     },
     {
         "id": "final_review",
-        "label": "Supervisor Final Review",
-        "description": "Supervisor reviews evidence quality and delivery mode before the user receives output.",
+        "label": "Hermes Final Review",
+        "description": "Hermes Agent reviews evidence quality and delivery mode before the user receives output.",
     },
     {
         "id": "delivery",
@@ -395,7 +395,7 @@ def render_dashboard_html() -> str:
     <section class="hero">
       <div>
         <div class="brand">JIMMORIA</div>
-        <div class="subtitle">Web Research HQ. Watch the Supervisor, Research Room, specialist agents, Agent Council, final review, reports, and vault artifacts from one local dashboard.</div>
+        <div class="subtitle">Web Research HQ. Watch Hermes Agent, Research Room, specialist agents, Agent Council, final review, reports, and vault artifacts from one local dashboard.</div>
       </div>
       <div class="status-grid">
         <div class="metric"><b>Runtime</b><span id="runtimeStatus">loading</span></div>
@@ -416,7 +416,7 @@ def render_dashboard_html() -> str:
         <section class="panel">
           <h2>Company Structure</h2>
           <div class="panel-body">
-            <div class="workflow" id="workflow"><div class="empty">Loading workflow: Agent Council, Supervisor Final Review.</div></div>
+            <div class="workflow" id="workflow"><div class="empty">Loading workflow: Agent Council, Hermes Final Review.</div></div>
           </div>
         </section>
 

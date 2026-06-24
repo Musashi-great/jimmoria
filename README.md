@@ -85,7 +85,7 @@ the total LLM call/token count in the header.
 
 ```text
 +--------------------------------------------------------------------------------+
-| JIMMORIA HQ | 슈퍼바이저 대화 | provider: codex_sdk | room: room_x | agents... |
+| JIMMORIA HQ | Hermes Agent | provider: codex_sdk | room: room_x | agents... |
 | 토큰 사용: ~42.0k tokens | LLM 호출: 12 | 로그: 백단 저장                  |
 | 진행: 스카우터 -> 툴 실행: web_search - official project query | 대기: ... |
 | 전체 AI 에이전트 대시보드 - 현재 작업                                      |
@@ -137,7 +137,7 @@ Recommended setup panel choice:
 1. Auto-attach OAuth/local logged-in models
 ```
 
-This applies only model families that are already authenticated through OAuth/local sessions: Codex SDK/CLI login, Hermes xAI OAuth, Grok OAuth token env/file/command, and Claude CLI. API keys are not auto-attached from the recommended flow. If more than one family is found, JIMMORIA sets `LLM_PROVIDER=multi` and the Supervisor/ModelGateway distributes work by role automatically.
+This applies only model families that are already authenticated through OAuth/local sessions: Codex SDK/CLI login, Hermes xAI OAuth, Grok OAuth token env/file/command, and Claude CLI. API keys are not auto-attached from the recommended flow. If more than one family is found, JIMMORIA sets `LLM_PROVIDER=multi` and Hermes Agent/ModelGateway distributes work by role automatically.
 
 Install Codex SDK support:
 
@@ -184,7 +184,7 @@ jimmoria
 Default multi-model routing:
 
 ```text
-Codex: supervisor, ingestion, contract/on-chain, product/tech, funding/token, report, Obsidian
+Codex: Hermes, ingestion, contract/on-chain, product/tech, funding/token, report, Obsidian
 Grok:  social/KOL, narrative, discovery
 ```
 
@@ -199,7 +199,7 @@ $env:JIMMORIA_AGENT_PROVIDER_REPORT_AGENT = "codex"
 Default model routing:
 
 ```text
-Codex supervisor chat:        gpt-5.4-mini
+Codex Hermes chat:            gpt-5.4-mini
 Codex specialist reasoning:   gpt-5.5 + pro reasoning
 Grok-only chat/reasoning:     grok-4.3 + high reasoning effort
 Multi-model report synthesis: Codex writing model + pro reasoning
@@ -209,16 +209,16 @@ For Codex CLI, JIMMORIA maps `pro` to the local Codex config value `model_reason
 
 ## How The Company Works
 
-The user talks to the Supervisor. The Supervisor acts as the company boss and orchestrator.
+The user talks to Hermes Agent. Hermes Agent acts as the company boss, memory keeper, and orchestrator.
 
-The Supervisor now has a Hermes-style front-door state layer. It keeps a
+Hermes Agent is the front-door state layer. It keeps a
 persistent conversation session in `data/supervisor_session.json`, durable
 operating preferences in `data/supervisor_memory.json`, and still opens
 Research Rooms only when the user asks for actual research, analysis, dossier,
-or report work. Normal conversation stays with the Supervisor; executable work
+or report work. Normal conversation stays with Hermes Agent; executable work
 is planned and delegated to specialist agents.
 
-Before dispatch, the Supervisor writes a Job Contract. Normal chat uses a
+Before dispatch, Hermes Agent writes a Job Contract. Normal chat uses a
 single-agent loop: answer directly, update memory/settings if needed, and keep
 the room closed. Confirmed research/report work uses a closed fleet loop:
 define the goal, output mode, specialist roster, source requirements, cost
@@ -228,7 +228,7 @@ only failed or missing-evidence slices instead of looping indefinitely.
 
 Hermes-inspired optimization rules are part of that contract: keep the core
 loop as a narrow waist, choose the lightest extension rung that solves the job,
-use compact skill/tool indexes before loading details, keep durable Supervisor
+use compact skill/tool indexes before loading details, keep durable Hermes
 memory small and high-signal, search old sessions/runs only on demand, and pass
 fresh subagents explicit task context instead of assuming they remember the
 parent conversation.
@@ -237,10 +237,10 @@ Typical flow:
 
 ```text
 User request
--> Supervisor intake and confirmation
--> Supervisor writes a bounded Job Contract
+-> Hermes intake and confirmation
+-> Hermes writes a bounded Job Contract
 -> Research Room opens for /research, /dossier, or explicit report/dossier creation
--> Supervisor creates a plan and delegates tasks
+-> Hermes creates a plan and delegates tasks
 -> Ingestion stores the request/source
 -> Social/KOL agent collects X, KOL, public thread, and article market signals first
    - who said what, official/candidate X handles, timeline status, and article/KOL opinion sources
@@ -248,18 +248,18 @@ User request
 -> Product/docs/GitHub, token/chain, funding, and candidate-specific social checks verify the project
 -> Agent Council summarizes agreement and risks
 -> ReportAgent drafts the report
--> Supervisor performs final review
+-> Hermes performs final review
 -> CLI/web output, report file, and Obsidian notes are saved
 ```
 
-For ordinary conversation, configuration requests, source-only notes, or loose "research this" messages, the Supervisor answers directly and keeps the room closed. Ask for a report or dossier when you want the full multi-agent room.
+For ordinary conversation, configuration requests, source-only notes, or loose "research this" messages, Hermes Agent answers directly and keeps the room closed. Ask for a report or dossier when you want the full multi-agent room.
 
 Project-specific seed evidence is kept outside agent code in `config/project_profiles/`. These profiles can hold aliases, official site/X/docs, search seeds, address registry hints, funding context, and article notes. Agents can use them as starting evidence, but the report still labels what is confirmed, partial, or unverified.
 
 ## Core Agents
 
 ```text
-supervisor_agent          Plans, routes, confirms, and final-reviews work
+supervisor_agent          Hermes Agent compatibility id; plans, routes, confirms, and final-reviews work
 ingestion_agent           Stores sources and extracts metadata
 social_kol_agent          First collects X/KOL/thread/article signals, then checks official social identity
 narrative_agent           Maps market narratives and thesis categories
@@ -269,7 +269,7 @@ product_tech_agent        Checks website, docs, GitHub, and product readiness
 funding_token_agent       Reviews investors, points, airdrop, and token hints
 report_agent              Turns findings into a human-readable dossier
 obsidian_curator_agent    Saves projects, sources, narratives, and reports
-signal_triage_agent       Planned: routes monitor signals to archive/watchlist/Supervisor review
+signal_triage_agent       Planned: routes monitor signals to archive/watchlist/Hermes review
 ```
 
 ## Agent Skills And Hooks
@@ -294,7 +294,7 @@ config/skills/skill_registry.yaml
 .agents/skills/<skill-name>/SKILL.md
 ```
 
-This lets `skill_view` and the Supervisor read the same structured skill definitions instead of treating skills as loose prompt text.
+This lets `skill_view` and Hermes Agent read the same structured skill definitions instead of treating skills as loose prompt text.
 Only the core skills are mirrored as `SKILL.md` right now: identity gate, market signal intake, contract/token info, and report writing.
 
 Hooks use the same idea. Agents still declare phase hooks in `config/agents/*.yaml`, while `config/hooks/` can now hold Hermes-style hook manifests:
@@ -413,7 +413,7 @@ Current active phase:
 
 ```text
 Phase 3: full_parallel_research_swarm
-After the Supervisor seeds the shared source/candidate context, ingestion, Social/KOL,
+After Hermes Agent seeds the shared source/candidate context, ingestion, Social/KOL,
 Narrative, Discovery, Contract/On-chain, Product/Tech, and Funding/Token agents run
 at the same time.
 ```
@@ -525,7 +525,7 @@ the entire Markdown report immediately.
 
 JIMMORIA does not depend on Google's AX runtime, but it now borrows the parts that fit this company structure:
 
-- a single Supervisor/Runtime path acts as the controller for each room
+- a single Hermes/Runtime path acts as the controller for each room
 - every runtime event gets a stable `seq`
 - agent and room events include `duration_ms` plus LLM call/token usage
 - `events.json` can be replayed from a cursor instead of reading the whole room again

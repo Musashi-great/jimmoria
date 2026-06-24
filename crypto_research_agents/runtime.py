@@ -408,7 +408,7 @@ class ResearchRuntime:
         candidate = self.memory.upsert_project(
             ProjectCandidate(
                 name=_seed_project_name(project_query),
-                reason_found="Supervisor seeded the primary candidate before the full parallel research swarm.",
+                reason_found="Hermes seeded the primary candidate before the full parallel research swarm.",
                 website=(profile.website if profile else _seed_website(project_query, identity_hints)),
                 x_account=(profile.official_x if profile else _seed_x_account(identity_hints)),
                 chain=profile.chain if profile else None,
@@ -445,7 +445,7 @@ class ResearchRuntime:
             source_id=source.source_id,
             candidate_id=candidate.project_id,
             project_query=project_query,
-            summary="Supervisor seeded shared source and candidate context before the full parallel research swarm.",
+            summary="Hermes seeded shared source and candidate context before the full parallel research swarm.",
         )
 
     def _seed_specialist_requests(self, room: ResearchRoom, candidate_id: str) -> None:
@@ -727,7 +727,7 @@ class ResearchRuntime:
             "final_review_start",
             room_id=room.room_id,
             agent_id="supervisor_agent",
-            summary="Supervisor reviews council consensus, quality gate, and report draft before delivery.",
+            summary="Hermes reviews council consensus, quality gate, and report draft before delivery.",
         )
         review = _build_supervisor_final_review(room)
         review_finding = self.memory.add_finding(
@@ -773,7 +773,7 @@ class ResearchRuntime:
         if korean:
             section = [
                 "",
-                "## 9. Supervisor Final Review",
+                "## 9. Hermes Final Review",
                 f"- 전달 모드: `{review['delivery_mode']}`",
                 f"- 전달 승인: `{str(review['approved_for_delivery']).lower()}`",
                 f"- 최종 판단: {review['summary']}",
@@ -781,7 +781,7 @@ class ResearchRuntime:
         else:
             section = [
                 "",
-                "## 9. Supervisor Final Review",
+                "## 9. Hermes Final Review",
                 f"- Delivery mode: `{review['delivery_mode']}`",
                 f"- Approved for delivery: `{str(review['approved_for_delivery']).lower()}`",
                 f"- Final judgment: {review['summary']}",
@@ -956,7 +956,7 @@ class ResearchRuntime:
                 mode=orchestration_plan.get("mode"),
                 delegated_count=orchestration_plan.get("delegated_count"),
                 checkpoints=orchestration_plan.get("coordination_checkpoints", []),
-                summary="Supervisor set the orchestration plan and coordination checkpoints.",
+                summary="Hermes set the orchestration plan and coordination checkpoints.",
             )
 
     def _save_run(self, room: ResearchRoom, memory_path: str | Path | None) -> None:
@@ -1183,7 +1183,7 @@ def _build_supervisor_final_review(room: ResearchRoom) -> dict[str, Any]:
     if insufficient:
         delivery_mode = "diagnostic_memo"
         summary = (
-            "Supervisor approved delivery as a diagnostic memo, not as a completed research report, because evidence remains insufficient."
+            "Hermes approved delivery as a diagnostic memo, not as a completed research report, because evidence remains insufficient."
         )
         required_followups = [
             "Add source-backed social/KOL evidence.",
@@ -1193,7 +1193,7 @@ def _build_supervisor_final_review(room: ResearchRoom) -> dict[str, Any]:
         confidence = 0.55
     else:
         delivery_mode = "final_research_report"
-        summary = "Supervisor approved the report for client delivery after council consensus and quality review."
+        summary = "Hermes approved the report for client delivery after council consensus and quality review."
         required_followups = []
         confidence = 0.8
     return {

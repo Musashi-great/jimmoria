@@ -17,7 +17,7 @@ def generate_supervisor_chat_reply(
     session_context: list[str] | None = None,
     model_gateway: ModelGateway | None = None,
 ) -> list[str]:
-    """Answer as the front-door Supervisor without opening a Research Room."""
+    """Answer as the front-door Hermes Agent without opening a Research Room."""
 
     gateway = model_gateway or ModelGateway()
     provider_name = getattr(gateway.provider, "provider_name", "")
@@ -48,8 +48,9 @@ def generate_supervisor_chat_reply(
 def supervisor_chat_system_prompt(settings: CompanySettings) -> str:
     return "\n".join(
         [
-            "You are the JIMMORIA Supervisor, the boss and front-door operator of a crypto research-only multi-agent company.",
-            "The user is your client. Talk naturally and directly, like a capable executive assistant and research company CEO.",
+            "You are JIMMORIA Hermes Agent, the boss, memory keeper, and front-door operator of a crypto research-only multi-agent company.",
+            "The internal compatibility id may still be supervisor_agent, but your user-facing identity is Hermes Agent.",
+            "The user is your client. Talk naturally and directly, like a capable executive assistant, research company CEO, and central orchestrator.",
             "Do not sound like a classifier, router, or log system.",
             "Do not mention hidden intent labels unless the user asks about internals.",
             "Do not open or promise a full report unless the user explicitly asks for research, analysis, investigation, or report generation.",
@@ -59,7 +60,7 @@ def supervisor_chat_system_prompt(settings: CompanySettings) -> str:
             "Korean is preferred for conversation. English crypto/technical terms may be used when natural.",
             f"Current report_language: {settings.report_language}",
             f"English technical terms allowed: {settings.allow_english_terms}",
-            f"Supervisor mode: {settings.supervisor_mode}",
+            f"Hermes mode: {settings.supervisor_mode}",
             f"Client relationship: {settings.client_relationship}",
         ]
     )
@@ -83,7 +84,7 @@ def supervisor_chat_user_prompt(
         "settings": settings.to_dict(),
         "internal_decision": decision.to_dict(),
         "instruction": (
-            "Reply as the Supervisor in 1-5 concise Korean sentences. "
+            "Reply as Hermes Agent in 1-5 concise Korean sentences. "
             "Use supervisor_memory and session_context for continuity, but do not expose hidden labels. "
             "If the user gives executable work, explain that you will dispatch specialists through the research company path."
         ),
@@ -97,7 +98,7 @@ def fallback_supervisor_chat_reply(line: str, settings: CompanySettings) -> list
 
     if compact in {"안녕", "안녕하세요", "하이", "ㅎㅇ", "hello", "hi", "hey"}:
         return [
-            "안녕. 나는 JIMMORIA Supervisor야.",
+            "안녕. 나는 JIMMORIA Hermes Agent야.",
             "나한테 편하게 말하면 돼. 리서치가 필요하면 방을 열고, 설정이나 방향 이야기면 여기서 바로 정리할게.",
         ]
 
@@ -111,9 +112,9 @@ def fallback_supervisor_chat_reply(line: str, settings: CompanySettings) -> list
             return ["응, 현재 보고서는 한국어 우선으로 작성되도록 설정돼 있어. crypto 용어는 필요하면 영어 그대로 섞어서 쓰는 정책이야."]
         return [f"아직 한국어 우선은 아니야. 현재 report_language는 `{settings.report_language}`이고, 바꾸려면 '보고서는 한글로 만들어'라고 말하면 돼."]
 
-    if any(term in line for term in ["슈퍼바이저", "사장", "보스", "대표", "권한", "외주"]):
+    if any(term in line for term in ["Hermes", "hermes", "헤르메스", "슈퍼바이저", "사장", "보스", "대표", "권한", "외주"]):
         return [
-            "맞아. 나는 이 회사의 보스 겸 front desk야.",
+            "맞아. 나는 이 회사의 Hermes Agent, 보스 겸 front desk야.",
             "너는 나한테 편하게 외주 주듯 말하면 되고, 나는 필요한 경우에만 내부 에이전트들에게 일을 나눠줄게.",
         ]
 

@@ -75,6 +75,6 @@
   ],
   "must_not": [
     "Do not use private chat channel connectors.",
-    "Do not tell another agent to start work without Supervisor routing."
+    "Do not tell another agent to start work without Hermes routing."
   ]
 }

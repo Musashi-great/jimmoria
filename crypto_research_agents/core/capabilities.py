@@ -120,11 +120,11 @@ def collect_capabilities(
     ]
 
     tool_specs = [
-        ("Supervisor room opener", "create_research_room"),
-        ("Supervisor task creator", "create_task"),
-        ("Supervisor task assignment", "assign_task"),
-        ("Supervisor handoff", "agent_handoff"),
-        ("Supervisor task status", "update_task_status"),
+        ("Hermes room opener", "create_research_room"),
+        ("Hermes task creator", "create_task"),
+        ("Hermes task assignment", "assign_task"),
+        ("Hermes handoff", "agent_handoff"),
+        ("Hermes task status", "update_task_status"),
         ("Public web search", "web_search"),
         ("X/Twitter search", "x_search_posts"),
         ("X/KOL timeline", "x_get_user_timeline"),

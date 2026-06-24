@@ -8,7 +8,7 @@ from crypto_research_agents.core.supervisor_intake import SupervisorIntakeDecisi
 
 @dataclass(slots=True)
 class SupervisorJobContract:
-    """Bounded loop contract chosen by the Supervisor before work dispatch."""
+    """Bounded loop contract chosen by Hermes Agent before work dispatch."""
 
     loop_mode: str
     output_mode: str
@@ -75,7 +75,7 @@ def build_supervisor_job_contract(
             "Do not hide internal uncertainty if the user asks about system behavior.",
         ],
         completion_criteria=[
-            "Supervisor answered directly or persisted the requested setting/memory update.",
+            "Hermes Agent answered directly or persisted the requested setting/memory update.",
         ],
         iteration_policy={
             "mode": "bounded_single_turn",
@@ -96,7 +96,7 @@ def build_supervisor_job_contract(
             "requires_explicit_handoff_context": False,
             "recursive_delegation_allowed": False,
         },
-        notes=["Single-agent loop is used for Supervisor conversation and lightweight control-plane work."],
+        notes=["Single-agent loop is used for Hermes Agent conversation and lightweight control-plane work."],
     )
 
 
@@ -129,7 +129,7 @@ def _closed_fleet_contract(
             "Report output must be a reader-facing project intelligence memo, not raw logs.",
         ]
         completion_criteria = [
-            "Supervisor owns the goal and delegates specialist evidence work.",
+            "Hermes Agent owns the goal and delegates specialist evidence work.",
             "Specialist findings are merged through council/final review.",
             "Report or diagnostic memo states missing evidence plainly.",
             "Evidence packet and raw logs remain in artifacts, not the main report body.",
@@ -190,7 +190,7 @@ def _closed_fleet_contract(
         },
         notes=[
             "Open exploration is limited to candidate discovery; the room itself is a closed fleet loop.",
-            "The Supervisor owns the goal; specialists own evidence slices.",
+            "Hermes Agent owns the goal; specialists own evidence slices.",
         ],
     )
 
@@ -215,7 +215,7 @@ def max_agent_attempts_from_contract(contract: dict[str, Any] | None, *, default
 def _hermes_extension_policy(*, extension_rung: str) -> dict[str, Any]:
     return {
         "architecture_rule": "narrow_waist",
-        "core_boundary": "Keep the Supervisor/Runtime loop stable; add capability through config, skills, toolsets, connectors, MCP, or job contracts first.",
+        "core_boundary": "Keep the Hermes/Runtime loop stable; add capability through config, skills, toolsets, connectors, MCP, or job contracts first.",
         "selected_rung": extension_rung,
         "footprint_ladder": [
             "extend_existing_config_or_skill",
@@ -239,8 +239,8 @@ def _hermes_context_policy(*, loop_shape: str) -> dict[str, Any]:
 
 def _hermes_memory_policy() -> dict[str, Any]:
     return {
-        "durable_notes": "Keep supervisor_memory small, high-signal, and preference-oriented.",
-        "user_model": "Use Supervisor session context for style, continuity, last room, and operating preferences.",
+        "durable_notes": "Keep Hermes memory small, high-signal, and preference-oriented.",
+        "user_model": "Use Hermes session context for style, continuity, last room, and operating preferences.",
         "deep_recall": "Search saved runs/sessions on demand instead of stuffing old transcripts into every prompt.",
         "memory_write_rule": "Persist stable preferences and room pointers; do not dump raw logs into durable memory.",
     }

@@ -1,6 +1,6 @@
 {
   "skill_id": "signal_triage",
-  "description": "Deduplicate raw monitor signals, resolve likely project identity, score priority, and route the item to archive, watchlist, or Supervisor review.",
+  "description": "Deduplicate raw monitor signals, resolve likely project identity, score priority, and route the item to archive, watchlist, or Hermes review.",
   "steps": [
     "load_signal_queue_item",
     "merge_duplicate_signals",

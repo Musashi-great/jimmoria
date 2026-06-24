@@ -9,7 +9,7 @@ from crypto_research_agents.core.input_resolver import resolve_research_input
 
 @dataclass(slots=True)
 class SupervisorIntakeDecision:
-    """The company president's first-pass routing decision for a chat input."""
+    """Hermes Agent's first-pass routing decision for a chat input."""
 
     intent_type: str
     action: str
@@ -53,7 +53,7 @@ def build_supervisor_reply(
         ]
     elif _looks_like_small_talk(line.strip(), lowered):
         lines = [
-            "안녕하세요. JIMMORIA Supervisor입니다.",
+            "안녕하세요. JIMMORIA Hermes Agent입니다.",
             "리서치 지시, 회사 설정 변경, 상태 확인 중 무엇을 원하는지 말해주면 제가 먼저 분류해서 처리하겠습니다.",
         ]
     elif any(term in line for term in ["보고서", "리포트", "레포트", "한글", "한국어", "세팅", "설정"]):
@@ -63,10 +63,10 @@ def build_supervisor_reply(
         else:
             lines.append(f"아직 한국어 우선은 아닙니다. 현재 report_language는 `{report_language}`입니다.")
         lines.append(f"영어 기술 용어 정책은 `{terms_policy}`입니다.")
-    elif any(term in line for term in ["슈퍼바이저", "사장", "대표", "권한", "외주"]):
+    elif any(term in line for term in ["Hermes", "hermes", "헤르메스", "슈퍼바이저", "사장", "대표", "권한", "외주"]):
         lines = [
-            "Supervisor는 현재 모든 일반 채팅 입력을 먼저 받고 출력 모드를 결정합니다.",
-            f"현재 supervisor_mode는 `{settings.supervisor_mode}`입니다.",
+            "Hermes Agent는 현재 모든 일반 채팅 입력을 먼저 받고 출력 모드를 결정합니다.",
+            f"현재 Hermes mode는 `{settings.supervisor_mode}`입니다.",
         ]
     elif "report" in lowered:
         lines = ["명시적으로 조사/분석/보고서 작성을 요청할 때만 전체 Research Room을 엽니다."]
@@ -91,7 +91,7 @@ def build_company_instruction_reply(
         [
             "",
             f"현재 보고서 언어: {settings.report_language}",
-            f"현재 Supervisor mode: {settings.supervisor_mode}",
+            f"현재 Hermes mode: {settings.supervisor_mode}",
         ]
     )
     return lines
@@ -113,7 +113,7 @@ def build_supervisor_dispatch_reply(decision: SupervisorIntakeDecision, agent_co
 def build_company_status_reply(settings: CompanySettings) -> list[str]:
     return [
         "현재 회사 설정을 보여드리겠습니다.",
-        f"Supervisor mode는 `{settings.supervisor_mode}`이고, 보고서 언어는 `{settings.report_language}`입니다.",
+        f"Hermes mode는 `{settings.supervisor_mode}`이고, 보고서 언어는 `{settings.report_language}`입니다.",
     ]
 
 
@@ -142,7 +142,7 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
             output_mode="supervisor_reply",
             needs_research_room=False,
             confidence=0.9,
-            rationale="The client is greeting or casually talking to the Supervisor.",
+            rationale="The client is greeting or casually talking to Hermes Agent.",
             next_step="Reply directly and wait for a concrete research, settings, or status request.",
             supervisor_authority=authority,
         )
@@ -155,7 +155,7 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
             needs_research_room=False,
             confidence=0.82,
             rationale="The client is asking to inspect the company or current operating state.",
-            next_step="Show settings, routing policy, and supervisor authority.",
+            next_step="Show settings, routing policy, and Hermes authority.",
             supervisor_authority=authority,
         )
 
@@ -166,7 +166,7 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
             output_mode="supervisor_reply",
             needs_research_room=False,
             confidence=0.84,
-            rationale="The client is asking the Supervisor a confirmation or operating question.",
+            rationale="The client is asking Hermes Agent a confirmation or operating question.",
             next_step="Reply directly without opening a Research Room or writing a report.",
             supervisor_authority=authority,
         )
@@ -246,8 +246,8 @@ def decide_supervisor_intake(line: str, settings: CompanySettings | None = None)
             output_mode="supervisor_reply",
             needs_research_room=False,
             confidence=0.8,
-            rationale="The input is phrased as a conversation with the Supervisor rather than a task dispatch.",
-            next_step="Answer as the company president and keep the room closed.",
+            rationale="The input is phrased as a conversation with Hermes Agent rather than a task dispatch.",
+            next_step="Answer as Hermes Agent and keep the room closed.",
             supervisor_authority=authority,
         )
 
@@ -343,6 +343,9 @@ COMPANY_CONFIG_TERMS = [
     "한글로",
     "한국어",
     "영어단어",
+    "Hermes",
+    "hermes",
+    "헤르메스",
     "슈퍼바이저",
     "수퍼바이저",
     "supervisor",
@@ -632,6 +635,9 @@ def _looks_like_supervisor_chat(original: str, lowered: str) -> bool:
             "레포트",
             "설정",
             "세팅",
+            "Hermes",
+            "hermes",
+            "헤르메스",
             "슈퍼바이저",
             "수퍼바이저",
             "사장",

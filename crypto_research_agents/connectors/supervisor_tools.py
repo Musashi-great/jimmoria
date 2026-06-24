@@ -16,7 +16,7 @@ def create_research_room(
 ) -> dict[str, Any]:
     return {
         "status": "success",
-        "message": f"Supervisor office opened {research_room_id}.",
+        "message": f"Hermes office opened {research_room_id}.",
         "data": {
             "room_id": research_room_id,
             "topic": topic,

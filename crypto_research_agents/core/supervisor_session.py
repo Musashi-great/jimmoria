@@ -37,7 +37,7 @@ class SupervisorSessionMessage:
 
 
 class SupervisorSessionStore:
-    """Persistent conversation state for the front-door Supervisor."""
+    """Persistent conversation state for Hermes Agent; class name stays for compatibility."""
 
     def __init__(
         self,
@@ -143,7 +143,7 @@ class SupervisorSessionStore:
         first_user = next((item.content for item in old if item.role == "user"), "")
         last_user = next((item.content for item in reversed(old) if item.role == "user"), "")
         summary = (
-            f"Compacted {len(old)} older Supervisor messages "
+            f"Compacted {len(old)} older Hermes messages "
             f"({user_count} user, {supervisor_count} supervisor). "
             f"First user topic: {first_user[:120]}. Last older user topic: {last_user[:120]}."
         )

@@ -5,7 +5,7 @@ Current merged local-state handoff:
 
 이 문서는 JIMMORIA의 현재 구조, 에이전트 역할, 실행 흐름, 도구 정책, 저장 위치, 병렬화 로드맵을 설명한다.
 
-JIMMORIA는 크립토 가격 매매 도구가 아니라 리서치 전용 멀티에이전트 회사다. 사용자는 CLI 또는 로컬 웹 대시보드에서 Supervisor와 대화하고, Supervisor는 보고서나 dossier 작성이 명확히 요청될 때만 Research Room을 열어 하위 에이전트에게 작업을 배정한다.
+JIMMORIA는 크립토 가격 매매 도구가 아니라 리서치 전용 멀티에이전트 회사다. 사용자는 CLI 또는 로컬 웹 대시보드에서 Hermes Agent와 대화하고, Hermes Agent는 보고서나 dossier 작성이 명확히 요청될 때만 Research Room을 열어 하위 에이전트에게 작업을 배정한다.
 
 ## 1. 현재 방향
 
@@ -40,7 +40,7 @@ JIMMORIA의 핵심 목표는 "채팅으로 조종하는 크립토 리서치 회�
 - KOL/X/public web 기반 소셜 맥락 확인
 - RootData, CoinGecko, DEX Screener, explorer를 이용한 프로젝트 식별 보강
 - Agent Council을 통한 합의와 리스크 정리
-- Supervisor final review 후 Markdown 보고서와 Obsidian-style note 생성
+- Hermes final review 후 Markdown 보고서와 Obsidian-style note 생성
 - 나중에 웹 UI에서 replay할 수 있도록 이벤트 로그 저장
 
 ## 3. Top-Level Structure
@@ -118,8 +118,8 @@ crypto-research = "crypto_research_agents.cli:main"
 ```mermaid
 flowchart LR
     User[User] --> Console[CLI / Web]
-    Console --> Supervisor[Supervisor Agent]
-    Supervisor --> Runtime[ResearchRuntime]
+    Console --> Hermes[Hermes Agent]
+    Hermes --> Runtime[ResearchRuntime]
     Runtime --> Room[Research Room]
     Runtime --> Bus[Collaboration Bus]
     Runtime --> Memory[Shared Memory]
@@ -146,7 +146,7 @@ flowchart LR
 
 | Layer | File | Role |
 |---|---|---|
-| CLI | `crypto_research_agents/cli.py` | 명령어, 채팅 루프, Supervisor intake |
+| CLI | `crypto_research_agents/cli.py` | 명령어, 채팅 루프, Hermes intake |
 | Console | `crypto_research_agents/console.py` | 터미널 UI, 로고, 입력 dock, background event handling, live agent board |
 | Runtime | `crypto_research_agents/runtime.py` | Research Room 생성과 agent 실행 |
 | Research Room | `core/room.py` | 한 개 리서치 작업 단위 |
@@ -155,7 +155,7 @@ flowchart LR
 | Tool Gateway | `core/tool_gateway.py` | tool 권한, connector 호출, audit log |
 | Model Gateway | `core/model_gateway.py` | task type별 Codex/Grok provider route, pro reasoning effort |
 | Usage Meter | `core/usage.py` | LLM duration/token usage extraction, fallback estimation, room/agent aggregation |
-| Supervisor Brain | `core/supervisor_brain.py`, `core/supervisor_memory.py`, `core/supervisor_session.py`, `core/supervisor_job_contract.py` | Hermes-style front-door memory, session continuity, routing context, and bounded job contracts |
+| Hermes Brain | `core/supervisor_brain.py`, `core/supervisor_memory.py`, `core/supervisor_session.py`, `core/supervisor_job_contract.py` | Hermes-style front-door memory, session continuity, routing context, and bounded job contracts; `supervisor_*` names remain compatibility ids |
 | Concurrency Policy | `core/concurrency.py`, `config/concurrency.yaml` | Phase 1-4 병렬화 정책 |
 | Storage | `storage/` | run snapshot, reports, vault notes |
 | Web Dashboard | `web/` | 로컬 구조/런타임 시각화 |
@@ -183,7 +183,7 @@ dashboard를 유지한다. 내부 supervisor office tool event는 화면에 찍�
 ```text
 conversation transcript
   You > ...
-  Supervisor > ...
+  Hermes > ...
 
 fixed runtime dashboard
   JIMMORIA HQ | provider | room | agent counts
@@ -214,7 +214,7 @@ Now: active_agent -> current work | Waiting: next agents
 Room running notice
 전체 AI 에이전트 대시보드 - 현재 작업
 상태    AI                ID                          현재 작업
-진행    슈퍼바이저        supervisor_agent            Planning direction
+진행    Hermes        supervisor_agent            Planning direction
 대기    아카이비스트      ingestion_agent             Extracting metadata
 ...
 > working...
@@ -224,7 +224,7 @@ The active summary line exists so the user can still see the current worker with
 
 ## 5.2 Model Routing
 
-JIMMORIA는 Codex-only, Grok-only, Codex+Grok hybrid 모델 정책을 모두 지원한다. 기본 운영 권장값은 `LLM_PROVIDER=codex_grok`이다. 이 모드에서는 Supervisor/보고서/최종 검토는 Codex가 맡고, X/KOL과 내러티브/후보 발굴처럼 소셜 맥락이 중요한 작업은 Grok가 맡는다.
+JIMMORIA는 Codex-only, Grok-only, Codex+Grok hybrid 모델 정책을 모두 지원한다. 기본 운영 권장값은 `LLM_PROVIDER=codex_grok`이다. 이 모드에서는 Hermes/보고서/최종 검토는 Codex가 맡고, X/KOL과 내러티브/후보 발굴처럼 소셜 맥락이 중요한 작업은 Grok가 맡는다.
 
 ```text
 Hybrid default
@@ -335,16 +335,16 @@ $env:JIMMORIA_AGENT_PROVIDER_SOCIAL_KOL_AGENT = "grok"
 $env:JIMMORIA_AGENT_PROVIDER_REPORT_AGENT = "codex"
 ```
 
-## 6. Supervisor Role
+## 6. Hermes Role
 
 Loop policy:
 
-- Normal Supervisor conversation uses a single-agent loop: answer directly, update memory/settings when needed, and keep the room closed.
-- Confirmed research/report work uses a closed-fleet loop: create `SupervisorJobContract`, lock the goal/output mode/agents/source requirements/cost controls/verification gates/completion criteria, and dispatch bounded specialist work.
+- Normal Hermes conversation uses a single-agent loop: answer directly, update memory/settings when needed, and keep the room closed.
+- Confirmed research/report work uses a closed-fleet loop: create the compatibility `SupervisorJobContract`, lock the goal/output mode/agents/source requirements/cost controls/verification gates/completion criteria, and dispatch bounded specialist work.
 - Open exploration is limited to candidate discovery; retries target failed agents or missing-evidence slices instead of looping indefinitely.
-- Hermes Atlas rules applied here: keep the core loop a narrow waist, prefer config/skills/toolsets/connectors/MCP before core changes, use progressive disclosure for skill/tool detail, keep durable Supervisor memory small, search prior sessions/runs on demand, and pass explicit fresh context to each delegated agent.
+- Hermes Atlas rules applied here: keep the core loop a narrow waist, prefer config/skills/toolsets/connectors/MCP before core changes, use progressive disclosure for skill/tool detail, keep durable Hermes memory small, search prior sessions/runs on demand, and pass explicit fresh context to each delegated agent.
 
-Supervisor는 단순 라우터가 아니라 회사의 boss/orchestrator다.
+Hermes Agent는 단순 라우터가 아니라 회사의 boss/orchestrator다.
 
 역할:
 
@@ -352,7 +352,7 @@ Supervisor는 단순 라우터가 아니라 회사의 boss/orchestrator다.
 - Research Room이 필요한지 판단
 - `/research <topic-or-url>` 또는 `/dossier <topic-or-url>` 명령은 보고서 작성 워크플로우를 단계별로 표시한 뒤 사용자 확인 후 room open
 - 자연어 보고서/dossier 작성 요청이면 사용자에게 확인 후 room open
-- 사용자가 y/Enter로 승인한 뒤에는 중복 Supervisor 설명 박스를 출력하지 않고 room 실행 dock으로 전환
+- 사용자가 y/Enter로 승인한 뒤에는 중복 Hermes 설명 박스를 출력하지 않고 room 실행 dock으로 전환
 - 저장 보고서 조회가 실패한 뒤 사용자가 "만들어/작성해"라고 정정하면 직전 요청을 새 보고서 작성 요청으로 복구
 - `3jane`처럼 숫자로 시작하는 프로젝트명도 추출하고, 보고서 작성 요청이면 public web discovery를 우선 수행
 - 목표, 우선순위, task plan 생성
@@ -453,7 +453,7 @@ confidence
 - 보고서가 충분한지, evidence가 부족한지 판단
 - 사용자에게 최종 응답 전달
 
-일상 대화, 설정 변경, 단순 "조사해봐/알아봐" 요청은 report를 만들지 않고 Supervisor가 직접 응답한다. Research Room은 `/research`, `/dossier`, 또는 "보고서 작성해봐", "dossier 만들어봐", "리서치 보고서 생성해줘"처럼 최종 산출물 작성이 명확한 경우에만 열린다.
+일상 대화, 설정 변경, 단순 "조사해봐/알아봐" 요청은 report를 만들지 않고 Hermes Agent가 직접 응답한다. Research Room은 `/research`, `/dossier`, 또는 "보고서 작성해봐", "dossier 만들어봐", "리서치 보고서 생성해줘"처럼 최종 산출물 작성이 명확한 경우에만 열린다.
 
 ## 7. Agent Roster
 
@@ -471,7 +471,7 @@ confidence
 | `obsidian_curator_agent` | Knowledge curator | vault note 생성 |
 | `monitor_24h_agent` | Planned watcher | public web/X/GitHub/docs/RSS/DEX/RootData signal queue 예정 |
 
-| `signal_triage_agent` | Planned signal curator | raw monitor signals -> archive/watchlist/Supervisor review routing |
+| `signal_triage_agent` | Planned signal curator | raw monitor signals -> archive/watchlist/Hermes review routing |
 
 ## 7.1 Agent Skills And Runtime Hooks
 
@@ -506,7 +506,7 @@ before_run        load context, skill, profile, and prior memory
 before_tool_call  check permissions, public-source scope, and read-only boundaries
 after_tool_call   normalize evidence, dedupe, and record audit-friendly traces
 before_report     run report-only claim coverage, source backing, and template checks
-after_report      write report/evidence artifacts and request Supervisor final review
+after_report      write report/evidence artifacts and request Hermes final review
 quality_gate      reject missing identity, unsupported claims, hype, or agent-log output
 after_run         hand off verified findings to the next company step
 ```
@@ -523,7 +523,7 @@ config/hooks/<hook_name>/handler.py
 .agents/skills/<skill_name>/SKILL.md
 ```
 
-These skill files are intentionally small and structured. Agents can read them through `skill_view`, and the Supervisor can use the same names when assigning tasks. `crypto_research_agents/core/skill_spec.py` loads both individual skill YAML files and `skill_registry.yaml` into a shared `SkillSpecRegistry`.
+These skill files are intentionally small and structured. Agents can read them through `skill_view`, and Hermes Agent can use the same names when assigning tasks. `crypto_research_agents/core/skill_spec.py` loads both individual skill YAML files and `skill_registry.yaml` into a shared `SkillSpecRegistry`.
 
 The `.agents/skills` layer mirrors only the skills that need human-readable SOPs right now: identity gate, market signal intake, contract/token info, and report writing. Broader framework imports, complex dashboards, RBAC, and full external team runtimes remain intentionally out of scope until the report quality loop is stable.
 
@@ -603,12 +603,12 @@ DISCORD_BOT_TOKEN
 Current runtime is a full parallel research swarm.
 
 ```text
-1. Supervisor intake
+1. Hermes intake
 2. User confirmation when needed
-3. Supervisor Job Contract locks goal, output mode, agents, verification gates, and bounded retry limits
+3. Hermes Job Contract locks goal, output mode, agents, verification gates, and bounded retry limits
 4. Research Room creation
-5. Supervisor planning
-6. Supervisor seeds shared source and primary candidate context
+5. Hermes planning
+6. Hermes seeds shared source and primary candidate context
 7. Parallel research_swarm
    - Ingestion
    - Social/KOL market and candidate verification
@@ -619,7 +619,7 @@ Current runtime is a full parallel research swarm.
    - Funding/Token verification
 8. Agent Council joins specialist findings
 9. Report writing
-10. Supervisor final review
+10. Hermes final review
 11. Obsidian sync
 12. Run snapshot and replay events saved
 ```
@@ -630,7 +630,7 @@ Current runtime is a full parallel research swarm.
 
 | Phase | Status | Mode | Description |
 |---|---|---|---|
-| Phase 3 | active | full parallel agent swarm | After Supervisor seed context, seven research agents run together |
+| Phase 3 | active | full parallel agent swarm | After Hermes seed context, seven research agents run together |
 | Phase 4 | planned | room worker pool | Candidate A/B/C get separate Research Rooms, then summaries are merged |
 
 Safety rules:
@@ -799,7 +799,7 @@ Korean localization follows `epoko77-ai/im-not-ai` humanize-korean principles: p
 9. 확인된 내용 요약
 ```
 
-Internal Supervisor final review, agent council notes, tool payloads, raw LLM JSON, execution logs, detailed specialist coverage, and AntSeed peer review stay in `data/runs/<room_id>/` and `data/evidence_packets/<project>-<room_id>.md` instead of being appended to the final report body.
+Internal Hermes final review, agent council notes, tool payloads, raw LLM JSON, execution logs, detailed specialist coverage, and AntSeed peer review stay in `data/runs/<room_id>/` and `data/evidence_packets/<project>-<room_id>.md` instead of being appended to the final report body.
 
 ### Twitter/KOL-First Research Flow
 
@@ -808,8 +808,8 @@ Project research now treats X/Twitter, KOL posts, public threads, and related ar
 The room now behaves like this:
 
 ```text
-Supervisor plan
--> Supervisor seed source/candidate context
+Hermes plan
+-> Hermes seed source/candidate context
 -> Parallel research_swarm
    - Ingestion stores and enriches the source
    - Social/KOL checks X recent search, public site:x.com searches, KOL/article mentions, official/candidate X handles, timeline status, and who-said-what rows
@@ -833,7 +833,7 @@ JIMMORIA now mirrors the useful Hermes pattern of routing every tool call throug
 |---|---|
 | `url_safety_check` | Classifies public URLs before they are treated as research evidence. |
 | `source_relevance_filter` | Filters source URLs against the resolved project identity before final report inclusion. |
-| `tool_call_guardrail` | Records a repeated-failure guardrail pattern so the Supervisor can stop low-value tool loops. |
+| `tool_call_guardrail` | Records a repeated-failure guardrail pattern so Hermes Agent can stop low-value tool loops. |
 
 These are read-only, local connectors. They do not add trading, wallet, Telegram, Discord, or private-channel behavior.
 
@@ -853,7 +853,7 @@ JIMMORIA also registers Hermes-style operator tool names so agent personas can a
 | `search_files` | Keyword search over project-local files without shell access. |
 | `execute_code` | Limited deterministic utilities: timestamp, JSON summary, score aggregation. |
 | `write_file` | Writes artifacts only under `data/`, `reports/`, or `vault/`. |
-| `delegate_task` | Supervisor assignment alias for specialist work. |
+| `delegate_task` | Hermes assignment alias for specialist work. |
 | `cronjob` | Lists/evaluates configured local scheduled jobs. |
 | `multi_tool_use.parallel` | Records parallel intent; concurrency still follows Phase 1-4 policy. |
 | `terminal` | Registered but blocked for agents; use specific read-only connectors instead. |
@@ -862,7 +862,7 @@ JIMMORIA also registers Hermes-style operator tool names so agent personas can a
 
 Agent access is role-based:
 
-- Supervisor gets planning, delegation, playbook, cron, and parallel-intent tools.
+- Hermes gets planning, delegation, playbook, cron, and parallel-intent tools.
 - Ingestion gets source/file/browser text extraction.
 - Social/KOL gets X/public-web/browser snapshots for the first market-signal layer and stores `who_said_what`, official/candidate X sources, timeline checks, KOL/article opinion hits, and public X results.
 - Product/Tech gets website/docs/GitHub plus guarded file search and browser text extraction.
@@ -871,9 +871,9 @@ Agent access is role-based:
 
 ### Agent Persona Updates
 
-The agent specs now include a `professional_output_contract` for Supervisor, Discovery, Product/Tech, Social/KOL, Funding/Token, and Report:
+The agent specs now include a `professional_output_contract` for Hermes, Discovery, Product/Tech, Social/KOL, Funding/Token, and Report:
 
-- Supervisor acts as company president and final client-delivery gate.
+- Hermes acts as company president and final client-delivery gate.
 - Discovery resolves official identity first and avoids choosing GitHub org pages as the project website when an official domain exists.
 - Product/Tech separates official product/docs evidence from GitHub code/activity evidence.
 - Social/KOL runs market-signal intake before Discovery, then separates official project handles from unrelated personal accounts found by search and records speaker/claim/source rows for the report.
@@ -966,11 +966,11 @@ It is intended for:
 
 ### 12.1 AX-Style Event Runtime
 
-Google AX was reviewed as a reference for distributed agent runtime design. JIMMORIA does not import AX as a dependency because the company already has a Supervisor, Research Room, CollaborationBus, ToolGateway, and local Run Store. Instead, the useful runtime ideas were adapted into the existing structure.
+Google AX was reviewed as a reference for distributed agent runtime design. JIMMORIA does not import AX as a dependency because the company already has Hermes Agent, Research Room, CollaborationBus, ToolGateway, and local Run Store. Instead, the useful runtime ideas were adapted into the existing structure.
 
 Applied ideas:
 
-- Single controller: one Supervisor/ResearchRuntime path controls each room, so state changes stay auditable.
+- Single controller: one Hermes/ResearchRuntime path controls each room, so state changes stay auditable.
 - Sequenced event log: every runtime event now carries a stable `seq`.
 - Cursor resume: `jimmoria events <room_id> --after-seq <N>` prints only events after the last sequence the client already saw.
 - Checkpoint fork: `jimmoria fork <room_id> --seq <N>` creates a new saved room snapshot from a previous event checkpoint.
@@ -995,7 +995,7 @@ python -m unittest discover -s tests -v
 
 Important test coverage:
 
-- Supervisor chat vs research request routing
+- Hermes chat vs research request routing
 - no-report behavior for settings/conversation
 - process specs
 - tool registry and toolsets
@@ -1008,7 +1008,7 @@ Important test coverage:
 
 ## 14. Current Limits
 
-- The research swarm now runs ingestion, Social/KOL, narrative, discovery, contract/on-chain, product/tech, and funding/token agents together after Supervisor seed context.
+- The research swarm now runs ingestion, Social/KOL, narrative, discovery, contract/on-chain, product/tech, and funding/token agents together after Hermes seed context.
 - If one research swarm agent fails, the runtime retries only that agent once before failing the whole room.
 - Council, report writing, final review, and Obsidian sync still run after the swarm joins because they consume the combined evidence.
 - X/RootData/Explorer/RPC need optional secrets for live API results.
@@ -1029,4 +1029,4 @@ Important test coverage:
 
 ## 16. One-Line Summary
 
-JIMMORIA is currently a Codex-first, public-web-first multi-agent crypto research company with Supervisor orchestration, controlled P2P collaboration, shared memory, read-only ToolGateway, Markdown/Obsidian outputs, and a full parallel research_swarm for the core research agents.
+JIMMORIA is currently a Codex-first, public-web-first multi-agent crypto research company with Hermes orchestration, controlled P2P collaboration, shared memory, read-only ToolGateway, Markdown/Obsidian outputs, and a full parallel research_swarm for the core research agents.

@@ -5,7 +5,7 @@ workflow:
     domain: crypto_research
     output: korean_radar_report
   nodes:
-    - id: Supervisor
+    - id: Hermes
       type: agent
       agent_ref: supervisor_agent
       context_window: 0
@@ -38,7 +38,7 @@ workflow:
         reset_on_emit: true
 
   edges:
-    - from: Supervisor
+    - from: Hermes
       to: Discovery Scout
       trigger: true
       condition: true

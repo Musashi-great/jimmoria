@@ -147,7 +147,7 @@ class SmokeTest(unittest.TestCase):
 
         self.assertEqual(value, "/quit")
         self.assertIn("+", output.getvalue())
-        self.assertIn("슈퍼바이저 대화", output.getvalue())
+        self.assertIn("Hermes Agent", output.getvalue())
         self.assertIn("@path/to/file", output.getvalue())
         self.assertEqual(mocked_input.call_args[0][0], "> ")
         box_lines = [line for line in output.getvalue().splitlines() if line.startswith(("+", "|"))]
@@ -177,7 +177,7 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(mocked_input.call_args[0][0], "\033[2A\033[4C")
         self.assertGreaterEqual(len(box_lines), 5)
         self.assertTrue(box_lines[0].startswith("+"))
-        self.assertIn("슈퍼바이저 대화", box_lines[1])
+        self.assertIn("Hermes Agent", box_lines[1])
         self.assertTrue(box_lines[1].endswith("|"))
         self.assertTrue(box_lines[2].endswith("|"))
         self.assertTrue(box_lines[3].endswith("|"))
@@ -216,14 +216,14 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(display_width(line), console.input_box_width())
         self.assertTrue(line.endswith("|"))
         self.assertIn("JIMMORIA HQ", line)
-        self.assertIn("슈퍼바이저 대화", line)
+        self.assertIn("Hermes Agent", line)
 
     def test_status_card_uses_display_width_for_korean(self) -> None:
         console = JimmoriaConsole()
         console.width = 118
 
         card = console.status_card(
-            title="슈퍼바이저  [진행]",
+            title="Hermes  [진행]",
             subtitle="supervisor_agent",
             body="리서치 방향과 작업 순서를 정리하는 중",
             state="running",
@@ -243,7 +243,7 @@ class SmokeTest(unittest.TestCase):
         status = console.input_status_text()
 
         self.assertIn("JIMMORIA HQ", status)
-        self.assertIn("슈퍼바이저 대화", status)
+        self.assertIn("Hermes Agent", status)
         self.assertIn("room_12345...bcdef", status)
         self.assertIn("진행 1/대기 1/완료 1", status)
 
@@ -268,8 +268,8 @@ class SmokeTest(unittest.TestCase):
             console.print_supervisor_working("Reading and routing.")
 
         text = output.getvalue()
-        self.assertIn("슈퍼바이저 > Reading and routing.", text)
-        self.assertNotIn("[Supervisor]", text)
+        self.assertIn("Hermes > Reading and routing.", text)
+        self.assertNotIn("[Hermes]", text)
 
     def test_chat_help_does_not_show_static_agent_roster(self) -> None:
         output = StringIO()
@@ -294,15 +294,15 @@ class SmokeTest(unittest.TestCase):
         console.width = 96
 
         with redirect_stdout(output):
-            console.block("슈퍼바이저", ["한국어 문장이 길어도 오른쪽 테두리가 맞아야 합니다.", "", "/settings  회사 운영 설정 보기"])
+            console.block("Hermes", ["한국어 문장이 길어도 오른쪽 테두리가 맞아야 합니다.", "", "/settings  회사 운영 설정 보기"])
 
         lines = [line for line in output.getvalue().splitlines() if line.startswith(("+", "|"))]
         widths = {display_width(line) for line in lines}
         self.assertEqual(len(widths), 1)
-        self.assertTrue(lines[0].startswith("+ 슈퍼바이저"))
+        self.assertTrue(lines[0].startswith("+ Hermes"))
         self.assertTrue(lines[-1].startswith("+"))
         self.assertTrue(all(line.endswith(("+", "|")) for line in lines))
-        self.assertNotIn("[슈퍼바이저]", output.getvalue())
+        self.assertNotIn("[Hermes]", output.getvalue())
 
     def test_chat_intake_routes_company_settings_without_report(self) -> None:
         output = StringIO()
@@ -328,7 +328,7 @@ class SmokeTest(unittest.TestCase):
             self.assertFalse((root / "reports").exists())
 
         text = output.getvalue()
-        self.assertIn("Supervisor", text)
+        self.assertIn("Hermes", text)
         self.assertIn("회사 운영 지시", text)
         self.assertIn("반영한 내용", text)
 
@@ -362,8 +362,8 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("choose_response_shape_per_request", settings.supervisor_authority)
         self.assertIn("orchestrate_specialist_workflow", settings.supervisor_authority)
         self.assertIn("coordinate_agent_council", settings.supervisor_authority)
-        self.assertIn("Supervisor mode: company CEO / outsourcing intake", applied)
-        self.assertIn("Supervisor role: orchestrator / specialist coordinator", applied)
+        self.assertIn("Hermes mode: company CEO / outsourcing intake", applied)
+        self.assertIn("Hermes role: orchestrator / specialist coordinator", applied)
 
     def test_company_instruction_sets_supervisor_as_orchestrator(self) -> None:
         settings = CompanySettings()
@@ -378,7 +378,7 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("orchestrate_specialist_workflow", settings.supervisor_authority)
         self.assertIn("coordinate_agent_council", settings.supervisor_authority)
         self.assertTrue(any("orchestrator" in item for item in settings.operating_principles))
-        self.assertIn("Supervisor role: orchestrator / specialist coordinator", applied)
+        self.assertIn("Hermes role: orchestrator / specialist coordinator", applied)
 
     def test_supervisor_intake_returns_output_modes(self) -> None:
         settings = CompanySettings(supervisor_mode="company_ceo")
@@ -505,8 +505,8 @@ class SmokeTest(unittest.TestCase):
             self.assertFalse((root / "reports").exists())
 
         text = output.getvalue()
-        self.assertIn("슈퍼바이저", text)
-        self.assertNotIn("Supervisor intake", text)
+        self.assertIn("Hermes", text)
+        self.assertNotIn("Hermes intake", text)
         self.assertNotIn("Report preview", text)
         self.assertIn("한국어 우선", text)
 
@@ -536,9 +536,9 @@ class SmokeTest(unittest.TestCase):
             self.assertEqual(session["messages"][-1]["role"], "supervisor")
 
         text = output.getvalue()
-        self.assertIn("슈퍼바이저", text)
-        self.assertNotIn("Supervisor intake", text)
-        self.assertIn("JIMMORIA Supervisor", text)
+        self.assertIn("Hermes", text)
+        self.assertNotIn("Hermes intake", text)
+        self.assertIn("JIMMORIA Hermes Agent", text)
         self.assertNotIn("Company instruction applied", text)
 
     def test_supervisor_chat_explains_report_structure_naturally(self) -> None:
@@ -690,8 +690,8 @@ class SmokeTest(unittest.TestCase):
             self.assertFalse((root / "reports").exists())
 
         text = output.getvalue()
-        self.assertIn("슈퍼바이저", text)
-        self.assertNotIn("Supervisor intake", text)
+        self.assertIn("Hermes", text)
+        self.assertNotIn("Hermes intake", text)
         self.assertIn("Company settings", text)
 
     def test_chat_saved_report_request_prints_existing_report_without_room(self) -> None:
@@ -755,7 +755,7 @@ class SmokeTest(unittest.TestCase):
             self.assertFalse((root / "runs").exists())
 
         text = output.getvalue()
-        self.assertIn("Supervisor check", text)
+        self.assertIn("Hermes check", text)
         self.assertIn("Research Room은 열지 않겠습니다", text)
         self.assertNotIn("Room > OPEN", text)
 
@@ -855,7 +855,7 @@ class SmokeTest(unittest.TestCase):
             self.assertTrue(run_article.called)
 
         text = output.getvalue()
-        self.assertIn("Supervisor check", text)
+        self.assertIn("Hermes check", text)
         self.assertNotIn("이건 리서치 요청으로 판단했습니다", text)
         self.assertNotIn("작업을 배정하겠습니다", text)
         self.assertNotIn("제가 먼저 목표와 우선순위를", text)
@@ -1086,7 +1086,7 @@ class SmokeTest(unittest.TestCase):
                     "room_id": "room_test",
                     "agent_id": "supervisor_agent",
                     "tool_name": "create_research_room",
-                    "summary": "Supervisor office opened room_test.",
+                    "summary": "Hermes office opened room_test.",
                     "latency_ms": 1,
                 }
             )
@@ -1149,7 +1149,7 @@ class SmokeTest(unittest.TestCase):
 
         text = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", output.getvalue())
         self.assertIn("룸 > OPEN room_test", text)
-        self.assertIn("상태 > 대기: 슈퍼바이저, 아카이비스트", text)
+        self.assertIn("상태 > 대기: Hermes, 아카이비스트", text)
         self.assertNotIn("JIMMORIA HQ", text)
         self.assertEqual(console.runtime_dock_lines, 0)
 
@@ -1231,10 +1231,10 @@ class SmokeTest(unittest.TestCase):
 
         clean = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", output.getvalue())
         self.assertIn("JIMMORIA HQ", clean)
-        self.assertIn("리서치룸 실행 중입니다. 슈퍼바이저가 완료하면 입력창이 돌아옵니다.", clean)
+        self.assertIn("리서치룸 실행 중입니다. Hermes Agent가 완료하면 입력창이 돌아옵니다.", clean)
         self.assertIn("토큰 사용: 0 tokens | LLM 호출: 0", clean)
         self.assertIn("진행: 아카이비스트 -> 입력 소스와 메타데이터를 정리하는 중", clean)
-        self.assertIn("대기: 슈퍼바이저", clean)
+        self.assertIn("대기: Hermes", clean)
         self.assertIn("전체 AI 에이전트 대시보드 - 현재 작업", clean)
         self.assertIn("상태", clean)
         self.assertIn("현재 작업", clean)
@@ -1285,7 +1285,7 @@ class SmokeTest(unittest.TestCase):
                     )
 
         clean = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", output.getvalue())
-        self.assertIn("진행: 슈퍼바이저 -> 리서치 방향과 작업 순서를 정리하는 중", clean)
+        self.assertIn("진행: Hermes -> Hermes is planning the room and del", clean)
         self.assertIn("대기: 아카이비스트, 소셜/KOL, 내러티브, 스카우터 +5", clean)
         self.assertIn("상태", clean)
         self.assertIn("supervisor_agent", clean)
@@ -1293,7 +1293,7 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("social_kol_agent", clean)
         self.assertIn("contract_onchain_agent", clean)
         self.assertIn("obsidian_curator_agent", clean)
-        self.assertIn("진행: 리서치 방향과 작업 순서를 정리하는 중", clean)
+        self.assertIn("진행: Hermes is planning the room and delegation order", clean)
         self.assertIn("대기: 볼트 노트와 지식 기록을 동기화하는 중", clean)
         self.assertNotIn("+--------------------------------------------------------+", clean)
         self.assertEqual(console.runtime_dock_lines, 21)
@@ -1688,7 +1688,7 @@ class SmokeTest(unittest.TestCase):
         text = output.getvalue()
         self.assertIn("JIMMORIA response", text)
         self.assertIn("에이전트 완료 요약", text)
-        self.assertIn("슈퍼바이저", text)
+        self.assertIn("Hermes", text)
         self.assertIn("리포트", text)
         self.assertIn("Report preview", text)
         self.assertIn("Full report command: /report room_full", text)
@@ -1832,7 +1832,7 @@ class SmokeTest(unittest.TestCase):
             ]
             self.assertTrue(supervisor_findings)
             orchestration_plan = supervisor_findings[0].data["orchestration_plan"]
-            self.assertEqual(orchestration_plan["mode"], "supervisor_orchestrator")
+            self.assertEqual(orchestration_plan["mode"], "hermes_orchestrator")
             self.assertIn("agent_council", [item["checkpoint"] for item in orchestration_plan["coordination_checkpoints"]])
             self.assertGreaterEqual(len(runtime.model_gateway.call_log), 10)
             llm_log = json.loads((root / "runs" / result.room.room_id / "llm_call_log.json").read_text(encoding="utf-8"))
@@ -1890,7 +1890,7 @@ class SmokeTest(unittest.TestCase):
             self.assertIn("[MVP Placeholder]", report)
             self.assertIn("LLM provider: `offline_fallback`", report)
             self.assertIn("Live LLM: not configured", report)
-            self.assertNotIn("Supervisor Final Review", report)
+            self.assertNotIn("Hermes Final Review", report)
             self.assertEqual(result.room.project_card["supervisor_final_review"]["delivery_mode"], "diagnostic_memo")
 
             project_notes = list((root / "vault" / "10_Projects").glob("*.md"))
@@ -2512,7 +2512,7 @@ class SmokeTest(unittest.TestCase):
         self.assertNotIn("????", report)
         self.assertNotIn("?묒", report)
         self.assertNotIn("李", report)
-        self.assertNotIn("Supervisor Final Review", report)
+        self.assertNotIn("Hermes Final Review", report)
         self.assertNotIn("Agent Research Notes", report)
         self.assertNotIn("Agent Research Notes", report)
         self.assertNotIn("LLM synthesis", report)
@@ -2624,7 +2624,8 @@ class SmokeTest(unittest.TestCase):
         supervisor = registry.get("supervisor_agent")
         self.assertIsNotNone(supervisor)
         assert supervisor is not None
-        self.assertEqual(supervisor.persona_name, "The Company President")
+        self.assertEqual(supervisor.name, "Hermes Agent")
+        self.assertEqual(supervisor.persona_name, "Hermes Orchestrator")
         self.assertIn("company_settings", supervisor.memory_scope.write)
         self.assertIn("supervisor_memory", supervisor.memory_scope.read)
         self.assertIn("supervisor_session", supervisor.memory_scope.write)
@@ -4759,7 +4760,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertIn("JIMMORIA Web Research HQ", html)
         self.assertIn("Company Structure", html)
         self.assertIn("Agent Council", html)
-        self.assertIn("Supervisor Final Review", html)
+        self.assertIn("Hermes Final Review", html)
 
     def test_web_overview_payload_lists_agents_and_runtime_layers(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -4806,7 +4807,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
                             "type": "agent_done",
                             "agent_id": "supervisor_agent",
                             "task_type": "supervision",
-                            "summary": "Supervisor planned the room.",
+                            "summary": "Hermes planned the room.",
                         },
                     ],
                     ensure_ascii=False,

@@ -5,7 +5,7 @@ default_research_modes:
 
 toolsets:
   supervisor_office:
-    description: Hermes-inspired internal delegation tools for Supervisor task routing.
+    description: Hermes-inspired internal delegation tools for Hermes Agent task routing.
     tools:
       - create_research_room
       - create_task
@@ -111,7 +111,7 @@ tools:
     category: supervisor_office
     mode: artifact_write
     implementation_status: implemented
-    description: Record a Research Room opening as an auditable Supervisor office action.
+    description: Record a Research Room opening as an auditable Hermes office action.
   create_task:
     connector_name: create_task
     category: supervisor_office
@@ -129,7 +129,7 @@ tools:
     category: supervisor_office
     mode: artifact_write
     implementation_status: implemented
-    description: Record a handoff between Supervisor and specialist agents.
+    description: Record a handoff between Hermes Agent and specialist agents.
   update_task_status:
     connector_name: update_task_status
     category: supervisor_office
@@ -159,7 +159,7 @@ tools:
     category: supervisor_office
     mode: artifact_write
     implementation_status: implemented
-    description: Hermes-style delegation alias that records an internal assignment through Supervisor Office.
+    description: Hermes-style delegation alias that records an internal assignment through Hermes office.
   skill_view:
     connector_name: skill_view
     category: operator_bridge

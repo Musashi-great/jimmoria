@@ -31,7 +31,7 @@ except ImportError:  # pragma: no cover - fallback for non-installed editable ch
 
 
 AGENT_ACTIVITY = {
-    "supervisor_agent": "리서치 방향과 작업 순서를 정리하는 중",
+    "supervisor_agent": "Hermes is planning the room and delegation order",
     "ingestion_agent": "입력 소스와 메타데이터를 정리하는 중",
     "social_kol_agent": "X/KOL/공개 소셜 신호를 모으는 중",
     "narrative_agent": "내러티브와 투자 논리를 매핑하는 중",
@@ -44,7 +44,7 @@ AGENT_ACTIVITY = {
 }
 
 AGENT_DISPLAY_NAMES = {
-    "supervisor_agent": "슈퍼바이저",
+    "supervisor_agent": "Hermes",
     "ingestion_agent": "아카이비스트",
     "social_kol_agent": "소셜/KOL",
     "narrative_agent": "내러티브",
@@ -136,7 +136,7 @@ class JimmoriaConsole:
             ("/quit", "종료"),
         ]
         lines = [
-            "메시지를 입력하면 슈퍼바이저가 대화/설정/소스저장/리서치룸 실행 여부를 판단합니다.",
+            "메시지를 입력하면 Hermes Agent가 대화/설정/소스저장/리서치룸 실행 여부를 판단합니다.",
             "진행 중에는 raw tool 로그 대신 에이전트별 작업 상태와 compact event line이 업데이트됩니다.",
             "",
             "COMMAND                         설명",
@@ -164,7 +164,7 @@ class JimmoriaConsole:
             f"Settings file: {path}",
             f"Report language: {getattr(settings, 'report_language', 'en')}",
             f"English technical terms: {'allowed' if getattr(settings, 'allow_english_terms', True) else 'restricted'}",
-            f"Supervisor mode: {getattr(settings, 'supervisor_mode', 'research_director')}",
+            f"Hermes mode: {getattr(settings, 'supervisor_mode', 'research_director')}",
             f"Client relationship: {getattr(settings, 'client_relationship', 'user')}",
             f"Auto-apply company instructions: {getattr(settings, 'auto_apply_company_instructions', True)}",
         ]
@@ -173,7 +173,7 @@ class JimmoriaConsole:
             lines.extend(f"- {item}" for item in principles[-8:])
         authority = list(getattr(settings, "supervisor_authority", []) or [])
         if authority:
-            lines.extend(["", "Supervisor authority:"])
+            lines.extend(["", "Hermes authority:"])
             lines.extend(f"- {item}" for item in authority[-10:])
         self.block("Company settings", lines)
 
@@ -187,10 +187,10 @@ class JimmoriaConsole:
             f"Why: {getattr(decision, 'rationale', '')}",
             f"Next: {getattr(decision, 'next_step', '')}",
         ]
-        self.block("Supervisor intake", lines)
+        self.block("Hermes intake", lines)
 
     def print_supervisor_reply(self, lines: list[str]) -> None:
-        self.block("슈퍼바이저", lines)
+        self.block("Hermes", lines)
 
     def confirm_dispatch(
         self,
@@ -211,14 +211,14 @@ class JimmoriaConsole:
             "",
             "진행하려면 Enter 또는 y, 취소하려면 n을 입력하세요.",
         ]
-        self.block("Supervisor check", lines)
+        self.block("Hermes check", lines)
         if not sys.stdin.isatty():
             return True
         answer = input("Proceed [Enter/Y/n]: ").strip().lower()
         return answer in {"", "y", "yes", "ye", "go", "proceed", "ㅇ", "예", "네", "응"}
 
     def print_supervisor_working(self, activity: str = "요청을 읽고 다음 진행 방식을 정하는 중입니다.") -> None:
-        self.print_log_line("슈퍼바이저", activity, muted=True)
+        self.print_log_line("Hermes", activity, muted=True)
 
     def print_company_settings_updated(self, settings: Any, applied: list[str], path: str | Path) -> None:
         lines = [
@@ -233,7 +233,7 @@ class JimmoriaConsole:
             [
                 "",
                 f"Report language: {getattr(settings, 'report_language', 'en')}",
-                f"Supervisor mode: {getattr(settings, 'supervisor_mode', 'research_director')}",
+                f"Hermes mode: {getattr(settings, 'supervisor_mode', 'research_director')}",
             ]
         )
         self.block("Company instruction applied", lines)
@@ -350,7 +350,7 @@ class JimmoriaConsole:
             self.input_status_line_style(self.input_text_line(self.input_status_text())),
             self.input_metrics_line_style(),
             self.input_active_summary_line_style(),
-            self.input_hint_line_style(self.input_hint_line("리서치룸 실행 중입니다. 슈퍼바이저가 완료하면 입력창이 돌아옵니다.")),
+            self.input_hint_line_style(self.input_hint_line("리서치룸 실행 중입니다. Hermes Agent가 완료하면 입력창이 돌아옵니다.")),
             self.input_divider_line_style(),
             self.input_board_title_line_style(),
             self.input_board_header_line_style(),
@@ -445,7 +445,7 @@ class JimmoriaConsole:
         provider = os.getenv("LLM_PROVIDER") or "offline"
         room = self.short_room_label()
         agents = self.agent_state_label()
-        return f"JIMMORIA HQ | 슈퍼바이저 대화 | provider: {provider} | room: {room} | agents: {agents}"
+        return f"JIMMORIA HQ | Hermes Agent | provider: {provider} | room: {room} | agents: {agents}"
 
     def short_room_label(self) -> str:
         if not self.last_room_id:
@@ -503,8 +503,8 @@ class JimmoriaConsole:
         pink = "\033[38;2;255;92;212m"
         reset = "\033[0m"
         return self.input_frame_line_style(text).replace("JIMMORIA HQ", f"{pink}JIMMORIA HQ{reset}", 1).replace(
-            "슈퍼바이저 대화",
-            f"{dim}슈퍼바이저 대화{reset}",
+            "Hermes Agent",
+            f"{dim}Hermes Agent{reset}",
             1,
         )
 
@@ -959,12 +959,12 @@ class JimmoriaConsole:
             delegated_count = event.get("delegated_count", 0)
             checkpoints = event.get("checkpoints")
             checkpoint_count = len(checkpoints) if isinstance(checkpoints, list) else 0
-            summary = self.compact_text(str(event.get("summary") or "Supervisor set the orchestration plan."), 78)
+            summary = self.compact_text(str(event.get("summary") or "Hermes set the orchestration plan."), 78)
             if self.use_stream_events():
                 if self.use_compact_event_log():
                     self.print_event_line(
                         "계획",
-                        f"슈퍼바이저 | 작업 {delegated_count}개 배정 | 체크포인트 {checkpoint_count}개 | {summary}",
+                        f"Hermes | 작업 {delegated_count}개 배정 | 체크포인트 {checkpoint_count}개 | {summary}",
                     )
                     return
                 self.print_event_line(
@@ -973,7 +973,7 @@ class JimmoriaConsole:
                 )
                 return
             self.block(
-                "Supervisor orchestration plan",
+                "Hermes orchestration plan",
                 [
                     f"Delegated tasks: {delegated_count}",
                     f"Checkpoints: {checkpoint_count}",
@@ -1112,9 +1112,9 @@ class JimmoriaConsole:
         if event_type == "final_review_start":
             summary = self.compact_text(str(event.get("summary") or ""), 84)
             if self.use_stream_events():
-                self.print_event_line("Supervisor", f"REVIEW report | {summary}")
+                self.print_event_line("Hermes", f"REVIEW report | {summary}")
                 return
-            self.block("Supervisor final review started", [str(event.get("summary") or "")])
+            self.block("Hermes final review started", [str(event.get("summary") or "")])
             return
 
         if event_type == "final_review_done":
@@ -1122,12 +1122,12 @@ class JimmoriaConsole:
             summary = self.compact_text(str(event.get("summary") or ""), 84)
             if self.use_stream_events():
                 self.print_event_line(
-                    "Supervisor",
+                    "Hermes",
                     f"FINAL {delivery_mode} | {summary} | msg {event.get('messages')} / findings {event.get('findings')}",
                 )
                 return
             self.block(
-                "Supervisor final review",
+                "Hermes final review",
                 [
                     f"Delivery mode: {delivery_mode}",
                     f"Approved: {event.get('approved')}",
@@ -1964,7 +1964,7 @@ def print_color_hero(width: int) -> None:
     line = "=" * width
     logo = jimmoria_3d_logo_layers()
     subtitle = "Multi-agent crypto research company"
-    korean_subtitle = "슈퍼바이저가 이끄는 온체인 리서치 HQ"
+    korean_subtitle = "Hermes Agent가 이끄는 온체인 리서치 HQ"
     workflow = "tmux-friendly TUI  /  agent cards  /  council room  /  obsidian memory"
 
     print(f"{violet}{line}{reset}")
@@ -1988,7 +1988,7 @@ def print_plain_hero(width: int) -> None:
     print("")
     print(center_text(f"JIMMORIA v{__version__}", width))
     print(center_text("Multi-agent crypto research company", width))
-    print(center_text("슈퍼바이저가 이끄는 온체인 리서치 HQ", width))
+    print(center_text("Hermes Agent가 이끄는 온체인 리서치 HQ", width))
     print(center_text("tmux-friendly TUI  /  agent cards  /  council room  /  obsidian memory", width))
     print(line)
 

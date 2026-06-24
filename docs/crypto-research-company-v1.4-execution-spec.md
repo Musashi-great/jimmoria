@@ -13,5 +13,5 @@ Current implementation policy:
 - CLI and local web dashboard are the active interfaces.
 - JIMMORIA is public-web first.
 - Telegram Bot and Discord Bot are not part of the current default research stack.
-- Supervisor decides whether a Research Room is needed before reports are created.
-- Phase 3 is active: after Supervisor seed context, the core research agents run as one full parallel research swarm.
+- Hermes Agent decides whether a Research Room is needed before reports are created.
+- Phase 3 is active: after Hermes seed context, the core research agents run as one full parallel research swarm.
