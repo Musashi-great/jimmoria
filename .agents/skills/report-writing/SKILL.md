@@ -10,7 +10,7 @@ owner_agents:
 
 ## Goal
 
-Write a client-facing Korean-first project intelligence report that explains what the project is, why it matters, what is verified, what is unclear, and what to watch next.
+Write an owner-facing Korean-first project intelligence report that explains what the project is, why it matters, what is verified, what is unclear, and what to watch next.
 
 ## Structure
 

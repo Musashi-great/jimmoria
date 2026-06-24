@@ -1,6 +1,6 @@
 {
   "skill_id": "investment_report_synthesis",
-  "description": "Write the client-facing Korean investment-style project intelligence report from specialist evidence, not from raw logs.",
+  "description": "Write the owner-facing Korean investment-style project intelligence report from specialist evidence, not from raw logs.",
   "steps": [
     "read_all_specialist_findings",
     "run_claim_evidence_check",

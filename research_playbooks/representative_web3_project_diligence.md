@@ -1,14 +1,14 @@
 # Representative Web3 Project Diligence
 
-This playbook adapts the representative research profile into JIMMORIA's public-web research company flow.
+This playbook adapts the representative research profile into JIMMORIA's public-web personal-agent research flow.
 
-It is used when the client asks for a Web3 project/token report, candidate dossier, or token diligence packet.
+It is used when the owner asks for a Web3 project/token report, candidate dossier, or token diligence packet.
 The trigger must be treated only as a candidate. Do not classify, recommend, or reject before the identity gate.
 
 ## Input
 
 ```text
-Project / X / CA / Site: <client supplied value>
+Project / X / CA / Site: <owner supplied value>
 ```
 
 The input can be a project name, official X profile, contract address, website, docs URL, app URL, or article.
@@ -104,7 +104,7 @@ Telegram and Discord are intentionally out of scope for the current public-web-o
    - Stance
 13. Final report:
    - Korean by default for the representative profile
-   - address the client as "대표님" in the conclusion or operator notes when conversationally appropriate
+   - address the owner as "대표님" in the conclusion or operator notes when conversationally appropriate
    - conclusion first
    - focus on product, narrative, who said it, what is confirmed, unresolved issues, and stance
    - no hype, buy/sell language, targets, or investment advice

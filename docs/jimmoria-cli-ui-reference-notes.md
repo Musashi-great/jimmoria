@@ -93,7 +93,7 @@ JIMMORIA의 현재 CLI는 full-screen TUI가 아니라 line-oriented CLI다. 따
 | > pearl 프로젝트 리서치 진행해봐                                                |
 +--------------------------------------------------------------------------------+
 
-Hermes > Reading the message, choosing the response shape, and routing the company.
+Hermes > Reading the message, choosing the response shape, and routing the personal-agent stack.
 
 + Hermes ------------------------------------------------------------------------------------+
 | 좋아. 이건 리서치 요청이라 Research Room을 열고 에이전트들을 배정할게.                     |
@@ -121,7 +121,7 @@ Hermes > Reading the message, choosing the response shape, and routing the compa
 | [Goose](https://github.com/block/goose) | 설치 후 `goose`로 세션을 열고, provider/extension/tool 상태를 명령으로 관리한다. | 대화는 짧게 유지하고 tool call/log/session은 별도 저장소와 diagnostics로 뺀다. | 화면에는 live dock만 보이고, 자세한 agent/tool log는 `data/runs/<room_id>`와 `/events`, `/messages`에서 확인한다. |
 | [Hermes Agent](https://hermes-agent.nousresearch.com/docs/getting-started/installation) | installer, device login, gateway, tools, cron, profiles 같은 운영 명령이 분리되어 있다. | 일반 대화와 운영 명령이 공존하지만, 운영 상태는 별도 명령으로 확인한다. | `jimmoria tools`, `cron`, `profile`, `playbook`, `sessions`, `doctor`처럼 회사 운영 명령을 분리한다. |
 | [crewAI](https://github.com/crewAIInc/crewAI) / [quickstart](https://docs.crewai.com/quickstart) | `crewai create crew`로 프로젝트를 만들고 agents/tasks YAML을 채운 뒤 `crewai run`으로 실행한다. | 대화형 assistant라기보다 crew/task 실행 프레임워크다. | 에이전트 내부는 유지하고, Research Room의 goals/tasks/expected outputs만 `config/processes/*.yaml`로 분리한다. |
-| [ChatDev](https://github.com/OpenBMB/ChatDev) | 자연어 요구사항을 software company workflow와 visual process로 전개한다. | 사용자는 회사에 일을 맡기고, 내부 role/phase가 순차적으로 움직인다. | 사용자는 Hermes Agent에게 외주를 주고, Hermes Agent가 Research Room을 열지 직접 대답할지 먼저 판단한다. |
+| [ChatDev](https://github.com/OpenBMB/ChatDev) | 자연어 요구사항을 software company workflow와 visual process로 전개한다. | 사용자는 조직형 워크플로에 일을 맡기고, 내부 role/phase가 순차적으로 움직인다. | 사용자는 Hermes Agent에게 요청하고, Hermes Agent가 Research Room을 열지 직접 대답할지 먼저 판단한다. |
 | [MetaGPT](https://github.com/FoundationAgents/MetaGPT) | 한 줄 requirement에서 PM/architect/engineer/reviewer 같은 role workflow를 만든다. | 회사 SOP처럼 요구사항을 role별 산출물로 분해한다. | 리서치 요청은 10개 agent room으로 분해하지만, 잡담/설정/상태 질문은 room을 열지 않는다. |
 
 ## Borrowed UX Rules
@@ -158,7 +158,7 @@ JIMMORIA에 적용할 기준은 다음이다.
 | OpenHands-style task sessions | 각 task는 독립 세션이며, CLI/headless/web 모드가 분리된다. | Research Room은 독립 run artifact를 갖고, 나중에 `resume`/`tui`/`web` 모드가 같은 `events.json`을 읽는다. |
 | Goose-style sessions and logs | 대화 화면은 짧게, 자세한 tool/session log는 diagnostics로 분리된다. | 실시간 화면은 live dock, 자세한 기록은 `/events`, `/messages`, `data/runs/<room_id>`. |
 | Hermes-style operations layer | tools, cron, profiles, sessions가 별도 운영 명령으로 분리된다. | 여러 작업은 `cron`, `sessions`, `rooms`, `profile` 명령으로 관리한다. |
-| ChatDev/MetaGPT-style company workflow | 여러 role이 움직일 때 phase와 artifact가 보여야 한다. | Workboard는 room 단위, Live board는 agent 단위, event log는 replay 단위로 분리한다. |
+| ChatDev/MetaGPT-style workflow | 여러 role이 움직일 때 phase와 artifact가 보여야 한다. | Workboard는 room 단위, Live board는 agent 단위, event log는 replay 단위로 분리한다. |
 
 현재 적용된 기능:
 

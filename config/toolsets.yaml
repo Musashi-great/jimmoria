@@ -7,6 +7,8 @@ toolsets:
   supervisor_office:
     description: Hermes-inspired internal delegation tools for Hermes Agent task routing.
     tools:
+      - classify_owner_request
+      - choose_output_mode
       - create_research_room
       - create_task
       - assign_task
@@ -15,6 +17,7 @@ toolsets:
       - read_agent_status
       - task_retry
       - task_cancel
+      - update_personal_agent_settings
   personal_agent_stack:
     description: "Personal agent OS stack controlled by Hermes: Honcho memory, Obsidian vault, QMD search, CDP browser harness, Tavily search, and Codex local work."
     tools:
@@ -144,6 +147,18 @@ toolsets:
       - seed_phrase_read
 
 tools:
+  classify_owner_request:
+    connector_name: classify_owner_request
+    category: supervisor_office
+    mode: read_only
+    implementation_status: implemented
+    description: Classify the owner message before deciding whether Hermes should chat, save settings, or open a Research Room.
+  choose_output_mode:
+    connector_name: choose_output_mode
+    category: supervisor_office
+    mode: read_only
+    implementation_status: implemented
+    description: Choose the owner-facing output mode for the current Hermes turn.
   create_research_room:
     connector_name: create_research_room
     category: supervisor_office
@@ -192,6 +207,12 @@ tools:
     mode: artifact_write
     implementation_status: implemented
     description: Record an internal task cancellation decision.
+  update_personal_agent_settings:
+    connector_name: update_personal_agent_settings
+    category: supervisor_office
+    mode: artifact_write
+    implementation_status: implemented
+    description: Persist a personal-agent operating preference without opening a Research Room.
   delegate_task:
     connector_name: delegate_task
     category: supervisor_office

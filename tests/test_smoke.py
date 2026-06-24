@@ -13,21 +13,21 @@ from contextlib import redirect_stdout
 from io import StringIO
 from unittest.mock import patch
 
-from crypto_research_agents.runtime import ResearchRuntime
-from crypto_research_agents.agents.base import AgentResult, normalize_llm_analysis
-from crypto_research_agents.agents.discovery import build_live_candidates, extract_project_query, project_identity_hints, should_live_discover
-from crypto_research_agents.agents.social_kol import (
+from jimmoria.runtime import ResearchRuntime
+from jimmoria.agents.base import AgentResult, normalize_llm_analysis
+from jimmoria.agents.discovery import build_live_candidates, extract_project_query, project_identity_hints, should_live_discover
+from jimmoria.agents.social_kol import (
     build_public_social_queries,
     build_who_said_what,
     extract_handles_from_social_results,
 )
-from crypto_research_agents.agents.report import ReportAgent, assess_report_quality, build_claim_evidence_ledger, diligence_score
-from crypto_research_agents.agents.reporting.evidence_ledger import build_project_dossier_evidence_pack
-from crypto_research_agents.connectors import register_default_connectors
-from crypto_research_agents.core.agent_spec import AgentSpecRegistry
-from crypto_research_agents.core.agent_stack import load_agent_stack
-from crypto_research_agents.cli import (
-    apply_company_instruction,
+from jimmoria.agents.report import ReportAgent, assess_report_quality, build_claim_evidence_ledger, diligence_score
+from jimmoria.agents.reporting.evidence_ledger import build_project_dossier_evidence_pack
+from jimmoria.connectors import register_default_connectors
+from jimmoria.core.agent_spec import AgentSpecRegistry
+from jimmoria.core.agent_stack import load_agent_stack
+from jimmoria.cli import (
+    apply_personal_agent_instruction,
     chat_command,
     classify_chat_input,
     chat_input_to_source,
@@ -43,45 +43,45 @@ from crypto_research_agents.cli import (
     print_banner,
     print_current_model_config,
 )
-from crypto_research_agents.console import JimmoriaConsole, display_width, print_jimmoria_logo
-from crypto_research_agents.core.company_settings import CompanySettings
-from crypto_research_agents.core.input_resolver import resolve_research_input
-from crypto_research_agents.core.concurrency import load_concurrency_policy
-from crypto_research_agents.core.llm_provider import CodexApiProvider, CodexCliProvider, CodexSdkProvider, LLMRequest, LLMResponse, parse_json_response, provider_from_env
-from crypto_research_agents.core.memory import ProjectCandidate, SharedMemory, SourceRecord
-from crypto_research_agents.core.model_gateway import ModelGateway
-from crypto_research_agents.core.process_spec import ProcessSpecRegistry, load_process_spec
-from crypto_research_agents.core.project_profile import find_project_profile
-from crypto_research_agents.core.dynamic_dispatch import DynamicCandidateDispatcher
-from crypto_research_agents.core.edge_conditions import evaluate_edge_condition
-from crypto_research_agents.core.hook_registry import HookRegistry, runtime_event_to_hook_event
-from crypto_research_agents.core.korean_style import korean_report_humanize_prompt
-from crypto_research_agents.core.quality_gate import review_report_quality
-from crypto_research_agents.core.room import ResearchRoom
-from crypto_research_agents.core.scheduler import CronRegistry
-from crypto_research_agents.core.skill_spec import SkillSpecRegistry
-from crypto_research_agents.core.thesis_memory import OutcomeLabel, ThesisCard, ThesisMemoryStore
-from crypto_research_agents.core.supervisor_brain import SupervisorBrain
-from crypto_research_agents.core.supervisor_chat import generate_supervisor_chat_reply
-from crypto_research_agents.core.supervisor_intake import decide_supervisor_intake
-from crypto_research_agents.core.supervisor_job_contract import (
+from jimmoria.console import JimmoriaConsole, display_width, print_jimmoria_logo
+from jimmoria.core.personal_agent_settings import PersonalAgentSettings
+from jimmoria.core.input_resolver import resolve_research_input
+from jimmoria.core.concurrency import load_concurrency_policy
+from jimmoria.core.llm_provider import CodexApiProvider, CodexCliProvider, CodexSdkProvider, LLMRequest, LLMResponse, parse_json_response, provider_from_env
+from jimmoria.core.memory import ProjectCandidate, SharedMemory, SourceRecord
+from jimmoria.core.model_gateway import ModelGateway
+from jimmoria.core.process_spec import ProcessSpecRegistry, load_process_spec
+from jimmoria.core.project_profile import find_project_profile
+from jimmoria.core.dynamic_dispatch import DynamicCandidateDispatcher
+from jimmoria.core.edge_conditions import evaluate_edge_condition
+from jimmoria.core.hook_registry import HookRegistry, runtime_event_to_hook_event
+from jimmoria.core.korean_style import korean_report_humanize_prompt
+from jimmoria.core.quality_gate import review_report_quality
+from jimmoria.core.room import ResearchRoom
+from jimmoria.core.scheduler import CronRegistry
+from jimmoria.core.skill_spec import SkillSpecRegistry
+from jimmoria.core.thesis_memory import OutcomeLabel, ThesisCard, ThesisMemoryStore
+from jimmoria.core.supervisor_brain import SupervisorBrain
+from jimmoria.core.supervisor_chat import generate_supervisor_chat_reply
+from jimmoria.core.supervisor_intake import decide_supervisor_intake
+from jimmoria.core.supervisor_job_contract import (
     build_supervisor_job_contract,
     max_agent_attempts_from_contract,
 )
-from crypto_research_agents.core.supervisor_memory import SupervisorMemoryStore
-from crypto_research_agents.core.supervisor_session import SupervisorSessionStore
-from crypto_research_agents.core.capabilities import collect_capabilities
-from crypto_research_agents.core.playbook import ResearchPlaybookRegistry
-from crypto_research_agents.core.profile import WorkerProfileRegistry
-from crypto_research_agents.core.tool_gateway import PolicyEngine, ToolGateway
-from crypto_research_agents.core.workflow import LoopCounter
-from crypto_research_agents.core.workflow_executor import WorkflowExecutor
-from crypto_research_agents.core.workflow_loader import WorkflowSpecRegistry, load_workflow_spec
-from crypto_research_agents.storage.artifact_store import ArtifactStore
-from crypto_research_agents.storage.run_store import events_after_seq, load_report_index
-from crypto_research_agents.storage.session_store import search_sessions
-from crypto_research_agents.tools.registry import load_tool_registry
-from crypto_research_agents.web import build_overview_payload, build_run_payload, render_dashboard_html
+from jimmoria.core.supervisor_memory import SupervisorMemoryStore
+from jimmoria.core.supervisor_session import SupervisorSessionStore
+from jimmoria.core.capabilities import collect_capabilities
+from jimmoria.core.playbook import ResearchPlaybookRegistry
+from jimmoria.core.profile import WorkerProfileRegistry
+from jimmoria.core.tool_gateway import PolicyEngine, ToolGateway
+from jimmoria.core.workflow import LoopCounter
+from jimmoria.core.workflow_executor import WorkflowExecutor
+from jimmoria.core.workflow_loader import WorkflowSpecRegistry, load_workflow_spec
+from jimmoria.storage.artifact_store import ArtifactStore
+from jimmoria.storage.run_store import events_after_seq, load_report_index
+from jimmoria.storage.session_store import search_sessions
+from jimmoria.tools.registry import load_tool_registry
+from jimmoria.web import build_overview_payload, build_run_payload, render_dashboard_html
 
 
 def _offline_no_secret_env() -> dict[str, str]:
@@ -118,7 +118,7 @@ class SmokeTest(unittest.TestCase):
     def test_color_banner_uses_purple_pink_3d_palette(self) -> None:
         output = StringIO()
 
-        with patch("crypto_research_agents.console.supports_color", return_value=True):
+        with patch("jimmoria.console.supports_color", return_value=True):
             with redirect_stdout(output):
                 print_jimmoria_logo(100)
 
@@ -131,8 +131,8 @@ class SmokeTest(unittest.TestCase):
     def test_pyproject_exposes_jimmoria_command(self) -> None:
         pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
 
-        self.assertEqual(pyproject["project"]["scripts"]["jimmoria"], "crypto_research_agents.cli:main")
-        self.assertEqual(pyproject["tool"]["setuptools"]["packages"]["find"]["include"], ["crypto_research_agents*"])
+        self.assertEqual(pyproject["project"]["scripts"]["jimmoria"], "jimmoria.cli:main")
+        self.assertEqual(pyproject["tool"]["setuptools"]["packages"]["find"]["include"], ["jimmoria*", "crypto_research_agents*"])
         self.assertIn("rich>=13.7.0", pyproject["project"]["dependencies"])
         self.assertIn("all", pyproject["project"]["optional-dependencies"])
         self.assertIn("codex", pyproject["project"]["optional-dependencies"])
@@ -167,7 +167,7 @@ class SmokeTest(unittest.TestCase):
 
         with patch.dict("os.environ", {"JIMMORIA_FORCE_ANSI_INPUT": "1"}, clear=False):
             with patch("sys.stdin.isatty", return_value=True):
-                with patch("crypto_research_agents.console.supports_color", return_value=True):
+                with patch("jimmoria.console.supports_color", return_value=True):
                     with patch("builtins.input", return_value="/quit") as mocked_input:
                         with redirect_stdout(output):
                             value = console.read_chat_input()
@@ -195,7 +195,7 @@ class SmokeTest(unittest.TestCase):
 
         with patch.dict("os.environ", {"JIMMORIA_DISABLE_ANSI_INPUT": "1"}, clear=False):
             with patch("sys.stdin.isatty", return_value=True):
-                with patch("crypto_research_agents.console.supports_color", return_value=True):
+                with patch("jimmoria.console.supports_color", return_value=True):
                     with patch("builtins.input", return_value="/quit") as mocked_input:
                         with redirect_stdout(output):
                             value = console.read_chat_input()
@@ -309,7 +309,7 @@ class SmokeTest(unittest.TestCase):
         self.assertTrue(all(line.endswith(("+", "|")) for line in lines))
         self.assertNotIn("[Hermes]", output.getvalue())
 
-    def test_chat_intake_routes_company_settings_without_report(self) -> None:
+    def test_chat_intake_routes_personal_agent_settings_without_report(self) -> None:
         output = StringIO()
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -325,7 +325,7 @@ class SmokeTest(unittest.TestCase):
                         with redirect_stdout(output):
                             chat_command(args)
 
-            settings_path = root / "company_settings.json"
+            settings_path = root / "personal_agent_settings.json"
             self.assertTrue(settings_path.exists())
             settings = json.loads(settings_path.read_text(encoding="utf-8"))
             self.assertEqual(settings["report_language"], "ko")
@@ -339,8 +339,8 @@ class SmokeTest(unittest.TestCase):
 
     def test_chat_intake_classifies_research_vs_settings(self) -> None:
         self.assertEqual(classify_chat_input("pearl 프로젝트에 대해서 리서치 보고서 만들어봐"), "research_input_resolution")
-        self.assertEqual(classify_chat_input("보고서는 한글로 만들어봐 영어단어는 써도 돼"), "company_config")
-        self.assertEqual(classify_chat_input("현재 회사 상태랑 설정 보여줘"), "company_status")
+        self.assertEqual(classify_chat_input("보고서는 한글로 만들어봐 영어단어는 써도 돼"), "personal_agent_config")
+        self.assertEqual(classify_chat_input("현재 개인 에이전트 상태랑 설정 보여줘"), "personal_agent_status")
         self.assertEqual(classify_chat_input("이 링크는 소스만 저장해줘"), "source_ingestion")
         self.assertEqual(classify_chat_input("지금 보고서 작성은 한글 위주로 세팅된게 맞지?"), "supervisor_chat")
         self.assertEqual(classify_chat_input("안녕"), "supervisor_chat")
@@ -353,16 +353,16 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(classify_chat_input("show 3jane full report"), "report_retrieval")
         self.assertEqual(classify_chat_input("3jane 보고서 가지고 와봐"), "report_retrieval")
 
-    def test_company_instruction_expands_supervisor_role(self) -> None:
-        settings = CompanySettings()
+    def test_personal_agent_instruction_expands_supervisor_role(self) -> None:
+        settings = PersonalAgentSettings()
 
-        applied = apply_company_instruction(
+        applied = apply_personal_agent_instruction(
             "슈퍼바이저는 회사의 사장 느낌으로 외주를 받는 역할로 가져가자",
             settings,
         )
 
         self.assertEqual(settings.supervisor_mode, "personal_agent_orchestrator")
-        self.assertEqual(settings.client_relationship, "owner_operator")
+        self.assertEqual(settings.user_relationship, "owner_operator")
         self.assertIn("route_all_plain_chat_inputs", settings.supervisor_authority)
         self.assertIn("choose_response_shape_per_request", settings.supervisor_authority)
         self.assertIn("orchestrate_specialist_workflow", settings.supervisor_authority)
@@ -370,29 +370,29 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("Hermes mode: personal agent orchestrator", applied)
         self.assertIn("Hermes role: orchestrator / specialist coordinator", applied)
 
-    def test_company_instruction_sets_supervisor_as_orchestrator(self) -> None:
-        settings = CompanySettings()
+    def test_personal_agent_instruction_sets_supervisor_as_orchestrator(self) -> None:
+        settings = PersonalAgentSettings()
 
-        applied = apply_company_instruction(
+        applied = apply_personal_agent_instruction(
             "수퍼바이저가 오케스트레이터로 활동을 하고 조율하는거야",
             settings,
         )
 
         self.assertEqual(settings.supervisor_mode, "personal_agent_orchestrator")
-        self.assertEqual(settings.client_relationship, "owner_operator")
+        self.assertEqual(settings.user_relationship, "owner_operator")
         self.assertIn("orchestrate_specialist_workflow", settings.supervisor_authority)
         self.assertIn("coordinate_agent_council", settings.supervisor_authority)
         self.assertTrue(any("orchestrator" in item for item in settings.operating_principles))
         self.assertIn("Hermes role: orchestrator / specialist coordinator", applied)
 
     def test_supervisor_intake_returns_output_modes(self) -> None:
-        settings = CompanySettings(supervisor_mode="company_ceo")
+        settings = PersonalAgentSettings(supervisor_mode="personal_agent_orchestrator")
 
         research = decide_supervisor_intake("pearl 프로젝트를 분석해봐", settings)
         report = decide_supervisor_intake("pearl 프로젝트 리서치 보고서 작성해봐 https://x.com/pearl", settings)
         missing_link_report = decide_supervisor_intake("pearl 프로젝트 리서치 보고서 작성해봐", settings)
         config = decide_supervisor_intake("로그 출력 스타일을 바꿔봐", settings)
-        status = decide_supervisor_intake("현재 회사 상태 보여줘", settings)
+        status = decide_supervisor_intake("현재 개인 에이전트 상태 보여줘", settings)
 
         self.assertFalse(research.needs_research_room)
         self.assertEqual(research.output_mode, "supervisor_reply")
@@ -491,8 +491,8 @@ class SmokeTest(unittest.TestCase):
         output = StringIO()
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
-            (root / "company_settings.json").write_text(
-                json.dumps(CompanySettings(report_language="ko").to_dict(), ensure_ascii=False),
+            (root / "personal_agent_settings.json").write_text(
+                json.dumps(PersonalAgentSettings(report_language="ko").to_dict(), ensure_ascii=False),
                 encoding="utf-8",
             )
             args = argparse.Namespace(
@@ -532,7 +532,7 @@ class SmokeTest(unittest.TestCase):
                             chat_command(args)
 
             self.assertFalse((root / "reports").exists())
-            self.assertFalse((root / "company_settings.json").exists())
+            self.assertFalse((root / "personal_agent_settings.json").exists())
             session_path = root / "supervisor_session.json"
             self.assertTrue(session_path.exists())
             session = json.loads(session_path.read_text(encoding="utf-8"))
@@ -547,7 +547,7 @@ class SmokeTest(unittest.TestCase):
         self.assertNotIn("Company instruction applied", text)
 
     def test_supervisor_chat_explains_report_structure_naturally(self) -> None:
-        settings = CompanySettings(report_language="ko")
+        settings = PersonalAgentSettings(report_language="ko")
         decision = decide_supervisor_intake("보고서 뭐뭐씀?", settings)
 
         reply = generate_supervisor_chat_reply("보고서 뭐뭐씀?", settings, decision)
@@ -572,11 +572,11 @@ class SmokeTest(unittest.TestCase):
 
         provider = FakeProvider()
         gateway = ModelGateway(provider=provider)
-        decision = decide_supervisor_intake("보고서 뭐뭐씀?", CompanySettings(report_language="ko"))
+        decision = decide_supervisor_intake("보고서 뭐뭐씀?", PersonalAgentSettings(report_language="ko"))
 
         reply = generate_supervisor_chat_reply(
             "보고서 뭐뭐씀?",
-            CompanySettings(report_language="ko"),
+            PersonalAgentSettings(report_language="ko"),
             decision,
             history=[{"role": "user", "content": "안녕"}],
             model_gateway=gateway,
@@ -596,7 +596,7 @@ class SmokeTest(unittest.TestCase):
 
         provider = FakeProvider()
         gateway = ModelGateway(provider=provider)
-        settings = CompanySettings(report_language="ko")
+        settings = PersonalAgentSettings(report_language="ko")
         decision = decide_supervisor_intake("what do you remember?", settings)
 
         generate_supervisor_chat_reply(
@@ -620,7 +620,7 @@ class SmokeTest(unittest.TestCase):
 
             captured = store.observe_user_message(
                 "Make the supervisor work like Hermes with memory and delegate_task to sub-agent workers.",
-                CompanySettings(report_language="ko"),
+                PersonalAgentSettings(report_language="ko"),
             )
             store.save()
             loaded = SupervisorMemoryStore.load(path)
@@ -664,7 +664,7 @@ class SmokeTest(unittest.TestCase):
             turn = brain.prepare_turn(
                 "Make supervisor act like Hermes with memory.",
                 "Make supervisor act like Hermes with memory.",
-                CompanySettings(report_language="ko"),
+                PersonalAgentSettings(report_language="ko"),
             )
             brain.record_reply(turn, ["ok"], room_id="room_xyz", topic="Hermes supervisor")
             reloaded = SupervisorBrain.for_memory_path(root / "memory.json")
@@ -814,7 +814,7 @@ class SmokeTest(unittest.TestCase):
                         side_effect=["3jane 보고서 들고와봐", "만들어보라는거잖아 https://x.com/3jane", "y", "/quit"],
                     ):
                         with patch(
-                            "crypto_research_agents.cli.ResearchRuntime.run_article_research",
+                            "jimmoria.cli.ResearchRuntime.run_article_research",
                             return_value=fake_result,
                         ) as run_article:
                             with redirect_stdout(output):
@@ -851,7 +851,7 @@ class SmokeTest(unittest.TestCase):
                 with patch("sys.stdin.isatty", return_value=True):
                     with patch("builtins.input", side_effect=["3jane 관련 투자 보고서 만들어봐 https://x.com/3jane", "y", "/quit"]):
                         with patch(
-                            "crypto_research_agents.cli.ResearchRuntime.run_article_research",
+                            "jimmoria.cli.ResearchRuntime.run_article_research",
                             return_value=fake_result,
                         ) as run_article:
                             with redirect_stdout(output):
@@ -889,7 +889,7 @@ class SmokeTest(unittest.TestCase):
                 with patch("sys.stdin.isatty", return_value=True):
                     with patch("builtins.input", side_effect=["/research https://z.cash/ 최근 ZEC 하락 보고서", "y", "/quit"]):
                         with patch(
-                            "crypto_research_agents.cli.ResearchRuntime.run_article_research",
+                            "jimmoria.cli.ResearchRuntime.run_article_research",
                             return_value=fake_result,
                         ) as run_article:
                             with redirect_stdout(output):
@@ -1140,7 +1140,7 @@ class SmokeTest(unittest.TestCase):
 
         with patch.dict("os.environ", {"JIMMORIA_FORCE_RUNTIME_DOCK": "1", "JIMMORIA_EVENT_STYLE": "compact"}, clear=False):
             console = JimmoriaConsole()
-            with patch("crypto_research_agents.console.supports_color", return_value=True):
+            with patch("jimmoria.console.supports_color", return_value=True):
                 with redirect_stdout(output):
                     console.handle_event(
                         {
@@ -1214,7 +1214,7 @@ class SmokeTest(unittest.TestCase):
 
         with patch.dict("os.environ", {"JIMMORIA_FORCE_RUNTIME_DOCK": "1", "JIMMORIA_EVENT_STYLE": "dock"}, clear=False):
             console = JimmoriaConsole()
-            with patch("crypto_research_agents.console.supports_color", return_value=True):
+            with patch("jimmoria.console.supports_color", return_value=True):
                 with redirect_stdout(output):
                     console.handle_event(
                         {
@@ -1258,7 +1258,7 @@ class SmokeTest(unittest.TestCase):
         with patch.dict("os.environ", {"JIMMORIA_FORCE_RUNTIME_DOCK": "1", "JIMMORIA_EVENT_STYLE": "dock"}, clear=False):
             console = JimmoriaConsole()
             console.width = 160
-            with patch("crypto_research_agents.console.supports_color", return_value=True):
+            with patch("jimmoria.console.supports_color", return_value=True):
                 with redirect_stdout(output):
                     console.handle_event(
                         {
@@ -1309,7 +1309,7 @@ class SmokeTest(unittest.TestCase):
         with patch.dict("os.environ", {"JIMMORIA_FORCE_RUNTIME_DOCK": "1", "JIMMORIA_EVENT_STYLE": "dock"}, clear=False):
             console = JimmoriaConsole()
             console.width = 150
-            with patch("crypto_research_agents.console.supports_color", return_value=True):
+            with patch("jimmoria.console.supports_color", return_value=True):
                 with redirect_stdout(output):
                     console.handle_event(
                         {
@@ -1358,7 +1358,7 @@ class SmokeTest(unittest.TestCase):
 
         with patch.dict("os.environ", {"JIMMORIA_FORCE_RUNTIME_DOCK": "1", "JIMMORIA_EVENT_STYLE": "dock"}, clear=False):
             console = JimmoriaConsole()
-            with patch("crypto_research_agents.console.supports_color", return_value=True):
+            with patch("jimmoria.console.supports_color", return_value=True):
                 with redirect_stdout(output):
                     console.handle_event(
                         {
@@ -1396,7 +1396,7 @@ class SmokeTest(unittest.TestCase):
 
         with patch.dict("os.environ", {"JIMMORIA_FORCE_RUNTIME_DOCK": "1", "JIMMORIA_EVENT_STYLE": "dock"}, clear=False):
             console = JimmoriaConsole()
-            with patch("crypto_research_agents.console.supports_color", return_value=True):
+            with patch("jimmoria.console.supports_color", return_value=True):
                 with redirect_stdout(output):
                     console.handle_event(
                         {
@@ -1428,7 +1428,7 @@ class SmokeTest(unittest.TestCase):
 
         with patch.dict("os.environ", {"JIMMORIA_FORCE_RUNTIME_DOCK": "1", "JIMMORIA_EVENT_STYLE": "dock"}, clear=False):
             console = JimmoriaConsole()
-            with patch("crypto_research_agents.console.supports_color", return_value=True):
+            with patch("jimmoria.console.supports_color", return_value=True):
                 with redirect_stdout(output):
                     console.handle_event(
                         {
@@ -1480,7 +1480,7 @@ class SmokeTest(unittest.TestCase):
 
         with patch.dict("os.environ", {"JIMMORIA_FORCE_RUNTIME_DOCK": "1", "JIMMORIA_EVENT_STYLE": "dock"}, clear=False):
             console = JimmoriaConsole()
-            with patch("crypto_research_agents.console.supports_color", return_value=True):
+            with patch("jimmoria.console.supports_color", return_value=True):
                 with redirect_stdout(output):
                     console.handle_event(
                         {
@@ -1970,11 +1970,11 @@ class SmokeTest(unittest.TestCase):
             self.assertIn("room_old", context)
             self.assertIn("이전 리서치 핵심 내용", context)
 
-    def test_report_uses_korean_company_setting(self) -> None:
+    def test_report_uses_korean_personal_agent_setting(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
-            settings = CompanySettings(report_language="ko")
-            (root / "company_settings.json").write_text(
+            settings = PersonalAgentSettings(report_language="ko")
+            (root / "personal_agent_settings.json").write_text(
                 json.dumps(settings.to_dict(), ensure_ascii=False),
                 encoding="utf-8",
             )
@@ -2047,7 +2047,7 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(data["official_links"]["github"][0]["url"], "https://github.com/pearl-labs/app")
 
     def test_web_search_can_be_skipped_for_smoke_runs(self) -> None:
-        from crypto_research_agents.connectors.web_search import web_search
+        from jimmoria.connectors.web_search import web_search
 
         with patch.dict("os.environ", {"JIMMORIA_SKIP_EXTERNAL_SEARCH": "1"}, clear=False):
             result = web_search("3Jane Protocol", limit=3)
@@ -2057,11 +2057,11 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("skipped", result["message"])
 
     def test_public_web_research_connectors_validate_required_inputs(self) -> None:
-        from crypto_research_agents.connectors.defillama_connector import defillama_protocol_search, defillama_tvl_snapshot
-        from crypto_research_agents.connectors.github_connector import github_get_repo_activity
-        from crypto_research_agents.connectors.market_connectors import get_dex_pair, get_token_metadata
-        from crypto_research_agents.connectors.rss_connector import rss_monitor_feed
-        from crypto_research_agents.connectors.snapshot_connector import snapshot_get_proposals
+        from jimmoria.connectors.defillama_connector import defillama_protocol_search, defillama_tvl_snapshot
+        from jimmoria.connectors.github_connector import github_get_repo_activity
+        from jimmoria.connectors.market_connectors import get_dex_pair, get_token_metadata
+        from jimmoria.connectors.rss_connector import rss_monitor_feed
+        from jimmoria.connectors.snapshot_connector import snapshot_get_proposals
 
         self.assertEqual(rss_monitor_feed()["status"], "missing_input")
         self.assertEqual(defillama_protocol_search()["status"], "missing_input")
@@ -2137,7 +2137,7 @@ class SmokeTest(unittest.TestCase):
         self.assertEqual(vision["data"]["status"], "external_connector_required")
 
     def test_airdrop_checker_filters_generic_non_project_results(self) -> None:
-        from crypto_research_agents.connectors.opportunity_connector import check_airdrop_points
+        from jimmoria.connectors.opportunity_connector import check_airdrop_points
 
         generic_results = {
             "status": "success",
@@ -2156,7 +2156,7 @@ class SmokeTest(unittest.TestCase):
                 ]
             },
         }
-        with patch("crypto_research_agents.connectors.opportunity_connector.web_search", return_value=generic_results):
+        with patch("jimmoria.connectors.opportunity_connector.web_search", return_value=generic_results):
             result = check_airdrop_points("3Jane Protocol")
 
         hints = result["data"]["hints"]
@@ -2631,14 +2631,14 @@ class SmokeTest(unittest.TestCase):
         assert supervisor is not None
         self.assertEqual(supervisor.name, "Hermes Agent")
         self.assertEqual(supervisor.persona_name, "Hermes Orchestrator")
-        self.assertIn("company_settings", supervisor.memory_scope.write)
+        self.assertIn("personal_agent_settings", supervisor.memory_scope.write)
         self.assertIn("supervisor_memory", supervisor.memory_scope.read)
         self.assertIn("supervisor_session", supervisor.memory_scope.write)
         self.assertIn("skill_view", supervisor.tools.allow)
         self.assertIn("multi_tool_use.parallel", supervisor.tools.allow)
         self.assertIn("supervisor_orchestration", supervisor.skills)
         self.assertIn("intake_classification_skill", supervisor.skills.secondary)
-        self.assertIn("classify_client_intent", supervisor.hooks["before_run"])
+        self.assertIn("classify_owner_intent", supervisor.hooks["before_run"])
         self.assertIn("verify_specialist_assignment", supervisor.hooks["quality_gate"])
         supervisor_prompt = supervisor.system_prompt()
         self.assertIn("Skills/playbooks: supervisor_orchestration", supervisor_prompt)
@@ -2667,7 +2667,7 @@ class SmokeTest(unittest.TestCase):
         self.assertIn("no_agent_log_in_final", report.hooks["quality_gate"])
         self.assertIn("risk_to_unclear_points_transform", report.hooks["before_report"])
         self.assertIn("Korean-first investment-style project report", report.mission.primary_goal)
-        self.assertTrue(any("client comprehension" in item for item in report.must_follow))
+        self.assertTrue(any("owner comprehension" in item for item in report.must_follow))
         self.assertTrue(any("project intelligence report" in item for item in report.must_not))
         self.assertTrue(any("raw LLM JSON" in item for item in report.must_not))
         self.assertIn("evidence_packet", report.output_schema.required)
@@ -3453,7 +3453,7 @@ class SmokeTest(unittest.TestCase):
         )
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "openai-test"}, clear=True):
-            with patch("crypto_research_agents.core.llm_provider.urllib.request.urlopen", side_effect=fake_urlopen):
+            with patch("jimmoria.core.llm_provider.urllib.request.urlopen", side_effect=fake_urlopen):
                 response = CodexApiProvider().complete(request)
 
         payload = seen["payload"]
@@ -3607,7 +3607,7 @@ class SmokeTest(unittest.TestCase):
         )
 
         with patch.dict("os.environ", {"LLM_PROVIDER": "grok", "XAI_API_KEY": "xai-test"}, clear=True):
-            with patch("crypto_research_agents.core.llm_provider.urllib.request.urlopen", side_effect=fake_urlopen):
+            with patch("jimmoria.core.llm_provider.urllib.request.urlopen", side_effect=fake_urlopen):
                 response = provider_from_env().complete(request)
 
         payload = seen["payload"]
@@ -3656,8 +3656,8 @@ Usage: codex exec [OPTIONS] [PROMPT]
             reasoning_effort="pro",
         )
 
-        with patch("crypto_research_agents.core.llm_provider.shutil.which", return_value="/usr/local/bin/codex"):
-            with patch("crypto_research_agents.core.llm_provider.subprocess.run", side_effect=fake_run):
+        with patch("jimmoria.core.llm_provider.shutil.which", return_value="/usr/local/bin/codex"):
+            with patch("jimmoria.core.llm_provider.subprocess.run", side_effect=fake_run):
                 response = CodexCliProvider().complete(request)
 
         exec_command = commands[1]
@@ -3690,9 +3690,9 @@ Usage: codex exec [OPTIONS] [PROMPT]
                 },
                 clear=True,
             ):
-                with patch("crypto_research_agents.cli.codex_sdk_available", return_value=False):
-                    with patch("crypto_research_agents.cli.codex_login_status", return_value="Codex logged in"):
-                        with patch("crypto_research_agents.cli.claude_cli_available", return_value=False):
+                with patch("jimmoria.cli.codex_sdk_available", return_value=False):
+                    with patch("jimmoria.cli.codex_login_status", return_value="Codex logged in"):
+                        with patch("jimmoria.cli.claude_cli_available", return_value=False):
                             with redirect_stdout(output):
                                 configure_all_logged_in_models()
                 self.assertEqual(os.environ["LLM_PROVIDER"], "multi")
@@ -3747,7 +3747,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
                 {"JIMMORIA_MODEL_SETTINGS_PATH": settings_path, "ANTHROPIC_API_KEY": "anthropic-secret"},
                 clear=True,
             ):
-                with patch("crypto_research_agents.cli.claude_cli_available", return_value=True):
+                with patch("jimmoria.cli.claude_cli_available", return_value=True):
                     with patch("builtins.input", side_effect=["3"]):
                         with redirect_stdout(output):
                             configure_model_panel()
@@ -3818,10 +3818,10 @@ Usage: codex exec [OPTIONS] [PROMPT]
             "JIMMORIA_GROK_AUTH_PROVIDER": "xai_oauth",
         }
         with patch.dict("os.environ", env, clear=True):
-            with patch("crypto_research_agents.cli.codex_sdk_available", return_value=True):
-                with patch("crypto_research_agents.cli.codex_login_status", return_value="Logged in using ChatGPT"):
+            with patch("jimmoria.cli.codex_sdk_available", return_value=True):
+                with patch("jimmoria.cli.codex_login_status", return_value="Logged in using ChatGPT"):
                     with patch(
-                        "crypto_research_agents.cli.grok_oauth_status",
+                        "jimmoria.cli.grok_oauth_status",
                         return_value="Grok/xAI OAuth token from Hermes credential_pool",
                     ):
                         with redirect_stdout(output):
@@ -3836,7 +3836,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
         self.assertNotIn("Claude:", text)
 
     def test_chat_input_promotes_first_url_without_fetching_mixed_instruction(self) -> None:
-        with patch("crypto_research_agents.cli.fetch_url_text", side_effect=AssertionError("should not fetch mixed chat input")):
+        with patch("jimmoria.cli.fetch_url_text", side_effect=AssertionError("should not fetch mixed chat input")):
             title, content, url = chat_input_to_source("https://x.com/3janexyz 보고서 만들어봐")
 
         self.assertEqual(url, "https://x.com/3janexyz")
@@ -3851,13 +3851,13 @@ Usage: codex exec [OPTIONS] [PROMPT]
     def test_stale_hybrid_model_settings_are_not_ready_without_user_credentials(self) -> None:
         with TemporaryDirectory() as tmp:
             with patch.dict("os.environ", {"LLM_PROVIDER": "codex_grok", "HERMES_HOME": tmp}, clear=True):
-                with patch("crypto_research_agents.cli.codex_sdk_available", return_value=False):
-                    with patch("crypto_research_agents.cli.codex_login_status", return_value="Codex login status unknown"):
+                with patch("jimmoria.cli.codex_sdk_available", return_value=False):
+                    with patch("jimmoria.cli.codex_login_status", return_value="Codex login status unknown"):
                         self.assertFalse(configured_model_provider_ready())
 
     def test_stale_codex_cli_settings_are_not_ready_without_codex_command(self) -> None:
         with patch.dict("os.environ", {"LLM_PROVIDER": "codex_cli"}, clear=True):
-            with patch("crypto_research_agents.cli.codex_login_status", return_value="Codex CLI not found"):
+            with patch("jimmoria.cli.codex_login_status", return_value="Codex CLI not found"):
                 self.assertFalse(configured_model_provider_ready())
 
     def test_offline_fallback_is_not_startup_ready(self) -> None:
@@ -3876,9 +3876,9 @@ Usage: codex exec [OPTIONS] [PROMPT]
             os.environ["JIMMORIA_CODEX_AUTH_PROVIDER"] = "oauth"
 
         with patch.dict("os.environ", {}, clear=True):
-            with patch("crypto_research_agents.cli.auto_configure_codex_provider_if_logged_in"):
-                with patch("crypto_research_agents.cli.codex_login_status", return_value="Codex logged in"):
-                    with patch("crypto_research_agents.cli.configure_model_panel", side_effect=attach_codex):
+            with patch("jimmoria.cli.auto_configure_codex_provider_if_logged_in"):
+                with patch("jimmoria.cli.codex_login_status", return_value="Codex logged in"):
+                    with patch("jimmoria.cli.configure_model_panel", side_effect=attach_codex):
                         ensure_interactive_model_ready(clear_before=False)
 
         self.assertEqual(calls, 1)
@@ -3892,8 +3892,8 @@ Usage: codex exec [OPTIONS] [PROMPT]
                 "CODEX_MODEL_FAST": "bad-manual-value",
             }
             with patch.dict("os.environ", env, clear=True):
-                with patch("crypto_research_agents.cli.codex_login_status", return_value="Logged in using ChatGPT"):
-                    with patch("crypto_research_agents.cli.codex_sdk_available", return_value=True):
+                with patch("jimmoria.cli.codex_login_status", return_value="Logged in using ChatGPT"):
+                    with patch("jimmoria.cli.codex_sdk_available", return_value=True):
                         with patch("builtins.input", side_effect=["1"]):
                             with redirect_stdout(output):
                                 configure_model_panel()
@@ -3922,11 +3922,11 @@ Usage: codex exec [OPTIONS] [PROMPT]
                 skip_model_setup=False,
             )
             with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(settings_path)}, clear=True):
-                with patch("crypto_research_agents.cli.codex_login_status", return_value="Logged in using ChatGPT"):
-                    with patch("crypto_research_agents.cli.codex_sdk_available", return_value=True):
+                with patch("jimmoria.cli.codex_login_status", return_value="Logged in using ChatGPT"):
+                    with patch("jimmoria.cli.codex_sdk_available", return_value=True):
                         with patch("sys.stdin.isatty", return_value=True):
                             with patch("builtins.input", return_value="/quit"):
-                                with patch("crypto_research_agents.cli.configure_model_panel") as setup_panel:
+                                with patch("jimmoria.cli.configure_model_panel") as setup_panel:
                                     with redirect_stdout(output):
                                         chat_command(args)
                                     self.assertFalse(setup_panel.called)
@@ -3945,11 +3945,11 @@ Usage: codex exec [OPTIONS] [PROMPT]
                 skip_model_setup=False,
             )
             with patch.dict("os.environ", {"JIMMORIA_MODEL_SETTINGS_PATH": str(settings_path)}, clear=True):
-                with patch("crypto_research_agents.cli.codex_login_status", return_value="Logged in using ChatGPT"):
-                    with patch("crypto_research_agents.cli.codex_sdk_available", return_value=True):
+                with patch("jimmoria.cli.codex_login_status", return_value="Logged in using ChatGPT"):
+                    with patch("jimmoria.cli.codex_sdk_available", return_value=True):
                         with patch("sys.stdin.isatty", return_value=True):
                             with patch("builtins.input", return_value="/quit"):
-                                with patch("crypto_research_agents.cli.configure_model_panel") as setup_panel:
+                                with patch("jimmoria.cli.configure_model_panel") as setup_panel:
                                     with redirect_stdout(output):
                                         chat_command(args)
                                     self.assertFalse(setup_panel.called)
@@ -4268,10 +4268,10 @@ Usage: codex exec [OPTIONS] [PROMPT]
             clear=True,
         ):
             with patch(
-                "crypto_research_agents.core.model_gateway._codex_provider_from_env",
+                "jimmoria.core.model_gateway._codex_provider_from_env",
                 return_value=FakeProvider("codex_cli"),
             ):
-                with patch("crypto_research_agents.core.model_gateway.GrokProvider", side_effect=fake_grok_provider):
+                with patch("jimmoria.core.model_gateway.GrokProvider", side_effect=fake_grok_provider):
                     gateway = ModelGateway()
 
         self.assertEqual(gateway.provider_name, "codex_grok")
@@ -4666,7 +4666,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
             room,
             SharedMemory(),
             [],
-            company_settings=CompanySettings(report_language="ko"),
+            personal_agent_settings=PersonalAgentSettings(report_language="ko"),
         )
 
         self.assertTrue(gateway.system_prompts)
@@ -4690,7 +4690,7 @@ Usage: codex exec [OPTIONS] [PROMPT]
             room,
             SharedMemory(),
             [],
-            company_settings=CompanySettings(report_language="en"),
+            personal_agent_settings=PersonalAgentSettings(report_language="en"),
         )
 
         self.assertTrue(gateway.system_prompts)

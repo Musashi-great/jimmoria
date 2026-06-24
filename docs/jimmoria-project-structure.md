@@ -47,7 +47,7 @@ JIMMORIA의 핵심 목표는 "채팅으로 조종하는 크립토 리서치 회�
 
 ```text
 jimmoria/
-  crypto_research_agents/
+  jimmoria/
     cli.py
     console.py
     runtime.py
@@ -83,7 +83,7 @@ jimmoria/
   vault/
 ```
 
-`crypto_research_agents/`는 실행 코드, `config/`는 회사 운영 정책, `data/`, `reports/`, `vault/`는 로컬 실행 산출물이다.
+`jimmoria/`는 실행 코드, `config/`는 회사 운영 정책, `data/`, `reports/`, `vault/`는 로컬 실행 산출물이다.
 
 ## 4. Entry Points
 
@@ -109,8 +109,8 @@ jimmoria report <room_id>   Saved report
 
 ```toml
 [project.scripts]
-jimmoria = "crypto_research_agents.cli:main"
-crypto-research = "crypto_research_agents.cli:main"
+jimmoria = "jimmoria.cli:main"
+crypto-research = "jimmoria.cli:main"
 ```
 
 ## 5. Runtime Architecture
@@ -146,9 +146,9 @@ flowchart LR
 
 | Layer | File | Role |
 |---|---|---|
-| CLI | `crypto_research_agents/cli.py` | 명령어, 채팅 루프, Hermes intake |
-| Console | `crypto_research_agents/console.py` | 터미널 UI, 로고, 입력 dock, background event handling, live agent board |
-| Runtime | `crypto_research_agents/runtime.py` | Research Room 생성과 agent 실행 |
+| CLI | `jimmoria/cli.py` | 명령어, 채팅 루프, Hermes intake |
+| Console | `jimmoria/console.py` | 터미널 UI, 로고, 입력 dock, background event handling, live agent board |
+| Runtime | `jimmoria/runtime.py` | Research Room 생성과 agent 실행 |
 | Research Room | `core/room.py` | 한 개 리서치 작업 단위 |
 | Collaboration Bus | `core/bus.py` | 요청, 응답, handoff, update 기록 |
 | Shared Memory | `core/memory.py` | sources, candidates, findings, entity graph |
@@ -174,7 +174,7 @@ $env:JIMMORIA_EVENT_STYLE = "compact"
 jimmoria
 ```
 
-`crypto_research_agents/console.py`는 Research Room 실행 중 전체 AI agent
+`jimmoria/console.py`는 Research Room 실행 중 전체 AI agent
 dashboard를 유지한다. 내부 supervisor office tool event는 화면에 찍지 않고,
 저장된 run artifact와 debug stream에만 남긴다.
 
@@ -508,7 +508,7 @@ after_tool_call   normalize evidence, dedupe, and record audit-friendly traces
 before_report     run report-only claim coverage, source backing, and template checks
 after_report      write report/evidence artifacts and request Hermes final review
 quality_gate      reject missing identity, unsupported claims, hype, or agent-log output
-after_run         hand off verified findings to the next company step
+after_run         hand off verified findings to the next specialist step
 ```
 
 Skill files live in:
@@ -523,11 +523,11 @@ config/hooks/<hook_name>/handler.py
 .agents/skills/<skill_name>/SKILL.md
 ```
 
-These skill files are intentionally small and structured. Agents can read them through `skill_view`, and Hermes Agent can use the same names when assigning tasks. `crypto_research_agents/core/skill_spec.py` loads both individual skill YAML files and `skill_registry.yaml` into a shared `SkillSpecRegistry`.
+These skill files are intentionally small and structured. Agents can read them through `skill_view`, and Hermes Agent can use the same names when assigning tasks. `jimmoria/core/skill_spec.py` loads both individual skill YAML files and `skill_registry.yaml` into a shared `SkillSpecRegistry`.
 
 The `.agents/skills` layer mirrors only the skills that need human-readable SOPs right now: identity gate, market signal intake, contract/token info, and report writing. Broader framework imports, complex dashboards, RBAC, and full external team runtimes remain intentionally out of scope until the report quality loop is stable.
 
-Hooks are also registry-backed. `crypto_research_agents/core/hook_registry.py` loads the common phase hooks and any Hermes-style manifest directory with `HOOK.yaml`. The runtime maps internal events such as `agent_start`, `tool_done`, `report_written`, and `room_completed` into stable hook events such as `agent:start`, `tool:done`, `report:after_render`, and `room:completed`. The current handlers are non-blocking guardrail/checkpoint declarations; they are ready for stricter validation later.
+Hooks are also registry-backed. `jimmoria/core/hook_registry.py` loads the common phase hooks and any Hermes-style manifest directory with `HOOK.yaml`. The runtime maps internal events such as `agent_start`, `tool_done`, `report_written`, and `room_completed` into stable hook events such as `agent:start`, `tool:done`, `report:after_render`, and `room:completed`. The current handlers are non-blocking guardrail/checkpoint declarations; they are ready for stricter validation later.
 
 Social/KOL has two explicit skill modes:
 
@@ -536,7 +536,7 @@ market_signal_intake_skill          runs as the first public signal layer
 candidate_social_verification_skill runs after candidate context exists
 ```
 
-The current full-parallel swarm keeps these modes inside one Social/KOL worker run, but the process spec names both so the company can split them into separate tasks later without changing the agent contract.
+The current full-parallel swarm keeps these modes inside one Social/KOL worker run, but the process spec names both so Hermes can split them into separate specialist tasks later without changing the agent contract.
 
 ## 8. Tool Policy
 
@@ -645,7 +645,7 @@ Safety rules:
 
 ```text
 data/memory.json
-data/company_settings.json
+data/personal_agent_settings.json
 data/model_settings.json
 data/report_index.json
 data/runs/<room_id>/room.json
@@ -670,7 +670,7 @@ vault/50_Reports/*.md
 reports/*.md
 vault/*
 data/report_index.json
-data/company_settings.json
+data/personal_agent_settings.json
 data/model_settings.json
 ```
 
@@ -785,7 +785,7 @@ Korean localization follows `epoko77-ai/im-not-ai` humanize-korean principles: p
 
 ### Current Reader-Friendly Report Shape
 
-`research_complete` report output is now written as a reader-friendly project dossier, not an internal agent activity log. The client-facing report uses this shape:
+`research_complete` report output is now written as a reader-friendly project dossier, not an internal agent activity log. The owner-facing report uses this shape:
 
 ```text
 1. 대표님용 투자 메모
@@ -827,7 +827,7 @@ This means Social/KOL is not a later validation desk. It is one of the first wor
 
 ### Hermes-Inspired Tool Guardrails
 
-JIMMORIA now mirrors the useful Hermes pattern of routing every tool call through a guarded gateway without copying unsafe or irrelevant tools into the crypto research company. The added research guardrails are:
+JIMMORIA now mirrors the useful Hermes pattern of routing every tool call through a guarded gateway without copying unsafe or irrelevant tools into the personal research stack. The added research guardrails are:
 
 | Tool | Purpose |
 |---|---|
@@ -839,7 +839,7 @@ These are read-only, local connectors. They do not add trading, wallet, Telegram
 
 ### Hermes Operator Bridge
 
-JIMMORIA also registers Hermes-style operator tool names so agent personas can ask for familiar capabilities while the runtime still enforces the company boundary. These tools are not raw host access; they are mapped to safe local connectors or blocked stubs.
+JIMMORIA also registers Hermes-style operator tool names so agent personas can ask for familiar capabilities while the runtime still enforces the personal-agent boundary. These tools are not raw host access; they are mapped to safe local connectors or blocked stubs.
 
 | Operator tool | Runtime mapping |
 |---|---|
@@ -873,13 +873,13 @@ Agent access is role-based:
 
 The agent specs now include a `professional_output_contract` for Hermes, Discovery, Product/Tech, Social/KOL, Funding/Token, and Report:
 
-- Hermes acts as company president and final client-delivery gate.
+- Hermes acts as the personal-agent orchestrator and final owner-delivery gate.
 - Discovery resolves official identity first and avoids choosing GitHub org pages as the project website when an official domain exists.
 - Product/Tech separates official product/docs evidence from GitHub code/activity evidence.
 - Social/KOL runs market-signal intake before Discovery, then separates official project handles from unrelated personal accounts found by search and records speaker/claim/source rows for the report.
 - Funding/Token only marks points or airdrop as `hint_found` when project-specific evidence exists.
 - Funding/Token extracts structured funding rows when public evidence supports it, including amount, stage, lead investors, named backers, and funding source links.
-- Report writes a Korean-first project intelligence report first and keeps logs/audit trails out of the client-facing body. Links are shown with short display labels, while the full URL remains available in Markdown.
+- Report writes a Korean-first project intelligence report first and keeps logs/audit trails out of the owner-facing body. Links are shown with short display labels, while the full URL remains available in Markdown.
 - For known/high-signal projects such as 3Jane, the report includes article/web mention notes, public X statements, official docs interpretation, value-capture analysis, founder/team uncertainty, funding context, and a clear WATCH/TOP/OPERATOR/EXCLUDE stance.
 
 ## Representative Web3 Diligence Playbook
@@ -890,7 +890,7 @@ JIMMORIA now has a dedicated representative-grade Web3 project/token diligence p
 research_playbooks/representative_web3_project_diligence.md
 ```
 
-This playbook is used when the client asks for a project, token, X profile, contract address, site, or narrative report. The central rule is that the trigger is only a candidate until the Identity Gate passes.
+This playbook is used when the owner asks for a project, token, X profile, contract address, site, or narrative report. The central rule is that the trigger is only a candidate until the Identity Gate passes.
 
 The report order is:
 
@@ -914,14 +914,14 @@ Key rules:
 - Official site, docs, GitHub, app, explorer, DEX, and public APIs are the verification layer.
 - Telegram and Discord are intentionally out of scope for the current public-web research stack.
 - Final reports must explain the project itself first: what it is, what problem it attacks, what narrative it belongs to, what the product mechanics are, who is publicly talking about it, who funded it, and what remains unresolved.
-- Agent logs, raw tool payloads, and raw LLM JSON are not client-facing report content. They stay in the run audit files.
+- Agent logs, raw tool payloads, and raw LLM JSON are not owner-facing report content. They stay in the run audit files.
 - Founder claims must be sourced. Name, school, employer, LinkedIn, GitHub, X, funding, and previous projects are not guessed.
 - Token value-capture must separate live mechanics from roadmap claims.
 - Contract, LP, holder, liquidity, and market data are background unless they create a fatal risk.
 - No hype, buy/sell, target, or guaranteed-return language.
-- Evidence Packet and AntSeed-style peer review are saved separately, while the client-facing report stays readable.
+- Evidence Packet and AntSeed-style peer review are saved separately, while the owner-facing report stays readable.
 
-Every completed room now writes two client-useful artifacts:
+Every completed room now writes two owner-useful artifacts:
 
 ```text
 reports/<project>-<room_id>.md
@@ -958,7 +958,7 @@ If interactive chat is using the default `report_only` retention, completed room
 
 It is intended for:
 
-- company structure visualization
+- personal-agent structure visualization
 - live/replayed agent board
 - Research Room status
 - report preview
@@ -966,13 +966,13 @@ It is intended for:
 
 ### 12.1 AX-Style Event Runtime
 
-Google AX was reviewed as a reference for distributed agent runtime design. JIMMORIA does not import AX as a dependency because the company already has Hermes Agent, Research Room, CollaborationBus, ToolGateway, and local Run Store. Instead, the useful runtime ideas were adapted into the existing structure.
+Google AX was reviewed as a reference for distributed agent runtime design. JIMMORIA does not import AX as a dependency because the stack already has Hermes Agent, Research Room, CollaborationBus, ToolGateway, and local Run Store. Instead, the useful runtime ideas were adapted into the existing structure.
 
 Applied ideas:
 
 - Single controller: one Hermes/ResearchRuntime path controls each room, so state changes stay auditable.
 - Sequenced event log: every runtime event now carries a stable `seq`.
-- Cursor resume: `jimmoria events <room_id> --after-seq <N>` prints only events after the last sequence the client already saw.
+- Cursor resume: `jimmoria events <room_id> --after-seq <N>` prints only events after the last sequence the owner already saw.
 - Checkpoint fork: `jimmoria fork <room_id> --seq <N>` creates a new saved room snapshot from a previous event checkpoint.
 - Web trace support: the dashboard normalizes legacy events, shows event sequence numbers, and exposes `event_cursor.last_seq`.
 
@@ -1029,4 +1029,4 @@ Important test coverage:
 
 ## 16. One-Line Summary
 
-JIMMORIA is currently a Codex-first, public-web-first multi-agent crypto research company with Hermes orchestration, controlled P2P collaboration, shared memory, read-only ToolGateway, Markdown/Obsidian outputs, and a full parallel research_swarm for the core research agents.
+JIMMORIA is currently a Codex-first, public-web-first personal crypto research agent stack with Hermes orchestration, controlled P2P collaboration, shared memory, read-only ToolGateway, Markdown/Obsidian outputs, and a full parallel research_swarm for the core research agents.

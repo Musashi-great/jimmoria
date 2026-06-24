@@ -138,7 +138,7 @@
       "requires": [
         "agent_council_deliberation"
       ],
-      "description": "Write the Korean project intelligence report for the client. It must explain the project, not the agent workflow. Conclusion first, then identity, product, narrative, social/KOL, founder, token value-capture, risks, score/stance, and sources.",
+      "description": "Write the Korean project intelligence report for the owner. It must explain the project, not the agent workflow. Conclusion first, then identity, product, narrative, social/KOL, founder, token value-capture, risks, score/stance, and sources.",
       "expected_output": "Markdown project intelligence dossier plus evidence packet with Identity, What changed, Product/Operator Evidence, Founder Dossier, On-chain/Market, Social Signal, Risks, Scores, AntSeed Peer Review, and Stance.",
       "output_channels": ["report", "evidence_packet", "finding"]
     },

@@ -4,7 +4,7 @@
       "load_agent_profile",
       "load_room_context",
       "load_personal_agent_context",
-      "load_company_settings",
+      "load_personal_agent_settings",
       "retrieve_relevant_memory",
       "apply_agent_scope",
       "cost_guard"

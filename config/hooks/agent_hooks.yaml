@@ -91,8 +91,8 @@
       "priority": 30,
       "guardrail": true
     },
-    "classify_client_intent": {
-      "description": "Classify client intent normalization/action hook for before_run events.",
+    "classify_owner_intent": {
+      "description": "Classify owner intent normalization/action hook for before_run events.",
       "events": [
         "before_run",
         "agent:start"
@@ -120,8 +120,8 @@
       "priority": 30,
       "guardrail": false
     },
-    "client_report_shape": {
-      "description": "Client report shape normalization/action hook for before_run events.",
+    "owner_report_shape": {
+      "description": "Owner report shape normalization/action hook for before_run events.",
       "events": [
         "before_run",
         "agent:start"
@@ -461,8 +461,17 @@
       "priority": 10,
       "guardrail": false
     },
-    "load_company_context": {
-      "description": "Load company context normalization/action hook for before_run events.",
+    "load_personal_agent_context": {
+      "description": "Load personal-agent context normalization/action hook for before_run events.",
+      "events": [
+        "before_run",
+        "agent:start"
+      ],
+      "priority": 10,
+      "guardrail": false
+    },
+    "load_personal_agent_settings": {
+      "description": "Load persistent personal-agent settings for before_run events.",
       "events": [
         "before_run",
         "agent:start"

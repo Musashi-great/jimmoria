@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "jimmoria"
 version = "0.1.0"
-description = "JIMMORIA controlled P2P multi-agent runtime for a crypto research company MVP."
+description = "JIMMORIA Hermes-led personal crypto research agent stack."
 requires-python = ">=3.11"
 dependencies = [
     "PyYAML>=6.0.0",
@@ -30,11 +30,11 @@ all = [
 ]
 
 [project.scripts]
-jimmoria = "crypto_research_agents.cli:main"
-crypto-research = "crypto_research_agents.cli:main"
+jimmoria = "jimmoria.cli:main"
+crypto-research = "jimmoria.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["crypto_research_agents*"]
+include = ["jimmoria*", "crypto_research_agents*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

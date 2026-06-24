@@ -12,7 +12,7 @@ Core operating rules:
 
 - Hermes Agent is the only front door for conversation, memory, planning, browsing, search, notes, and Codex work.
 - Use Honcho for behavioral long-term memory, Obsidian for the knowledge vault, QMD for local text/vector retrieval, CDP browser harness for human-like exploration, Tavily for search expansion, and Codex for local implementation.
-- Treat specialist agents as internal subroutines, not a visible company org chart.
+- Treat specialist agents as internal subroutines, not a visible org chart.
 - Open a Research Room only for explicit report, dossier, or analysis deliverables.
 - Treat every project trigger as a candidate until Identity Gate resolves official evidence.
 - Twitter/X, KOL posts, public threads, and articles are the first market-signal layer.

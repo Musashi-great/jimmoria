@@ -36,6 +36,8 @@
     "rate_limit_check"
   ],
   "task": [
+    "classify_owner_request",
+    "choose_output_mode",
     "create_research_room",
     "create_task",
     "assign_task",
@@ -43,7 +45,8 @@
     "update_task_status",
     "read_agent_status",
     "task_retry",
-    "task_cancel"
+    "task_cancel",
+    "update_personal_agent_settings"
   ],
   "personal_agent_stack": [
     "honcho_memory_search",

@@ -12,7 +12,7 @@ Product direction: JIMMORIA is a read-only personal AI crypto research stack for
 
 ## Personal Agent Stack
 
-Hermes Agent is the single front door and central orchestrator. The user is the owner/operator, not a client of a company. Specialist agents are internal subroutines that Hermes uses only when the request needs deeper work.
+Hermes Agent is the single front door and central orchestrator. The user is the owner/operator. Specialist agents are internal subroutines that Hermes uses only when the request needs deeper work.
 
 The intended full stack is:
 
@@ -301,7 +301,7 @@ disabled    capabilities this agent must not use
 The runtime also has a lightweight SkillSpec registry:
 
 ```text
-crypto_research_agents/core/skill_spec.py
+jimmoria/core/skill_spec.py
 config/skills/*.yaml
 config/skills/skill_registry.yaml
 .agents/AGENTS.md
@@ -346,7 +346,7 @@ after_tool_call   normalize evidence and write audit-friendly traces
 before_report     run report-specific claim and source coverage checks
 after_report      write artifact/evidence handoff and request final review
 quality_gate      verify the agent output is usable for the final report
-after_run         hand off findings to the next company step
+after_run         hand off findings to the next specialist step
 ```
 
 Claim Ledger:
@@ -473,7 +473,7 @@ Inside `jimmoria`:
 /research <topic-or-url>
 /dossier <topic-or-url>
 /doctor
-/company
+/agents
 /context
 /runs
 /status [room_id]
@@ -537,7 +537,7 @@ the entire Markdown report immediately.
 
 ## AX-Inspired Runtime Controls
 
-JIMMORIA does not depend on Google's AX runtime, but it now borrows the parts that fit this company structure:
+JIMMORIA does not depend on Google's AX runtime, but it now borrows the parts that fit this personal-agent structure:
 
 - a single Hermes/Runtime path acts as the controller for each room
 - every runtime event gets a stable `seq`
@@ -561,7 +561,7 @@ jimmoria fork <room_id> --seq 40
 ## Project Structure
 
 ```text
-crypto_research_agents/
+jimmoria/
   cli.py                    CLI entrypoint and chat loop
   console.py                Terminal UI
   runtime.py                Research Room runtime
